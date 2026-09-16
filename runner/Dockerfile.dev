@@ -1,0 +1,38 @@
+FROM golang:1.26.8-bookworm
+
+WORKDIR /app
+
+# Runtime dependencies: git + ssh for repo ops, python + uv for MCP server
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git openssh-client ca-certificates curl python3 python3-venv gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (MCP server runner)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN cp /root/.local/bin/uv /usr/local/bin/uv
+
+# Install claude CLI (Node.js via n + npm)
+RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s -- lts \
+    && npm install -g @anthropic-ai/claude-code
+
+# Install gh CLI for PR creation
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
+
+# Cache Go modules
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Config files
+RUN mkdir -p /etc/backplane
+COPY configs/runner.docker.yaml /etc/backplane/runner.yaml
+COPY configs/mcp-config.docker.json /etc/backplane/mcp-config.json
+
+# Entrypoint: create non-root user matching host UID, fix perms, exec as that user.
+# Claude CLI refuses --dangerously-skip-permissions as root.
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["sh", "-c", "go build -o ./bin/backplane-runner ./cmd/backplane-runner/ && exec ./bin/backplane-runner -config /etc/backplane/runner.yaml"]

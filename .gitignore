@@ -1,0 +1,108 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.serena/
+
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Build output
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+mcp-server/envs/prod.env
+mcp-server/envs/*.local.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+postgres-data/
+
+# Runner runtime artifacts
+runner/logs/
+runner/bin/
+# live local build — launch artifact, never tracked
+runner/backplane-runner
+# Top-level runner binary (the launch command runs ./bin/backplane-runner)
+/bin/
+
+# Local file storage (dev fallback for GCS)
+backend/data/
+
+# Alembic
+backend/alembic/versions/__pycache__/
+
+# GCP service account keys
+**/gcp-sa-key.json
+*.key.json
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Runner working state
+runner/bin/
+runner/repos/
+runner/repos-*/
+
+# Runner run-configs carry live API keys and client-shaped settings — never
+# track them. Only the reference variants (*.example.* and *.docker.*, which use
+# ${VALARIS_API_KEY} placeholders) are committed. This is a pattern deny (not a
+# per-file allowlist) so a new client config can never slip in tracked.
+# Session-1 secrets containment, docs/opensource-consolidation-plan.md.
+runner/configs/*.yaml
+runner/configs/*.yml
+runner/configs/*.json
+runner/configs/poc-*
+!runner/configs/*.example.yaml
+!runner/configs/*.example.yml
+!runner/configs/*.example.json
+!runner/configs/*.docker.yaml
+!runner/configs/*.docker.yml
+!runner/configs/*.docker.json
+
+# Local MCP config carries the LIVE prod API key — never track it.
+# (Committed history only ever held a clean localhost stub; this keeps it that way.)
+.mcp.json
+
+# Claude Code per-user session state (agents/hooks/rules/skills remain tracked)
+.claude/projects/
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# Valaris visual-testing run artifacts
+.valaris/
+
+# Local dev compose override (host port remap)
+docker-compose.localdev.yml
+docker-compose.override.yml
+
+# Release/CI evidence bundles (logs, wheels, screenshot zips) — large
+# binaries that belong in GCS and on the board card, never in git history.
+artifacts/

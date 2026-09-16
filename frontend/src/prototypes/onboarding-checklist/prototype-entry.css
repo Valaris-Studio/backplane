@@ -1,0 +1,9 @@
+@import "tailwindcss" source(none);
+@reference "../../index.css";
+
+/* The surrounding .gitignore keeps experimental utilities out of the
+   production scan. This separate stylesheet generates them only for the lab. */
+@source "./**/*.{ts,tsx}";
+/* The selected timeline stays inside this lab-only Tailwind compilation. */
+@source "./timeline/**/*.{ts,tsx}";
+@source "./timeline/variants/TimelineRail.tsx";

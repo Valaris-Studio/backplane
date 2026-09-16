@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#76b679" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
+    <link rel="icon" href="/brand/favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <!-- use-credentials: behind IAP the manifest fetch is otherwise anonymous,
+         gets redirected to the login page and fails CORS on every page load. -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
+    <meta property="og:title" content="Backplane" />
+    <meta property="og:image" content="/brand/og-image.png" />
+    <title>Backplane</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+# Tags are repo-wide `v*` semver — one tag releases the whole monorepo, and the
+# runner binary/image version simply follows that repo release version. No GCP
+# here: this publishes GitHub release artifacts and a ghcr.io image, nothing else.
+name: Release runner
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    name: goreleaser — binaries + ghcr image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+          workdir: runner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,188 @@
+name: CI
+
+# Public, GCP-free quality gates. Mirrors (and exceeds) the private
+# cloudbuild.yaml gates so external contributors get the same signal without
+# any cloud credentials. cloudbuild.yaml stays deploy-only.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend — pytest + ruff
+    runs-on: ubuntu-latest
+    # Measured 2026-09-02: -n 4 on ubuntu-latest exceeds 20 min (run 33604721558
+    # was cancelled mid-suite). Generous cap until the suite is timed and split.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Install public-export gate tools
+        # tests/test_public_export_snapshot_identity.py runs the real export
+        # (git-filter-repo rewrite + gitleaks acceptance) into a temp dir and
+        # SKIPS without them — a silent skip would hide identity/crash regressions.
+        run: |
+          pip install git-filter-repo
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          git-filter-repo --version && gitleaks version
+      - name: Lint
+        working-directory: backend
+        run: ruff check app/
+      - name: Tests
+        working-directory: backend
+        # Worker count pinned to 4, matching cloudbuild: -n auto spawns one
+        # worker per core and each loads the full app, which has OOM-killed
+        # workers mid-run and surfaced as a crash on a random unrelated test.
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m pytest -n 4 -m "not slow" -p no:cacheprovider --tb=short -q
+
+  mcp-server:
+    name: MCP server — pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      # Install from uv.lock, never from ranges: CI must test the exact
+      # resolution the lock ships, otherwise the lock rots while CI stays green.
+      - name: Install (frozen lock)
+        working-directory: mcp-server
+        run: uv sync --frozen --extra dev
+      - name: Tests
+        working-directory: mcp-server
+        run: uv run python -m pytest tests/ --tb=short -q
+      # An unfixable advisory is waived explicitly with `--ignore-vuln <ID>`,
+      # never by loosening --strict.
+      - name: Audit the locked resolution
+        working-directory: mcp-server
+        run: |
+          uv export --frozen --no-hashes --no-emit-project --extra dev -o /tmp/mcp-lock-requirements.txt
+          uvx pip-audit --strict --no-deps -r /tmp/mcp-lock-requirements.txt
+      - name: Package builds (keeps it publishable)
+        working-directory: mcp-server
+        run: uv build --wheel --out-dir /tmp/wheel
+
+  frontend:
+    name: Frontend — lint + test + build
+    runs-on: ubuntu-latest
+    # Same 2026-09-02 measurement: full vitest run does not fit in 20 min here.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        working-directory: frontend
+        # --ignore-scripts: no native postinstall builds are needed for the
+        # lint/test/build gates, and it keeps CI from running arbitrary
+        # dependency install hooks.
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Lint
+        working-directory: frontend
+        run: pnpm lint
+      - name: Tests
+        working-directory: frontend
+        env:
+          I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm vitest run
+      - name: Check generated product documentation
+        working-directory: frontend
+        run: pnpm docs:check
+      - name: Build (typecheck + bundle)
+        working-directory: frontend
+        run: pnpm build
+
+  runner:
+    name: Runner — go vet + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # workloop tests make real `git commit`s in scratch clones, which do not
+    # inherit any repo-local identity; hosted runners have no global one.
+    env:
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@backplane.invalid
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@backplane.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - name: Vet
+        working-directory: runner
+        run: go vet ./...
+      - name: Build
+        working-directory: runner
+        run: go build ./...
+      - name: Tests
+        working-directory: runner
+        # Integration tests are behind the `integration` build tag and need a
+        # live coding-agent CLI on PATH, so they stay out of CI by default.
+        run: go test ./...
+
+  runner-artifact:
+    name: Runner — artifact recovery gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: astral-sh/setup-uv@v6
+      - name: Install fixture dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Qualify binary, real API, recovery and generated MCP through the TUI
+        run: ./scripts/runner-artifact-gate.sh
+
+  secrets:
+    name: Secrets scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gitleaks
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+      - name: Scan tracked files
+        # Same script contributors run locally, so CI never disagrees with a
+        # clean local run. Scans git-tracked files only — see the script header.
+        run: ./scripts/scan-secrets.sh

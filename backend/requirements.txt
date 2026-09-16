@@ -1,0 +1,30 @@
+fastapi==0.115.14
+uvicorn[standard]==0.34.0
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+# Pinned, not left to fastapi's range: pydantic generates the JSON Schema that
+# docs/api/openapi.json is asserted against. 2.13 unifies models whose validation
+# and serialization shapes differ into one schema, where 2.12 emits the
+# `-Input`/`-Output` pair the snapshot was generated with — an unpinned resolve
+# silently breaks the live-documentation contract test on a clean CI builder.
+pydantic==2.12.5
+pydantic-settings==2.7.0
+gunicorn==23.0.0
+python-dotenv==1.2.2
+httpx==0.28.1
+google-auth>=2.27.0
+cachecontrol==0.14.4  # wraps the IAP cert-fetch session so verify_token doesn't re-fetch on every call
+google-cloud-storage==2.19.0
+ruff==0.8.4
+pytest==8.3.4
+pytest-asyncio==0.24.0
+aiosqlite==0.20.0
+pytest-cov==6.0.0
+pytest-xdist==3.6.1
+pytest-timeout==2.3.1
+cryptography==46.0.7
+argon2-cffi==25.1.0
+githubkit==0.15.4
+itsdangerous==2.2.0
+markdown-it-py==4.0.0

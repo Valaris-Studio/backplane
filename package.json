@@ -1,0 +1,19 @@
+{
+  "name": "backplane",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Valaris-Studio/backplane.git"
+  },
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:frontend": "pnpm --filter frontend build",
+    "lint:frontend": "pnpm --filter frontend lint",
+    "brand:assets": "node scripts/brand/generate-assets.mjs"
+  },
+  "devDependencies": {
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.2"
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "activity.board.created": {
+    "params": { "board_name": "string" }
+  },
+  "activity.board.deleted": {
+    "params": { "board_name": "string" }
+  },
+  "activity.board.frozen": {
+    "params": { "board_name": "string" }
+  },
+  "activity.board.done_gate_auto_relaxed": {
+    "params": {}
+  },
+  "activity.board.done_gate_rearmed": {
+    "params": {}
+  },
+  "activity.board.loop_config_updated": {
+    "params": {}
+  },
+  "activity.board.loop_disabled": {
+    "params": {}
+  },
+  "activity.board.loop_enabled": {
+    "params": {}
+  },
+  "activity.board.loop_template_bound": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.board.loop_template_detached": {
+    "params": { "template_slug": "string" }
+  },
+  "activity.board.loop_template_rerendered": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.board.unfrozen": {
+    "params": { "board_name": "string" }
+  },
+  "activity.board.updated": {
+    "params": { "board_name": "string", "fields": "string_array" }
+  },
+  "activity.card.bulk_created": {
+    "params": { "card_count": "number" },
+    "pluralParam": "card_count"
+  },
+  "activity.card.claimed": {
+    "params": { "card_title": "string" }
+  },
+  "activity.card.created": {
+    "params": { "card_title": "string" }
+  },
+  "activity.card.deleted": {
+    "params": { "card_title": "string" }
+  },
+  "activity.card.dependencies_replaced": {
+    "params": { "dependency_count": "number" },
+    "pluralParam": "dependency_count"
+  },
+  "activity.card.dependency_added": {
+    "params": { "depends_on_card_id": "string", "depends_on_title": "string" }
+  },
+  "activity.card.dependency_removed": {
+    "params": { "depends_on_card_id": "string", "depends_on_title": "string" }
+  },
+  "activity.card.moved": {
+    "params": {
+      "card_title": "string",
+      "from_column_name": "nullable_string",
+      "from_column_known": "boolean",
+      "to_column_name": "string"
+    }
+  },
+  "activity.card.parked_no_progress": {
+    "params": {
+      "card_title": "string",
+      "attempt_count": "number",
+      "execution_action": "string",
+      "label": "string"
+    },
+    "pluralParam": "attempt_count"
+  },
+  "activity.card.parked_unresolved_git_repo": {
+    "params": {
+      "card_title": "string",
+      "git_repo_slug": "string",
+      "label": "string"
+    }
+  },
+  "activity.card.participant_added": {
+    "params": {
+      "card_title": "string",
+      "participant_email": "string",
+      "role": "string"
+    }
+  },
+  "activity.card.participant_removed": {
+    "params": { "card_title": "string", "participant_email": "string" }
+  },
+  "activity.card.pipeline_role_participants_removed": {
+    "params": {
+      "card_title": "string",
+      "participant_count": "number",
+      "pipeline_role": "string"
+    },
+    "pluralParam": "participant_count"
+  },
+  "activity.card.reserved": {
+    "params": { "card_title": "string", "role": "string" }
+  },
+  "activity.card.ui_validation_label_applied": {
+    "params": { "card_title": "string", "label": "string" }
+  },
+  "activity.card.unknown_git_repo_slug_dropped": {
+    "params": { "card_title": "string", "git_repo_slug": "string" }
+  },
+  "activity.card.updated": {
+    "params": { "card_title": "string", "fields": "string_array" }
+  },
+  "activity.channel.created": {
+    "params": { "channel_name": "string" }
+  },
+  "activity.channel.deleted": {
+    "params": { "channel_name": "string" }
+  },
+  "activity.channel.updated": {
+    "params": { "channel_name": "string", "fields": "string_array" }
+  },
+  "activity.column.created": {
+    "params": { "column_name": "string" }
+  },
+  "activity.column.deleted": {
+    "params": { "column_name": "string" }
+  },
+  "activity.column.reordered": {
+    "params": { "column_name": "string" }
+  },
+  "activity.column.updated": {
+    "params": { "column_name": "string", "fields": "string_array" }
+  },
+  "activity.definition.created": {
+    "params": {}
+  },
+  "activity.definition.updated": {
+    "params": {}
+  },
+  "activity.git_repo.linked": {
+    "params": { "git_repo_name": "string" }
+  },
+  "activity.git_repo.unlinked": {
+    "params": { "git_repo_name": "string" }
+  },
+  "activity.git_repo.updated": {
+    "params": { "git_repo_name": "string", "fields": "string_array" }
+  },
+  "activity.git_connection.connected": {
+    "params": { "provider": "string", "account_login": "string" }
+  },
+  "activity.git_connection.disconnected": {
+    "params": { "provider": "string", "account_login": "string" }
+  },
+  "activity.loop_template.created": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.loop_template.published": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.loop_template.archived": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.loop_template.unarchived": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.loop_template.restored": {
+    "params": { "template_slug": "string", "template_version": "number" }
+  },
+  "activity.agent.paused": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.agent.resumed": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.agent.poll_requested": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.agent.deactivated": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.agent.restart_requested": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.agent.hard_deleted": {
+    "params": { "agent_name": "string" }
+  },
+  "activity.member.added": {
+    "params": { "member_email": "string", "role": "string" }
+  },
+  "activity.member.added_with_initial_password": {
+    "params": { "member_email": "string", "role": "string" }
+  },
+  "activity.member.removed": {
+    "params": {}
+  },
+  "activity.member.temporary_password_set": {
+    "params": { "member_email": "string" }
+  },
+  "activity.member.role_changed": {
+    "params": { "member_email": "string", "role": "string", "previous_role": "string" }
+  },
+  "activity.note.created": {
+    "params": { "note_title": "string" }
+  },
+  "activity.note.appended": {
+    "params": { "note_title": "string" }
+  },
+  "activity.note.deleted": {
+    "params": { "note_title": "string" }
+  },
+  "activity.note.section_replaced": {
+    "params": { "section_heading": "string", "note_title": "string" }
+  },
+  "activity.note.updated": {
+    "params": { "note_title": "string", "fields": "string_array" }
+  },
+  "activity.resource.created": {
+    "params": { "resource_name": "string", "resource_type": "string" }
+  },
+  "activity.resource.deleted": {
+    "params": { "resource_name": "string" }
+  },
+  "activity.resource.updated": {
+    "params": { "resource_name": "string" }
+  },
+  "activity.workspace.created": {
+    "params": { "workspace_name": "string" }
+  },
+  "activity.workspace.updated": {
+    "params": { "workspace_name": "string", "fields": "string_array" }
+  }
+}

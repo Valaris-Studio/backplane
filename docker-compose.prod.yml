@@ -1,0 +1,165 @@
+# Backplane — self-hosted production stack.
+# Everything is configured through environment variables; no cloud provider
+# account, credential file, or host home directory is required.
+#
+#   cp .env.example .env   # set POSTGRES_PASSWORD and OAUTH_STATE_SIGNING_KEY;
+#                          # local password login is on by default
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Backend and frontend build from source — no published images exist yet, so
+# `pull_policy: build` stops compose from probing the registry (which prints a
+# scary-but-harmless "denied" before falling back to the build). The runner
+# image IS published; its `build:` stays for hacking on it locally.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-backplane}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-backplane}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-backplane}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: ${BACKPLANE_BACKEND_IMAGE:-ghcr.io/valaris-studio/backplane-backend:latest}
+    build: ./backend
+    pull_policy: build
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-backplane}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-backplane}
+      ENV: production
+      EVENT_BUS_BACKEND: postgres
+      # Left at the default: the postgres bus already makes Tier-1 cache
+      # eviction cross-instance-correct, so no single-instance opt-in is needed.
+      CACHE_SINGLE_INSTANCE: ${CACHE_SINGLE_INSTANCE:-false}
+
+      # Empty bucket selects the local-filesystem storage backend.
+      GCS_BUCKET: ${GCS_BUCKET:-}
+      LOCAL_STORAGE_DIR: /data/resources
+
+      # Identity comes from whatever sits in front of this container. With
+      # neither verifier configured the backend refuses to start rather than
+      # trust an unauthenticated header — see the in-app docs section
+      # "Securing a Self-Hosted Deployment" and SECURITY.md.
+      IAP_AUDIENCE: ${IAP_AUDIENCE:-}
+      TRUSTED_PROXY_AUTH: ${TRUSTED_PROXY_AUTH:-false}
+      TRUSTED_PROXY_AUTH_HEADER: ${TRUSTED_PROXY_AUTH_HEADER:-X-Goog-Authenticated-User-Email}
+
+      # Browsers only ever reach the backend through the frontend's /api proxy,
+      # so every public URL is the frontend's.
+      CORS_ORIGINS: ${BACKPLANE_URL:-http://localhost:8080}
+      FRONTEND_URL: ${BACKPLANE_URL:-http://localhost:8080}
+      API_URL: ${BACKPLANE_URL:-http://localhost:8080}
+
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+      GITEA_TOKEN: ${GITEA_TOKEN:-}
+      ALLOW_GLOBAL_TOKEN_FALLBACK: ${ALLOW_GLOBAL_TOKEN_FALLBACK:-true}
+      # Non-empty defaults here on purpose: `${VAR:-}` would render an unset
+      # host var as "", which pydantic treats as an explicit override of the
+      # non-empty Settings default (merge commits would attribute to nobody).
+      GIT_USER_NAME: ${GIT_USER_NAME:-Backplane Merge Bot}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-merge-bot@valaris.studio}
+      MERGE_QUEUE_STALE_THRESHOLD_SECONDS: ${MERGE_QUEUE_STALE_THRESHOLD_SECONDS:-300}
+      INTEGRATIONS_TOKEN_KEY: ${INTEGRATIONS_TOKEN_KEY:-}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      # Signs login session cookies (local auth + OIDC) as well as OAuth
+      # state — without it the first-run admin setup 403s after the form.
+      OAUTH_STATE_SIGNING_KEY: ${OAUTH_STATE_SIGNING_KEY:?OAUTH_STATE_SIGNING_KEY is required — generate one with 'openssl rand -hex 32'}
+
+      # Local password login + OIDC — see .env.example's Authentication /
+      # OIDC sections for what each knob does.
+      LOCAL_AUTH_ENABLED: ${LOCAL_AUTH_ENABLED:-true}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
+      OIDC_SESSION_TTL_SECONDS: ${OIDC_SESSION_TTL_SECONDS:-43200}
+      AUTH_ALLOWED_EMAIL_DOMAINS: ${AUTH_ALLOWED_EMAIL_DOMAINS:-}
+      AUTH_AUTO_PROVISION: ${AUTH_AUTO_PROVISION:-true}
+      TRUSTED_PROXY_SECRET: ${TRUSTED_PROXY_SECRET:-}
+
+      # Anonymous instance telemetry — off unless both are set (see
+      # .env.example's Telemetry section).
+      BACKPLANE_TELEMETRY_ENABLED: ${BACKPLANE_TELEMETRY_ENABLED:-false}
+      BACKPLANE_TELEMETRY_ENDPOINT: ${BACKPLANE_TELEMETRY_ENDPOINT:-}
+
+      # GCS service-account email, only relevant when GCS_BUCKET is set above.
+      GCS_SA_EMAIL: ${GCS_SA_EMAIL:-}
+
+      WS_HEARTBEAT_INTERVAL: ${WS_HEARTBEAT_INTERVAL:-30}
+      WS_PONG_TIMEOUT: ${WS_PONG_TIMEOUT:-10}
+    volumes:
+      - backplane-storage:/data/resources
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # No curl/wget on python:3.12-slim -- urllib is stdlib and gives us a
+      # real HTTP round-trip against the DB-backed /api/ready (not /api/health,
+      # which would report healthy before `alembic upgrade head` finishes).
+      # start_period is long because the very first boot builds from source
+      # and then runs migrations before the port opens.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+
+  frontend:
+    image: ${BACKPLANE_FRONTEND_IMAGE:-ghcr.io/valaris-studio/backplane-frontend:latest}
+    build: ./frontend
+    pull_policy: build
+    restart: unless-stopped
+    ports:
+      - "${BACKPLANE_HTTP_PORT:-8080}:8080"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      # Gating on backend's health (not just container start) is what makes
+      # first boot show "nothing until ready" instead of nginx proxying to a
+      # backend that isn't listening yet.
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  runner:
+    image: ${BACKPLANE_RUNNER_IMAGE:-ghcr.io/valaris-studio/backplane-runner:latest}
+    build: ./runner
+    restart: unless-stopped
+    profiles:
+      - runner
+    environment:
+      VALARIS_API_URL: http://backend:8000
+      VALARIS_API_KEY: ${VALARIS_API_KEY:-}
+      VALARIS_WORKSPACE: ${VALARIS_WORKSPACE:-}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+    volumes:
+      # The runner image ships no config; supply one (start from
+      # runner/configs/runner.example.yaml). API url/key and workspace are
+      # overridden by the env vars above, so the file only carries the rest.
+      - ${BACKPLANE_RUNNER_CONFIG:-./runner/configs/runner.example.yaml}:/etc/backplane/runner.yaml:ro
+      - runner-repos:/repos
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  backplane-storage:
+  runner-repos:

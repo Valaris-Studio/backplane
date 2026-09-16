@@ -1,0 +1,5 @@
+# Tailwind v4 honors gitignore boundaries during automatic source detection.
+# Keep experimental utilities out of the production CSS bundle. Files in this
+# disposable lab are intentionally force-added when the experiment is shared.
+*
+!.gitignore

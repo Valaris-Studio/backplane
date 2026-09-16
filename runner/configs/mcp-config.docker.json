@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "valaris": {
+      "command": "bash",
+      "args": ["/mcp-server/run.sh"],
+      "env": {
+        "VALARIS_API_URL": "http://backend:8000",
+        "VALARIS_API_KEY": "${VALARIS_API_KEY}",
+        "VALARIS_AGENT_EMAIL": "runner@valaris.studio"
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+[
+  {
+    "file": "frontend/src/i18n/supported-languages.ts",
+    "kind": "object-property",
+    "slot": "label",
+    "text": "EN",
+    "occurrences": 1,
+    "reason": "Locale selector label is an ISO 639-1 language code, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/i18n/supported-languages.ts",
+    "kind": "object-property",
+    "slot": "label",
+    "text": "ES",
+    "occurrences": 1,
+    "reason": "Locale selector label is an ISO 639-1 language code, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/i18n/supported-languages.ts",
+    "kind": "object-property",
+    "slot": "label",
+    "text": "PT-BR",
+    "occurrences": 1,
+    "reason": "Locale selector label is a BCP 47 language tag, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/pages/documentation/routes.ts",
+    "kind": "object-property",
+    "slot": "title",
+    "text": "Integrating a New Git Host",
+    "occurrences": 1,
+    "reason": "Canonical English route metadata; the rendered title is always resolved from the locale-specific documentation catalog."
+  },
+  {
+    "file": "frontend/src/pages/documentation/routes.ts",
+    "kind": "object-property",
+    "slot": "title",
+    "text": "MCP Toolsets",
+    "occurrences": 1,
+    "reason": "Canonical English route metadata; the rendered title is always resolved from the locale-specific documentation catalog."
+  },
+  {
+    "file": "frontend/src/features/kanban/components/loop-template/TemplateBoundView.tsx",
+    "kind": "jsx-text",
+    "slot": "span",
+    "text": "v",
+    "occurrences": 1,
+    "reason": "Version-number prefix rendered as v{{version}}; a bare numeric marker, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/features/kanban/components/loop-template/TemplateChooser.tsx",
+    "kind": "jsx-text",
+    "slot": "span",
+    "text": "v",
+    "occurrences": 1,
+    "reason": "Version-number prefix rendered as v{{version}}; a bare numeric marker, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/features/loop-templates/components/LoopTemplateDetailPage.tsx",
+    "kind": "jsx-text",
+    "slot": "Badge",
+    "text": "v",
+    "occurrences": 1,
+    "reason": "Version-number prefix rendered as v{{version}}; a bare numeric marker, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/features/loop-templates/components/LoopTemplateLibrary.tsx",
+    "kind": "jsx-text",
+    "slot": "Badge",
+    "text": "v",
+    "occurrences": 1,
+    "reason": "Version-number prefix rendered as v{{version}}; a bare numeric marker, not translatable product copy."
+  },
+  {
+    "file": "frontend/src/features/loop-templates/components/LoopTemplateRailsTab.tsx",
+    "kind": "jsx-text",
+    "slot": "RailLabel",
+    "text": "model",
+    "occurrences": 1,
+    "reason": "Names the loop_config wire field the rail edits; the sibling rails render the same identifier programmatically from `rail`."
+  },
+  {
+    "file": "frontend/src/features/loop-templates/components/LoopTemplateRailsTab.tsx",
+    "kind": "jsx-text",
+    "slot": "RailLabel",
+    "text": "provider",
+    "occurrences": 1,
+    "reason": "Names the loop_config wire field the rail edits; the sibling rails render the same identifier programmatically from `rail`."
+  }
+]

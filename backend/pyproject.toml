@@ -1,0 +1,28 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+# Per-test wall-clock cap. A hung test (deadlocked WS, unresolved async, etc.)
+# fails fast instead of burning CI/subagent time. Raise per-test with
+# `@pytest.mark.timeout(N)` when legitimately needed.
+#
+# 30s, not 5s: the cap exists to catch HANGS, not to enforce speed. Under the
+# parallel deploy gate (`-n 4` on a shared Cloud Build machine) a healthy test
+# can exceed a small wall-clock budget through CPU contention alone, turning
+# builder load into deploy-gate flakes.
+timeout = 30
+# "signal" (SIGALRM), NOT "thread": pytest-timeout's thread method ends in
+# os._exit(1), which under pytest-xdist kills the whole worker process — the
+# exact "worker 'gwN' crashed on a random unrelated test" flake that gated
+# deploys. The signal method fails ONLY the offending test; the worker
+# survives. xdist workers run tests in the worker's main thread on
+# Linux/macOS so SIGALRM is deliverable; pytest-timeout auto-falls-back to
+# the thread method where signals aren't available.
+timeout_method = "signal"
+markers = [
+    "slow: marks tests as slow (>500ms individually). Deselect with '-m \"not slow\"'.",
+    "live: credentialed Tier-2 smoke hitting a real external service. LOCAL-ONLY/MANUAL, never in public CI. Skips without its env gate; deselect with '-m \"not live\"'.",
+]
+
+[tool.ruff]
+target-version = "py312"

@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "For production IAP auth with impersonated credentials, run:",
+    "  gcloud auth application-default login --impersonate-service-account=SA_NAME@PROJECT.iam.gserviceaccount.com",
+    "This writes ~/.config/gcloud/application_default_credentials.json which google.auth.default() reads automatically.",
+    "Supported auth methods: impersonated SA, SA key file (GOOGLE_APPLICATION_CREDENTIALS), GCE metadata server.",
+    "Both entries below use `uvx backplane-mcp` — the published PyPI package (needs uv on PATH).",
+    "Running from a source checkout instead? Swap in:",
+    "  \"command\": \"uv\", \"args\": [\"--directory\", \"/path/to/backplane/mcp-server\", \"run\", \"valaris-mcp\"]"
+  ],
+  "mcpServers": {
+    "valaris": {
+      "command": "uvx",
+      "args": ["backplane-mcp"],
+      "env": {
+        "VALARIS_API_URL": "http://localhost:8000",
+        "VALARIS_AGENT_EMAIL": "agent@valaris.dev"
+      }
+    },
+    "valaris-production": {
+      "command": "uvx",
+      "args": ["backplane-mcp"],
+      "env": {
+        "VALARIS_API_URL": "https://backplane.example.com",
+        "VALARIS_IAP_AUDIENCE": "/projects/<project-number>/locations/us-central1/services/<frontend-service>"
+      }
+    }
+  }
+}

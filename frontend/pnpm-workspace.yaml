@@ -1,0 +1,47 @@
+# The presence of this file makes frontend/ a workspace ROOT. Under the pnpm 9
+# of the 2026-07 incident, a missing `packages` key made installs refuse
+# outright — killing every fresh Docker clone before Vite for 6 days. Our
+# pinned pnpm 11.5.1 instead defaults an omitted `packages` to ["."], so the
+# explicit list below is pinned convention, not a runtime guard; the guard is
+# backend/tests/test_pnpm_config_drift.py, which fails at commit time.
+# "." = frontend itself, the only package in this standalone install.
+packages:
+  - "."
+# esbuild ships prebuilt binaries via optional deps and msw's postinstall is
+# unneeded — both build scripts were always skipped here; false records that
+# decision so pnpm 11 stops hard-failing installs with "run approve-builds".
+allowBuilds:
+  esbuild: false
+  msw: false
+# frontend/ installs standalone in Docker and CI (both Dockerfiles pin
+# pnpm 11.5.1, which reads ONLY this file — package.json "pnpm" fields are
+# ignored and drift-tested deleted), so it needs its own copy of the root
+# pnpm-workspace.yaml overrides; keep the two in sync
+# (backend/tests/test_pnpm_config_drift.py pins them equal).
+overrides:
+  "@tiptap/core": 3.30.1
+  "@tiptap/pm": 3.30.1
+  "@tiptap/extensions": 3.30.1
+  "@tiptap/extension-bold": 3.30.1
+  "@tiptap/extension-code": 3.30.1
+  "@tiptap/extension-link": 3.30.1
+  "@tiptap/extension-list": 3.30.1
+  "@tiptap/extension-text": 3.30.1
+  "@tiptap/extension-italic": 3.30.1
+  "@tiptap/extension-strike": 3.30.1
+  "@tiptap/extension-heading": 3.30.1
+  "@tiptap/extension-document": 3.30.1
+  "@tiptap/extension-paragraph": 3.30.1
+  "@tiptap/extension-underline": 3.30.1
+  "@tiptap/extension-blockquote": 3.30.1
+  "@tiptap/extension-code-block": 3.30.1
+  "@tiptap/extension-hard-break": 3.30.1
+  "@tiptap/extension-horizontal-rule": 3.30.1
+  "@tiptap/extension-bubble-menu": 3.30.1
+  "@tiptap/extension-floating-menu": 3.30.1
+  "@tiptap/extension-gapcursor": 3.30.1
+  "@tiptap/extension-dropcursor": 3.30.1
+  "@tiptap/extension-list-item": 3.30.1
+  "@tiptap/extension-bullet-list": 3.30.1
+  "@tiptap/extension-ordered-list": 3.30.1
+  "@tiptap/extension-list-keymap": 3.30.1

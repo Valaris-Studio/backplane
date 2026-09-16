@@ -1,0 +1,28 @@
+name: Quickstart gate
+
+# Scheduled + manual only, not per-push/per-PR: this org is on GitHub's free
+# plan, where Actions minutes are scarce, and this gate builds and boots the
+# whole Docker stack from scratch (~5-10 min/run). Nightly + on-demand is the
+# deliberate cost/coverage trade-off — it still catches a cold-path regression
+# within a day, without taxing every push.
+#
+# GitHub-hosted runners are cache-cold by construction (no prior `docker
+# compose up` on the machine, no populated named volumes), which is exactly
+# what makes this job the authoritative cold-clone run. A local
+# `make quickstart-gate` gets fresh VOLUMES too (via the script's unique
+# COMPOSE_PROJECT_NAME) but may still reuse cached Docker image layers on a
+# dev machine; this job has neither.
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  quickstart-gate:
+    name: Fresh-clone Quickstart
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Quickstart gate
+        run: ./scripts/quickstart-gate.sh

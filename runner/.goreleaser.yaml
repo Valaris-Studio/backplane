@@ -1,0 +1,86 @@
+version: 2
+
+project_name: backplane-runner
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: backplane-runner
+    main: ./cmd/backplane-runner/
+    binary: backplane-runner
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/Valaris-Studio/backplane/runner/internal/version.Version={{ .Version }}
+      - -X github.com/Valaris-Studio/backplane/runner/internal/version.GitCommit={{ .ShortCommit }}
+      - -X github.com/Valaris-Studio/backplane/runner/internal/version.BuildTime={{ .Date }}
+
+archives:
+  - id: backplane-runner
+    ids: [backplane-runner]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      # README.md is matched only if the runner grows one — the repo-root README
+      # lives outside goreleaser's workdir and cannot be archived from here.
+      - README.md
+      - configs/runner.example.yaml
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+# docker-compose.prod.yml defaults BACKPLANE_RUNNER_IMAGE to
+# ghcr.io/valaris-studio/backplane-runner:latest, so that name is load-bearing.
+# The Dockerfile compiles the binary itself; the GIT_COMMIT/BUILD_TIME build args
+# exist because the release build context has no .git to derive them from.
+dockers_v2:
+  - id: backplane-runner
+    dockerfile: Dockerfile
+    images:
+      - ghcr.io/valaris-studio/backplane-runner
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    build_args:
+      VERSION: "{{ .Version }}"
+      GIT_COMMIT: "{{ .ShortCommit }}"
+      BUILD_TIME: "{{ .Date }}"
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.source: https://github.com/Valaris-Studio/backplane
+      org.opencontainers.image.licenses: MIT
+
+release:
+  # Repo-wide v* tags cover backend/frontend/mcp-server too, so the runner
+  # release notes must not claim to be the whole release.
+  name_template: "v{{ .Version }}"
+  footer: |
+    ## Container image
+
+    ```
+    docker pull ghcr.io/valaris-studio/backplane-runner:{{ .Version }}
+    ```
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

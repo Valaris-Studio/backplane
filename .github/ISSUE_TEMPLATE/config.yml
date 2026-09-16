@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Valaris-Studio/backplane/security/advisories/new
+    about: Report privately — please never open a public issue for a vulnerability.
+  - name: Question or idea
+    url: https://github.com/Valaris-Studio/backplane/issues/new
+    about: Ask a usage question or share an idea in GitHub Issues.
+  - name: Thinking of opening a pull request?
+    url: https://github.com/Valaris-Studio/backplane/blob/main/CONTRIBUTING.md
+    about: Backplane is maintained by the Valaris team and does not accept outside PRs yet — issues are open and wanted.

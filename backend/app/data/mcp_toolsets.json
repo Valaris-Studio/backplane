@@ -1,0 +1,620 @@
+{
+  "default": {
+    "exclusions": {
+      "add_workspace_member": "workspace admin, pairs with remove_workspace_member",
+      "delete_board": "destroys a board and every card on it",
+      "delete_column": "cascade-deletes every card in the column",
+      "delete_workspace": "destroys the whole workspace",
+      "freeze_board": "workspace admin",
+      "next_assignment": "runner-only pickup path; interactive sessions claim by move_card",
+      "remove_workspace_member": "workspace admin",
+      "unfreeze_board": "workspace admin, pairs with freeze_board",
+      "update_workspace_member": "workspace admin, pairs with remove_workspace_member"
+    },
+    "ids": [
+      "start-here",
+      "work-management",
+      "knowledge-content"
+    ],
+    "inclusions": {
+      "get_skill": "the server instructions tell interactive agents to install the board's skills",
+      "get_workspace_metrics": "read-only reporting used by the standup workflow",
+      "list_git_repos": "read-only; boards are linked to repos",
+      "list_skills": "the server instructions tell interactive agents to install the board's skills"
+    },
+    "tools": [
+      "add_card_dependency",
+      "add_card_participant",
+      "bulk_create_cards",
+      "bulk_set_card_dependencies",
+      "create_board",
+      "create_card",
+      "create_column",
+      "create_note",
+      "create_resource",
+      "create_workspace",
+      "delete_card",
+      "delete_note",
+      "delete_resource",
+      "enable_toolsets",
+      "get_board",
+      "get_board_health",
+      "get_board_loop",
+      "get_card",
+      "get_card_dependency_status",
+      "get_card_verdict",
+      "get_definition",
+      "get_download_url",
+      "get_note",
+      "get_project_context",
+      "get_resource",
+      "get_server_info",
+      "get_skill",
+      "get_upload_url",
+      "get_workspace",
+      "get_workspace_metrics",
+      "get_workspace_summary",
+      "list_activity",
+      "list_boards",
+      "list_card_dependencies",
+      "list_cards",
+      "list_documentation",
+      "list_git_repos",
+      "list_notes",
+      "list_resources",
+      "list_skills",
+      "list_workspace_members",
+      "list_workspaces",
+      "move_card",
+      "read_documentation",
+      "remove_card_dependency",
+      "remove_card_participant",
+      "reorder_columns",
+      "search_cards",
+      "set_board_loop",
+      "update_board",
+      "update_card",
+      "update_column",
+      "update_definition",
+      "update_note",
+      "update_resource",
+      "validate_board_dependencies",
+      "whoami"
+    ]
+  },
+  "tool_count": 142,
+  "toolsets": [
+    {
+      "group": "Start here",
+      "id": "start-here",
+      "kind": "group",
+      "title": "Start here",
+      "tools": [
+        "bulk_create_cards",
+        "enable_toolsets",
+        "get_board_health",
+        "get_project_context",
+        "get_server_info",
+        "list_documentation",
+        "next_assignment",
+        "read_documentation",
+        "search_cards",
+        "whoami"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "work-management",
+      "kind": "group",
+      "title": "Work management",
+      "tools": [
+        "add_card_dependency",
+        "add_card_participant",
+        "add_workspace_member",
+        "bulk_set_card_dependencies",
+        "create_board",
+        "create_card",
+        "create_column",
+        "create_workspace",
+        "delete_board",
+        "delete_card",
+        "delete_column",
+        "delete_workspace",
+        "freeze_board",
+        "get_board",
+        "get_board_loop",
+        "get_card",
+        "get_card_dependency_status",
+        "get_card_verdict",
+        "get_workspace",
+        "get_workspace_summary",
+        "list_boards",
+        "list_card_dependencies",
+        "list_cards",
+        "list_workspace_members",
+        "list_workspaces",
+        "move_card",
+        "remove_card_dependency",
+        "remove_card_participant",
+        "remove_workspace_member",
+        "reorder_columns",
+        "set_board_loop",
+        "unfreeze_board",
+        "update_board",
+        "update_card",
+        "update_column",
+        "update_workspace_member",
+        "validate_board_dependencies"
+      ]
+    },
+    {
+      "group": "Knowledge & content",
+      "id": "knowledge-content",
+      "kind": "group",
+      "title": "Knowledge & content",
+      "tools": [
+        "create_note",
+        "create_resource",
+        "delete_note",
+        "delete_resource",
+        "get_definition",
+        "get_download_url",
+        "get_note",
+        "get_resource",
+        "get_upload_url",
+        "list_activity",
+        "list_notes",
+        "list_resources",
+        "update_definition",
+        "update_note",
+        "update_resource"
+      ]
+    },
+    {
+      "group": "Collaboration",
+      "id": "collaboration",
+      "kind": "group",
+      "title": "Collaboration",
+      "tools": [
+        "add_team_member",
+        "create_channel",
+        "create_git_repo",
+        "create_team",
+        "create_webhook",
+        "deactivate_team",
+        "delete_channel",
+        "delete_git_repo",
+        "get_team",
+        "get_webhook",
+        "list_channels",
+        "list_git_repos",
+        "list_teams",
+        "list_webhooks",
+        "remove_team_member",
+        "update_channel",
+        "update_git_repo",
+        "update_team",
+        "update_webhook"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "autonomous-operations",
+      "kind": "group",
+      "title": "Autonomous operations",
+      "tools": [
+        "activate_catalog_skill",
+        "apply_loop_template_fixes",
+        "archive_loop_template",
+        "cancel_execution",
+        "cancel_merge_queue_entry",
+        "create_agent",
+        "create_loop_template",
+        "create_prompt_config",
+        "decide_approval",
+        "delete_prompt_config",
+        "duplicate_loop_template",
+        "enqueue_for_merge",
+        "enqueue_pr_for_merge",
+        "export_loop_template",
+        "export_pipeline_bundle",
+        "get_agent",
+        "get_agent_budget_status",
+        "get_agent_config",
+        "get_approval_status",
+        "get_board_loop_binding_raw",
+        "get_completion_policy",
+        "get_completion_status",
+        "get_loop_template",
+        "get_merge_queue_entry",
+        "get_pipeline_sensors",
+        "get_prompt_config",
+        "get_skill",
+        "get_workspace_config",
+        "get_workspace_metrics",
+        "import_loop_template",
+        "import_pipeline_bundle",
+        "list_agents",
+        "list_approvals",
+        "list_executions",
+        "list_loop_template_versions",
+        "list_loop_templates",
+        "list_merge_queue",
+        "list_prompt_configs",
+        "list_skill_bindings_raw",
+        "list_skill_catalog",
+        "list_skills",
+        "log_execution_start",
+        "log_execution_update",
+        "pause_agent",
+        "propose_skill",
+        "publish_loop_template",
+        "remove_skill_binding",
+        "request_approval",
+        "request_landing",
+        "restart_agent",
+        "restore_loop_template_version",
+        "resume_agent",
+        "resume_cost_breaker",
+        "retry_completion",
+        "rotate_agent_key",
+        "set_skill_binding",
+        "submit_completion_candidate",
+        "update_agent",
+        "update_loop_template",
+        "update_prompt_config",
+        "update_workspace_config"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "context",
+      "kind": "category",
+      "title": "Project Context",
+      "tools": [
+        "get_project_context",
+        "list_documentation",
+        "read_documentation"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "search",
+      "kind": "category",
+      "title": "Search",
+      "tools": [
+        "search_cards"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "assignments",
+      "kind": "category",
+      "title": "Assignments",
+      "tools": [
+        "next_assignment"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "bulk",
+      "kind": "category",
+      "title": "Bulk Operations",
+      "tools": [
+        "bulk_create_cards"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "health",
+      "kind": "category",
+      "title": "Board Health",
+      "tools": [
+        "get_board_health"
+      ]
+    },
+    {
+      "group": "Start here",
+      "id": "server-info",
+      "kind": "category",
+      "title": "Server Info",
+      "tools": [
+        "enable_toolsets",
+        "get_server_info",
+        "whoami"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "workspaces",
+      "kind": "category",
+      "title": "Workspaces",
+      "tools": [
+        "add_workspace_member",
+        "create_workspace",
+        "delete_workspace",
+        "get_workspace",
+        "get_workspace_summary",
+        "list_workspace_members",
+        "list_workspaces",
+        "remove_workspace_member",
+        "update_workspace_member"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "boards",
+      "kind": "category",
+      "title": "Boards",
+      "tools": [
+        "create_board",
+        "delete_board",
+        "freeze_board",
+        "get_board",
+        "get_board_loop",
+        "list_boards",
+        "set_board_loop",
+        "unfreeze_board",
+        "update_board"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "columns",
+      "kind": "category",
+      "title": "Columns",
+      "tools": [
+        "create_column",
+        "delete_column",
+        "reorder_columns",
+        "update_column"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "cards",
+      "kind": "category",
+      "title": "Cards",
+      "tools": [
+        "add_card_participant",
+        "create_card",
+        "delete_card",
+        "get_card",
+        "list_cards",
+        "move_card",
+        "remove_card_participant",
+        "update_card"
+      ]
+    },
+    {
+      "group": "Work management",
+      "id": "card-dependencies",
+      "kind": "category",
+      "title": "Card Dependencies",
+      "tools": [
+        "add_card_dependency",
+        "bulk_set_card_dependencies",
+        "get_card_dependency_status",
+        "get_card_verdict",
+        "list_card_dependencies",
+        "remove_card_dependency",
+        "validate_board_dependencies"
+      ]
+    },
+    {
+      "group": "Knowledge & content",
+      "id": "notes",
+      "kind": "category",
+      "title": "Notes",
+      "tools": [
+        "create_note",
+        "delete_note",
+        "get_note",
+        "list_notes",
+        "update_note"
+      ]
+    },
+    {
+      "group": "Knowledge & content",
+      "id": "definitions",
+      "kind": "category",
+      "title": "Definitions",
+      "tools": [
+        "get_definition",
+        "update_definition"
+      ]
+    },
+    {
+      "group": "Knowledge & content",
+      "id": "resources",
+      "kind": "category",
+      "title": "Resources",
+      "tools": [
+        "create_resource",
+        "delete_resource",
+        "get_download_url",
+        "get_resource",
+        "get_upload_url",
+        "list_resources",
+        "update_resource"
+      ]
+    },
+    {
+      "group": "Knowledge & content",
+      "id": "activity",
+      "kind": "category",
+      "title": "Activity",
+      "tools": [
+        "list_activity"
+      ]
+    },
+    {
+      "group": "Collaboration",
+      "id": "teams",
+      "kind": "category",
+      "title": "Teams",
+      "tools": [
+        "add_team_member",
+        "create_team",
+        "deactivate_team",
+        "get_team",
+        "list_teams",
+        "remove_team_member",
+        "update_team"
+      ]
+    },
+    {
+      "group": "Collaboration",
+      "id": "channels",
+      "kind": "category",
+      "title": "Channels",
+      "tools": [
+        "create_channel",
+        "delete_channel",
+        "list_channels",
+        "update_channel"
+      ]
+    },
+    {
+      "group": "Collaboration",
+      "id": "git-repos",
+      "kind": "category",
+      "title": "Git Repos",
+      "tools": [
+        "create_git_repo",
+        "delete_git_repo",
+        "list_git_repos",
+        "update_git_repo"
+      ]
+    },
+    {
+      "group": "Collaboration",
+      "id": "webhooks",
+      "kind": "category",
+      "title": "Webhooks",
+      "tools": [
+        "create_webhook",
+        "get_webhook",
+        "list_webhooks",
+        "update_webhook"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "agents-executions",
+      "kind": "category",
+      "title": "Agents & Executions",
+      "tools": [
+        "cancel_execution",
+        "create_agent",
+        "get_agent",
+        "get_agent_budget_status",
+        "get_agent_config",
+        "get_workspace_metrics",
+        "list_agents",
+        "list_executions",
+        "log_execution_start",
+        "log_execution_update",
+        "pause_agent",
+        "restart_agent",
+        "resume_agent",
+        "rotate_agent_key",
+        "update_agent"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "approvals",
+      "kind": "category",
+      "title": "Approvals",
+      "tools": [
+        "decide_approval",
+        "get_approval_status",
+        "list_approvals",
+        "request_approval"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "merge-queue",
+      "kind": "category",
+      "title": "Merge Queue",
+      "tools": [
+        "cancel_merge_queue_entry",
+        "enqueue_for_merge",
+        "enqueue_pr_for_merge",
+        "get_completion_policy",
+        "get_completion_status",
+        "get_merge_queue_entry",
+        "list_merge_queue",
+        "request_landing",
+        "retry_completion",
+        "submit_completion_candidate"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "workspace-config",
+      "kind": "category",
+      "title": "Workspace Config",
+      "tools": [
+        "export_pipeline_bundle",
+        "get_pipeline_sensors",
+        "get_workspace_config",
+        "import_pipeline_bundle",
+        "resume_cost_breaker",
+        "update_workspace_config"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "prompt-configs",
+      "kind": "category",
+      "title": "Prompt Configs",
+      "tools": [
+        "create_prompt_config",
+        "delete_prompt_config",
+        "get_prompt_config",
+        "list_prompt_configs",
+        "update_prompt_config"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "loop-templates",
+      "kind": "category",
+      "title": "Loop Templates",
+      "tools": [
+        "apply_loop_template_fixes",
+        "archive_loop_template",
+        "create_loop_template",
+        "duplicate_loop_template",
+        "export_loop_template",
+        "get_board_loop_binding_raw",
+        "get_loop_template",
+        "import_loop_template",
+        "list_loop_template_versions",
+        "list_loop_templates",
+        "publish_loop_template",
+        "restore_loop_template_version",
+        "update_loop_template"
+      ]
+    },
+    {
+      "group": "Autonomous operations",
+      "id": "skills",
+      "kind": "category",
+      "title": "Skills",
+      "tools": [
+        "activate_catalog_skill",
+        "get_skill",
+        "list_skill_bindings_raw",
+        "list_skill_catalog",
+        "list_skills",
+        "propose_skill",
+        "remove_skill_binding",
+        "set_skill_binding"
+      ]
+    }
+  ]
+}

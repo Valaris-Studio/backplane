@@ -1,0 +1,240 @@
+# Backplane — Runner Configuration
+# Copy to runner.yaml and fill in your values.
+#
+# Every key below exists on the Go Config struct (internal/config/config.go);
+# a drift test fails if this file and the struct disagree. Commented keys are
+# optional — the value shown is the built-in default unless noted.
+
+valaris:
+  # Backend API URL for runner control-plane REST calls: identity, heartbeat,
+  # platform/loop config, assignments, execution records, and transitions.
+  # Coding-agent tool calls use the separate MCP config below.
+  # Env override: VALARIS_API_URL.
+  api_url: "http://localhost:8000"
+
+  # Agent API key (Bearer vlr_... token). Created via POST /api/agents.
+  # Env override: VALARIS_API_KEY (takes precedence). Required.
+  # This authenticates the Go runner only. It is NOT injected into an existing
+  # MCP JSON; the coding-agent config needs its own concrete copy of the key.
+  api_key: "${VALARIS_API_KEY}"
+
+  # Workspace to operate in. Passed to MCP tool prompts.
+  # Env override: VALARIS_WORKSPACE. Required.
+  workspace_slug: "my-workspace"
+
+  # Boards to monitor. Each entry is a board slug or UUID. Empty = all boards.
+  board_ids: []
+
+  # Roles are fetched from the backend's workspace pipeline_config.
+  # The agent runs one strategy per stage in that config.
+
+llm:
+  # Default coding-agent provider. Ships: "claude-cli" | "codex-cli".
+  # Its binary must be on PATH (`claude` / `codex`) — startup preflight fails otherwise.
+  provider: "claude-cli"
+
+  # Model passed to the provider CLI.
+  model: "sonnet"
+
+  # Per-phase model overrides. Keys are pipeline phase names; unlisted phases
+  # use `model` above.
+  model_overrides: {}
+  # model_overrides:
+  #   discover: "haiku"
+
+  # Additional providers to build at startup so a pipeline can mix coding agents
+  # per stage (e.g. codex-cli implements while ui_validator stays on claude-cli).
+  # The default `provider` is always built; these are opt-in extras and are
+  # preflighted too.
+  extra_providers: []
+
+  # Maps the backend's abstract tier (premium/mid/low) to YOUR ordered local
+  # provider preference — the backend tier is only INTENT, the runner owns the
+  # policy. First entry actually built wins; an unmapped tier falls back to the
+  # backend-resolved provider, then to `provider`. Providers named here are
+  # built automatically.
+  tier_providers: {}
+  # tier_providers:
+  #   premium: ["codex-cli", "claude-cli"]
+  #   mid: ["claude-cli"]
+  #   low: ["claude-cli"]
+
+  # Maximum spend per card execution (USD).
+  max_budget_usd: 1.00
+
+  # Path to the MCP server config handed to the provider CLI. Required.
+  # This is the coding-agent session's integration surface. Tools invoked by
+  # the model flow through MCP; the Go runner still uses REST for orchestration.
+  # The runner reads this JSON verbatim and does not expand ${VAR} placeholders
+  # inside it. Generate a private 0600 file with the setup wizard/-doctor -fix,
+  # or materialize the key in a local copy that is never committed.
+  # Relative paths resolve against THIS config file's directory (not the process
+  # CWD), and a leading ~ expands to your home directory — same rules as
+  # git.base_dir below, so the runner loads the same wherever it is launched.
+  mcp_config_path: "mcp-config.json"
+
+  # Provider permission mode (e.g. "auto", "bypassPermissions"). Requires a
+  # trusted .claude.json; most installs leave this empty and use the flag below.
+  permission_mode: ""
+
+  # Skip all permission checks for headless autonomous operation.
+  # Required because agent repos don't have .claude.json trust files.
+  # A tool deny-list still applies (backend tool_policy, else SafeToolDenyFloor).
+  dangerously_skip_permissions: true
+
+  # Resume LLM sessions across retries to avoid re-reading codebases.
+  session_persistence: true
+
+  # Additional directories injected via --add-dir into every LLM invocation.
+  # Put CLAUDE.md files, skill definitions, or project context here.
+  # The Go binary doesn't need to know what's in them — the agent CLI reads them.
+  # Claude CLI only: the Codex driver never passes --add-dir, so these dirs are
+  # not visible to codex-cli agents.
+  context_dirs: []
+  # context_dirs:
+  #   - "./prompts"          # Custom prompt/skill files
+  #   - "./project-context"  # Project-specific CLAUDE.md
+
+  # Anthropic API key passed explicitly to the agent subprocess. Leave empty to
+  # use OAuth/subscription auth (Claude Code Max) — the runner strips an inherited
+  # ANTHROPIC_API_KEY from the subprocess env, so setting it HERE is the only way
+  # to bill API credits.
+  anthropic_api_key: ""
+
+  # Budget checkpoint-and-resume: fraction of the per-card budget an implement
+  # pass must reach for its failure to count as a budget cutoff (suspend and
+  # resume next pass) rather than an ordinary error. Default 0.9.
+  budget_suspend_threshold: 0.9
+
+  # Consecutive checkpoint-suspends allowed before the card escalates to the
+  # normal failure path instead of suspending again. Default 5.
+  budget_suspend_max_passes: 5
+
+git:
+  # Base directory where repos are cloned. Relative paths resolve against THIS
+  # config file's directory, not the process CWD, so the clone root does not
+  # move with however the runner was launched. A leading ~ expands to your home
+  # directory (the shape exported agent configs use). Startup fails if the resolved
+  # path sits inside a git worktree — the runner hard-resets clones under it,
+  # and git would walk up and rewind the enclosing repository. That is why this
+  # defaults outside the checkout rather than to a relative "./repos".
+  base_dir: "/tmp/backplane-runner-repos"
+
+  # Git remote name.
+  default_remote: "origin"
+
+  # Branch name prefix for runner-created branches.
+  branch_prefix: "runner/"
+
+  # Automatically open a PR on successful completion.
+  auto_pr: true
+
+  # Merge strategy used when the reviewer merges: squash | rebase | merge.
+  merge_strategy: "squash"
+
+  # Forge driver built at startup: "github" (shells the `gh` CLI) or "gitea"
+  # (Gitea/Forgejo REST API). One driver per runner; the platform's per-repo
+  # GitRepo.Provider is only a guard, it does not swap the driver mid-run.
+  forge: "github"
+
+  # Required by HTTP forge drivers (gitea) — the instance root and an access
+  # token. The github driver infers auth from the local clone's `gh` login and
+  # ignores both. Distinct from git.tokens below.
+  forge_base_url: ""
+  forge_token: ""
+
+  # Submit forge-side PR reviews alongside card movements.
+  review_on_github: true
+
+  # How a review verdict is recorded: "platform" (comment-only — the default,
+  # because a single-identity install cannot approve its own PR) or "github"
+  # (formal `gh pr review`, needs a second identity such as a reviewer bot).
+  review_mode: "platform"
+
+  # Allow --force-with-lease push on rework branches (branch_prefix only).
+  force_with_lease: true
+
+  # Per-role forge tokens for the `gh` CLI, overriding the ambient GH_TOKEN.
+  tokens: {}
+  # tokens:
+  #   reviewer: "ghp_xxx"
+
+work_loop:
+  # How often to poll for new work.
+  poll_interval: 2m
+
+  # Max time allowed per card execution.
+  card_timeout: 30m
+
+  # Sleep duration when no assignable cards are found.
+  idle_sleep: 5m
+
+  # Ceiling for the idle backoff — idle_sleep doubles up to this value.
+  max_idle_interval: 16m
+
+  # Priority order for card selection.
+  priorities: ["urgent", "high", "medium", "low"]
+
+  # How often to poll for approval decisions.
+  approval_poll_interval: 30s
+
+  # Maximum time to wait for an approval decision.
+  approval_max_wait: 1h
+
+  # Multi-role scheduling. The platform's pipeline_config.scheduling is
+  # authoritative — priority_order in particular must come from the platform;
+  # only `mode` is meaningfully overridable here.
+  scheduling:
+    # Selection family. "priority" is the only implemented value.
+    strategy: "priority"
+    # Runtime selection algorithm, overriding the platform's scheduling.mode
+    # when non-empty: "priority" (drain highest first) | "round_robin"
+    # (rotate one card per role per tick). Empty = defer to the platform.
+    mode: ""
+    # Role precedence. Leave empty and let the platform supply it.
+    priority_order: []
+
+# Settings for -loop mode only (bind to one board, repeat a headless session on
+# the board's loop prompt). The pipeline work loop above reads none of these.
+loop_mode:
+  # What to do when the board's loop is switched OFF.
+  #   false (default) — exit, the historical behaviour.
+  #   true            — stay connected and wait for an operator to re-enable it,
+  #                     heartbeating so the agent keeps reading `alive`, running
+  #                     no sessions and spending nothing while it waits.
+  # Safety rails (budget_usd, max_iterations, completion_query) still exit even
+  # with keep_alive: they mean the JOB is over, not that it is paused.
+  # Overridable per run with -keep-alive / -keep-alive=false.
+  keep_alive: false
+
+daemon:
+  # Grace period after first SIGINT/SIGTERM before force-killing in-flight work.
+  drain_timeout: 60s
+
+  # Port for the /healthz HTTP endpoint. 0 = disabled.
+  health_port: 0
+
+  # Interface for /healthz and /pollnow. These carry no auth and /healthz
+  # discloses blocked-card details, so the default is loopback-only.
+  # Set "0.0.0.0" only when something outside this host must reach them
+  # (e.g. a container health check) and the port is firewalled.
+  health_bind: "127.0.0.1"
+
+websocket:
+  # Subscribe to backend push events instead of relying on poll_interval alone.
+  # Env override: VALARIS_WS_ENABLED=false (or 0) force-disables.
+  enabled: true
+
+  # Reconnect backoff bounds after a dropped connection.
+  reconnect_min: 1s
+  reconnect_max: 30s
+
+# OpenTelemetry tracing. Disabled by default.
+telemetry:
+  enabled: false
+  exporter: "otlp"             # "otlp" | "stdout" | "none"
+  endpoint: "localhost:4317"   # OTLP gRPC endpoint
+  service_name: "backplane-runner"
+  sample_rate: 1.0             # 0.0-1.0
+
+log_level: "info"

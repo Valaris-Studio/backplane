@@ -1,0 +1,57 @@
+# Gitleaks config for Backplane — secrets gate for CI and the public-export
+# pipeline (docs/opensource-consolidation-plan.md, Session 1).
+#
+# Run locally: scripts/scan-secrets.sh   (works with or without gitleaks installed)
+# Install:     brew install gitleaks     (or see https://github.com/gitleaks/gitleaks)
+
+title = "Backplane secrets policy"
+
+[extend]
+# Start from gitleaks' curated default ruleset (AWS, GCP, Slack, private keys, …)
+useDefault = true
+
+[[rules]]
+id = "valaris-api-key"
+description = "Backplane/Valaris platform API key (vlr_ prefix)"
+# Real keys are `vlr_` + 40+ base64url chars. Placeholders are short or contain
+# obvious sentinel words, excluded via the allowlist regexes below.
+regex = '''vlr_[A-Za-z0-9_\-]{40,}'''
+keywords = ["vlr_"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-[A-Za-z0-9_\-]{20,}'''
+keywords = ["sk-ant"]
+
+[allowlist]
+description = "Placeholders, reference configs, and test fixtures — not real secrets"
+# Paths that legitimately contain key-SHAPED strings that are NOT live secrets.
+paths = [
+  '''.*\.example\..*''',
+  '''runner/configs/.*\.docker\..*''',
+  # Test suites use key-SHAPED fixtures throughout; real keys never live here.
+  '''backend/tests/.*''',
+  '''mcp-server/tests/.*''',
+  '''frontend/.*__tests__/.*''',
+  '''frontend/src/i18n/locales/.*\.json''',
+  # Build output, not source.
+  '''frontend/dist/.*''',
+  # Per-user local state and stale agent worktrees — gitignored, never tracked.
+  '''\.claude/.*''',
+  # Internal ops docs pending relocation to the private ops repo. The keys they
+  # contain were revoked on 2026-07-24 (verified 403) and these paths are in the
+  # REMOVE set of docs/public-export-manifest.md, so they never reach the public
+  # snapshot. Drop these entries once the relocation lands.
+  '''docs/pipeline-design/HANDOVER-.*\.md''',
+  '''runner/docs/PLAYBOOK-.*\.md''',
+]
+# Sentinel placeholder strings that must never trip the gate.
+regexes = [
+  '''vlr_your[_\-]?(api[_\-]?)?key[_\-]?here''',
+  '''vlr_your_agent_key_here''',
+  '''vlr_REPLACE.*''',
+  '''vlr_(test|other|invalid|secret|fake|dummy|example)[_\-0-9].*''',
+  '''vlr_ab12cd34.*''',
+  '''\$\{VALARIS_API_KEY\}''',
+]

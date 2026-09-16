@@ -1,0 +1,106 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: valaris
+      POSTGRES_PASSWORD: valaris
+      POSTGRES_DB: valaris
+    # Host ports are env-overridable so the quickstart gate (and anything else
+    # needing a parallel stack) can run alongside a live `make dev`. Defaults
+    # unchanged; docker-compose.override.yml remains the way to remap for good.
+    ports:
+      - "${BACKPLANE_DEV_DB_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U valaris"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${BACKPLANE_DEV_BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://valaris:valaris@postgres:5432/valaris
+      ENV: development
+      CORS_ORIGINS: http://localhost:5173
+      # Empty bucket selects the local-filesystem storage backend, so uploads
+      # work with no cloud account. Override in docker-compose.override.yml.
+      GCS_BUCKET: ""
+      VALARIS_EVENT_LOG: ${VALARIS_EVENT_LOG:-}
+      # Fernet key for the git-credentials vault. Compose reads the root .env
+      # for ${...} interpolation only — pydantic's env_file resolves to
+      # backend/.env inside the container, so without this passthrough a key
+      # in the root .env never reaches the backend and every "Add token" 503s.
+      INTEGRATIONS_TOKEN_KEY: ${INTEGRATIONS_TOKEN_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Same DB-backed /api/ready split as docker-compose.prod.yml's backend
+      # probe (not /api/health, which is DB-free and would report healthy
+      # before `alembic upgrade head` finishes). start_period is shorter than
+      # prod's because dev builds are lighter (bind-mounted source, no
+      # from-source image build in the loop).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${BACKPLANE_DEV_FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      API_URL: http://backend:8000
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  runner:
+    build:
+      context: ./runner
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./runner:/app
+      - ./mcp-server:/mcp-server
+      - runner-repos:/repos
+      - ${HOME}/.ssh:/home/runner/.ssh:ro
+      # If ~/.claude.json doesn't exist yet, `touch ~/.claude.json` before
+      # `up` — otherwise Docker creates a root-owned DIRECTORY at that path,
+      # breaking both this mount and any later Claude CLI setup on the host.
+      - ${HOME}/.claude.json:/host-claude-json:ro
+    environment:
+      VALARIS_API_KEY: ${VALARIS_API_KEY:-vlr_dev_key}
+      # `:-` keeps Compose from warning about these on every `make dev`, which
+      # runs without the runner profile and has no reason to want agent
+      # credentials. An unset token stays unset either way.
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+      RUNNER_UID: ${UID:-501}
+    depends_on:
+      - backend
+    profiles:
+      - runner
+
+volumes:
+  postgres-data:
+  frontend-node-modules:
+  runner-repos:

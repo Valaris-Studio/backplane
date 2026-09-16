@@ -1,0 +1,40 @@
+# Intern config for docker-compose development.
+# Activated via: docker compose --profile runner up
+
+valaris:
+  api_url: "http://backend:8000"
+  api_key: "${VALARIS_API_KEY}"
+  workspace_slug: "webgl-snake"
+  board_ids: []
+
+llm:
+  provider: "claude-cli"
+  model: "sonnet"
+  max_budget_usd: 1.00
+  mcp_config_path: "/etc/backplane/mcp-config.json"
+  dangerously_skip_permissions: true
+  session_persistence: true
+  context_dirs: []
+
+git:
+  base_dir: "/repos"
+  default_remote: "origin"
+  branch_prefix: "runner/"
+  auto_pr: true
+
+work_loop:
+  poll_interval: 2m
+  card_timeout: 30m
+  idle_sleep: 5m
+  priorities: ["urgent", "high", "medium", "low"]
+  approval_poll_interval: 30s
+  approval_max_wait: 1h
+
+daemon:
+  drain_timeout: 60s
+  health_port: 8081
+  # Container health checks probe from outside the network namespace, so
+  # loopback-only would make health_port unreachable here.
+  health_bind: "0.0.0.0"
+
+log_level: "info"

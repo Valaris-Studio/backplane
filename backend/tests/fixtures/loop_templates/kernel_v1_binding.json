@@ -1,0 +1,178 @@
+{
+  "_comment": [
+    "Golden binding for the renderer contract (spec f52328b3 §3.1 rule 9).",
+    "This kernel is a REPRESENTATIVE loop template, deliberately small enough to",
+    "read in one screen while exercising every rule: block re-indent (METHOD),",
+    "list join (GATES), enum (LANDING_MODE), variant fills (LANDING), inline",
+    "optional (BASELINES), parenthesised optional (WORKDIR), lone-line optional",
+    "(LESSONS), runner vars in the kernel, and prose that must survive verbatim",
+    "(`cat <<EOF`, `2>>log`, `python3 -m venv .venv`, double spaces).",
+    "optional (BASELINES, authored as a whole line so rule 4 removes it cleanly), parenthesised optional (WORKDIR), lone-line optional",
+    "deliverable; when it lands, ADD its binding + rendered fixtures beside these",
+    "rather than replacing them — this pair pins the RULES, that pair pins the",
+    "SEED. Any renderer change that alters output must update rendered-*.md in",
+    "the same PR."
+  ],
+  "content": {
+    "system_prompt": "You are the <<ROLE>> for board {{.BoardID}} in workspace {{.Workspace}}.\n\n<<MISSION>>\n\nMethod (non-negotiable):\n    <<METHOD>>\n\n<<BASELINES>>\nWorking directory (<<WORKDIR>>) is yours.\n<<LESSONS>>\nShell prose that must survive verbatim: `cat <<EOF`, `2>>log`, and\n`python3 -m venv .venv`  with  deliberate  double  spaces.\n",
+    "loop_prompt": "Iteration {{.Iteration}} on board {{.BoardID}} (execution {{.ExecutionID}}).\n\nYou advance the board by ONE card labelled <<RUN_LABEL>> per iteration. Landing mode: <<LANDING_MODE>>.\n\n<<LANDING_POLICY>>\n\nGates that must be green:\n- <<GATES>>\n\nWhen the run is complete, stop yourself with the off switch.\n",
+    "slots": [
+      {
+        "name": "ROLE",
+        "kind": "scalar",
+        "required": true,
+        "label": "Role",
+        "help": "What this loop is, in a noun phrase.",
+        "example": "delivery agent"
+      },
+      {
+        "name": "RUN_LABEL",
+        "kind": "scalar",
+        "required": true,
+        "label": "Run label",
+        "help": "The card label this run works; also drives completion_query.",
+        "example": "loop-templates"
+      },
+      {
+        "name": "MISSION",
+        "kind": "block",
+        "required": true,
+        "label": "Mission",
+        "help": "What the run is for. Multi-line prose."
+      },
+      {
+        "name": "METHOD",
+        "kind": "block",
+        "required": true,
+        "label": "Method",
+        "help": "Indented block: re-indents under its placeholder."
+      },
+      {
+        "name": "BASELINES",
+        "kind": "scalar",
+        "required": false,
+        "label": "Baselines",
+        "help": "Inline optional: empty removes one adjacent space."
+      },
+      {
+        "name": "WORKDIR",
+        "kind": "scalar",
+        "required": false,
+        "label": "Working directory",
+        "help": "Parenthesised optional: empty drops the parentheses too."
+      },
+      {
+        "name": "LESSONS",
+        "kind": "block",
+        "required": false,
+        "label": "Lessons from previous runs",
+        "help": "Lone-line optional: empty removes the whole line."
+      },
+      {
+        "name": "GATES",
+        "kind": "list",
+        "required": true,
+        "join": "\n- ",
+        "label": "Gates",
+        "help": "Joined into a markdown list."
+      },
+      {
+        "name": "LANDING_MODE",
+        "kind": "enum",
+        "required": true,
+        "enum_values": [
+          "self-merge",
+          "stop-at-pr",
+          "merge-queue"
+        ],
+        "label": "Landing mode"
+      },
+      {
+        "name": "LANDING",
+        "kind": "variant",
+        "required": true,
+        "label": "Landing",
+        "help": "Selecting a landing supplies its policy prose, tools and rails.",
+        "variants": [
+          {
+            "id": "self_merge",
+            "label": "A — self merge",
+            "fills": {
+              "LANDING_POLICY": "Open the PR for the audit trail, then merge it\nyourself with plain git. Never push the default branch.",
+              "LANDING_MODE": "self-merge"
+            },
+            "rails": {
+              "loop_landing": "human"
+            }
+          },
+          {
+            "id": "merge_queue",
+            "label": "C — merge queue",
+            "fills": {
+              "LANDING_POLICY": "Enqueue the PR and let the platform land it.",
+              "LANDING_MODE": "merge-queue"
+            },
+            "tools_extra": [
+              "mcp__valaris__enqueue_pr_for_merge"
+            ],
+            "rails": {
+              "loop_landing": "merge_queue"
+            }
+          }
+        ]
+      },
+      {
+        "name": "LANDING_POLICY",
+        "kind": "block",
+        "required": false,
+        "label": "Landing policy",
+        "help": "Filled by the LANDING variant; never typed directly."
+      }
+    ],
+    "tools": [
+      "mcp__valaris__set_board_loop",
+      "mcp__valaris__get_card",
+      "mcp__valaris__move_card"
+    ],
+    "rails_defaults": {
+      "max_iterations": 25,
+      "budget_usd": 20.0,
+      "max_blocked_on_human": 3
+    },
+    "derived_rails": {
+      "completion_query": {
+        "label": "<<RUN_LABEL>>",
+        "exclude_column_type": "done"
+      }
+    },
+    "setup_contract": {
+      "columns_by_type": [
+        "backlog",
+        "active",
+        "done"
+      ],
+      "optional_columns_by_type": [
+        "review"
+      ],
+      "requires_run_label": true,
+      "tools_must_include": [
+        "mcp__valaris__set_board_loop"
+      ]
+    }
+  },
+  "slot_values": {
+    "ROLE": "delivery agent",
+    "MISSION": "Ship the cards labelled loop-templates, one per iteration,\nuntil none remain outside Done.",
+    "METHOD": "Failing test first — run it, see it fail.\nMinimum code to green.\nMutation-check every new test.",
+    "BASELINES": "Baselines: backend 3894 passed / 1 skipped",
+    "WORKDIR": "~/backplane-runner/repos/loop",
+    "LESSONS": "Loop #7: every mutation survivor was outside the card's named targets.",
+    "GATES": [
+      "make test-fast",
+      "make runner-test",
+      "pnpm -C frontend build"
+    ],
+    "LANDING": "self_merge",
+    "RUN_LABEL": "loop-templates"
+  }
+}

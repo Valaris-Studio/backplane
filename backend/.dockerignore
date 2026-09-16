@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+.venv
+.env
+.pytest_cache
+.coverage
+htmlcov
+tests
+alembic/versions/__pycache__
+Dockerfile.dev
+# Credentials and local uploads must never reach the image (COPY . . in
+# Dockerfile) — gitignored, but the build context doesn't read .gitignore.
+gcp-sa-key.json
+*sa-key.json
+*.pem
+data

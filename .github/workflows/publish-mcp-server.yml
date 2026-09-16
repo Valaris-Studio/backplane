@@ -1,0 +1,78 @@
+# Publishes the mcp-server package to PyPI on its own `mcp-server-v*` tags, so
+# it can ship independently of the repo-wide `v*` releases.
+name: Publish mcp-server
+
+on:
+  push:
+    tags: ["mcp-server-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Gate — pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      # Same policy as ci.yml: the gate tests the locked resolution.
+      - name: Install (frozen lock)
+        working-directory: mcp-server
+        run: uv sync --frozen --extra dev
+      - name: Tests
+        working-directory: mcp-server
+        run: uv run python -m pytest tests/ --tb=short -q
+      # Never publish a lock resolution ci.yml would have flagged. An
+      # unfixable advisory is waived explicitly with `--ignore-vuln <ID>`.
+      - name: Audit the locked resolution
+        working-directory: mcp-server
+        run: |
+          uv export --frozen --no-hashes --no-emit-project --extra dev -o /tmp/mcp-lock-requirements.txt
+          uvx pip-audit --strict --no-deps -r /tmp/mcp-lock-requirements.txt
+
+  build:
+    name: Build wheel + sdist
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        working-directory: mcp-server
+        run: |
+          pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: mcp-server/dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No `environment:` while the repo is private — deployment environments
+    # need a paid plan on private repos, and the PyPI trusted publisher was
+    # registered without an environment constraint to match. At public launch:
+    # create a `pypi` environment with required reviewers, add `environment:
+    # pypi` here, and set the same environment on the PyPI publisher.
+    # Trusted Publishing: no API token anywhere — the PyPI project must have this
+    # repo + workflow file registered as a trusted publisher for it to work.
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
