@@ -6,6 +6,30 @@ import { linkToRoute } from "../link-to-route";
 import type { NotificationLink } from "../../api/notifications-api";
 
 describe("linkToRoute", () => {
+  it.each(["\\example.invalid", "/example.invalid", "/\\example.invalid", "team?mode=other#fragment"])(
+    "keeps a persisted workspace slug %j inside one same-origin path segment",
+    (slug) => {
+      const origin = "https://backplane.invalid";
+      const links: NotificationLink[] = [
+        { kind: "workspace" },
+        { kind: "approval" },
+        { kind: "board", board_id: "b1" },
+        { kind: "card", board_id: "b1", card_id: "c1" },
+        { kind: "note", note_id: "n1" },
+        { kind: "note", board_id: "b1", note_id: "n1" },
+      ];
+      for (const link of links) {
+        // Covers both the live notification fallback and inbox rollup slug.
+        for (const route of [linkToRoute(link, slug), linkToRoute({ ...link, workspace_slug: slug }, "acme")]) {
+          expect(route).not.toBeNull();
+          const target = new URL(route!, origin);
+          expect(target.origin).toBe(origin);
+          expect(decodeURIComponent(target.pathname.split("/")[1] ?? "")).toBe(slug);
+        }
+      }
+    },
+  );
+
   it("returns null for a null/undefined link", () => {
     expect(linkToRoute(null, "acme")).toBeNull();
     expect(linkToRoute(undefined, "acme")).toBeNull();

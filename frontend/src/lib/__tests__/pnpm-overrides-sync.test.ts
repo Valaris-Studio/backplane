@@ -19,7 +19,7 @@ function parseOverrides(yamlPath: string): Record<string, string> {
   expect(start, `no overrides block in ${yamlPath}`).toBeGreaterThanOrEqual(0);
   const overrides: Record<string, string> = {};
   for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.startsWith("#")) continue;
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
     const match = line.match(/^ {2}['"]?([^'":]+)['"]?:\s*(.+)$/);
     if (!match) break; // dedented — end of the overrides block
     overrides[match[1]!] = match[2]!.trim();

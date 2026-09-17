@@ -22,16 +22,18 @@ export function linkToRoute(
   if (!link) return null;
   const slug = link.workspace_slug ?? fallbackSlug;
   if (!slug) return null;
+  // Persisted slugs also reach location.assign through browser notifications.
+  const workspacePath = `/${encodeURIComponent(slug)}`;
 
   switch (link.kind) {
     case "card": {
       if (!link.board_id) return null;
-      const base = `/${slug}/boards/${link.board_id}`;
+      const base = `${workspacePath}/boards/${link.board_id}`;
       return link.card_id ? `${base}?card=${link.card_id}` : base;
     }
     case "board": {
       if (!link.board_id) return null;
-      return `/${slug}/boards/${link.board_id}`;
+      return `${workspacePath}/boards/${link.board_id}`;
     }
     case "note": {
       // Board-scoped notes live under the board's notes tab; workspace-scoped
@@ -39,14 +41,14 @@ export function linkToRoute(
       // so the NoteList opens the matching note. No note_id → unresolvable.
       if (!link.note_id) return null;
       const base = link.board_id
-        ? `/${slug}/boards/${link.board_id}/notes`
-        : `/${slug}/notes`;
+        ? `${workspacePath}/boards/${link.board_id}/notes`
+        : `${workspacePath}/notes`;
       return `${base}?note=${link.note_id}`;
     }
     case "approval":
-      return `/${slug}/approvals`;
+      return `${workspacePath}/approvals`;
     case "workspace":
-      return `/${slug}`;
+      return workspacePath;
     default:
       return null;
   }
