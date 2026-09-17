@@ -362,10 +362,9 @@ Use `FORCE=1` only if you intend to override that protection.
 
 **3. Open the app**
 
-| Open | What to expect |
-|---|---|
-| **http://localhost:5173** | Automatically authenticated as `dev@valaris.dev`, with no signup flow |
-| **http://localhost:8000/api/docs** | Interactive API docs (Swagger UI) |
+- **App:** http://localhost:5173. You are automatically authenticated as
+  `dev@valaris.dev`, with no signup flow.
+- **Interactive API docs:** http://localhost:8000/api/docs (Swagger UI).
 
 **Stop and resume:** `Ctrl+C` in Terminal A stops the stack. Your database stays
 in a Docker volume, so `make dev` picks up where you left off.
@@ -406,13 +405,13 @@ plus a candid guide to current rough edges.
 
 | Looking for | Read |
 |---|---|
-| **Events** | [`docs/events.md`](docs/events.md): event taxonomy |
-| **Forge credentials** | [`docs/git-credentials.md`](docs/git-credentials.md): workspace accounts, provider tokens, scopes, and troubleshooting |
-| **Agent and forge providers** | [`runner/docs/providers.md`](runner/docs/providers.md) |
-| **REST API schema** | [`docs/api/openapi.json`](docs/api/openapi.json), browsable through [`docs/api/index.html`](docs/api/index.html) |
-| **Development** | [`CONTRIBUTING.md`](CONTRIBUTING.md): contribution policy, dev setup, architecture rules, and TDD workflow |
-| **Architecture history** | [`docs/platform-source-of-truth.md`](docs/platform-source-of-truth.md): historical reference; use in-app docs for current behavior |
-| **Pipeline design history** | [`docs/pipeline-config-reference.md`](docs/pipeline-config-reference.md): historical reference; use in-app docs for current fields |
+| **Events** | [Event taxonomy](docs/events.md) |
+| **Forge credentials** | [Accounts, tokens, scopes, and troubleshooting](docs/git-credentials.md) |
+| **Agent and forge providers** | [Provider guide](runner/docs/providers.md) |
+| **REST API** | [Schema](docs/api/openapi.json) · [API browser](docs/api/index.html) |
+| **Development** | [Contribution policy, setup, architecture, and tests](CONTRIBUTING.md) |
+| **Architecture history** | [Historical reference](docs/platform-source-of-truth.md); use in-app docs for current behavior |
+| **Pipeline history** | [Historical design](docs/pipeline-config-reference.md); use in-app docs for current fields |
 
 **Need the live API contract?** A running instance serves Swagger UI at
 `/api/docs` in development and the machine-readable schema at `/api/openapi.json`.
