@@ -29,6 +29,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://valaris:valaris@postgres:5432/valaris
       ENV: development
+      # Keep root-owned bytecode out of the host source bind mount on Linux.
+      PYTHONDONTWRITEBYTECODE: "1"
       CORS_ORIGINS: http://localhost:5173
       # Empty bucket selects the local-filesystem storage backend, so uploads
       # work with no cloud account. Override in docker-compose.override.yml.

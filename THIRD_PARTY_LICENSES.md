@@ -83,3 +83,15 @@ All other dependencies are under standard permissive or weak-copyleft licenses
 
 Run the generator commands above for exact, version-pinned results; treat this
 table as orientation, not as a legal inventory.
+
+## Office document previews
+
+Spreadsheet previews use SheetJS Community Edition `xlsx` 0.20.3 from the
+[official SheetJS distribution](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/),
+under Apache-2.0. The npm registry's `xlsx` package remains at an older release;
+`frontend/package.json` pins the official versioned tarball, and both pnpm
+lockfiles record its integrity digest and preserve the included Apache license.
+
+DOCX previews use Mammoth (BSD-2-Clause) and its XML parser `@xmldom/xmldom`
+(MIT). Converted HTML is sanitized with DOMPurify (dual-licensed under
+Apache-2.0 OR MPL-2.0). Their license texts ship with their respective packages.

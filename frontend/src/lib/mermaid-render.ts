@@ -9,8 +9,8 @@
 //      (HTML injection via classDef) and CVE-2026-41148 (CSS injection) are
 //      fixed in 11.15.0. A caret range would silently allow a downgrade.
 //   2. securityLevel: "strict" — mermaid runs its own DOMPurify over the SVG
-//      and disables click bindings. This is why we do NOT add a direct
-//      DOMPurify dependency (it would also break the MIT-only direct-dep rule).
+//      and disables click bindings. Keep SVG sanitization inside Mermaid;
+//      the HTML-only sanitizer for DOCX previews is a separate boundary.
 //   3. `%%{init ...}%%` directives are stripped from stored content before
 //      rendering. Without this, note content could set securityLevel:"loose"
 //      itself and re-enable raw HTML — the directive outranks initialize().

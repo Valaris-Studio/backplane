@@ -809,9 +809,12 @@ func TestClient_SendHeartbeat_WritesFrame(t *testing.T) {
 	triggerPoll := make(chan struct{}, 1)
 
 	received := make(chan map[string]any, 1)
+	subscribed := make(chan struct{}, 1)
+	releaseServer := make(chan struct{})
 
 	server := newTestServer(t, func(conn *websocket.Conn, ctx context.Context) {
 		readSubscription(t, conn, ctx)
+		subscribed <- struct{}{}
 		for {
 			_, data, err := conn.Read(ctx)
 			if err != nil {
@@ -826,11 +829,15 @@ func TestClient_SendHeartbeat_WritesFrame(t *testing.T) {
 				case received <- msg:
 				default:
 				}
+				// Reading the frame can finish before the client's Write returns.
+				// Keep the peer open until the test has checked the write result.
+				<-releaseServer
 				return
 			}
 		}
 	})
 	defer server.Close()
+	defer close(releaseServer)
 
 	client := newTestClient(server.URL, triggerPoll)
 
@@ -839,14 +846,10 @@ func TestClient_SendHeartbeat_WritesFrame(t *testing.T) {
 
 	go client.Run(ctx)
 
-	for i := 0; i < 50; i++ {
-		if client.Connected() {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if !client.Connected() {
-		t.Fatal("client never connected")
+	select {
+	case <-subscribed:
+	case <-ctx.Done():
+		t.Fatal("server never received subscription")
 	}
 
 	payload := map[string]any{"status": "idle", "uptime_seconds": 42}

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useEffect, useState } from "react";
+import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,7 +28,12 @@ export function DocumentPreview({ data }: DocumentPreviewProps) {
     import("mammoth")
       .then((m) => m.default.convertToHtml({ arrayBuffer: data }))
       .then((result) => {
-        if (!cancelled) setState({ status: "ready", html: result.value });
+        if (!cancelled) {
+          setState({
+            status: "ready",
+            html: DOMPurify.sanitize(result.value, { USE_PROFILES: { html: true } }),
+          });
+        }
       })
       .catch(() => {
         if (!cancelled) setState({ status: "failed" });
@@ -53,9 +59,6 @@ export function DocumentPreview({ data }: DocumentPreviewProps) {
   return (
     <div
       className="prose prose-sm dark:prose-invert max-h-[70vh] max-w-none overflow-auto rounded border border-border/50 px-4 py-3"
-      // mammoth emits a fixed, small tag vocabulary (headings, p, lists,
-      // tables, em/strong) and drops scripts and event handlers during
-      // conversion, so its output is not an injection vector here.
       dangerouslySetInnerHTML={{ __html: state.html }}
     />
   );
