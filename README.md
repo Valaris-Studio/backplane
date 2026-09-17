@@ -17,7 +17,7 @@ your team works, ready to reuse across projects.
 [🏠 Self-host Backplane](#self-hosting) · [🔌 Connect your agent](#connect-your-agent) ·
 [🌐 Website, Cloud & support](https://getbackplane.ai)
 
-[Skills](#skills-share-the-how) · [Runner TUI](#the-runner-in-your-terminal) ·
+[Your workshop](#your-workflow-belongs-here) · [Skills](#skills-share-the-how) · [Runner TUI](#the-runner-in-your-terminal) ·
 [Screenshots](#a-closer-look) · [Documentation](#documentation) ·
 [Report an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose)
 
@@ -35,6 +35,30 @@ your team works, ready to reuse across projects.
 
 <p align="center"><strong>See the project at a glance. Keep the details within reach.</strong><br>
 <sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
+
+## Your workflow belongs here
+
+**A shared workshop. Your way of building.**
+
+Think of Backplane as a **well-equipped garage for your projects**. The plans are
+on the wall, the tools are within reach, and the work is ready for whoever walks
+in next: you, a teammate, or your agent.
+
+**Your team defines the method. Backplane gives it a shared home.** Keep the
+what and when on your boards, the context in notes and resources, and the how
+in [reusable skills](#skills-share-the-how).
+
+There is **no prescribed project methodology**. Start from optional templates,
+bring your own conventions, and choose how the tools work together. That freedom
+takes some setup. You can also build a more guided experience on top of Backplane.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/workshop-dark.svg">
+  <img src=".github/assets/readme/workshop-light.svg" alt="Workshop blueprint: plans, context, skills, and execution tools surround a shared workbench for people and agents; your methodology connects them" width="960">
+</picture>
+
+<p align="center"><strong>The workshop is ready. The way you build is yours.</strong><br>
+<sub>A map of the tools, not a fixed sequence. Open full size: <a href=".github/assets/readme/workshop-light.svg">Light</a> / <a href=".github/assets/readme/workshop-dark.svg">Dark</a></sub></p>
 
 ## Three ways to use Backplane
 
@@ -215,17 +239,6 @@ and [provider guide](runner/docs/providers.md) for current requirements and conf
 > others might find it useful too.
 >
 > **[Sebastian](https://www.linkedin.com/in/sebastian-breit-foncillas-a79723124/), cofounder of [Valaris](https://valaris.studio)**
-
-## Your workflow belongs here
-
-**Backplane provides the tools. You define how your team works.**
-
-Organize your projects, establish your conventions, and configure workflows around
-**your own methodology**. [Skills](#skills-share-the-how) let you turn those
-practices into reusable guidance. There is no single prescribed way to run a project.
-
-That flexibility takes some setup. You'll make choices about how to structure
-context and coordinate work. Backplane is built for people who want that control.
 
 **Different sessions. One place to pick up the thread.**
 

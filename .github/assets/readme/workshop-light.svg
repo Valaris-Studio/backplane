@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="704" viewBox="0 0 960 704" role="img" aria-labelledby="title description">
+<title id="title">Backplane: a shared workshop for your methodology</title>
+<desc id="description">Plans, context, skills, and execution surround a shared workbench for people and agents. Your team decides how the tools work together; no sequence is prescribed.</desc>
+<defs><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#d7e5dc" stroke-width="1"/></pattern></defs>
+<rect width="960" height="704" rx="16" fill="#f5f9f6"/>
+<rect x="16" y="16" width="928" height="672" fill="url(#grid)" stroke="#276b39" stroke-width="2"/>
+<g fill="none" stroke="#276b39" stroke-width="2" stroke-dasharray="7 7"><path d="M253 232V282M707 232V282M253 437V472M707 437V472"/></g>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif">
+<g><rect x="48" y="60" width="410" height="172" rx="5" fill="#ffffff" stroke="#276b39" stroke-width="2"/>
+<path d="M64 76h12m-12 0v12M442 216h-12m12 0v-12" fill="none" stroke="#276b39" stroke-width="2"/>
+<text x="76" y="111" fill="#173d2b" font-size="31" font-weight="700">PLANS</text>
+<text x="430" y="109" fill="#446452" font-size="20" text-anchor="end">What + when</text>
+<text x="76" y="163" fill="#173d2b" font-size="28">Boards, priorities</text>
+<text x="76" y="200" fill="#173d2b" font-size="28">and dependencies</text></g>
+<g><rect x="502" y="60" width="410" height="172" rx="5" fill="#ffffff" stroke="#276b39" stroke-width="2"/>
+<path d="M518 76h12m-12 0v12M896 216h-12m12 0v-12" fill="none" stroke="#276b39" stroke-width="2"/>
+<text x="530" y="111" fill="#173d2b" font-size="31" font-weight="700">CONTEXT</text>
+<text x="884" y="109" fill="#446452" font-size="20" text-anchor="end">The why</text>
+<text x="530" y="163" fill="#173d2b" font-size="28">Notes, decisions</text>
+<text x="530" y="200" fill="#173d2b" font-size="28">and resources</text></g>
+<g><rect x="48" y="472" width="410" height="172" rx="5" fill="#ffffff" stroke="#276b39" stroke-width="2"/>
+<path d="M64 488h12m-12 0v12M442 628h-12m12 0v-12" fill="none" stroke="#276b39" stroke-width="2"/>
+<text x="76" y="523" fill="#173d2b" font-size="31" font-weight="700">SKILLS</text>
+<text x="430" y="521" fill="#446452" font-size="20" text-anchor="end">The how</text>
+<text x="76" y="575" fill="#173d2b" font-size="28">Methods, checklists</text>
+<text x="76" y="612" fill="#173d2b" font-size="28">and conventions</text></g>
+<g><rect x="502" y="472" width="410" height="172" rx="5" fill="#ffffff" stroke="#276b39" stroke-width="2"/>
+<path d="M518 488h12m-12 0v12M896 628h-12m12 0v-12" fill="none" stroke="#276b39" stroke-width="2"/>
+<text x="530" y="523" fill="#173d2b" font-size="31" font-weight="700">EXECUTION</text>
+<text x="884" y="521" fill="#446452" font-size="20" text-anchor="end">Put it to work</text>
+<text x="530" y="575" fill="#173d2b" font-size="28">MCP tools and</text>
+<text x="530" y="612" fill="#173d2b" font-size="28">optional runners</text></g>
+<rect x="144" y="282" width="672" height="155" rx="8" fill="#e6f2e9" stroke="#276b39" stroke-width="3"/>
+<text x="480" y="322" fill="#446452" font-size="25" letter-spacing="2" text-anchor="middle">YOUR METHODOLOGY</text>
+<text x="480" y="372" fill="#173d2b" font-size="40" font-weight="700" text-anchor="middle">PEOPLE + AGENTS</text>
+<text x="480" y="409" fill="#173d2b" font-size="25" text-anchor="middle">Choose how the tools work together.</text>
+<text x="480" y="676" fill="#446452" font-size="17" letter-spacing="2" text-anchor="middle">BACKPLANE / THE SHARED WORKSHOP</text>
+</g></svg>
