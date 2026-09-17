@@ -11,11 +11,13 @@
 
 Backplane is a **shared workspace for your team and coding agents**. Keep tasks,
 project definitions, notes, and decisions together, so the next person or agent
-can pick up the work with the context behind it.
+can pick up the work with the context behind it. **Shared skills** preserve how
+your team works, ready to reuse across projects.
 
 [🏠 Self-host Backplane](#self-hosting) · [🔌 Connect your agent](#connect-your-agent) ·
 [🌐 Website, Cloud & support](https://getbackplane.ai)
 
+[Your workshop](#your-workflow-belongs-here) · [Skills](#skills-share-the-how) · [Runner TUI](#the-runner-in-your-terminal) ·
 [Screenshots](#a-closer-look) · [Documentation](#documentation) ·
 [Report an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose)
 
@@ -33,6 +35,30 @@ can pick up the work with the context behind it.
 
 <p align="center"><strong>See the project at a glance. Keep the details within reach.</strong><br>
 <sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
+
+## Your workflow belongs here
+
+**A shared workshop. Your way of building.**
+
+Think of Backplane as a **well-equipped garage for your projects**. The plans are
+on the wall, the tools are within reach, and the work is ready for whoever walks
+in next: you, a teammate, or your agent.
+
+**Your team defines the method. Backplane gives it a shared home.** Keep the
+what and when on your boards, the context in notes and resources, and the how
+in [reusable skills](#skills-share-the-how).
+
+There is **no prescribed project methodology**. Start from optional templates,
+bring your own conventions, and choose how the tools work together. That freedom
+takes some setup. You can also build a more guided experience on top of Backplane.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/workshop-dark.svg">
+  <img src=".github/assets/readme/workshop-light.svg" alt="Workshop blueprint: plans, context, skills, and execution tools surround a shared workbench for people and agents; your methodology connects them" width="960">
+</picture>
+
+<p align="center"><strong>The workshop is ready. The way you build is yours.</strong><br>
+<sub>A map of the tools, not a fixed sequence. Open full size: <a href=".github/assets/readme/workshop-light.svg">Light</a> / <a href=".github/assets/readme/workshop-dark.svg">Dark</a></sub></p>
 
 ## Three ways to use Backplane
 
@@ -63,11 +89,36 @@ can pick up the work with the context behind it.
   </tr>
 </table>
 
+## Skills: share the how
+
+**Boards, notes, and resources keep the what and when. Skills carry the how.**
+
+Turn a useful method into a **shared, reusable skill**: your release checklist,
+debugging approach, review standards, or team conventions. Keep it in your
+workspace library and apply it to the project boards that need it.
+
+- **📚 Build your team's playbook.** Author your own `SKILL.md` bundles or start
+  from the built-in catalog. Your methodology stays yours.
+- **🔗 Share across projects.** Reuse a skill across boards in your workspace.
+  Each board can follow the **latest published version** or **pin a version**.
+- **🌱 Improve as you learn.** Publish new versions as your methods evolve.
+  Runner agents can propose improvements; **humans review and approve publication**.
+- **🔌 Put it to work.** MCP-connected agents can read skill files. Configured
+  runners place board skills where Claude Code and Codex discover them.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/skills-dark.png">
+  <img src=".github/assets/readme/skills-light.png" alt="Backplane Skills Library with a reusable board hygiene playbook, a release checklist, and published version history" width="1200">
+</picture>
+
+<p align="center"><strong>A good method should survive the session that discovered it.</strong><br>
+<sub>Harborlight demo workspace · September 2026 · Open full size: <a href=".github/assets/readme/skills-light.png">Light</a> / <a href=".github/assets/readme/skills-dark.png">Dark</a></sub></p>
+
 ## Bring the agent you already use
 
 **Your tools can change. Your project context can stay together.**
 
-Backplane exposes its boards, cards, notes, and project context through **MCP**.
+Backplane exposes boards, cards, notes, **skills**, and project context through **MCP**.
 Choose a terminal, editor, or desktop assistant. Familiar clients with **local MCP
 server support** include:
 
@@ -119,6 +170,50 @@ configuration and available MCP features vary by client.
 **Want the full tour?** [Explore more product screens](https://getbackplane.ai/en/screens),
 including notes, resources, approvals, skills, and activity views.
 
+## The runner in your terminal
+
+**🖥️ Plan in Backplane. Run with your own agents. See what happened.**
+
+The optional **Backplane Runner** takes work from the platform, runs your configured
+workflow in your repositories, and reports the results. The **terminal UI (TUI)**
+guides setup; the console keeps execution visible.
+
+- **Choose how to run.** Use pipeline assignments or board loops with
+  **Claude Code or Codex CLI**, on your own machine and credentials.
+- **Review before launch.** Choose the board, agent, model, and MCP configuration
+  in the guided wizard. Review the settings and save a **reusable profile**.
+- **Follow the work.** See assignments, execution stages, **reported costs**, and
+  Git outcomes in the console. Runner forge support covers **GitHub and Gitea**.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/runner-setup-dark.webp">
+  <img src=".github/assets/readme/runner-setup-light.webp" alt="Backplane runner terminal wizard reviewing the board, agent, model, MCP configuration, and profile before launch" width="1200">
+</picture>
+
+<p align="center"><strong>Your next run, ready to review before it starts.</strong><br>
+<sub>Local demo TUI capture · August 2026 · Open full size: <a href=".github/assets/readme/runner-setup-light.webp">Light</a> / <a href=".github/assets/readme/runner-setup-dark.webp">Dark</a></sub></p>
+
+<details>
+<summary>🔎 See a demo execution: assignments, stages, costs, and Git activity</summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/runner-work-dark.webp">
+  <img src=".github/assets/readme/runner-work-light.webp" alt="Backplane runner console showing a local demo assignment, agent execution, reported cost, commit, and branch push" width="1200">
+</picture>
+
+**From a card to a recorded result.** The console shows the work as it moves
+through the configured stages, including agent completion and Git activity.
+
+<sub>Local demo executions captured August 25, 2026. Light and dark show separate
+runs, so timestamps and reported costs differ. Open full size:
+<a href=".github/assets/readme/runner-work-light.webp">Light</a> /
+<a href=".github/assets/readme/runner-work-dark.webp">Dark</a>.</sub>
+
+</details>
+
+**Runners are experimental.** Start with the [runner setup guide](runner/README.md#quickstart)
+and [provider guide](runner/docs/providers.md) for current requirements and configuration.
+
 ## Why I'm building Backplane
 
 > When we founded [Valaris](https://valaris.studio), I kept coming back to two questions:
@@ -145,16 +240,6 @@ including notes, resources, approvals, skills, and activity views.
 >
 > **[Sebastian](https://www.linkedin.com/in/sebastian-breit-foncillas-a79723124/), cofounder of [Valaris](https://valaris.studio)**
 
-## Your workflow belongs here
-
-**Backplane provides the tools. You define how your team works.**
-
-Organize your projects, establish your conventions, and configure workflows around
-**your own methodology**. There is no single prescribed way to run a project.
-
-That flexibility takes some setup. You'll make choices about how to structure
-context and coordinate work. Backplane is built for people who want that control.
-
 **Different sessions. One place to pick up the thread.**
 
 ```text
@@ -170,7 +255,7 @@ context and coordinate work. Backplane is built for people who want that control
 
 ```mermaid
 flowchart TB
-    H["People"] <-->|Web app| B["Backplane<br/>Project context · Tasks · Decisions"]
+    H["People"] <-->|Web app| B["Backplane<br/>Project context · Tasks · Skills"]
     A["Your coding agent"] <-->|MCP| B
     B -->|Configured work and context| R["Optional runners<br/>Experimental"]
     R -->|Progress, results, costs| B
@@ -292,7 +377,8 @@ client configuration, and protecting remote HTTP connections.
 
 **💡 Give your agent somewhere to start.** Once connected, try:
 
-> Read this project's definition and summarize its goals and constraints.
+> Read this project's definition and assigned skills, then summarize its goals
+> and working conventions.
 
 > Show me the blocked cards and their dependencies.
 
@@ -302,6 +388,8 @@ Use your own prompts and conventions. **The shared context stays in Backplane**
 when you switch sessions or tools.
 
 ### Optional runners
+
+[See the terminal UI and demo execution above ↑](#the-runner-in-your-terminal)
 
 ⚙️ **Ready to let agents pick up work?** Add a runner as a separate step.
 **Runners are experimental.** You need a **coding-agent CLI on PATH** and
