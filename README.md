@@ -7,7 +7,7 @@
 <p align="center"><strong>Shared context for projects that outlive a coding session.</strong></p>
 <p align="center">🏠 Self-hosted &nbsp; · &nbsp; 🔌 Bring your own agents &nbsp; · &nbsp; 🧭 Your methodology</p>
 
-**A new coding session should not mean starting your project from scratch.**
+**Start every new coding session with an organized, coherent and updated context**
 
 Backplane is a **shared workspace for your team and coding agents**. Keep tasks,
 project definitions, notes, and decisions together, so the next person or agent
@@ -41,7 +41,7 @@ can pick up the work with the context behind it.
     <td width="64" align="center"><img src=".github/assets/readme/organize.svg" alt="" width="40"></td>
     <td>
       <strong>Organize the work, keep the context</strong><br>
-      Tasks, definitions, notes, and decisions give your team a shared place to plan, track progress, and preserve why a decision was made.<br>
+      Tasks, definitions, notes, and decisions give you and your team a shared place to plan, track progress, and preserve why a decision was made.<br>
       <em>Start here. Useful on its own, without an agent.</em>
     </td>
   </tr>
