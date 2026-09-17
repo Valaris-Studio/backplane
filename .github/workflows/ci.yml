@@ -5,7 +5,7 @@ name: CI
 # any cloud credentials. cloudbuild.yaml stays deploy-only.
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/preview-*']
   pull_request:
   workflow_dispatch:
 

@@ -1,10 +1,9 @@
 name: Quickstart gate
 
-# Scheduled + manual only, not per-push/per-PR: this org is on GitHub's free
-# plan, where Actions minutes are scarce, and this gate builds and boots the
-# whole Docker stack from scratch (~5-10 min/run). Nightly + on-demand is the
-# deliberate cost/coverage trade-off — it still catches a cold-path regression
-# within a day, without taxing every push.
+# Required checks must run on eligible push/PR events: workflow_dispatch jobs
+# alone do not satisfy branch protection, even when their commit is green.
+# Release staging pushes qualify the exact commit before promotion to main.
+# Keep nightly and manual runs available for additional cold-install checks.
 #
 # GitHub-hosted runners are cache-cold by construction (no prior `docker
 # compose up` on the machine, no populated named volumes), which is exactly
@@ -13,9 +12,15 @@ name: Quickstart gate
 # COMPOSE_PROJECT_NAME) but may still reuse cached Docker image layers on a
 # dev machine; this job has neither.
 on:
+  push:
+    branches: [main, 'codex/preview-*']
+  pull_request:
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   quickstart-gate:
