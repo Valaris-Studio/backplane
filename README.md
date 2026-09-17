@@ -7,27 +7,31 @@
 <p align="center"><strong>Shared context for projects that outlive a coding session.</strong></p>
 <p align="center">🏠 Self-hosted &nbsp; · &nbsp; 🔌 Bring your own agents &nbsp; · &nbsp; 🧭 Your methodology</p>
 
-Keep project knowledge, decisions, and work connected across your team and your
-coding agents. Backplane brings project definitions, tasks, notes, and decisions
-into one durable workspace, so people and agents can work from shared context
-as a project grows.
+**A new coding session should not mean starting your project from scratch.**
 
-[Get started](#self-hosting) · [Connect an agent](#connect-your-agent) ·
+Backplane is a **shared workspace for your team and coding agents**. Keep tasks,
+project definitions, notes, and decisions together, so the next person or agent
+can pick up the work with the context behind it.
+
+[🏠 Self-host Backplane](#self-hosting) · [🔌 Connect your agent](#connect-your-agent) ·
+[🌐 Website, Cloud & support](https://getbackplane.ai)
+
 [Screenshots](#a-closer-look) · [Documentation](#documentation) ·
 [Report an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose)
 
-> **Open Source Preview.** Self-host Backplane and bring your own coding agents.
-> APIs and workflows may evolve as we incorporate feedback.
-> Start with [Self-hosting](#self-hosting) for an instance with password login.
-> **Runners are experimental.** See [Known limitations](#known-limitations)
-> before planning a deployment.
+> [!NOTE]
+> **Open Source Preview.** Start with [Self-hosting](#self-hosting) for an instance
+> with password login. Bring your own agents whenever you're ready.
+>
+> APIs and workflows may evolve. **Runners are experimental**; review the
+> [known limitations](#known-limitations) before planning a deployment.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">
   <img src=".github/assets/readme/board-light.png" alt="Backplane's Tidewatch demo board, with tasks across Backlog, In Progress, In Review, Done, and Blocked" width="1200">
 </picture>
 
-<p align="center"><strong>The work, the context, and the next step. In one place.</strong><br>
+<p align="center"><strong>See the project at a glance. Keep the details within reach.</strong><br>
 <sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
 
 ## Three ways to use Backplane
@@ -36,49 +40,75 @@ as a project grows.
   <tr>
     <td width="64" align="center"><img src=".github/assets/readme/organize.svg" alt="" width="40"></td>
     <td>
-      <strong>Organize your projects</strong><br>
-      Keep tasks, definitions, notes, and decisions together. Collaborate with your team in the app.<br>
-      <em>Useful on its own, without an agent.</em>
+      <strong>Organize the work, keep the context</strong><br>
+      Tasks, definitions, notes, and decisions give your team a shared place to plan, track progress, and preserve why a decision was made.<br>
+      <em>Start here. Useful on its own, without an agent.</em>
     </td>
   </tr>
   <tr>
     <td width="64" align="center"><img src=".github/assets/readme/connect.svg" alt="" width="40"></td>
     <td>
-      <strong>Connect your agent</strong><br>
-      Give your coding agent access to shared project context and work through MCP.<br>
+      <strong>Let your agent join the project</strong><br>
+      Connect through MCP to read and update boards, cards, and notes from the coding tools you already use.<br>
       <em>Your agent, your credentials. No runner required.</em>
     </td>
   </tr>
   <tr>
     <td width="64" align="center"><img src=".github/assets/readme/workflow.svg" alt="" width="40"></td>
     <td>
-      <strong>Run configured workflows</strong><br>
-      Add optional runners to execute workflows and report progress, results, and costs.<br>
-      <em>Experimental. You choose roles, providers, budgets, and approval gates.</em>
+      <strong>Make delegated work observable</strong><br>
+      Add optional runners for configured workflows. Choose roles, providers, budgets, and approval gates, then follow progress, results, and costs.<br>
+      <em>Experimental. Configure the process around your team.</em>
     </td>
   </tr>
 </table>
+
+## Bring the agent you already use
+
+**Your tools can change. Your project context can stay together.**
+
+Backplane exposes its boards, cards, notes, and project context through **MCP**.
+Choose a terminal, editor, or desktop assistant. Familiar clients with **local MCP
+server support** include:
+
+| Where you work | MCP clients |
+|---|---|
+| **⌨️ Terminal** | [Claude Code](https://code.claude.com/docs/en/mcp) · [Codex](https://developers.openai.com/codex/mcp/) · [Gemini CLI](https://geminicli.com/docs/tools/mcp-server/) · [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers) · [OpenCode](https://opencode.ai/docs/mcp-servers/) |
+| **🧑‍💻 Editor** | [Cursor](https://cursor.com/docs/mcp) · [GitHub Copilot in VS Code](https://code.visualstudio.com/docs/agent-customization/mcp-servers) · [Cline](https://docs.cline.bot/mcp/mcp-overview) · [Roo Code](https://docs.roocode.com/features/mcp/using-mcp-in-roo) |
+| **💬 Desktop** | [Claude Desktop](https://modelcontextprotocol.io/docs/develop/connect-local-servers) |
+
+Use **`backplane-mcp` over stdio** to connect a compatible MCP client,
+including **your own agent**, to your instance.
+**Streamable HTTP** is also available where the client supports it. Follow the
+linked client documentation and our [MCP setup guide](mcp-server/README.md#configure);
+configuration and available MCP features vary by client.
+
+**[Connect your agent →](#connect-your-agent)**
+
+> **⚙️ Want Backplane to run the work?** The optional runner currently executes
+> **Claude Code and Codex CLI**. [Runners are experimental](#optional-runners)
+> and are a separate setup from connecting an MCP client.
 
 ## A closer look
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <strong>📍 Give the project a shared direction</strong><br><br>
+      <strong>📍 Give everyone the same starting point</strong><br><br>
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/definition-dark.png">
         <img src=".github/assets/readme/definition-light.png" alt="Project definition showing scope, objectives, priorities, and exclusions" width="580">
       </picture><br>
-      Keep scope, objectives, and boundaries alongside the work.<br>
+      <strong>Scope, objectives, and boundaries</strong> stay alongside the work they guide.<br>
       <a href=".github/assets/readme/definition-light.png">Full size: light</a> · <a href=".github/assets/readme/definition-dark.png">dark</a>
     </td>
     <td width="50%" valign="top">
-      <strong>🔎 Follow a task beyond its title</strong><br><br>
+      <strong>🔎 Follow the work beyond its status</strong><br><br>
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/card-dark.png">
         <img src=".github/assets/readme/card-light.png" alt="A task showing its description, priority, dependencies, participants, and linked pull request" width="580">
       </picture><br>
-      See the details, dependencies, and linked pull request in one card.<br>
+      Keep the <strong>description, dependencies, participants, and linked pull request</strong> together.<br>
       <a href=".github/assets/readme/card-light.png">Full size: light</a> · <a href=".github/assets/readme/card-dark.png">dark</a>
     </td>
   </tr>
@@ -86,41 +116,46 @@ as a project grows.
 
 <sub>Original captures of fictional demo projects, September 2026. Screenshots follow your light or dark theme.</sub>
 
+**Want the full tour?** [Explore more product screens](https://getbackplane.ai/en/screens),
+including notes, resources, approvals, skills, and activity views.
+
 ## Why I'm building Backplane
 
-When we founded [Valaris](https://valaris.studio), I kept coming back to two
-questions: how do we keep a team aligned when everyone works with coding agents,
-and how do we stay aware of our projects' context and progress?
-
-Backplane started as our project management tool. It gradually became our shared
-context manager: the place we use every day to organize work, preserve decisions,
-and collaborate on our own projects and our customers' projects.
-
-Coding agents are awesome. But over longer projects, their sessions can start to
-look like Swiss cheese: useful work, with holes in the context between sessions,
-people, and tools. Those gaps accumulate unless someone actively takes care of
-them.
-
-"Trust me bro" isn't enough for us. We want to understand what's planned, when
-and how it should happen, and what happened before. And we want that information
-to be easy to share with both people and agents.
-
-Backplane gives us a durable place to keep that context and coordinate the work
-around it. We built it for ourselves, and we're opening it up because we think
-others might find it useful too.
-
-**Sebastian, cofounder of Valaris**
+> When we founded [Valaris](https://valaris.studio), I kept coming back to two questions:
+>
+> - **How do we keep a team aligned** when everyone works with coding agents?
+> - **How do we stay aware** of our projects' context and progress?
+>
+> Backplane started as our project management tool. It gradually became our shared
+> context manager: the place we use every day to organize work, preserve decisions,
+> and collaborate on our own projects and our customers' projects.
+>
+> Coding agents are awesome. But over longer projects, their sessions can start to
+> look like **Swiss cheese**: useful work, with holes in the context between sessions,
+> people, and tools. Those gaps accumulate unless someone actively takes care of them.
+>
+> **"Trust me bro" isn't enough for us.** We want to understand what's planned,
+> when and how it should happen, and what happened before.
+>
+> And we want that information to be easy to share with both people and agents.
+>
+> Backplane gives us a durable place to keep that context and coordinate the work
+> around it. We built it for ourselves, and we're opening it up because we think
+> others might find it useful too.
+>
+> **[Sebastian](https://www.linkedin.com/in/sebastian-breit-foncillas-a79723124/), cofounder of [Valaris](https://valaris.studio)**
 
 ## Your workflow belongs here
 
-Backplane provides the tools; you define how your team works. Organize your
-projects, establish your conventions, and configure workflows around your own
-methodology. There is no single prescribed way to run a project.
+**Backplane provides the tools. You define how your team works.**
+
+Organize your projects, establish your conventions, and configure workflows around
+**your own methodology**. There is no single prescribed way to run a project.
 
 That flexibility takes some setup. You'll make choices about how to structure
 context and coordinate work. Backplane is built for people who want that control.
 
-Different sessions. One place to pick up the thread.
+**Different sessions. One place to pick up the thread.**
 
 ```text
  session 01   session 02   session 03
@@ -142,15 +177,17 @@ flowchart TB
     R --> G["Your repositories"]
 ```
 
-Backplane supplies no intelligence: you bring your own agents. The platform owns
-configuration, scheduling, prompts, and authorization; runners execute that
-contract. Runners can work in separate Git branches and open pull requests, but
-execute agent commands on their host. See
-[Known security posture](SECURITY.md#known-security-posture).
+**🧩 Bring the intelligence. Backplane keeps the work connected.**
 
-The runner supports Claude Code and Codex CLI, with GitHub and Gitea for the
-pull-request lifecycle. You can also use the platform through MCP from your own
-agent without running a runner.
+- **People and agents share the same project record**, through the web app and MCP.
+- **The platform owns the configuration**, scheduling, prompts, and authorization.
+- **Optional runners execute that contract** and report progress, results, and costs.
+
+Runners can work in **separate Git branches** and open pull requests. They execute
+agent commands on their host; see [Known security posture](SECURITY.md#known-security-posture).
+
+The runner currently supports **Claude Code and Codex CLI**, with **GitHub and Gitea**
+for the pull-request lifecycle. Connecting through MCP **does not require a runner**.
 
 <details>
 <summary>Inside the repository</summary>
@@ -168,8 +205,16 @@ agent without running a runner.
 
 ## Self-hosting
 
-The production stack is one compose file (Postgres, backend, frontend), with
-local password login on by default and no cloud dependency:
+🏠 **Your infrastructure. Your project context.**
+
+Run Backplane with **one Compose file**: Postgres, backend, and frontend.
+**Local password login is enabled by default**, with no cloud dependency.
+
+> **☁️ Cloud & support:** Visit [getbackplane.ai](https://getbackplane.ai) for
+> product information and the planned **Backplane Cloud** offering, including
+> managed hosting, support, and guided onboarding. **Cloud is not yet available.**
+
+**1. Configure and start**
 
 ```bash
 git clone https://github.com/Valaris-Studio/backplane.git
@@ -182,71 +227,115 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Open **http://localhost:8080** or your `BACKPLANE_URL` (port override:
-`BACKPLANE_HTTP_PORT`). A fresh instance shows a first-run screen to create
-the admin account; after that it's the normal login page. Backend and frontend
-build from source on the first `up` (no published images), and database
-migrations run automatically on startup, no manual step.
+**2. Create your admin account**
 
-The first `up -d` builds both images from source and then runs migrations, so
-it can take a few minutes before anything answers. The frontend won't accept
-traffic until the backend reports healthy, so you'll see nothing rather than a
-half-broken page in the meantime. Watch progress with
-`docker compose -f docker-compose.prod.yml logs -f backend`, and check
-`docker compose -f docker-compose.prod.yml ps`; services show `(healthy)`
-once ready. If backend instead cycles between `unhealthy` and `restarting`,
-that's a migration or startup crash-loop; the backend logs above are where to
-look.
+Open **http://localhost:8080** or your `BACKPLANE_URL`.
+The first-run screen creates your admin account; later visits use the normal login page.
+Use `BACKPLANE_HTTP_PORT` to override the port.
 
-Optional: seed the same demo workspace as dev; pass the email of the account
-you created at first run so it gets owner access to the seeded workspace:
+**The first start builds backend and frontend from source**, then runs database
+migrations automatically. There are no published images for these two services
+and no manual migration step. Allow a few minutes for the first build and startup.
+
+<details>
+<summary>🔎 Watch startup progress or troubleshoot a slow first boot</summary>
+
+The frontend accepts traffic only after the backend reports healthy. Until then,
+the page is unavailable while the stack finishes starting.
+
+Follow the backend logs:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend
+```
+
+Check service status:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+Services show **`(healthy)`** once ready. If the backend cycles between
+`unhealthy` and `restarting`, inspect its logs for a migration or startup crash.
+
+</details>
+
+**3. Explore a populated workspace (optional)**
+
+Seed the same demo workspace used in development. Pass the email of your
+first-run account to give it **owner access** to the seeded workspace:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec -T backend python -m scripts.seed_demo --email you@example.com
 ```
 
-Hardening an internet-facing deployment (TLS, proxies, OIDC) is covered in [`SECURITY.md`](SECURITY.md) and the in-app
-documentation's *Securing a Self-Hosted Deployment* section.
+> [!IMPORTANT]
+> **Putting Backplane on the internet?** Follow [`SECURITY.md`](SECURITY.md) and
+> **Securing a Self-Hosted Deployment** in the in-app documentation for TLS,
+> proxies, and OIDC.
 
 ## Connect your agent
 
-Once your instance is running, connect an MCP-capable coding agent to read
-project context and work with boards, cards, and notes.
+🔌 **Bring your agent into the same project context.**
 
-1. Create a platform API key from your account menu under **API Keys**.
-2. Follow the [MCP setup guide](mcp-server/README.md#configure) to configure
-   `backplane-mcp` with your instance URL and API key in your client.
-3. Start with the `default` toolset for everyday project work.
+Once your instance is running, connect an MCP-capable coding agent to read
+context and work with **boards, cards, and notes**.
+
+1. **Create an API key** from your account menu under **API Keys**.
+2. **Connect your client** using the [MCP setup guide](mcp-server/README.md#configure).
+   Configure `backplane-mcp` with your instance URL and API key.
+3. **Start with the `default` toolset** for everyday project work.
 
 The MCP server is available on [PyPI](https://pypi.org/project/backplane-mcp/)
-and runs through `uvx backplane-mcp`. The setup guide covers credentials,
+and runs through **`uvx backplane-mcp`**. The setup guide covers credentials,
 client configuration, and protecting remote HTTP connections.
+
+**💡 Give your agent somewhere to start.** Once connected, try:
+
+> Read this project's definition and summarize its goals and constraints.
+
+> Show me the blocked cards and their dependencies.
+
+> Record our decision in a project note so the next session can find it.
+
+Use your own prompts and conventions. **The shared context stays in Backplane**
+when you switch sessions or tools.
 
 ### Optional runners
 
-Adding a runner is a separate step: you need a coding-agent CLI on PATH and
-forge credentials. In the app, it's the **Launch runner wizard** at **Runner →
-Runners → Create runner**, which walks Identity → Roles → Config → Launch and
-ends with the command that starts the binary. The full write-up is in the in-app
-documentation (**Documentation → Getting Started → Registering a Runner**), also
-readable at `/documentation` without creating a workspace, and mirrored in
-[`runner/README.md`](runner/README.md#quickstart). If `~/.claude.json` doesn't
-exist yet, `touch ~/.claude.json` before your first `make dev-runner`;
-otherwise Docker creates a root-owned directory at that path instead of
-bind-mounting the file.
+⚙️ **Ready to let agents pick up work?** Add a runner as a separate step.
+**Runners are experimental.** You need a **coding-agent CLI on PATH** and
+**forge credentials**.
+
+Open **Runner → Runners → Create runner** to use the **Launch runner wizard**:
+
+```text
+Identity → Roles → Config → Launch
+```
+
+The wizard ends with the command that starts the binary. For the full guide, see
+**Documentation → Getting Started → Registering a Runner** in the app, or
+[`runner/README.md`](runner/README.md#quickstart).
+The in-app guide is also available at `/documentation` without creating a workspace.
+
+> [!NOTE]
+> **Before your first `make dev-runner`:** if `~/.claude.json` does not exist,
+> run `touch ~/.claude.json`. Otherwise Docker creates a root-owned directory
+> at that path instead of bind-mounting the file.
 
 ## Quickstart
 
-This is the local development setup, with automatic authentication. For an
-instance with password login, follow [Self-hosting](#self-hosting).
+🛠️ **Working on Backplane itself? Start here.**
 
-You need Docker + Compose, git, make, bash, and curl. The stack runs in
-containers; native Python, Node, pnpm, and Go installs are only needed for
-[development outside Docker](CONTRIBUTING.md#dev-setup). `lsof` improves the
-health helpers' port checks when available.
+This is the **local development setup**, with automatic authentication.
+For an instance with password login, follow [Self-hosting](#self-hosting).
 
-`make dev` runs in the foreground and keeps streaming logs, so the optional
-seed goes in a second terminal.
+**You need:** Docker + Compose, git, make, bash, and curl.
+The stack runs in containers. Native Python, Node, pnpm, and Go installs are only
+needed for [development outside Docker](CONTRIBUTING.md#dev-setup).
+Optional `lsof` improves the health helpers' port checks.
+
+**1. Start the stack in Terminal A**
 
 ```bash
 # Terminal A
@@ -256,136 +345,168 @@ cp .env.example .env      # defaults work for local dev as-is
 make dev                  # Postgres :5433 + backend :8000 + frontend :5173
 ```
 
-Wait for `Application startup complete` from the backend and `VITE ready` from
-the frontend. The backend runs its migrations on startup, so first boot takes
-a little longer.
+`make dev` stays in the foreground and streams logs.
+Wait for **`Application startup complete`** from the backend and **`VITE ready`**
+from the frontend. Migrations run automatically, so first boot takes a little longer.
+
+**2. Add sample work in Terminal B (optional)**
 
 ```bash
 # Terminal B (optional)
 make seed-demo            # a sample workspace + populated board
 ```
 
-Open **http://localhost:5173**. In dev mode you are authenticated automatically
-as `dev@valaris.dev`, with no signup flow.
+The demo gives you a **populated board to explore**. It is safe to re-run and
+refuses to add demo data to an instance that already holds real work.
+Use `FORCE=1` only if you intend to override that protection.
 
-**Stopping and restarting**
+**3. Open the app**
 
-`Ctrl+C` in Terminal A stops the stack; your database survives in a Docker
-volume, so `make dev` picks up where you left off. To throw everything away,
-run `make clean`. It runs `docker compose down -v` and also removes local
-`node_modules` and build output. **That deletes your database.**
+| Open | What to expect |
+|---|---|
+| **http://localhost:5173** | Automatically authenticated as `dev@valaris.dev`, with no signup flow |
+| **http://localhost:8000/api/docs** | Interactive API docs (Swagger UI) |
 
-`make seed-demo` gives you something to click through instead of an empty
-screen. It is safe to re-run, and it refuses to add demo data to an instance
-that already holds real work (pass `FORCE=1` to override).
+**Stop and resume:** `Ctrl+C` in Terminal A stops the stack. Your database stays
+in a Docker volume, so `make dev` picks up where you left off.
 
-Not sure if the stack actually came up cleanly? `make doctor` prints a
-one-shot health readout: container health, listening ports, endpoint probes,
-and migration head. It is the quick answer to "is my stack actually up?"
+> [!WARNING]
+> **`make clean` deletes your database.** It runs `docker compose down -v` and
+> also removes local `node_modules` and build output. Use it only when you want
+> to throw everything away.
 
-API docs (Swagger UI): **http://localhost:8000/api/docs**
+<details>
+<summary>🧪 Check stack health and the development setup</summary>
 
-For native development and test commands, see
-[Contributing](CONTRIBUTING.md#dev-setup). Use `make runner-test` for runner
-checks; bare Go tests inside this repository can modify the live worktree.
+- **`make doctor`** gives a one-shot health readout: container health, listening
+  ports, endpoint probes, and migration head.
+- **`make quickstart-gate`** verifies this Quickstart in a temporary copy, using
+  disposable containers, volumes, and randomized ports. It needs Docker and
+  can run while `make dev` is up.
+- **[Native development and test commands](CONTRIBUTING.md#dev-setup)** cover
+  working on individual components outside Docker.
 
-`make quickstart-gate` verifies the development Quickstart in a temporary copy
-with disposable containers, volumes, and randomized ports. It needs Docker and
-can run while `make dev` is up.
+**Use `make runner-test` for runner checks.** Bare Go tests inside this repository
+can modify the live worktree.
+
+</details>
 
 ## Documentation
 
-The full documentation ships **inside the app**, covering
-core concepts, configuration of every pipeline field, operations, architecture,
-and an honest "rough edges" section. Open `/documentation` on your instance:
-[self-hosted](http://localhost:8080/documentation) or
+📚 **The full guide ships with the app.**
+
+Open **`/documentation`** on your instance:
+[self-hosted](http://localhost:8080/documentation) ·
 [local development](http://localhost:5173/documentation).
 
-Reference material also lives in-repo:
+It covers **core concepts, every pipeline field, operations, and architecture**,
+plus a candid guide to current rough edges.
 
-| Doc | What's in it |
+**Find the reference you need:**
+
+| Looking for | Read |
 |---|---|
-| [`docs/platform-source-of-truth.md`](docs/platform-source-of-truth.md) | Historical architecture reference; current behavior is documented in-app |
-| [`docs/pipeline-config-reference.md`](docs/pipeline-config-reference.md) | Historical pipeline design reference; use in-app documentation for current fields |
-| [`docs/events.md`](docs/events.md) | Event taxonomy |
-| [`docs/git-credentials.md`](docs/git-credentials.md) | Connecting a workspace's own forge account: per-provider tokens, scopes, troubleshooting |
-| [`runner/docs/providers.md`](runner/docs/providers.md) | Coding-agent and forge providers |
-| [`docs/api/openapi.json`](docs/api/openapi.json) | Exported REST API schema: browse it via [`docs/api/index.html`](docs/api/index.html) |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution policy, dev setup, architecture rules, TDD workflow |
+| **Events** | [`docs/events.md`](docs/events.md): event taxonomy |
+| **Forge credentials** | [`docs/git-credentials.md`](docs/git-credentials.md): workspace accounts, provider tokens, scopes, and troubleshooting |
+| **Agent and forge providers** | [`runner/docs/providers.md`](runner/docs/providers.md) |
+| **REST API schema** | [`docs/api/openapi.json`](docs/api/openapi.json), browsable through [`docs/api/index.html`](docs/api/index.html) |
+| **Development** | [`CONTRIBUTING.md`](CONTRIBUTING.md): contribution policy, dev setup, architecture rules, and TDD workflow |
+| **Architecture history** | [`docs/platform-source-of-truth.md`](docs/platform-source-of-truth.md): historical reference; use in-app docs for current behavior |
+| **Pipeline design history** | [`docs/pipeline-config-reference.md`](docs/pipeline-config-reference.md): historical reference; use in-app docs for current fields |
 
-Any running instance serves the same API contract live: Swagger UI at `/api/docs`
-in dev, and the machine-readable schema at `/api/openapi.json`. Regenerate the
-checked-in copy with `python scripts/export-openapi.py` (backend venv active).
+**Need the live API contract?** A running instance serves Swagger UI at
+`/api/docs` in development and the machine-readable schema at `/api/openapi.json`.
+The checked-in export may lag the live schema. Regenerate it with
+`python scripts/export-openapi.py` while the backend venv is active.
 
 ## Known limitations
 
-Being upfront, because these decide whether Backplane fits you today:
+🚧 **Know what fits today and what still needs care.**
 
-- **Authentication is young.** Local email + password login works out of the box
-  (on by default): a fresh instance opens with a first-run admin setup screen,
-  failed logins are throttled per IP and lock the account after 5 straight
-  misses, and workspace admins manage accounts. No identity provider or
-  fronting proxy is required. Generic OIDC (Keycloak, Authentik, Google, Entra,
-  Okta), Google Cloud IAP, and an explicit trusted-proxy mode also work, and
-  production refuses to start with no verifier at all. But the whole surface
-  has far less mileage than the rest of the platform. Treat a first deployment
-  as something to verify, not assume. SAML, SCIM, enforced MFA and email-based
-  password reset are not implemented; password recovery is a workspace admin
-  setting a temporary password.
-- **Object storage** defaults to local disk; the alternative path is Google Cloud
-  Storage. No S3 driver yet.
-- **The backend and frontend ship as source, not images.** Self-hosting builds
-  them locally via docker compose. The client artifacts *are* released: the
-  runner as a multi-arch image (`ghcr.io/valaris-studio/backplane-runner`) and
-  as standalone binaries with checksums
+**Authentication works out of the box, but is still young.** It has less mileage
+than the rest of the platform. Verify your first deployment carefully.
+
+| Authentication today | Details |
+|---|---|
+| **Local login** | Email + password is on by default, with a first-run admin setup screen. No identity provider or fronting proxy is required. |
+| **Login protection** | Failed logins are throttled per IP. Accounts lock after 5 consecutive failed attempts. |
+| **Account management** | Workspace admins manage accounts. Password recovery requires an admin to set a temporary password. |
+| **External authentication** | Generic OIDC (Keycloak, Authentik, Google, Entra, Okta), Google Cloud IAP, and explicit trusted-proxy mode are supported. Production refuses to start with no verifier. |
+| **Not implemented** | SAML, SCIM, enforced MFA, and email-based password reset. |
+
+**Other boundaries to consider:**
+
+- **Storage:** local disk by default, with Google Cloud Storage as an alternative.
+  There is **no S3 driver** yet.
+- **Distribution:** backend and frontend ship as **source, not images**;
+  Docker Compose builds them locally. Client artifacts are released separately:
+  the runner as a multi-arch image (`ghcr.io/valaris-studio/backplane-runner`)
+  and standalone binaries with checksums
   ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/SHA256SUMS)),
-  and the MCP server via `uvx backplane-mcp`.
-- **GitLab PAT connections are supported** for repository credentials and the
-  backend merge-queue plumbing. The runner forge driver for GitLab does not yet
-  open, review, or merge merge requests; those lifecycle operations currently
-  support GitHub and Gitea.
+  and the MCP server through `uvx backplane-mcp`.
+- **GitLab PAT connections are supported** for repository credentials and backend
+  merge-queue plumbing. The runner forge driver for GitLab does not yet open,
+  review, or merge merge requests. Those lifecycle operations currently support
+  **GitHub and Gitea**.
 
 ## Telemetry
 
-**Telemetry is off by default.** The telemetry endpoint also ships empty.
-Sending a ping requires both `BACKPLANE_TELEMETRY_ENABLED=true` and an explicit
-`BACKPLANE_TELEMETRY_ENDPOINT`.
+🔒 **Telemetry is off by default. The endpoint ships empty.**
 
-The optional ping contains five fields: a one-way hashed instance identifier,
-the Backplane version, the Python version, and user and workspace counts.
-It includes no names, emails, workspace slugs, card content, repository URLs,
-or prompts. See the [payload implementation](backend/app/services/telemetry.py).
+Sending a ping requires **both** settings:
+
+```text
+BACKPLANE_TELEMETRY_ENABLED=true
+BACKPLANE_TELEMETRY_ENDPOINT=<your-explicit-endpoint>
+```
+
+- **Five fields only:** a one-way hashed instance identifier, Backplane version,
+  Python version, user count, and workspace count.
+- **No project content:** no names, emails, workspace slugs, card content,
+  repository URLs, or prompts.
+
+Inspect the [payload implementation](backend/app/services/telemetry.py).
 
 ## Contributing
 
+💬 **Your feedback helps shape Backplane.**
+
+| You can help with | Where to go |
+|---|---|
+| **Bug reports, feature requests, and questions** | [Open an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose) |
+| **Security reports** | Follow [`SECURITY.md`](SECURITY.md) privately. Never open a public issue. |
+| **Your own adaptations** | Fork freely under the applicable [component licenses](LICENSES.md). |
+
 **Backplane is maintained solely by the Valaris team and is not accepting outside
-code contributions yet.** Pull requests from outside the team will be closed
-unreviewed. We have no contributor agreement in place and would rather say so
-before you spend the time than after.
+code contributions yet.** External pull requests will be closed unreviewed.
+We have no contributor agreement in place and want you to know before investing
+time in a patch.
 
-**Issues are open and wanted**: bug reports, feature requests, and questions all
-help. Security reports go privately via [`SECURITY.md`](SECURITY.md), never a
-public issue. The licenses permit forks. Fork freely.
-
-We expect to open up to contributions once the architecture settles;
-[`CONTRIBUTING.md`](CONTRIBUTING.md) carries the current policy alongside the dev
-loop, the layering rules (Router → Service → Repository → Model), and the
-test-first expectation.
+We expect to open contributions once the architecture settles.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) carries the current policy, development loop,
+**Router → Service → Repository → Model** layering rules, and test-first expectation.
 
 ## License
 
-Per-component, mapped in **[`LICENSES.md`](LICENSES.md)**:
+⚖️ **Licensing follows the component.** See the full map in
+**[`LICENSES.md`](LICENSES.md)**.
 
-- Platform core (`backend/`, `frontend/`, `mcp-server/`): **AGPL-3.0-or-later**
-- The runner (`runner/`): **MIT**
-- API / OpenAPI / MCP tool schemas: **Apache-2.0**
+| Component | License |
+|---|---|
+| **Platform core:** `backend/`, `frontend/`, `mcp-server/` | AGPL-3.0-or-later |
+| **Runner:** `runner/` | MIT |
+| **API / OpenAPI / MCP tool schemas** | Apache-2.0 |
 
-Third-party dependencies, including one documented non-OSI exception (GSAP), are
-covered in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+Third-party dependencies, including the documented **non-OSI exception (GSAP)**,
+are covered in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ## Naming
 
-The platform is **Backplane**. The `valaris` MCP namespace and `VALARIS_*`
-environment variables are stable technical identifiers and are intentionally not
-renamed; changing them would break every existing agent configuration. Full
-policy: [`docs/branding.md`](docs/branding.md).
+🏷️ **The product is Backplane.** The `valaris` MCP namespace and `VALARIS_*`
+environment variables remain **stable technical identifiers** so existing agent
+configurations keep working.
+
+See the [full naming policy](docs/branding.md).
+
+<p align="center"><strong>Keep the next session connected to the work you have already done.</strong><br>
+<a href="#self-hosting">Self-host Backplane</a> · <a href="#connect-your-agent">Connect your agent</a> · <a href="https://getbackplane.ai">Explore Backplane, Cloud & support</a></p>
