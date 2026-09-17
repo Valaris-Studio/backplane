@@ -15,6 +15,7 @@ as a project grows.
 
 > **Open Source Preview.** Self-host Backplane and bring your own coding agents.
 > APIs and workflows may evolve as we incorporate feedback.
+> Start with [Self-hosting](#self-hosting) for an instance with password login.
 > **Runners are experimental.** See [Known limitations](#known-limitations)
 > before planning a deployment.
 
