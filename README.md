@@ -34,22 +34,26 @@ as a project grows.
 
 <table>
   <tr>
-    <td width="33%" valign="top">
-      <img src=".github/assets/readme/organize.svg" alt="" width="40"><br>
-      <strong>Organize your projects</strong><br><br>
-      Keep tasks, definitions, notes, and decisions together. Collaborate with your team in the app.<br><br>
+    <td width="64" align="center"><img src=".github/assets/readme/organize.svg" alt="" width="40"></td>
+    <td>
+      <strong>Organize your projects</strong><br>
+      Keep tasks, definitions, notes, and decisions together. Collaborate with your team in the app.<br>
       <em>Useful on its own, without an agent.</em>
     </td>
-    <td width="33%" valign="top">
-      <img src=".github/assets/readme/connect.svg" alt="" width="40"><br>
-      <strong>Connect your agent</strong><br><br>
-      Give your coding agent access to shared project context and work through MCP.<br><br>
+  </tr>
+  <tr>
+    <td width="64" align="center"><img src=".github/assets/readme/connect.svg" alt="" width="40"></td>
+    <td>
+      <strong>Connect your agent</strong><br>
+      Give your coding agent access to shared project context and work through MCP.<br>
       <em>Your agent, your credentials. No runner required.</em>
     </td>
-    <td width="33%" valign="top">
-      <img src=".github/assets/readme/workflow.svg" alt="" width="40"><br>
-      <strong>Run configured workflows</strong><br><br>
-      Add optional runners to execute workflows and report progress, results, and costs.<br><br>
+  </tr>
+  <tr>
+    <td width="64" align="center"><img src=".github/assets/readme/workflow.svg" alt="" width="40"></td>
+    <td>
+      <strong>Run configured workflows</strong><br>
+      Add optional runners to execute workflows and report progress, results, and costs.<br>
       <em>Experimental. You choose roles, providers, budgets, and approval gates.</em>
     </td>
   </tr>
