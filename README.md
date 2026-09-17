@@ -1,8 +1,11 @@
-<img src="frontend/public/brand/logo-light.png" alt="Backplane" width="200">
+<p align="center">
+  <img src="frontend/public/brand/logo-light.png" alt="Backplane" width="96">
+</p>
 
-# Backplane
+<h1 align="center">Backplane</h1>
 
-**Shared context for projects that outlive a coding session.**
+<p align="center"><strong>Shared context for projects that outlive a coding session.</strong></p>
+<p align="center">🏠 Self-hosted &nbsp; · &nbsp; 🔌 Bring your own agents &nbsp; · &nbsp; 🧭 Your methodology</p>
 
 Keep project knowledge, decisions, and work connected across your team and your
 coding agents. Backplane brings project definitions, tasks, notes, and decisions
@@ -10,7 +13,7 @@ into one durable workspace, so people and agents can work from shared context
 as a project grows.
 
 [Get started](#self-hosting) · [Connect an agent](#connect-your-agent) ·
-[Documentation](#documentation) ·
+[Screenshots](#a-closer-look) · [Documentation](#documentation) ·
 [Report an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose)
 
 > **Open Source Preview.** Self-host Backplane and bring your own coding agents.
@@ -19,12 +22,65 @@ as a project grows.
 > **Runners are experimental.** See [Known limitations](#known-limitations)
 > before planning a deployment.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">
+  <img src=".github/assets/readme/board-light.png" alt="Backplane's Tidewatch demo board, with tasks across Backlog, In Progress, In Review, Done, and Blocked" width="1200">
+</picture>
+
+<p align="center"><strong>The work, the context, and the next step. In one place.</strong><br>
+<sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
+
 ## Three ways to use Backplane
 
-| Organize your projects | Connect your agent | Run configured workflows |
-|---|---|---|
-| Keep tasks, project definitions, notes, and decisions together. Collaborate with your team in the app. | Give your coding agent access to shared project context and work through MCP. | Add optional runners to execute workflows you configure and report progress, results, and costs. |
-| Useful on its own, without an agent. | Bring your own agent and credentials. No runner required. | Experimental. You choose roles, providers, budgets, and approval gates. |
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src=".github/assets/readme/organize.svg" alt="" width="40"><br>
+      <strong>Organize your projects</strong><br><br>
+      Keep tasks, definitions, notes, and decisions together. Collaborate with your team in the app.<br><br>
+      <em>Useful on its own, without an agent.</em>
+    </td>
+    <td width="33%" valign="top">
+      <img src=".github/assets/readme/connect.svg" alt="" width="40"><br>
+      <strong>Connect your agent</strong><br><br>
+      Give your coding agent access to shared project context and work through MCP.<br><br>
+      <em>Your agent, your credentials. No runner required.</em>
+    </td>
+    <td width="33%" valign="top">
+      <img src=".github/assets/readme/workflow.svg" alt="" width="40"><br>
+      <strong>Run configured workflows</strong><br><br>
+      Add optional runners to execute workflows and report progress, results, and costs.<br><br>
+      <em>Experimental. You choose roles, providers, budgets, and approval gates.</em>
+    </td>
+  </tr>
+</table>
+
+## A closer look
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>📍 Give the project a shared direction</strong><br><br>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/definition-dark.png">
+        <img src=".github/assets/readme/definition-light.png" alt="Project definition showing scope, objectives, priorities, and exclusions" width="580">
+      </picture><br>
+      Keep scope, objectives, and boundaries alongside the work.<br>
+      <a href=".github/assets/readme/definition-light.png">Full size: light</a> · <a href=".github/assets/readme/definition-dark.png">dark</a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>🔎 Follow a task beyond its title</strong><br><br>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/card-dark.png">
+        <img src=".github/assets/readme/card-light.png" alt="A task showing its description, priority, dependencies, participants, and linked pull request" width="580">
+      </picture><br>
+      See the details, dependencies, and linked pull request in one card.<br>
+      <a href=".github/assets/readme/card-light.png">Full size: light</a> · <a href=".github/assets/readme/card-dark.png">dark</a>
+    </td>
+  </tr>
+</table>
+
+<sub>Original captures of fictional demo projects, September 2026. Screenshots follow your light or dark theme.</sub>
 
 ## Why I'm building Backplane
 
@@ -59,6 +115,17 @@ methodology. There is no single prescribed way to run a project.
 
 That flexibility takes some setup. You'll make choices about how to structure
 context and coordinate work. Backplane is built for people who want that control.
+
+Different sessions. One place to pick up the thread.
+
+```text
+ session 01   session 02   session 03
+      \           |           /
+       +----------+----------+
+                  |
+            [ Backplane ]
+          context that stays
+```
 
 ## How it fits together
 
