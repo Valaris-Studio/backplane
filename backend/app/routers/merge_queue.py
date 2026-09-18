@@ -43,7 +43,7 @@ MERGED_LOOKBACK_MAX_HOURS = 24 * 30
 async def enqueue_merge(
     payload: MergeQueueEnqueueRequest,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MergeQueueService(db, event_bus=event_bus)
     entry, _created = await service.enqueue(
@@ -70,7 +70,7 @@ async def list_merge_queue(
         ),
     ),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MergeQueueService(db)
     return await service.list_workspace_active(
@@ -83,7 +83,7 @@ async def list_merge_queue(
 async def get_merge_queue_entry(
     entry_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MergeQueueService(db)
     entry = await service.repo.get(entry_id)
@@ -96,7 +96,7 @@ async def get_merge_queue_entry(
 async def re_enqueue_merge_queue_entry(
     payload: MergeQueueReEnqueueRequest,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Re-queue the parent merge-queue entry for a card.
 
@@ -115,7 +115,7 @@ async def re_enqueue_merge_queue_entry(
 async def cancel_merge_queue_entry(
     entry_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MergeQueueService(db)
     entry = await service.repo.get(entry_id)

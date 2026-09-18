@@ -31,7 +31,7 @@ class ImprovementStatusRead(BaseModel):
 )
 async def get_improvement_status(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ImprovementTriggerService(db)
     triggers = await service.detect_triggers(ctx.workspace.id)

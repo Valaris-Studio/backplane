@@ -42,7 +42,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/boards", tags=["boards"])
 @router.get("", response_model=list[BoardRead])
 async def list_boards(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.list_boards(ctx.workspace.id)
@@ -52,7 +52,7 @@ async def list_boards(
 async def create_board(
     data: BoardCreate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.create_board(ctx.workspace.id, data, ctx.user.id)
@@ -76,7 +76,7 @@ async def get_board(
         ),
     ),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.get_board_by_identifier(board_id, ctx.workspace.id)
@@ -101,7 +101,7 @@ async def update_board(
     board_id: str,
     data: BoardUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.get_board_by_identifier(board_id, ctx.workspace.id)
@@ -118,7 +118,7 @@ async def update_board(
 async def freeze_board(
     board_id: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.get_board_by_identifier(board_id, ctx.workspace.id)
@@ -129,7 +129,7 @@ async def freeze_board(
 async def unfreeze_board(
     board_id: str,
     ctx: WorkspaceContext = Depends(get_workspace_owner),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.get_board_by_identifier(board_id, ctx.workspace.id)
@@ -148,7 +148,7 @@ async def get_board_loop(
     request: Request,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.get_loop_config(
@@ -161,7 +161,7 @@ async def get_board_loop(
 async def get_board_loop_readiness(
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.get_loop_readiness(board_uuid, ctx.workspace.id)
@@ -171,7 +171,7 @@ async def get_board_loop_readiness(
 async def get_board_loop_binding(
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """The authoring state behind a bound board's prompts.
 
@@ -187,7 +187,7 @@ async def get_board_loop_binding(
 async def get_board_loop_binding_diff(
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """What a re-render would change, for the drift banner's review step.
 
@@ -202,7 +202,7 @@ async def get_board_loop_binding_diff(
 async def get_board_loop_history(
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.get_loop_history(board_uuid, ctx.workspace.id)
@@ -214,7 +214,7 @@ async def get_board_loop_transitions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.get_loop_transitions(
@@ -226,7 +226,7 @@ async def get_board_loop_transitions(
 async def get_board_loop_status(
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.get_loop_status(board_uuid, ctx.workspace.id)
@@ -237,7 +237,7 @@ async def put_board_loop(
     data: LoopConfigPut,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.put_loop_config(
@@ -250,7 +250,7 @@ async def patch_board_loop_state(
     data: LoopStatePatch,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     return await service.set_loop_state(
@@ -264,7 +264,7 @@ async def patch_board_loop_state(
 async def delete_board(
     board_id: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardService(db)
     board = await service.get_board_by_identifier(board_id, ctx.workspace.id)

@@ -1,4 +1,5 @@
-fastapi==0.115.14
+fastapi==0.136.0
+starlette==1.6.0
 uvicorn[standard]==0.34.0
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
@@ -16,13 +17,6 @@ httpx==0.28.1
 google-auth>=2.27.0
 cachecontrol==0.14.4  # wraps the IAP cert-fetch session so verify_token doesn't re-fetch on every call
 google-cloud-storage==2.19.0
-ruff==0.8.4
-pytest==8.3.4
-pytest-asyncio==0.24.0
-aiosqlite==0.20.0
-pytest-cov==6.0.0
-pytest-xdist==3.6.1
-pytest-timeout==2.3.1
 cryptography==50.0.0
 argon2-cffi==25.1.0
 githubkit==0.15.4

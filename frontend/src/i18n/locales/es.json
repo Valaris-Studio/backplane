@@ -41,6 +41,7 @@
   "errors": {
     "unknown": "Algo salió mal. Inténtalo de nuevo.",
     "upload_failed": "No se pudo subir el archivo. Inténtalo de nuevo.",
+    "upload_too_large": "El archivo supera el límite de carga. Elige un archivo más pequeño e inténtalo de nuevo.",
     "request_validation_error": "Algunos campos no son válidos. Revísalos e inténtalo de nuevo.",
     "validation_error": "Parte de la información no es válida. Revísala e inténtalo de nuevo.",
     "not_found": "No se encontró el elemento solicitado.",
@@ -7793,6 +7794,7 @@
   "a11y": {
     "languageSwitcher": "Idioma",
     "topbar": {
+      "moreControls": "Más controles",
       "breadcrumb": "Ruta de navegación",
       "toggleSidebar": "Alternar barra lateral"
     },

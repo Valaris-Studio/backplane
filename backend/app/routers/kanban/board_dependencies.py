@@ -36,7 +36,7 @@ router = APIRouter(
 async def list_board_dependencies(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DependencyService(db)
     edges = await service.list_for_board(board_id=board_id)
@@ -50,6 +50,6 @@ async def list_board_dependencies(
 async def validate_board_dependencies(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await DependencyGraphService(db).validate(board_id=board_id)

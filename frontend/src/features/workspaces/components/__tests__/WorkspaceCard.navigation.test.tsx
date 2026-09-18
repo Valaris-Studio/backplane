@@ -13,7 +13,7 @@ vi.mock("@/features/visuals/components/WaveBackground", () => ({
   WaveBackground: () => null,
 }));
 
-function WorkspaceNavigation({ slug }: { slug: string }) {
+function WorkspaceNavigation({ slug, onNavigationError }: { slug: string; onNavigationError?: (error: unknown) => void }) {
   const navigate = useNavigate();
   const workspace: Workspace = {
     id: "workspace-1",
@@ -24,7 +24,14 @@ function WorkspaceNavigation({ slug }: { slug: string }) {
     updated_at: "2026-01-01T00:00:00Z",
   };
   // Match WorkspacesPage's persisted-workspace callback, using real browser history.
-  return <WorkspaceCard workspace={workspace} onOpen={(value) => navigate(`/${value}`)} />;
+  return <WorkspaceCard workspace={workspace} onOpen={(value) => {
+    try {
+      navigate(`/${value}`);
+    } catch (error) {
+      if (!onNavigationError) throw error;
+      onNavigationError(error);
+    }
+  }} />;
 }
 
 describe("persisted workspace browser navigation", () => {
@@ -33,14 +40,16 @@ describe("persisted workspace browser navigation", () => {
   });
 
   it.each(["\\example.invalid", "\\\\example.invalid", "/\\example.invalid"])(
-    "keeps a workspace slug %j on the current origin",
+    "rejects a workspace slug %j that resolves outside the current origin",
     async (slug) => {
       const origin = window.location.origin;
-      render(<BrowserRouter><WorkspaceNavigation slug={slug} /></BrowserRouter>);
+      const onNavigationError = vi.fn();
+      render(<BrowserRouter><WorkspaceNavigation slug={slug} onNavigationError={onNavigationError} /></BrowserRouter>);
 
       await userEvent.click(screen.getByRole("button", { name: /persisted workspace/i }));
 
-      await waitFor(() => expect(window.location.pathname).toBe("/example.invalid"));
+      expect(onNavigationError).toHaveBeenCalledWith(expect.objectContaining({ message: "External navigation is not allowed" }));
+      expect(window.location.pathname).toBe("/");
       expect(window.location.origin).toBe(origin);
     },
   );

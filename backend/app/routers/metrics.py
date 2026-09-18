@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/metrics", tags=["metrics"])
 async def get_agent_metrics(
     include_inactive: bool = Query(False),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_agent_metrics(
@@ -30,7 +30,7 @@ async def get_agent_metrics(
 @router.get("/velocity", response_model=VelocityRead)
 async def get_velocity(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_velocity(ctx.workspace.id)
@@ -39,7 +39,7 @@ async def get_velocity(
 @router.get("/quality", response_model=QualityRead)
 async def get_quality(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_quality(ctx.workspace.id)
@@ -48,7 +48,7 @@ async def get_quality(
 @router.get("/cost", response_model=CostRead)
 async def get_cost(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_cost(ctx.workspace.id)
@@ -57,7 +57,7 @@ async def get_cost(
 @router.get("/card-costs", response_model=CardCostRead)
 async def get_card_costs(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_card_costs(ctx.workspace.id)
@@ -68,7 +68,7 @@ async def get_execution_analytics(
     agent_id: uuid.UUID | None = Query(None),
     days: int = Query(30, ge=1, le=365),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = MetricsService(db)
     return await service.get_execution_analytics(

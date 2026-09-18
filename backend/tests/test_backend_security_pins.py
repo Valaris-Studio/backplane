@@ -23,3 +23,17 @@ def test_cryptography_pin_and_runtime_include_security_fixes():
     assert Version(declared) >= Version("50.0.0"), "cryptography pin includes known security advisories"
     assert Version(version("cryptography")) >= Version("50.0.0"), "installed cryptography is still vulnerable"
     assert version("cryptography") in dependency.specifier, "tests must use the declared cryptography version"
+
+
+def test_starlette_runtime_includes_the_file_response_security_fixes():
+    assert Version(version("starlette")) >= Version("1.3.1")
+
+
+def test_runtime_requirements_exclude_development_tools():
+    requirements = Path(__file__).resolve().parents[1] / "requirements.txt"
+    names = {
+        Requirement(line.split("#", 1)[0].strip()).name
+        for line in requirements.read_text().splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    assert not names.intersection({"pytest", "pytest-asyncio", "pytest-cov", "pytest-xdist", "pytest-timeout", "ruff"})

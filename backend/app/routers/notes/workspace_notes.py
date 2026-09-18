@@ -71,7 +71,7 @@ async def list_workspace_notes(
     ),
     offset: int = Query(default=0, ge=0),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Workspace-level notes (board_id IS NULL).
 
@@ -96,7 +96,7 @@ async def list_workspace_notes(
 async def create_workspace_note(
     data: NoteCreate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.create_note(
@@ -108,7 +108,7 @@ async def create_workspace_note(
 async def resolve_workspace_note_by_prefix(
     prefix: str = Query(..., description="UUID prefix fragment (min 4 chars)."),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Registered BEFORE GET /{note_id} so the literal 'resolve' segment is never
     # shadowed by the UUID path param (FastAPI matches in declaration order).
@@ -124,7 +124,7 @@ async def get_workspace_note(
         description="`prosemirror` (default, raw PM JSON) or `markdown`.",
     ),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.get_note_read(
@@ -139,7 +139,7 @@ async def update_workspace_note(
     note_id: uuid.UUID,
     data: NoteUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.update_note(note_id, ctx.workspace.id, data, actor_id=ctx.user.id)
@@ -150,7 +150,7 @@ async def append_workspace_note(
     note_id: uuid.UUID,
     data: NoteAppend,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.append_note(note_id, ctx.workspace.id, data, actor_id=ctx.user.id)
@@ -161,7 +161,7 @@ async def replace_workspace_note_section(
     note_id: uuid.UUID,
     data: NoteSectionReplace,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.replace_note_section(
@@ -173,7 +173,7 @@ async def replace_workspace_note_section(
 async def delete_workspace_note(
     note_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     await service.delete_note(note_id, ctx.workspace.id, actor_id=ctx.user.id)

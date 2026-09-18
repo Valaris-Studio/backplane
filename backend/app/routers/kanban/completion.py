@@ -31,7 +31,7 @@ router = APIRouter(
 async def read_policy(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionPolicyService(db).read_policy(
         board_id, ctx.workspace.id, ctx.user.id
@@ -43,7 +43,7 @@ async def preview_policy(
     data: CompletionPolicyPreview,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionPolicyService(db).preview_policy(
         board_id, ctx.workspace.id, ctx.user.id, data.policy, loop_config=data.loop_config,
@@ -56,7 +56,7 @@ async def write_policy(
     data: CompletionPolicyWrite,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionPolicyService(db).set_policy(
         board_id, ctx.workspace.id, ctx.user.id, data.policy
@@ -69,7 +69,7 @@ async def write_mode(
     data: CompletionModeWrite,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionPolicyService(db).set_mode(
         board_id, ctx.workspace.id, ctx.user.id, card_id, data.completion_mode
@@ -81,7 +81,7 @@ async def read_completion(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).status(
         board_id, ctx.workspace.id, ctx.user.id, card_id
@@ -94,7 +94,7 @@ async def submit_completion(
     data: CompletionSubmit,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).submit(
         board_id, ctx.workspace.id, ctx.user.id, card_id, data
@@ -107,7 +107,7 @@ async def land_completion(
     data: CompletionLand,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).land(
         board_id, ctx.workspace.id, ctx.user.id, card_id, data
@@ -119,7 +119,7 @@ async def retry_completion(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).retry(
         board_id, ctx.workspace.id, ctx.user.id, card_id
@@ -132,7 +132,7 @@ async def read_work(
     limit: int = Query(default=100, ge=1, le=100),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).work(
         board_id, ctx.workspace.id, ctx.user.id, cursor=cursor, limit=limit
@@ -144,7 +144,7 @@ async def claim_work(
     data: CompletionClaim,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).claim(
         board_id, ctx.workspace.id, ctx.user.id, data
@@ -157,7 +157,7 @@ async def submit_result(
     data: CompletionResult,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).result(
         board_id, ctx.workspace.id, ctx.user.id, attempt_id, data
@@ -168,7 +168,7 @@ async def submit_result(
 async def read_requirements(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).requirements(
         board_id, ctx.workspace.id, ctx.user.id
@@ -179,7 +179,7 @@ async def read_requirements(
 async def read_readiness(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).readiness(
         board_id, ctx.workspace.id, ctx.user.id

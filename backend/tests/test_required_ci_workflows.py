@@ -21,3 +21,11 @@ def test_required_checks_run_on_eligible_promotion_and_contributor_events(filena
     for branch in ("main", "codex/preview-security-ci"):
         assert any(fnmatchcase(branch, pattern) for pattern in branches)
     assert workflow["permissions"] == {"contents": "read"}
+
+
+def test_frontend_release_gate_handles_the_zero_before_sha_on_new_tags():
+    workflow = yaml.load((WORKFLOWS / "ci.yml").read_text(), Loader=yaml.BaseLoader)
+    test_step = next(step for step in workflow["jobs"]["frontend"]["steps"] if step.get("name") == "Tests")
+    expression = test_step["env"]["I18N_COPY_BASE_SHA"]
+    assert "github.event.before != '" + "0" * 40 + "'" in expression
+    assert "|| 'HEAD^'" in expression

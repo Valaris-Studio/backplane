@@ -1,0 +1,86 @@
+name: Release platform
+
+on:
+  push:
+    tags: ['platform-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/platform-release.py check-ref --component platform
+
+  qualify:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  install:
+    needs: validate
+    uses: ./.github/workflows/quickstart-gate.yml
+
+  package:
+    needs: [qualify, install]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package exact public source
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py package --tag "$RELEASE_TAG" --output /tmp/platform-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-release
+          path: /tmp/platform-release/
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    if: github.repository == 'Valaris-Studio/backplane' && vars.PUBLIC_RELEASES_ENABLED == 'true'
+    environment: platform-release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/platform-release.py check-ref --component platform
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-release
+          path: /tmp/platform-release
+      - name: Verify and create draft release
+        working-directory: /tmp/platform-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          sha256sum --check SHA256SUMS
+          python -c 'import json,os; assert json.load(open("release.json"))["source_commit"] == os.environ["SOURCE_COMMIT"]'
+          prerelease=()
+          if [[ "${RELEASE_TAG#platform-v}" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$RELEASE_TAG" --verify-tag --draft "${prerelease[@]}" \
+            --title "Backplane $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/releases/platform-release-notes.md" \
+            ./*.tar.gz ./release.json ./SHA256SUMS

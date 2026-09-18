@@ -52,6 +52,7 @@ job_backend() {
     cd backend || exit 1
     # shellcheck disable=SC1091
     source .venv/bin/activate || exit 1
+    python -m pip_audit --strict || exit 1
     ruff check app/ || exit 1
     python -m pytest -n 4 -m "not slow" -p no:cacheprovider --tb=short -q || exit 1
   )
@@ -80,6 +81,7 @@ job_frontend() {
   # investigating a single red test here; treat a repeatable failure as real.
   (
     cd frontend || exit 1
+    pnpm audit || exit 1
     pnpm lint || exit 1
     pnpm vitest run || exit 1
     pnpm docs:check || exit 1

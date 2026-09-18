@@ -22,7 +22,7 @@ router = APIRouter(tags=["activity"])
 )
 async def list_workspace_activity(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     limit: int = Query(default=50, le=100),
     before: datetime | None = Query(default=None),
     entity_type: ActivityEntityType | None = Query(default=None),
@@ -56,7 +56,7 @@ async def list_workspace_activity(
 async def list_board_activity(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     limit: int = Query(default=50, le=100),
     before: datetime | None = Query(default=None),
     entity_type: ActivityEntityType | None = Query(default=None),
@@ -90,7 +90,7 @@ async def list_board_activity(
 async def get_board_timeline(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     # Bounded default: a plain call returns 500 events (each with before/after
     # JSONB snapshots) plus a full-board baseline, not the 5000 ceiling. The
     # replay view that folds the whole log client-side opts back into 5000

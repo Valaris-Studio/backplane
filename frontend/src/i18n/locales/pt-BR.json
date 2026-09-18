@@ -41,6 +41,7 @@
   "errors": {
     "unknown": "Algo deu errado. Tente novamente.",
     "upload_failed": "Não foi possível enviar o arquivo. Tente novamente.",
+    "upload_too_large": "O arquivo excede o limite de envio. Escolha um arquivo menor e tente novamente.",
     "request_validation_error": "Alguns campos são inválidos. Revise-os e tente novamente.",
     "validation_error": "Algumas informações são inválidas. Revise-as e tente novamente.",
     "not_found": "Não foi possível encontrar o item solicitado.",
@@ -7793,6 +7794,7 @@
   "a11y": {
     "languageSwitcher": "Idioma",
     "topbar": {
+      "moreControls": "Mais controles",
       "breadcrumb": "Trilha de navegação",
       "toggleSidebar": "Alternar barra lateral"
     },

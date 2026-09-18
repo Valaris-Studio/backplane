@@ -29,7 +29,7 @@ async def start_execution(
     agent_id: uuid.UUID,
     data: ExecutionCreate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ExecutionService(db)
     return await service.start_execution(agent_id, data, user_id=user.id)
@@ -41,7 +41,7 @@ async def update_execution(
     execution_id: uuid.UUID,
     data: ExecutionUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ExecutionService(db)
     return await service.update_execution(agent_id, execution_id, data, user_id=user.id)
@@ -51,7 +51,7 @@ async def update_execution(
 async def list_executions(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     role: str | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
@@ -87,7 +87,7 @@ async def record_execution_warning(
     execution_id: uuid.UUID,
     data: ExecutionWarningCreate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ExecutionService(db)
     await service.record_warning(agent_id, execution_id, data, user_id=user.id)
@@ -104,7 +104,7 @@ async def record_tool_invocations(
     execution_id: uuid.UUID,
     invocations: list[ToolInvocationCreate],
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ToolInvocationService(db)
     return await service.record_invocations(

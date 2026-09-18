@@ -43,6 +43,8 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def get_db():
+    # Injection sites use scope="function" so commit failures cannot follow
+    # a success response or race the client's next request.
     async with async_session() as session:
         try:
             yield session

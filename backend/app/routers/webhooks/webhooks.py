@@ -24,7 +24,7 @@ router = APIRouter(tags=["webhooks"])
 async def create_webhook(
     data: WebhookCreate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ):
     service = WebhookService(db)
@@ -37,7 +37,7 @@ async def create_webhook(
 )
 async def list_webhooks(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     is_active: bool | None = Query(default=None),
 ):
     service = WebhookService(db)
@@ -51,7 +51,7 @@ async def list_webhooks(
 async def get_webhook(
     webhook_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WebhookService(db)
     webhook = await service.get(webhook_id, ctx.workspace.id)
@@ -66,7 +66,7 @@ async def update_webhook(
     webhook_id: uuid.UUID,
     data: WebhookUpdate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WebhookService(db)
     return await service.update(webhook_id, ctx.workspace.id, data)
@@ -79,7 +79,7 @@ async def update_webhook(
 async def delete_webhook(
     webhook_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WebhookService(db)
     await service.delete(webhook_id, ctx.workspace.id)

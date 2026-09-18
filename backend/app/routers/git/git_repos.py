@@ -43,7 +43,7 @@ def _require_admin_to_bind_connection(ctx: WorkspaceContext) -> None:
 async def list_git_repos(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = GitRepoService(db)
     return await service.list_git_repos(board_id)
@@ -55,7 +55,7 @@ async def create_git_repo(
     response: Response,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if data.connection_id is not None:
         _require_admin_to_bind_connection(ctx)
@@ -72,7 +72,7 @@ async def get_git_repo(
     repo_ident: str,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = GitRepoService(db)
     return await service.get_git_repo_by_identifier(repo_ident, board_id)
@@ -84,7 +84,7 @@ async def update_git_repo(
     data: GitRepoUpdate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Presence, not truthiness: clearing a binding (connection_id=null) is the
     # same privilege as setting one — it silently moves the repo onto whatever
@@ -107,7 +107,7 @@ async def delete_git_repo(
     repo_ident: str,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = GitRepoService(db)
     existing = await service.get_git_repo_by_identifier(repo_ident, board_id)

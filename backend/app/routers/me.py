@@ -24,7 +24,7 @@ async def get_me(user: User = Depends(get_current_user)):
 @router.get("/api-keys", response_model=list[ApiKeyRead])
 async def list_api_keys(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApiKeyService(db)
     return await service.list_keys(user.id)
@@ -39,7 +39,7 @@ async def list_api_keys(
 async def create_api_key(
     data: ApiKeyCreate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApiKeyService(db)
     api_key, raw_key = await service.create_key(user.id, data.name)
@@ -58,7 +58,7 @@ async def create_api_key(
 async def delete_api_key(
     key_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApiKeyService(db)
     await service.delete_key(key_id, user.id)

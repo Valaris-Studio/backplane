@@ -53,7 +53,7 @@ Working outside Docker on individual components:
 
 | Component | Setup | Tests |
 |---|---|---|
-| Backend | `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt` | `make test` (serial, authoritative) / `make test-fast` (parallel inner loop) |
+| Backend | `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt` | `make test` (serial, authoritative) / `make test-fast` (parallel inner loop) |
 | Frontend | `cd frontend && pnpm install` | `pnpm test`, `pnpm lint`, `pnpm build` |
 | MCP server | `make mcp-install` (creates `mcp-server/.venv`) | `make mcp-test` |
 | Runner | Go 1.26+ | `make runner-test` |

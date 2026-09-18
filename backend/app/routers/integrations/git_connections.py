@@ -53,7 +53,7 @@ def _service(db: AsyncSession) -> GitConnectionService:
 @router.get("", response_model=list[GitConnectionRead])
 async def list_git_connections(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await _service(db).list_connections(ctx.workspace.id)
 
@@ -63,7 +63,7 @@ async def create_git_connection_from_token(
     data: GitConnectionPatCreate,
     response: Response,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     probe: ForgeProbe = Depends(get_forge_probe),
 ):
     connection, created = await _service(db).create_pat_connection(
@@ -80,7 +80,7 @@ async def create_git_connection_from_token(
 async def verify_git_connection(
     connection_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     probe: ForgeProbe = Depends(get_forge_probe),
 ):
     return await _service(db).verify_connection(
@@ -94,7 +94,7 @@ async def verify_git_connection(
 async def delete_git_connection(
     connection_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _service(db).delete_connection(
         connection_id, ctx.workspace.id, actor_id=ctx.user.id
@@ -107,7 +107,7 @@ async def list_repositories_for_connection(
     connection_id: uuid.UUID,
     cursor: str | None = Query(default=None),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = _service(db)
     connection = await service.repo.get_by_id(connection_id)

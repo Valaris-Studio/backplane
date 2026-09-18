@@ -24,7 +24,7 @@ async def create_column(
     data: ColumnCreate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ColumnService(db)
     return await service.create_column(
@@ -37,7 +37,7 @@ async def reorder_columns(
     data: ColumnReorderRequest,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ColumnService(db)
     await service.reorder_columns(
@@ -53,7 +53,7 @@ async def update_column(
     data: ColumnUpdate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ColumnService(db)
     return await service.update_column(
@@ -66,7 +66,7 @@ async def delete_column(
     column_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ColumnService(db)
     await service.delete_column(

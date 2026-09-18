@@ -242,7 +242,7 @@ def extract_email_from_trusted_proxy_header(
 
 
 async def get_current_user(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, db: AsyncSession = Depends(get_db, scope="function")
 ) -> User:
     # API key auth: Bearer vlr_... tokens (prefix distinguishes from IAP OIDC JWTs)
     auth_header = request.headers.get("Authorization", "")

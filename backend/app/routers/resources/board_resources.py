@@ -36,7 +36,7 @@ router = APIRouter(
 async def list_board_resources(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     parent_id: uuid.UUID | None = Query(None),
     q: str | None = Query(None, min_length=1, max_length=200),
     resource_type: str | None = Query(None, pattern="^(file|folder)$"),
@@ -57,7 +57,7 @@ async def list_board_resources(
 async def list_board_tags(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     return await service.list_tags(ctx.workspace.id, board_id)
@@ -68,7 +68,7 @@ async def create_board_resource(
     data: ResourceCreate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     return await service.create_resource(
@@ -100,7 +100,7 @@ async def get_board_resource(
     resource_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     return await service.get_resource(resource_id, ctx.workspace.id)
@@ -111,7 +111,7 @@ async def get_download_url(
     resource_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     resource = await service.get_resource_for_signing(resource_id, ctx.workspace.id)
@@ -132,7 +132,7 @@ async def update_board_resource(
     data: ResourceUpdate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     return await service.update_resource(
@@ -145,7 +145,7 @@ async def delete_board_resource(
     resource_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
     await service.delete_resource(resource_id, ctx.workspace.id, ctx.user.id)

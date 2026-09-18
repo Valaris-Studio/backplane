@@ -23,7 +23,7 @@ router = APIRouter(
 async def create_approval(
     data: ApprovalCreate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApprovalService(db)
     return await service.create_approval(ctx.workspace.id, data)
@@ -33,7 +33,7 @@ async def create_approval(
 async def list_approvals(
     status: ApprovalStatus | None = Query(default=None),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApprovalService(db)
     return await service.list_approvals(ctx.workspace.id, status)
@@ -43,7 +43,7 @@ async def list_approvals(
 async def get_approval(
     approval_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApprovalService(db)
     return await service.get_approval(approval_id, ctx.workspace.id)
@@ -62,7 +62,7 @@ async def decide_approval(
     approval_id: uuid.UUID,
     data: ApprovalDecide,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ApprovalService(db)
     return await service.decide(approval_id, ctx.workspace.id, ctx.user.id, data)

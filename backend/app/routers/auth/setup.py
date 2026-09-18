@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.get("/setup-status")
-async def setup_status(db: AsyncSession = Depends(get_db)) -> dict[str, bool]:
+async def setup_status(db: AsyncSession = Depends(get_db, scope="function")) -> dict[str, bool]:
     return {"needs_setup": await LocalAuthService(db).needs_setup()}
 
 
@@ -37,7 +37,7 @@ async def first_run_setup(
     body: FirstRunSetupRequest,
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserRead:
     user = await LocalAuthService(db).create_first_admin(
         body.email,

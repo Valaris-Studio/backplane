@@ -30,7 +30,7 @@ router = APIRouter(
 @router.get("", response_model=list[ChannelListRead] | list[ChannelRead])
 async def list_channels(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     summary: bool = Query(
         default=False,
         description=(
@@ -50,7 +50,7 @@ async def list_channels(
 async def create_channel(
     data: ChannelCreate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ChannelService(db)
     return await service.create_channel(ctx.workspace.id, data, ctx.user.id)
@@ -60,7 +60,7 @@ async def create_channel(
 async def get_channel(
     channel_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ChannelService(db)
     return await service.get_channel(channel_id, ctx.workspace.id)
@@ -71,7 +71,7 @@ async def update_channel(
     channel_id: uuid.UUID,
     data: ChannelUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ChannelService(db)
     return await service.update_channel(channel_id, ctx.workspace.id, data, actor_id=ctx.user.id)
@@ -81,7 +81,7 @@ async def update_channel(
 async def delete_channel(
     channel_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ChannelService(db)
     await service.delete_channel(channel_id, ctx.workspace.id, actor_id=ctx.user.id)

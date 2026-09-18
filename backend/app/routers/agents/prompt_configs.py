@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/prompt-configs", tags=["prompt
 async def list_prompt_configs(
     team_role: str | None = Query(None),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     return await service.list_configs(ctx.workspace.id, team_role)
@@ -36,7 +36,7 @@ async def list_prompt_configs(
 async def get_prompt_defaults(
     role: str | None = None,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     workspace_config = await WorkspaceConfigService(db).get_config(ctx.workspace.id)
     return get_prompt_defaults_with_synthesis(
@@ -48,7 +48,7 @@ async def get_prompt_defaults(
 async def get_prompt_config(
     config_ident: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     config_id = await service.resolve_ident(config_ident, ctx.workspace.id)
@@ -59,7 +59,7 @@ async def get_prompt_config(
 async def create_prompt_config(
     data: PromptConfigCreate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     return await service.create_config(ctx.workspace.id, data, ctx.user.id)
@@ -70,7 +70,7 @@ async def update_prompt_config(
     config_ident: str,
     data: PromptConfigUpdate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     config_id = await service.resolve_ident(config_ident, ctx.workspace.id)
@@ -83,7 +83,7 @@ async def update_prompt_config(
 async def export_prompt_config(
     config_ident: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     config_id = await service.resolve_ident(config_ident, ctx.workspace.id)
@@ -105,7 +105,7 @@ async def export_prompt_config(
 async def delete_prompt_config(
     config_ident: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = PromptConfigService(db)
     config_id = await service.resolve_ident(config_ident, ctx.workspace.id)
