@@ -2380,6 +2380,7 @@ export const PT_BR_REFERENCE = {
     Variable: "Variável",
     Default: "Padrão",
     Purpose: "Finalidade",
+    "Optional literal password override for DATABASE_URL. Encoding is automatic. Production Compose supplies it from POSTGRES_PASSWORD.": "Senha literal opcional que substitui a de DATABASE_URL. A codificação é automática. O Compose de produção a obtém de POSTGRES_PASSWORD.",
     "Async SQLAlchemy DSN. Deployed environments point it at their Postgres instance. Must use the asyncpg driver.":
       "DSN assíncrono do SQLAlchemy. Em ambientes implantados, deve apontar para a instância do Postgres e usar o driver asyncpg.",
     "Gates dev-mode behaviors (swagger exposure, dev-mode auth fallback). Set to ":

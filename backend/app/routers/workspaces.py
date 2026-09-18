@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 @router.get("", response_model=list[WorkspaceRead])
 async def list_workspaces(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     return await service.list_workspaces(user)
@@ -45,7 +45,7 @@ async def list_workspaces(
 async def create_workspace(
     data: WorkspaceCreate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     return await service.create_workspace(data, user)
@@ -62,7 +62,7 @@ async def get_workspace_detail(ctx: WorkspaceContext = Depends(get_workspace)):
 )
 async def get_workspace_summary(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     summary_activity: bool = Query(
         default=False,
         description=(
@@ -84,7 +84,7 @@ async def get_workspace_summary(
 async def update_workspace(
     data: WorkspaceUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     return await service.update_workspace(ctx.workspace.id, data, actor_id=ctx.user.id)
@@ -93,7 +93,7 @@ async def update_workspace(
 @router.delete("/{slug}", status_code=204)
 async def delete_workspace(
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     await service.delete_workspace(ctx.workspace.id)
@@ -104,7 +104,7 @@ async def list_members(
     q: str | None = None,
     limit: int | None = None,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     # Optional ?q= turns the list into a capped ILIKE search (autocomplete
@@ -129,7 +129,7 @@ async def list_members(
 async def add_member(
     data: AddMemberRequest,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     await service.add_member(
@@ -150,7 +150,7 @@ async def set_member_temporary_password(
     user_id: uuid.UUID,
     data: TemporaryPasswordRequest,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     from fastapi import HTTPException
 
@@ -172,7 +172,7 @@ async def update_member_role(
     user_id: uuid.UUID,
     data: UpdateMemberRoleRequest,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     member = await service.update_member_role(
@@ -191,7 +191,7 @@ async def update_member_role(
 async def remove_member(
     user_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceService(db)
     await service.remove_member(ctx.workspace.id, user_id, actor_id=ctx.user.id)

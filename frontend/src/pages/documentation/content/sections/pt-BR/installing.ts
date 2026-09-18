@@ -158,6 +158,8 @@ export const PT_BR_INSTALLING = {
     "Restore into a controlled stack": "Restaure em uma stack controlada",
     "Put the backed-up .env and the intended source revision in place first. Keep backend and frontend stopped while replacing the database and files. The example below assumes local volume storage.":
       "Coloque primeiro o .env do backup e a revisão de código pretendida. Mantenha backend e frontend parados enquanto substitui o banco e os arquivos. O exemplo abaixo pressupõe armazenamento em volume local.",
+    "Run the whole block as a Bash script. It stops on the first error. This example uses a separate project and localhost port; choose an unused port. Preserve archive ownership so the backend can write restored files.":
+      "Execute o bloco inteiro como um script Bash. Ele para no primeiro erro. Este exemplo usa um projeto separado e uma porta de localhost; escolha uma porta livre. Preserve a propriedade dos arquivos no backup para que o backend possa gravar nos arquivos restaurados.",
     "Restore database and local resources": "Restaure o banco de dados e os recursos locais",
     "Newer source automatically upgrades an older dump": "Código mais novo atualiza automaticamente um dump antigo",
     "If you intentionally start a newer checkout, backend startup applies every missing Alembic revision before serving requests. To inspect the old schema unchanged, use the recorded source commit in an isolated environment and do not start a newer backend against it.":

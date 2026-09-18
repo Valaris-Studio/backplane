@@ -117,7 +117,7 @@ async def upload_file(
     file_path: str,
     request: Request,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _enforce_tenancy(file_path, user, db)
     dest = _safe_path(file_path)
@@ -131,7 +131,7 @@ async def upload_file(
 async def download_file(
     file_path: str,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _enforce_tenancy(file_path, user, db)
     dest = _safe_path(file_path)

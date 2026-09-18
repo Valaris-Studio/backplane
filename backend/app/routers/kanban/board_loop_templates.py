@@ -51,7 +51,7 @@ async def get_board_loop_template_fit(
     ref: str,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Setup-contract checks plus slot autofill for `ref` against this board.
 
@@ -79,7 +79,7 @@ async def fit_proposed_board_loop_template(
     body: LoopTemplatePreviewRequest,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     template = await resolve_template_view(
         db, ctx.workspace.id, ref, draft=body.draft, version=body.version
@@ -101,7 +101,7 @@ async def preview_board_loop_template(
     body: LoopTemplatePreviewRequest,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """The bind step's rehearsal: what would THIS board actually run?
 
@@ -131,7 +131,7 @@ async def apply_board_loop_template_fixes(
     body: LoopTemplateFitApplyRequest,
     board_uuid: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Run the fixes the fit report advertised, then answer with a fresh one.
 

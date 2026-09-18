@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/sensors", tags=["sensors"])
 @router.get("", response_model=list[SensorManifestEntry])
 async def list_sensors(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Return the union of sensor catalogs reported by agents in a workspace.
 

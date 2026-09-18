@@ -81,7 +81,7 @@ async def list_board_notes(
     offset: int = Query(default=0, ge=0),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Notes on one board, optionally restricted to one card in that scope.
 
@@ -107,7 +107,7 @@ async def create_board_note(
     data: NoteCreate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.create_note(ctx.workspace.id, data, ctx.user.id, board_id)
@@ -117,7 +117,7 @@ async def create_board_note(
 async def export_board_notes(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     board_slug = await db.scalar(select(Board.slug).where(Board.id == board_id))
     service = NoteService(db)
@@ -139,7 +139,7 @@ async def resolve_board_note_by_prefix(
     prefix: str = Query(..., description="UUID prefix fragment (min 4 chars)."),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Registered BEFORE GET /{note_id} so the literal 'resolve' segment is never
     # shadowed by the UUID path param (FastAPI matches in declaration order).
@@ -158,7 +158,7 @@ async def get_board_note(
     ),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.get_note_read(
@@ -174,7 +174,7 @@ async def update_board_note(
     data: NoteUpdate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.update_note(note_id, ctx.workspace.id, data, actor_id=ctx.user.id, board_id=board_id)
@@ -186,7 +186,7 @@ async def append_board_note(
     data: NoteAppend,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.append_note(
@@ -200,7 +200,7 @@ async def replace_board_note_section(
     data: NoteSectionReplace,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     return await service.replace_note_section(
@@ -213,7 +213,7 @@ async def delete_board_note(
     note_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     await service.delete_note(note_id, ctx.workspace.id, actor_id=ctx.user.id, board_id=board_id)

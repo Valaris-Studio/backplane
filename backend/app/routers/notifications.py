@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 @router.get("", response_model=list[NotificationRead])
 async def list_notifications(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     workspace: str | None = Query(default=None),
     limit: int = Query(default=50, le=100),
     before: datetime | None = Query(default=None),
@@ -58,7 +58,7 @@ async def list_notifications(
 @router.get("/unread-count", response_model=UnreadCountRead)
 async def unread_count(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     workspace: str | None = Query(default=None),
 ):
     service = NotificationApiService(db)
@@ -70,7 +70,7 @@ async def unread_count(
 @router.post("/read-all")
 async def read_all(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     workspace: str | None = Query(default=None),
 ):
     service = NotificationApiService(db)
@@ -82,7 +82,7 @@ async def read_all(
 @router.get("/preferences", response_model=NotificationPreferenceRead)
 async def get_preferences(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     workspace: str = Query(...),
 ):
     service = NotificationApiService(db)
@@ -94,7 +94,7 @@ async def get_preferences(
 async def put_preferences(
     data: NotificationPreferenceUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     workspace: str = Query(...),
 ):
     service = NotificationApiService(db)
@@ -111,7 +111,7 @@ async def put_preferences(
 @router.get("/channels", response_model=ChannelsRead)
 async def list_channels(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NotificationApiService(db)
     return ChannelsRead(channels=service.list_channels())
@@ -121,7 +121,7 @@ async def list_channels(
 async def read_notification(
     notification_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NotificationApiService(db)
     return await service.mark_read(user.id, notification_id)

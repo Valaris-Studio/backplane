@@ -20,7 +20,7 @@ router = APIRouter(
 @router.get("/skipped-card-ids", response_model=list[str])
 async def list_skipped_card_ids(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Card ids the board should badge as "needs prompt" — the union of
     cards_affected across the workspace's `skipped` executions, in one request
@@ -33,7 +33,7 @@ async def list_skipped_card_ids(
 async def list_workspace_executions(
     response: Response,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     status: str | None = Query(None),
     agent_id: uuid.UUID | None = Query(None),
     role: str | None = Query(None),
@@ -103,7 +103,7 @@ async def list_workspace_executions(
 async def get_workspace_execution(
     execution_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """One execution by id. Detail pages read this instead of scanning the
     newest-50 list, which silently rendered blank for older executions."""

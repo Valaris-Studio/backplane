@@ -1,7 +1,10 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 
 class Settings(BaseSettings):
@@ -10,6 +13,7 @@ class Settings(BaseSettings):
     # override this via env, so this default exists for native
     # `make dev-backend` runs.
     DATABASE_URL: str = "postgresql+asyncpg://valaris:valaris@localhost:5433/valaris"
+    DATABASE_PASSWORD: SecretStr | None = None
     CORS_ORIGINS: str = "http://localhost:5173"
     ENV: str = "development"
     GCS_BUCKET: str = ""
@@ -131,6 +135,18 @@ class Settings(BaseSettings):
     # persisted. Defaults to the dev Vite origin; production overrides via env
     # to the IAP-fronted Cloud Run host.
     FRONTEND_URL: str = "http://localhost:5173"
+
+    @model_validator(mode="after")
+    def apply_database_password(self):
+        if self.DATABASE_PASSWORD is not None:
+            try:
+                url = make_url(self.DATABASE_URL)
+            except ArgumentError:
+                raise ValueError("DATABASE_URL must be a valid database URL") from None
+            self.DATABASE_URL = url.set(
+                password=self.DATABASE_PASSWORD.get_secret_value()
+            ).render_as_string(hide_password=False)
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -60,7 +60,7 @@ async def list_loop_templates(
     sort: str = Query(default="name", pattern="^(name|updated_at|boards_using)$"),
     include_archived: bool = Query(default=False),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """The loop template catalog: system templates then workspace templates.
 
@@ -91,7 +91,7 @@ async def import_loop_template(
     bundle: dict[str, Any] = Body(...),
     dry_run: bool = True,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """Import a `loop_template` envelope as a DRAFT in this workspace.
 
@@ -116,7 +116,7 @@ async def get_loop_template(
     draft: bool = Query(default=False),
     include_archived: bool = Query(default=False),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """One template in full. `ref` is a system slug or a workspace row UUID.
 
@@ -136,7 +136,7 @@ async def get_loop_template(
 async def list_loop_template_versions(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> list[LoopTemplateVersionRead]:
     """Published history, newest first."""
     service = LoopTemplateService(db)
@@ -148,7 +148,7 @@ async def list_loop_template_versions(
 async def get_loop_template_profile(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateProfileRead:
     """The template's profile page — stored identity plus derived track record.
 
@@ -164,7 +164,7 @@ async def preview_loop_template(
     ref: str,
     body: LoopTemplatePreviewRequest,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """Render `ref` with no board in sight — the template author's own check.
 
@@ -191,7 +191,7 @@ async def preview_loop_template(
 async def create_loop_template(
     data: LoopTemplateCreate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """Create a draft template (version 0, nothing published yet).
 
@@ -219,7 +219,7 @@ async def update_loop_template(
     ref: str,
     data: LoopTemplateUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """Autosave the draft half under an optional `expected_updated_at` lock."""
     service = LoopTemplateService(db)
@@ -247,7 +247,7 @@ async def publish_loop_template(
     ref: str,
     data: LoopTemplatePublish,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplatePublishRead:
     """Validate the draft, snapshot it, and bump the published version.
 
@@ -275,7 +275,7 @@ async def publish_loop_template(
 async def export_loop_template(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Download a template as a portable `loop_template` envelope.
 
@@ -300,7 +300,7 @@ async def export_loop_template(
 async def lint_loop_template(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """Scan a template's kernel for facts that belong in slots (spec F12).
 
@@ -323,7 +323,7 @@ async def duplicate_loop_template(
     ref: str,
     data: LoopTemplateDuplicate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """Fork any template — system or workspace — into a new workspace draft."""
     service = LoopTemplateService(db)
@@ -347,7 +347,7 @@ async def duplicate_loop_template(
 async def archive_loop_template(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """Soft-archive: the row leaves the listing but keeps serving bound boards.
 
@@ -369,7 +369,7 @@ async def archive_loop_template(
 async def unarchive_loop_template(
     ref: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     service = LoopTemplateService(db)
     row = await service.unarchive(ctx.workspace.id, ref, actor_id=ctx.user.id)
@@ -387,7 +387,7 @@ async def restore_loop_template_version(
     ref: str,
     version: int,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> LoopTemplateDetailRead:
     """Stage a published snapshot as the draft. It does NOT republish."""
     service = LoopTemplateService(db)

@@ -1,6 +1,5 @@
-# Tags are repo-wide `v*` semver — one tag releases the whole monorepo, and the
-# runner binary/image version simply follows that repo release version. No GCP
-# here: this publishes GitHub release artifacts and a ghcr.io image, nothing else.
+# Legacy `v*` tags release only the runner. Platform uses `platform-v*` and
+# the MCP server uses `mcp-server-v*`; their versions advance independently.
 name: Release runner
 
 on:
@@ -9,18 +8,50 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
-  goreleaser:
-    name: goreleaser — binaries + ghcr image
+  qualify:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/platform-release.py check-ref --component runner
+  goreleaser:
+    name: goreleaser — binaries + ghcr image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [qualify, validate]
+    if: github.repository == 'Valaris-Studio/backplane' && vars.PUBLIC_RELEASES_ENABLED == 'true'
+    environment: runner-release
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Only runner tags enter this job's disposable clone. Other component
+      # tags must not become GoReleaser's current or previous release.
+      - name: Fetch runner release history
+        run: |
+          if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
+            git fetch --unshallow --no-tags origin
+          fi
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main 'refs/tags/v*:refs/tags/v*'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recheck public release ref after approval
+        run: python scripts/platform-release.py check-ref --component runner
 
       - uses: actions/setup-go@v5
         with:
@@ -43,3 +74,4 @@ jobs:
           workdir: runner
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/boards/{board_id}", tags=["boa
 async def get_board_health(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardHealthService(db)
     return await service.get_health(board_id, ctx.workspace.id)
@@ -28,7 +28,7 @@ async def get_board_health(
 async def escalate_stale_cards(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardHealthService(db)
     escalated = await service.escalate_stale_cards(

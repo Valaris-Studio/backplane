@@ -23,7 +23,7 @@ async def health():
 
 
 @router.get("/ready")
-async def ready(db: AsyncSession = Depends(get_db)):
+async def ready(db: AsyncSession = Depends(get_db, scope="function")):
     # Liveness (/api/health) vs readiness (/api/ready): both start scripts run
     # `alembic upgrade head` before binding the port, so "the process is
     # listening" already implies "migrations are done" -- a DB ping is enough

@@ -53,7 +53,7 @@ async def search_cards(
     limit: int = Query(default=50, le=100),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     cards = await service.search_cards(
@@ -84,7 +84,7 @@ async def resolve_card_by_prefix(
     prefix: str = Query(..., description="UUID prefix fragment (min 4 chars)."),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Registered BEFORE GET /{card_id} so the literal 'resolve' segment is never
     # shadowed by the UUID path param (FastAPI matches in declaration order).
@@ -99,7 +99,7 @@ async def create_card(
     data: CardCreate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.create_card(board_id, data, ctx.user.id, workspace_id=ctx.workspace.id)
@@ -110,7 +110,7 @@ async def bulk_create_cards(
     data: BulkCardCreate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     cards = await service.bulk_create_cards(
@@ -128,7 +128,7 @@ async def get_card(
     ),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.get_card(
@@ -142,7 +142,7 @@ async def update_card(
     data: CardUpdate,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.update_card(
@@ -155,7 +155,7 @@ async def delete_card(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     await service.delete_card(
@@ -169,7 +169,7 @@ async def move_card(
     data: CardMoveRequest,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.move_card(
@@ -183,7 +183,7 @@ async def add_participant(
     data: ParticipantAdd,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.add_participant(
@@ -200,7 +200,7 @@ async def remove_participant(
     user_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     card = await service.remove_participant(
@@ -221,7 +221,7 @@ async def remove_participants_by_pipeline_role(
     pipeline_role: str,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     card = await service.remove_participants_by_pipeline_role(
@@ -239,7 +239,7 @@ async def claim_card(
     data: CardClaimRequest,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = CardService(db)
     return await service.claim_card(

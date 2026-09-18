@@ -23,7 +23,7 @@ async def get_card_verdict(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
     verdict = await service.get_card_verdict(card_id, ctx.workspace.id)

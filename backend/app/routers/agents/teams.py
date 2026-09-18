@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/workspaces/{slug}/teams", tags=["agent-teams"])
 async def list_teams(
     include_inactive: bool = Query(False),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     teams = await service.list_teams(ctx.workspace.id, include_inactive)
@@ -42,7 +42,7 @@ async def create_team(
     data: TeamCreate,
     response: Response,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     team, created = await service.create_team(ctx.workspace.id, data, ctx.user.id)
@@ -55,7 +55,7 @@ async def create_team(
 async def export_team(
     team_slug: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     envelope = await service.export_team(
@@ -75,7 +75,7 @@ async def export_team(
 async def get_team(
     team_ident: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     team = await service.get_team_by_identifier(team_ident, ctx.workspace.id)
@@ -88,7 +88,7 @@ async def update_team(
     team_ident: str,
     data: TeamUpdate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     team = await service.get_team_by_identifier(team_ident, ctx.workspace.id)
@@ -101,7 +101,7 @@ async def update_team(
 async def deactivate_team(
     team_ident: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     team = await service.get_team_by_identifier(team_ident, ctx.workspace.id)
@@ -115,7 +115,7 @@ async def add_member(
     team_ident: str,
     data: TeamMemberAdd,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = TeamService(db)
     team = await service.get_team_by_identifier(team_ident, ctx.workspace.id)
@@ -130,7 +130,7 @@ async def remove_member(
     team_ident: str,
     agent_id: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     import uuid
 

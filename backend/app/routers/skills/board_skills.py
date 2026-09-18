@@ -34,7 +34,7 @@ router = APIRouter(
 async def list_board_skills(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """The board's EFFECTIVE set: enabled bindings resolved to pinned_version
     when set, else the skill's latest published version; a skill resolving to
@@ -50,7 +50,7 @@ async def list_board_skills(
 async def list_board_skill_bindings(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """EVERY binding row — enabled or not, resolving or not.
 
@@ -69,7 +69,7 @@ async def set_board_skill(
     data: BoardSkillBindingPut,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> BoardSkillBindingRead:
     """Upsert the binding. `pinned_version` is TRI-STATE: omitted leaves any
     existing pin unchanged, an explicit null unpins back to tracking the
@@ -87,7 +87,7 @@ async def remove_board_skill(
     skill_slug: str,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     """Idempotent: removing a binding that does not exist is still a 204."""
     service = SkillService(db)

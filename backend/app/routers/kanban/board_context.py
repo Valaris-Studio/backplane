@@ -20,7 +20,7 @@ router = APIRouter(
 async def get_board_context(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = BoardContextService(db)
     return await service.get_context(board_id, ctx.workspace.id)

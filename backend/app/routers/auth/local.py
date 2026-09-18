@@ -34,7 +34,7 @@ async def local_login(
     body: LocalLoginRequest,
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserRead:
     if not settings.LOCAL_AUTH_ENABLED:
         # The surface is off: answer like the route never existed.
@@ -65,7 +65,7 @@ async def change_password(
     body: ChangePasswordRequest,
     request: Request,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if not settings.LOCAL_AUTH_ENABLED:
         raise HTTPException(status_code=404, detail="Not Found")

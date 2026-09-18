@@ -79,7 +79,7 @@ class WorkspaceDep:
         self,
         slug: str,
         user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db),
+        db: AsyncSession = Depends(get_db, scope="function"),
     ) -> WorkspaceContext:
         await _enforce_agent_workspace_scope(slug, db)
 
@@ -145,7 +145,7 @@ get_workspace_owner = WorkspaceDep(min_role=WorkspaceRole.owner)
 async def resolve_board_id(
     board_id: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> uuid.UUID:
     """Resolve `{board_id}` path param (UUID or slug) to the board's UUID.
 

@@ -116,7 +116,7 @@ async def oidc_login(client: OidcClient = Depends(get_oidc_client)):
 @router.get("/callback", response_class=RedirectResponse)
 async def oidc_callback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     client: OidcClient = Depends(get_oidc_client),
 ):
     if error := request.query_params.get("error"):

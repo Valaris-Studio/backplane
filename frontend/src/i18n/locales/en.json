@@ -41,6 +41,7 @@
   "errors": {
     "unknown": "Something went wrong. Please try again.",
     "upload_failed": "The file could not be uploaded. Please try again.",
+    "upload_too_large": "The file exceeds the upload limit. Choose a smaller file and try again.",
     "request_validation_error": "Some fields are invalid. Review them and try again.",
     "validation_error": "Some information is invalid. Review it and try again.",
     "not_found": "The requested item could not be found.",
@@ -7759,6 +7760,7 @@
   "a11y": {
     "languageSwitcher": "Language",
     "topbar": {
+      "moreControls": "More controls",
       "breadcrumb": "Breadcrumb",
       "toggleSidebar": "Toggle sidebar"
     },

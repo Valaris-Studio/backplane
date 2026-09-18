@@ -24,7 +24,7 @@ router = APIRouter(
 async def create_threshold(
     data: AlertThresholdCreate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     return await service.create(ctx.workspace.id, ctx.user.id, data)
@@ -33,7 +33,7 @@ async def create_threshold(
 @router.get("/thresholds", response_model=list[AlertThresholdRead])
 async def list_thresholds(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     board_id: uuid.UUID | None = Query(None),
 ):
     service = AlertThresholdService(db)
@@ -44,7 +44,7 @@ async def list_thresholds(
 async def get_threshold(
     threshold_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     return await service.get(threshold_id, ctx.workspace.id)
@@ -55,7 +55,7 @@ async def update_threshold(
     threshold_id: uuid.UUID,
     data: AlertThresholdUpdate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     return await service.update(threshold_id, ctx.workspace.id, data)
@@ -65,7 +65,7 @@ async def update_threshold(
 async def delete_threshold(
     threshold_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     await service.delete(threshold_id, ctx.workspace.id)
@@ -76,7 +76,7 @@ async def evaluate_threshold(
     threshold_id: uuid.UUID,
     metrics: dict,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     threshold = await service.get(threshold_id, ctx.workspace.id)
@@ -87,7 +87,7 @@ async def evaluate_threshold(
 @router.post("/evaluate-cost")
 async def evaluate_cost_thresholds(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AlertThresholdService(db)
     return await service.evaluate_cost_thresholds(ctx.workspace.id)

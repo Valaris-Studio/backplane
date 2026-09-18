@@ -8,6 +8,7 @@ on:
     branches: [main, 'codex/preview-*']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,10 +30,15 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
       - name: Install dependencies
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
+      - name: Audit dependencies
+        working-directory: backend
+        run: python -m pip_audit --strict
       - name: Install public-export gate tools
         # tests/test_public_export_snapshot_identity.py runs the real export
         # (git-filter-repo rewrite + gitleaks acceptance) into a temp dir and
@@ -106,13 +112,16 @@ jobs:
         # lint/test/build gates, and it keeps CI from running arbitrary
         # dependency install hooks.
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit dependencies
+        working-directory: frontend
+        run: pnpm audit
       - name: Lint
         working-directory: frontend
         run: pnpm lint
       - name: Tests
         working-directory: frontend
         env:
-          I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'HEAD^' }}
         run: pnpm vitest run
       - name: Check generated product documentation
         working-directory: frontend
@@ -164,10 +173,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
       - uses: astral-sh/setup-uv@v6
       - name: Install fixture dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements-dev.txt
       - name: Qualify binary, real API, recovery and generated MCP through the TUI
         run: ./scripts/runner-artifact-gate.sh
 

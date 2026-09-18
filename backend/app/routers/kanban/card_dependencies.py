@@ -57,7 +57,7 @@ async def list_dependencies(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DependencyService(db)
     view = await service.list_for_card(
@@ -71,7 +71,7 @@ async def dependency_status(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     view = await DependencyService(db).list_for_card(
         workspace_id=ctx.workspace.id, card_id=card_id, board_id=board_id,
@@ -86,7 +86,7 @@ async def add_dependency(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DependencyService(db)
     # Check existing first so we can flip the status code 200 vs 201 to
@@ -109,7 +109,7 @@ async def bulk_set_dependencies(
     card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DependencyService(db)
     view = await service.bulk_set(
@@ -128,7 +128,7 @@ async def remove_dependency(
     depends_on_card_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DependencyService(db)
     await service.remove(

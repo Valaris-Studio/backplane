@@ -33,7 +33,8 @@ services:
     pull_policy: build
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-backplane}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-backplane}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-backplane}@postgres:5432/${POSTGRES_DB:-backplane}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       ENV: production
       EVENT_BUS_BACKEND: postgres
       # Left at the default: the postgres bus already makes Tier-1 cache

@@ -56,6 +56,14 @@ export function ReferenceEnvironmentVariables() {
               </td>
             </tr>
             <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4"><code>DATABASE_PASSWORD</code></td>
+              <td className="py-3 pr-4">—</td>
+              <td className="py-3 pr-4">
+                Optional literal password override for DATABASE_URL. Encoding is automatic.
+                Production Compose supplies it from POSTGRES_PASSWORD.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
               <td className="py-3 pr-4">
                 <code>ENV</code>
               </td>

@@ -57,7 +57,7 @@ async def next_assignment(
     agent_id: uuid.UUID,
     body: NextAssignmentRequest | None = None,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     body = body or NextAssignmentRequest()
 

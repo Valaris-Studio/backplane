@@ -66,8 +66,7 @@ dockers_v2:
       org.opencontainers.image.licenses: MIT
 
 release:
-  # Repo-wide v* tags cover backend/frontend/mcp-server too, so the runner
-  # release notes must not claim to be the whole release.
+  # v* tags identify runner releases; platform and MCP use separate prefixes.
   name_template: "v{{ .Version }}"
   footer: |
     ## Container image

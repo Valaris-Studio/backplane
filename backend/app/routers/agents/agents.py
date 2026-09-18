@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 async def get_current_agent(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> Agent:
     agent_id_val = current_agent_id.get()
     if agent_id_val is None:
@@ -50,7 +50,7 @@ async def get_current_agent(
 async def list_agents(
     include_inactive: bool = Query(False),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     summary: bool = Query(
         default=False,
         description=(
@@ -79,7 +79,7 @@ async def create_agent(
     data: AgentCreate,
     response: Response,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     agent, api_key, raw_key = await service.create_agent(data, user.id)
@@ -108,7 +108,7 @@ async def create_agent(
 @router.get("/me", response_model=AgentRead)
 async def get_agent_me(
     agent: Agent = Depends(get_current_agent),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     from app.schemas.agents.agent import TeamMembershipInfoCompat
 
@@ -133,7 +133,7 @@ async def get_agent_me(
 async def heartbeat(
     body: HeartbeatBody | None = None,
     agent: Agent = Depends(get_current_agent),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # DEPRECATED (WS-2): heartbeats now ride the workspace WebSocket as
     # `{"type":"heartbeat","payload":{...}}` frames. This HTTP path stays
@@ -158,7 +158,7 @@ async def heartbeat(
 @router.get("/me/budget-status", response_model=BudgetStatus)
 async def get_my_budget_status(
     agent: Agent = Depends(get_current_agent),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     return await service.get_budget_status_for_agent(agent.id)
@@ -175,7 +175,7 @@ async def get_agent_config(
         ),
     ),
     agent: Agent = Depends(get_current_agent),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     return await service.get_agent_config(agent.id, workspace_slug=workspace_slug)
@@ -185,7 +185,7 @@ async def get_agent_config(
 async def poll_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Trigger an immediate poll cycle on a running agent.
 
@@ -202,7 +202,7 @@ async def poll_agent(
 async def restart_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Ask a running agent to finish its in-flight card and then exit.
 
@@ -222,7 +222,7 @@ async def restart_agent(
 async def pause_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Stop the runner from picking up NEW cards.
 
@@ -244,7 +244,7 @@ async def pause_agent(
 async def resume_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Re-enable card pickup for a paused runner. Idempotent."""
     service = AgentService(db)
@@ -260,7 +260,7 @@ async def resume_agent(
 async def rotate_agent_key(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     agent, api_key, raw_key = await service.rotate_api_key(agent_id, user.id)
@@ -274,7 +274,7 @@ async def rotate_agent_key(
 async def get_budget_status(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     return await service.get_budget_status(agent_id, user.id)
@@ -288,7 +288,7 @@ async def get_budget_status(
 async def export_agent_config(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Return a ZIP bundle: runner-{name}.yaml + mcp-config-{name}.json.
 
@@ -331,7 +331,7 @@ async def export_agent_config(
 async def get_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     agent = await service.get_agent(agent_id, user.id)
@@ -352,7 +352,7 @@ async def update_agent(
     agent_id: uuid.UUID,
     data: AgentUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     agent = await service.update_agent(agent_id, user.id, data)
@@ -367,7 +367,7 @@ async def update_agent(
 async def hard_delete_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Permanently delete the agent and everything that only described it.
 
@@ -387,7 +387,7 @@ async def hard_delete_agent(
 async def deactivate_agent(
     agent_id: uuid.UUID,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = AgentService(db)
     agent = await service.deactivate_agent(agent_id, user.id)

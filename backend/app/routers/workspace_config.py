@@ -33,7 +33,7 @@ router = APIRouter(
 @router.get("", response_model=WorkspaceConfigRead)
 async def get_workspace_config(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceConfigService(db)
     return await service.get_config(ctx.workspace.id)
@@ -43,7 +43,7 @@ async def get_workspace_config(
 async def update_workspace_config(
     data: WorkspaceConfigUpdate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceConfigService(db)
     return await service.update_config(ctx.workspace.id, data, actor_id=ctx.user.id)
@@ -52,7 +52,7 @@ async def update_workspace_config(
 @router.get("/pipeline/export")
 async def export_pipeline(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = WorkspaceConfigService(db)
     envelope = await service.export_pipeline(ctx.workspace.id, ctx.workspace.slug)
@@ -69,7 +69,7 @@ async def export_pipeline(
 @router.get("/bundle/export")
 async def export_pipeline_bundle(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Download the workspace's portable config bundle (pipeline + setup
     contract + workspace-scoped prompts) as a JSON attachment."""
@@ -90,7 +90,7 @@ async def import_pipeline_bundle(
     bundle: dict[str, Any] = Body(...),
     dry_run: bool = True,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Import a config bundle into the workspace.
 
@@ -117,7 +117,7 @@ role_labels_router = APIRouter(
 @role_labels_router.get("")
 async def get_workspace_role_labels(
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await get_role_labels(db, ctx.workspace.id)
 
@@ -160,7 +160,7 @@ async def get_board_runner_config(
         "'create an agent' prerequisite, names the runner in the key step, "
         "and drops team binding only when the backend verifies it.",
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Pre-filled runner config for this board: `runner_yaml`, `mcp_config_json`,
     and a `prerequisites` checklist of host-environment steps the backend can't
@@ -208,7 +208,7 @@ async def completion_context_impact(
     source_kind: ContextSourceKind,
     source_id: uuid.UUID | None = None,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     from app.services.completion_context_impact import CompletionContextImpactService
 

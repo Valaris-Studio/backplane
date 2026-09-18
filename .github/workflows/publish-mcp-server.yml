@@ -1,5 +1,5 @@
 # Publishes the mcp-server package to PyPI on its own `mcp-server-v*` tags, so
-# it can ship independently of the repo-wide `v*` releases.
+# it can ship independently of platform and runner releases.
 name: Publish mcp-server
 
 on:
@@ -17,9 +17,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate public release ref
+        run: python scripts/platform-release.py check-ref --component mcp
       - uses: astral-sh/setup-uv@v6
       # Same policy as ci.yml: the gate tests the locked resolution.
       - name: Install (frozen lock)
@@ -61,16 +65,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # No `environment:` while the repo is private — deployment environments
-    # need a paid plan on private repos, and the PyPI trusted publisher was
-    # registered without an environment constraint to match. At public launch:
-    # create a `pypi` environment with required reviewers, add `environment:
-    # pypi` here, and set the same environment on the PyPI publisher.
+    if: github.repository == 'Valaris-Studio/backplane' && vars.PUBLIC_RELEASES_ENABLED == 'true'
+    environment: pypi
     # Trusted Publishing: no API token anywhere — the PyPI project must have this
     # repo + workflow file registered as a trusted publisher for it to work.
     permissions:
       id-token: write
+      contents: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Recheck public release ref after approval
+        run: python scripts/platform-release.py check-ref --component mcp
       - uses: actions/download-artifact@v4
         with:
           name: dist

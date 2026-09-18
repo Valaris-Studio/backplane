@@ -8,6 +8,7 @@ import { useUploadUrl, useCreateResource } from "../api/use-resources";
 import { Button } from "@/components/ui/button";
 import { RichTooltip } from "@/components/ui/rich-tooltip";
 import { resolveApiErrorMessage } from "@/lib/localized-errors";
+import { ApiError } from "@/lib/api-error";
 
 interface FileUploadButtonProps {
   slug: string;
@@ -48,11 +49,16 @@ export function FileUploadButton({
         content_type: file.type || "application/octet-stream",
       });
 
-      await fetch(upload_url, {
+      const response = await fetch(upload_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
+      if (!response.ok) {
+        throw new ApiError("Upload failed", response.status, undefined, {
+          errorCode: response.status === 413 ? "upload_too_large" : "upload_failed",
+        });
+      }
 
       await createResource.mutateAsync({
         name: file.name,
@@ -90,7 +96,7 @@ export function FileUploadButton({
         </Button>
       </RichTooltip>
       {errorMessage && (
-        <p className="text-xs text-destructive">{errorMessage}</p>
+        <p role="alert" className="text-xs text-destructive">{errorMessage}</p>
       )}
     </div>
   );

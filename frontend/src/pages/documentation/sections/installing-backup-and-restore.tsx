@@ -72,24 +72,36 @@ docker run --rm \
         Keep backend and frontend stopped while replacing the database and
         files. The example below assumes local volume storage.
       </p>
+      <p>
+        Run the whole block as a Bash script. It stops on the first error.
+        This example uses a separate project and localhost port; choose an
+        unused port. Preserve archive ownership so the backend can write
+        restored files.
+      </p>
       <CodeExample language="bash" title="Restore database and local resources">
-        {`BACKPLANE_RESTORE_REVISION=replace-with-recorded-source-commit
+        {`set -euo pipefail
+export COMPOSE_PROJECT_NAME=backplane-restore
+export BACKPLANE_HTTP_PORT=127.0.0.1:8081
+export BACKPLANE_URL=http://localhost:8081
+
+BACKPLANE_RESTORE_REVISION=replace-with-recorded-source-commit
 git checkout "$BACKPLANE_RESTORE_REVISION"
 cp /secure/backup/.env .
-docker compose -f docker-compose.prod.yml up -d postgres
+docker compose -f docker-compose.prod.yml stop backend frontend
+docker compose -f docker-compose.prod.yml up -d --wait --wait-timeout 60 postgres
 
 docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_restore -U backplane -d backplane --clean --if-exists \
+  pg_restore -U backplane -d backplane --clean --if-exists --exit-on-error \
   < backplane-2026-07-25.dump
 
-BACKPLANE_RESOURCE_VOLUME=backplane_backplane-storage
-docker volume inspect "$BACKPLANE_RESOURCE_VOLUME"
+BACKPLANE_RESOURCE_VOLUME="\${COMPOSE_PROJECT_NAME}_backplane-storage"
+docker volume create "$BACKPLANE_RESOURCE_VOLUME"
 docker run --rm \
   -v "$BACKPLANE_RESOURCE_VOLUME:/data" \
   -v "$PWD":/backup \
   alpine sh -c "tar xzf /backup/backplane-storage-2026-07-25.tar.gz -C /data"
 
-docker compose -f docker-compose.prod.yml up -d --build`}
+docker compose -f docker-compose.prod.yml up -d --build --wait`}
       </CodeExample>
 
       <ImportantNote title="Newer source automatically upgrades an older dump">

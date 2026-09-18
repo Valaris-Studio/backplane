@@ -115,7 +115,7 @@ async def _http_client_dependency() -> httpx.AsyncClient:
 @router.get("/api/oauth/github/callback", response_class=RedirectResponse)
 async def oauth_github_callback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     http_client: httpx.AsyncClient = Depends(_http_client_dependency),
 ):
     code = request.query_params.get("code")

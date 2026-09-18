@@ -29,7 +29,7 @@ router = APIRouter(
 async def get_definition(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DefinitionService(db)
     return await service.get_definition(board_id, ctx.workspace.id)
@@ -40,7 +40,7 @@ async def upsert_definition(
     data: DefinitionUpsert,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = DefinitionService(db)
     return await service.upsert_definition(
@@ -52,7 +52,7 @@ async def upsert_definition(
 async def export_definition(
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     board_slug = await db.scalar(select(Board.slug).where(Board.id == board_id))
     service = DefinitionService(db)

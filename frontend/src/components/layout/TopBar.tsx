@@ -1,13 +1,14 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   ChevronRight,
+  Ellipsis,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -73,6 +74,11 @@ export function TopBar({
   const location = useLocation();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const mobileToolsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (mobileToolsRef.current) mobileToolsRef.current.open = false;
+  }, [location.pathname]);
 
   const boardName = boardId
     ? queryClient.getQueryData<BoardDetail>(boardKeys.detail(slug, boardId))?.name
@@ -133,6 +139,24 @@ export function TopBar({
     };
   }, []);
 
+  const utilities = (
+    <>
+      <ThemeSwitcher />
+      {resolvedSlug ? <ObserverPanel slug={resolvedSlug} /> : null}
+      <NotificationBell slug={resolvedSlug} />
+      <ConnectionStatusIndicator />
+      <Link
+        to={`/${slug}/documentation`}
+        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-2")}
+        aria-label={t("nav.documentation")}
+      >
+        <BookOpen className="h-4 w-4" />
+        <span className={isMobile ? undefined : "hidden xl:inline"}>{t("nav.docs")}</span>
+      </Link>
+      <LanguageSwitcher />
+    </>
+  );
+
   return (
     <header
       className={cn(
@@ -150,6 +174,7 @@ export function TopBar({
           scrolled
             ? "h-10 rounded-none rounded-b-[var(--radius-lg)] border-t-0 px-3 bg-background/92"
             : "h-[var(--topbar-height)] rounded-[min(var(--radius-cap),calc(var(--radius-xl)+0.2rem))] px-4",
+          isMobile && "gap-1 px-2",
         )}
       >
         <Button
@@ -217,26 +242,32 @@ export function TopBar({
           </div>
         </nav>
 
-        <div className="flex items-center gap-2">
-          <ThemeSwitcher />
-          {resolvedSlug ? <ObserverPanel slug={resolvedSlug} /> : null}
-          <NotificationBell slug={resolvedSlug} />
-          <ConnectionStatusIndicator />
-          <Link
-            to={`/${slug}/documentation`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "gap-2",
-            )}
-            aria-label={t("nav.documentation")}
-          >
-            <BookOpen className="h-4 w-4" />
-            {/* Same short label as the workspace selector's docs link; the
-                aria-label keeps the full word for screen readers. Icon-only
-                below xl: the label yields before the breadcrumb trail does. */}
-            <span className="hidden xl:inline">{t("nav.docs")}</span>
-          </Link>
-          <LanguageSwitcher />
+        <div className="flex shrink-0 items-center gap-2">
+          {isMobile ? (
+            <details
+              ref={mobileToolsRef}
+              className="relative"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.currentTarget.open = false;
+                  event.currentTarget.querySelector("summary")?.focus();
+                }
+              }}
+            >
+              <summary
+                aria-label={t("a11y.topbar.moreControls")}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "icon" }),
+                  "cursor-pointer list-none [&::-webkit-details-marker]:hidden",
+                )}
+              >
+                <Ellipsis className="h-4 w-4" />
+              </summary>
+              <div className="absolute right-0 top-full z-30 mt-2 flex w-56 max-w-[calc(100vw-2rem)] flex-wrap items-center gap-2 rounded-lg border bg-popover p-3 shadow-panel">
+                {utilities}
+              </div>
+            </details>
+          ) : utilities}
           <AccountMenu />
         </div>
       </div>

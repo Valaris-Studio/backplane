@@ -49,7 +49,7 @@ catalog_router = APIRouter(
 async def list_skills(
     include_archived: bool = Query(default=False),
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict:
     """Listing items are METADATA only — file contents never ride here."""
     service = SkillService(db)
@@ -68,7 +68,7 @@ async def list_skills(
 async def create_skill(
     data: SkillCreate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> JSONResponse:
     """Create a skill with its files as draft version 1.
 
@@ -90,7 +90,7 @@ async def create_skill(
 async def propose_skill(
     data: SkillProposalCreate,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> JSONResponse:
     """Agent proposal path: a 'proposed' version + pending approval in one
     call. Member-gated, agent-caller required (the service raises the 403).
@@ -112,7 +112,7 @@ async def propose_skill(
 async def get_skill(
     skill_slug: str,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillRead:
     service = SkillService(db)
     return build_skill_read(
@@ -128,7 +128,7 @@ async def get_skill(
 async def archive_skill(
     skill_slug: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillRead:
     """Soft-archive: hides from the default listing, blocks new binds and
     proposals. Idempotent — re-archiving returns the skill unchanged."""
@@ -146,7 +146,7 @@ async def archive_skill(
 async def unarchive_skill(
     skill_slug: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillRead:
     service = SkillService(db)
     return build_skill_read(
@@ -161,7 +161,7 @@ async def get_skill_version(
     skill_slug: str,
     version: int,
     ctx: WorkspaceContext = Depends(get_workspace),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillVersionDetailRead:
     """The one place file contents are served — verbatim."""
     service = SkillService(db)
@@ -180,7 +180,7 @@ async def create_skill_version(
     skill_slug: str,
     data: SkillVersionCreate,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillVersionRead:
     service = SkillService(db)
     return build_version_read(
@@ -202,7 +202,7 @@ async def publish_skill_version(
     skill_slug: str,
     version: int,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillVersionRead:
     service = SkillService(db)
     return build_version_read(
@@ -230,7 +230,7 @@ async def list_skill_catalog(
 async def activate_catalog_skill(
     catalog_id: str,
     ctx: WorkspaceContext = Depends(get_workspace_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> JSONResponse:
     """Copy a catalog entry into the workspace as a published v1. Idempotent:
     re-activation returns the existing workspace copy (200) untouched."""

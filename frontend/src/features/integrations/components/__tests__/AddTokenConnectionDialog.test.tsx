@@ -137,8 +137,10 @@ describe("AddTokenConnectionDialog — scope guidance", () => {
     expect(guidance).toHaveTextContent(/Actions/i);
     expect(guidance).toHaveTextContent(/Commit statuses/i);
     const permissions = screen.getByRole("region", { name: /GitHub token permissions/i });
-    expect(within(permissions).getByText(/Pull requests.*Read and write/)).toBeVisible();
-    expect(within(permissions).getByText(/Contents.*Read and write/)).toBeVisible();
+    await waitFor(() => {
+      expect(within(permissions).getByText(/Pull requests.*Read and write/)).toBeVisible();
+      expect(within(permissions).getByText(/Contents.*Read and write/)).toBeVisible();
+    });
     expect(within(permissions).getAllByRole("listitem")).toHaveLength(4);
     expect(permissions.compareDocumentPosition(tokenField()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tokenField()).toHaveAccessibleDescription(/Pull requests/);
