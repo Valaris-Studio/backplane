@@ -47,11 +47,13 @@ type LoopMode struct {
 	after func(time.Duration) <-chan time.Time
 	// mcpSurface caches the once-per-run tools/list probe shared by the
 	// surface pre-flights (see servedMCPCatalog).
-	mcpSurface           *mcpSurfaceProbe
-	completionRetryAfter time.Time
-	completionNotices    map[string]string
-	budgetHistory        *valaris.LoopHistory
-	budgetSpent          float64
+	mcpSurface                 *mcpSurfaceProbe
+	completionRetryAfter       time.Time
+	completionReworkRetryAfter time.Time
+	completionRework           *valaris.CompletionWorkflow
+	completionNotices          map[string]string
+	budgetHistory              *valaris.LoopHistory
+	budgetSpent                float64
 	// Tests of completion scheduling inject the I/O boundary; production uses
 	// the actual configured MCP process before any source/review/validation work.
 	completionMCPCheck func(context.Context, string, string, string, *valaris.BoardLoopConfig) (MCPLaunchReport, error)
@@ -299,6 +301,7 @@ func (m *LoopMode) Run(ctx context.Context) error {
 			continue
 		}
 		consecutiveIdle = 0
+		m.completionRework = nil
 		delete(m.completionNotices, "idle")
 
 		if cfg.CompletionPolicy != nil {
@@ -415,7 +418,7 @@ func (m *LoopMode) Run(ctx context.Context) error {
 		// counter moves: a finished run must cost no session, no execution
 		// row, and no budget — the whole reason this condition is declarative
 		// rather than a paragraph in the loop prompt.
-		if cfg.CompletionQuery != nil {
+		if m.completionRework == nil && cfg.CompletionQuery != nil {
 			if done, ok := m.completionQuerySatisfied(ctx, cfg.CompletionQuery); ok && done {
 				err := m.disable(ctx, completionQueryReason(cfg.CompletionQuery))
 				recap(cfg.BudgetUSD)
@@ -423,7 +426,7 @@ func (m *LoopMode) Run(ctx context.Context) error {
 			}
 		}
 
-		if cfg.StarvationPolicy != "always_run" && !readinessUnsupported {
+		if m.completionRework == nil && cfg.StarvationPolicy != "always_run" && !readinessUnsupported {
 			readiness, err := m.client.GetLoopReadiness(ctx, m.workspaceSlug, m.boardID)
 			switch {
 			case errors.Is(err, valaris.ErrLoopReadinessUnsupported):
@@ -531,7 +534,29 @@ func (m *LoopMode) Run(ctx context.Context) error {
 			return fmt.Errorf("completion policy requires a recorded source execution; restore execution logging before resuming")
 		}
 
-		failed, cost, outcome := m.runIteration(ctx, cfg, globalIteration, executionID, provider, model, sessionCap, spent)
+		var reworkContext string
+		if rework := m.completionRework; rework != nil {
+			claimed, err := m.client.ClaimCompletionRework(ctx, m.workspaceSlug, m.boardID, rework.CardID, rework.CandidateID, rework.Attempt.ID, executionID)
+			if err != nil {
+				detail := m.completionOutput(err.Error(), "")
+				m.completeExecution(ctx, executionID, "failed", detail)
+				return fmt.Errorf("completion rework claim failed: %s", detail)
+			}
+			if claimed == nil {
+				m.completeExecution(ctx, executionID, "aborted", "Completion rework is no longer available; no source session was invoked.")
+				m.completionReworkRetryAfter = time.Now().Add(30 * time.Second)
+				continue
+			}
+			if claimed.CandidateID != rework.CandidateID || claimed.CardID != rework.CardID || claimed.FailedAttemptID != rework.Attempt.ID || claimed.ExecutionID != executionID || strings.TrimSpace(claimed.Context) == "" {
+				m.completeExecution(ctx, executionID, "failed", "Completion rework claim omitted its bound identity or mandatory context.")
+				return fmt.Errorf("completion rework claim omitted its bound identity or mandatory context")
+			}
+			m.completionRetryAfter = time.Time{}
+			reworkContext = claimed.Context
+			slog.Info("completion review recovery", "candidate_id", m.completionOutput(rework.CandidateID, ""), "failed_attempt_id", m.completionOutput(rework.Attempt.ID, ""), "finding", m.completionOutput(rework.Summary, ""), "recovery_action", "bounded implementation rework followed by fresh independent review", "execution_id", executionID)
+		}
+
+		failed, cost, outcome := m.runIteration(ctx, cfg, globalIteration, executionID, provider, model, sessionCap, spent, reworkContext)
 		spent += cost
 		if ctx.Err() != nil {
 			// Operator interrupt landed mid-session: the aborted session is
@@ -768,7 +793,7 @@ func parseLoopOutcome(result *llm.Result) *loopOutcome {
 // itself never re-resolves. sessionCap is the effective per-session ceiling
 // (min of board-remaining and yaml, computed by Run); spentBefore is the
 // cumulative spend entering this iteration, for the 80% budget warning.
-func (m *LoopMode) runIteration(ctx context.Context, cfg *valaris.BoardLoopConfig, iteration int, executionID string, provider llm.Provider, model string, sessionCap, spentBefore float64) (failed bool, cost float64, outcome *loopOutcome) {
+func (m *LoopMode) runIteration(ctx context.Context, cfg *valaris.BoardLoopConfig, iteration int, executionID string, provider llm.Provider, model string, sessionCap, spentBefore float64, reworkContext ...string) (failed bool, cost float64, outcome *loopOutcome) {
 	pctx := PromptContext{
 		Workspace:   m.workspaceSlug,
 		BoardID:     m.boardID,
@@ -800,6 +825,10 @@ func (m *LoopMode) runIteration(ctx context.Context, cfg *valaris.BoardLoopConfi
 		}
 		systemPrompt += "\n\n## Mandatory completion policy\n" + cfg.CompletionContext
 		systemPrompt += "\n\n## Mandatory source execution identity\nsource_execution_id: " + executionID + "\nUse this exact execution ID when submitting completion evidence for this iteration."
+	}
+
+	if len(reworkContext) > 0 && reworkContext[0] != "" {
+		systemPrompt += "\n\n## Mandatory completion review recovery\n" + reworkContext[0]
 	}
 
 	loopPrompt += toolManifest(cfg.Tools)

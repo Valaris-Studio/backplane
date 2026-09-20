@@ -123,6 +123,7 @@ def write_provider(path, version, body):
         "missing-runtime",
         "budget-history",
         "recovery",
+        "failed-review-rework",
         pytest.param("interactive", marks=pytest.mark.timeout(650)),
         pytest.param("interactive-fresh", marks=pytest.mark.timeout(650)),
     ],
@@ -168,6 +169,14 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
     review_marker = tmp_path / "review-sha"
     review_args = tmp_path / "review-argv"
     check_marker = tmp_path / "check-sha"
+    review_history = tmp_path / "review-history.jsonl"
+    failed_finding = (
+        "Evidence report is missing its exact revision verification. "
+        + "The report must identify the inspected candidate and its observed checks. "
+        * 24
+        + "FINAL_FINDING_REQUIREMENT_714: record the verified source revision."
+    )
+    corrected_evidence = "RECOVERED_EVIDENCE_714: exact source revision verified"
     write_executable(
         bin_dir / "gh",
         "#!/bin/sh\necho 'Fixture completion must use the server-side forge client' >&2\nexit 78\n",
@@ -190,6 +199,26 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
         "print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps({'outcome':'passed','summary':'Exact fixture candidate independently reviewed.'})}}))\n"
         "print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':1}}))\n",
     )
+    if scenario == "failed-review-rework":
+        write_provider(
+            bin_dir / "codex",
+            "codex-cli 0.144.1",
+            f"#!{sys.executable}\nimport json,subprocess,sys\nfrom pathlib import Path\n"
+            f"history=Path({str(review_history)!r})\n"
+            "previous=history.read_text().splitlines() if history.exists() else []\n"
+            "assert len(previous) < 2, 'review repeated without bounded rework'\n"
+            "revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()\n"
+            "prompt=sys.argv[-1]\n"
+            f"if previous: assert {corrected_evidence!r} in prompt, 'fresh review did not receive corrected evidence'\n"
+            f"Path({str(review_marker)!r}).write_text(revision)\n"
+            f"Path({str(review_args)!r}).write_text(json.dumps(sys.argv[1:]))\n"
+            "with history.open('a') as stream: stream.write(json.dumps({'sha':revision,'argv':sys.argv[1:]})+'\\n')\n"
+            "result={'outcome':'passed' if previous else 'failed',"
+            f"'summary':'Corrected evidence independently reviewed.' if previous else {failed_finding!r}}}\n"
+            "print(json.dumps({'type':'thread.started','thread_id':'fixture-review-'+str(len(previous))}))\n"
+            "print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps(result)}}))\n"
+            "print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':1}}))\n",
+        )
     if scenario == "missing-runtime":
         resources = tmp_path / "Fixture.app" / "Contents" / "Resources"
         resources.mkdir(parents=True)
@@ -352,11 +381,27 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
     result_receipts = []
     first_result = None
     requests = []
+    review_source_states = []
 
     @app.middleware("http")
     async def record_boundary(request, call_next):
         nonlocal drifted, first_result
         requests.append((request.method, request.url.path))
+        if scenario == "failed-review-rework":
+            if request.url.path.endswith("/result") and first_result is None:
+                first_result = (request.url.path, await request.json())
+            if request.url.path.endswith("/claim") and result_receipts:
+                async with sealed_artifact_database() as session:
+                    execution = await session.scalar(
+                        select(AgentExecution).where(
+                            AgentExecution.board_id == f.board.id,
+                            AgentExecution.action == "loop_iteration",
+                            AgentExecution.id != f.execution.id,
+                        )
+                    )
+                    review_source_states.append(
+                        execution.status.value if execution else None
+                    )
         if scenario == "budget-history" and request.url.path.endswith("/loop/history"):
             return Response("fixture history unavailable", status_code=503)
         if (
@@ -391,7 +436,8 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             response = Response(
                 body, status_code=response.status_code, headers=dict(response.headers)
             )
-            receipt_received.set()
+            if scenario != "failed-review-rework" or len(result_receipts) >= 2:
+                receipt_received.set()
         return response
 
     sock = socket.socket()
@@ -446,6 +492,35 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             )
         )
         mcp_path.chmod(0o600)
+        if scenario == "failed-review-rework":
+            write_provider(
+                bin_dir / "claude",
+                "2.1.0 (Claude Code)",
+                f"#!{sys.executable}\nimport json,sys,urllib.request\nfrom pathlib import Path\n"
+                "prompt='\\n'.join(sys.argv[1:])\n"
+                + f"assert {failed_finding!r} in prompt, 'full failed finding was not injected'\n"
+                + f"assert {str(candidate.id)!r} in prompt, 'rework did not identify its candidate'\n"
+                + f"marker=Path({str(source_marker)!r})\nassert not marker.exists(), 'source rework was repeated'\n"
+                + "config=Path(sys.argv[sys.argv.index('--mcp-config')+1])\n"
+                + "key=json.loads(config.read_text())['mcpServers']['valaris']['env']['FIXTURE_API_KEY']\n"
+                + "def request(url, data):\n"
+                + " req=urllib.request.Request(url,data=json.dumps(data).encode(),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'},method='POST')\n"
+                + " with urllib.request.urlopen(req,timeout=5) as response: return json.load(response)\n"
+                + f"note=request({f'{api_url}/api/workspaces/default/boards/{f.board.id}/notes'!r}, "
+                + repr(
+                    {
+                        "title": "Corrected verification evidence",
+                        "content": corrected_evidence,
+                        "pinned": True,
+                        "card_id": str(f.card.id),
+                    }
+                )
+                + ")\n"
+                + f"retry=request({f'{api_url}{f.url}/cards/{f.card.id}/retry'!r}, {{}})\n"
+                + "assert retry['candidate']['status']=='awaiting_review'\n"
+                + "marker.write_text(json.dumps({'argv':sys.argv[1:],'note_id':note['id']}))\n"
+                + "print(json.dumps({'type':'result','subtype':'success','result':'Corrected verification evidence and explicitly requested fresh review.','structured_output':{'outcome':'worked','summary':'Corrected evidence; independent review requested.'},'session_id':'fixture-source-rework','total_cost_usd':0.001,'usage':{'input_tokens':1,'output_tokens':1}}))\n",
+            )
         config_path = tmp_path / "runner.yaml"
         # JSON is valid YAML and avoids quoting shell fragments or secrets.
         config_path.write_text(
@@ -766,7 +841,9 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                 "-run-provider",
                 "claude-cli",
                 "-run-model",
-                "fable",
+                "fixture-source-model"
+                if scenario == "failed-review-rework"
+                else "fable",
                 cwd=tmp_path,
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
@@ -808,16 +885,71 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
         output = stdout.decode()
         for secret in (WORKSPACE_TOKEN, PLATFORM_TOKEN, RAW_ERROR, raw_key):
             assert secret not in output
-        assert (
-            not source_marker.exists()
-        ), "preserved candidate caused repeated source implementation"
+        if scenario != "failed-review-rework":
+            assert (
+                not source_marker.exists()
+            ), "preserved candidate caused repeated source implementation"
         if scenario != "missing-runtime":
             assert forge_http.requests
         assert {auth for _, auth in forge_http.requests} <= {
             f"Bearer {WORKSPACE_TOKEN}"
         }
         attempts = (await f.db.scalars(select(CompletionAttempt))).all()
-        if scenario == "recovery":
+        if scenario == "failed-review-rework":
+            reviews = [attempt for attempt in attempts if attempt.kind == "review"]
+            reworks = [attempt for attempt in attempts if attempt.kind == "rework"]
+            assert len(reviews) == 2 and len(reworks) == 1
+            failed = next(attempt for attempt in reviews if attempt.status == "failed")
+            passed = next(attempt for attempt in reviews if attempt.status == "passed")
+            assert failed.result["summary"] == failed_finding
+            assert reworks[0].result["failed_attempt_id"] == str(failed.id)
+            assert all(attempt.candidate_id == candidate.id for attempt in attempts)
+            assert all(attempt.source_sha == sha for attempt in attempts)
+            executions = (
+                await f.db.scalars(
+                    select(AgentExecution).where(
+                        AgentExecution.board_id == f.board.id,
+                        AgentExecution.action == "loop_iteration",
+                        AgentExecution.id != f.execution.id,
+                    )
+                )
+            ).all()
+            assert (
+                len(executions) == 1
+            ), "failed review must dispatch one bounded source correction"
+            source_execution = executions[0]
+            assert source_execution.id == reworks[0].execution_id
+            assert source_execution.status.value == "completed"
+            assert source_execution.provider == "claude-cli"
+            assert source_execution.model == "fixture-source-model"
+            assert str(f.card.id) in source_execution.cards_affected
+            assert review_source_states == ["completed"]
+            assert (
+                len({failed.execution_id, passed.execution_id, source_execution.id})
+                == 3
+            )
+            assert all(attempt.provider == "codex-cli" for attempt in reviews)
+            assert all(attempt.model == "fixture-review-model" for attempt in reviews)
+            history = [
+                json.loads(line) for line in review_history.read_text().splitlines()
+            ]
+            assert len(history) == 2
+            assert all(item["sha"] == sha for item in history)
+            assert corrected_evidence in history[-1]["argv"][-1]
+            assert source_marker.exists()
+            source_invocation = json.loads(source_marker.read_text())
+            assert failed_finding in "\n".join(source_invocation["argv"])
+            assert str(candidate.id) in output and "rework_completion" in output
+            assert failed_finding[:80] in output
+            await f.db.refresh(candidate)
+            assert candidate.review_passed is True
+            assert candidate.status == "awaiting_merge"
+            before_restart = source_marker.read_text()
+            stdout += await run_once(parked=True)
+            assert source_marker.read_text() == before_restart
+            assert len(review_history.read_text().splitlines()) == 2
+            assert len((await f.db.scalars(select(CompletionAttempt))).all()) == 3
+        elif scenario == "recovery":
             assert len(attempts) == 1 and attempts[0].status == "rejected"
             assert attempts[0].candidate_id == candidate.id
             assert "explicitly retry completion" in output

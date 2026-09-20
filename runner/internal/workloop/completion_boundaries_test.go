@@ -200,6 +200,7 @@ func TestCompletionReviewAcknowledgmentIncludesSuccessAndFailureMetrics(t *testi
 		t.Run(map[bool]string{false: "success", true: "failure"}[failed], func(t *testing.T) {
 			repo, sha, _ := completionSourceRepo(t)
 			srv := completionRunOnceServer(t, completionClaim(t, "review", "mock", repo, sha, nil))
+			srv.workBody = `{"pending_count":1,"actionable_count":1,"failed_count":0,"rework_count":0}`
 			provider := llm.NewMockProvider("reviewed")
 			provider.Caps = llm.Capabilities{StructuredOutput: true}
 			provider.InputTokens = 100
@@ -218,6 +219,12 @@ func TestCompletionReviewAcknowledgmentIncludesSuccessAndFailureMetrics(t *testi
 				t.Fatal(err)
 			}
 			receipt := assertCompletionAcknowledgment(t, srv, sha, outcome)
+			if failed && receipt["failure_class"] != "execution" {
+				t.Errorf("provider execution failure was exposed as an implementation finding: %#v", receipt)
+			}
+			if !failed && receipt["failure_class"] != nil {
+				t.Errorf("review verdict incorrectly classified as execution failure: %#v", receipt)
+			}
 			if receipt["tokens_used"] != float64(150) {
 				t.Errorf("missing completion token metrics: %#v", receipt["tokens_used"])
 			}
@@ -308,5 +315,38 @@ func TestCompletionPollingFallbackRemainsBoundedForLongConfiguredDelay(t *testin
 	m.iterationWait(&cfg, time.Hour)
 	if delay <= 0 || delay > 60*time.Second {
 		t.Fatalf("lost completion events can strand the loop for %s", delay)
+	}
+}
+
+func TestCompletionExecutionFailureSupportsStrictLegacyBackend(t *testing.T) {
+	repo, sha, _ := completionSourceRepo(t)
+	srv := completionRunOnceServer(t, completionClaim(t, "review", "mock", repo, sha, nil))
+	acknowledged := false
+	wrapper := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/result") {
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if _, ok := body["failure_class"]; ok {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				_, _ = w.Write([]byte(`{"detail":"extra field failure_class"}`))
+				return
+			}
+			acknowledged = body["outcome"] == "failed"
+			_, _ = w.Write([]byte(`{"status":"accepted"}`))
+			return
+		}
+		srv.handle(w, r)
+	}))
+	defer wrapper.Close()
+	provider := llm.NewMockProvider("unavailable")
+	provider.Caps = llm.Capabilities{StructuredOutput: true}
+	provider.FailWith = fmt.Errorf("provider unavailable")
+	mode := newLoopModeForServer(t, srv.base, provider)
+	mode.client = valaris.NewClient(wrapper.URL, "fixture")
+	if err := mode.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !acknowledged {
+		t.Fatal("legacy backend never accepted failed execution bookkeeping")
 	}
 }

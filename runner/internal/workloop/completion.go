@@ -47,6 +47,7 @@ func (m *LoopMode) completionCapabilities() valaris.CompletionCapabilities {
 // Completion work precedes ordinary iterations and every terminal/parking
 // decision. A failed or unavailable control plane never means "no work".
 func (m *LoopMode) runCompletionWork(ctx context.Context, cfg *valaris.BoardLoopConfig, remaining float64) (held, executed bool, cost float64, err error) {
+	m.completionRework = nil
 	if cfg.CompletionPolicy == nil {
 		return false, false, 0, nil
 	}
@@ -57,6 +58,16 @@ func (m *LoopMode) runCompletionWork(ctx context.Context, cfg *valaris.BoardLoop
 	m.reportCompletionProgress(status)
 	if !status.Outstanding() {
 		return false, false, 0, nil
+	}
+	if status.ActionableCount == 0 && status.ReworkCount > 0 && !time.Now().Before(m.completionReworkRetryAfter) {
+		rework, err := m.findCompletionRework(ctx, status)
+		if err != nil {
+			return true, false, 0, err
+		}
+		if rework != nil {
+			m.completionRework = rework
+			return false, false, 0, nil
+		}
 	}
 	if status.ActionableCount == 0 || time.Now().Before(m.completionRetryAfter) {
 		return true, false, 0, nil
@@ -81,6 +92,9 @@ func (m *LoopMode) runCompletionWork(ctx context.Context, cfg *valaris.BoardLoop
 	stopHeartbeat := m.startCompletionHeartbeat(ctx)
 	result, cost := m.executeCompletionWork(ctx, cfg, work, cap)
 	stopHeartbeat()
+	if !status.SupportsRework {
+		result.FailureClass = ""
+	}
 	if ctx.Err() != nil {
 		return true, true, cost, ctx.Err()
 	}
@@ -101,6 +115,7 @@ func (m *LoopMode) executeCompletionWork(ctx context.Context, cfg *valaris.Board
 	receipt = valaris.CompletionResult{LeaseToken: work.LeaseToken, CandidateID: work.CandidateID, PolicyHash: work.PolicyHash, ContractHash: work.ContractHash, SourceSHA: work.SourceSHA, Outcome: "failed", Checks: []valaris.CompletionCheckResult{}, Artifacts: work.Artifacts}
 	fail := func(reason string) (valaris.CompletionResult, float64) {
 		receipt.Summary = m.completionOutput(reason, work.LeaseToken)
+		receipt.FailureClass = "execution"
 		return receipt, cost
 	}
 	if work.AttemptID == "" || work.LeaseToken == "" || work.CandidateID == "" || work.CardID == "" || work.Role == "" || work.Context == "" || work.PolicyHash == "" || work.ContractHash == "" {
@@ -379,4 +394,33 @@ func (m *LoopMode) completionSourceProvider(cfg *valaris.BoardLoopConfig) (llm.P
 		return nil, fmt.Errorf("completion policy source provider %q is unavailable; install/configure that provider before resuming", cfg.Provider)
 	}
 	return provider, nil
+}
+
+func (m *LoopMode) findCompletionRework(ctx context.Context, status *valaris.CompletionWorkStatus) (*valaris.CompletionWorkflow, error) {
+	seen := map[string]bool{}
+	for {
+		for _, workflow := range status.Workflows {
+			if workflow.NextAction != "rework_completion" {
+				continue
+			}
+			if workflow.CardID == "" || workflow.CandidateID == "" || workflow.Attempt == nil || workflow.Attempt.ID == "" {
+				return nil, fmt.Errorf("completion rework workflow is missing candidate or failed attempt identity")
+			}
+			return &workflow, nil
+		}
+		if status.NextCursor == nil {
+			return nil, nil
+		}
+		cursor := *status.NextCursor
+		if cursor == "" || seen[cursor] {
+			return nil, fmt.Errorf("completion rework pagination returned an invalid repeated cursor")
+		}
+		seen[cursor] = true
+		var err error
+		status, err = m.client.GetCompletionWorkPage(ctx, m.workspaceSlug, m.boardID, cursor)
+		if err != nil {
+			return nil, err
+		}
+		m.reportCompletionProgress(status)
+	}
 }

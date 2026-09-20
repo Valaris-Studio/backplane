@@ -35,7 +35,7 @@ async def assemble_mandatory_completion_context(db, board, policy):
         "Independent review and exact merged-revision validation are scheduled by code. "
         "Do not change completion_mode or move unaccepted work to Done. "
         "Evidence-only work requires an operator-selected mode and exact source, artifact digests and check provenance. "
-        "Read completion status with get_completion_status; use retry_completion for a failed resumable attempt. "
+        "Read completion status with get_completion_status. A failed review requires correction before retry_completion; submit a fresh candidate when the source head changes. Recovery assignments include mandatory review findings. Use retry_completion for a resumable infrastructure failure after resolving its cause. "
         "Later main advancement does not change the exact commit being accepted.",
         definition,
         workspace_notes,

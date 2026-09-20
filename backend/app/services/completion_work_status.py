@@ -79,11 +79,24 @@ async def read_work_status(service, board, *, cursor=None, limit=100):
             action = (
                 "retry_completion" if failure["retryable"] else "inspect_completion"
             )
+            from app.services.completion_rework import review_rework
+
+            review_failure, rework = await review_rework(service, candidate)
+            if review_failure is not None:
+                action = (
+                    "rework_completion"
+                    if rework is None
+                    else "wait_for_rework"
+                    if await service.repo.active_rework(candidate, now)
+                    else "inspect_completion"
+                )
             if receipt and attempt.result.get("summary"):
                 summary = attempt.result["summary"]
         elif phase in {"awaiting_review", "awaiting_validation"}:
             action = (
-                "wait_for_lease"
+                "wait_for_rework"
+                if await service.repo.active_rework(candidate, now)
+                else "wait_for_lease"
                 if lease and lease["lease_state"] == "active"
                 else "claim_completion"
             )

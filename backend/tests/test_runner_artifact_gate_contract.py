@@ -26,7 +26,7 @@ def test_artifact_gate_is_mandatory_in_public_ci_and_local_verify():
     assert "BACKPLANE_RUNNER_BIN" in gate.read_text()
 
 
-def _run_controlled_gate(tmp_path, *, complete):
+def _run_controlled_gate(tmp_path, *, complete, excluded=()):
     import json
     import os
     import subprocess
@@ -40,6 +40,7 @@ def _run_controlled_gate(tmp_path, *, complete):
             "missing-runtime",
             "budget-history",
             "recovery",
+            "failed-review-rework",
             "interactive",
             "interactive-fresh",
         )
@@ -49,6 +50,7 @@ def _run_controlled_gate(tmp_path, *, complete):
     names = [
         "test_built_runner_real_api_readiness_and_preserved_completion[" + item + "]"
         for item in scenarios
+        if item not in excluded
     ] + ["test_fixture_cleanup"]
     xml = '<testsuites><testsuite tests="' + str(len(names)) + '" skipped="0">'
     xml += "".join('<testcase name="' + name + '"/>' for name in names)
@@ -94,6 +96,16 @@ def test_artifact_gate_ignores_inherited_pytest_selection(tmp_path):
     assert result.returncode == 0, result.stderr
     assert invocation["addopts"] is None
     assert "addopts=" in invocation["args"]
+
+
+def test_artifact_gate_rejects_missing_failed_review_rework(tmp_path):
+    result, _ = _run_controlled_gate(
+        tmp_path, complete=True, excluded=("failed-review-rework",)
+    )
+    assert (
+        result.returncode != 0
+    ), "artifact skipped failed-review correction qualification"
+    assert "failed-review-rework" in result.stderr
 
 
 def _run_source_gate(tmp_path, *, dirty=False, symlink=False):
