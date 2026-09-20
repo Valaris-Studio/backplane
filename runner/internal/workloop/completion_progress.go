@@ -28,7 +28,7 @@ func (m *LoopMode) reportCompletionProgress(status *valaris.CompletionWorkStatus
 		return
 	}
 	slog.Info("completion workflow status", "board_id", m.boardID,
-		"pending", status.PendingCount, "actionable", status.ActionableCount, "failed", status.FailedCount)
+		"pending", status.PendingCount, "actionable", status.ActionableCount, "failed", status.FailedCount, "rework", status.ReworkCount)
 	for _, item := range status.Workflows {
 		mergeSHA, failure := "", ""
 		if item.MergeSHA != nil {

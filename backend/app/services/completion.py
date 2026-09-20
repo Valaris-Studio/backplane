@@ -638,6 +638,13 @@ class CompletionService:
             await self._publish(candidate)
         return await self._status(board, card)
 
+    async def rework(self, board_id, workspace_id, actor_id, card_id, data):
+        from app.services.completion_rework import dispatch_rework
+
+        return await dispatch_rework(
+            self, board_id, workspace_id, actor_id, card_id, data
+        )
+
     async def work(self, board_id, workspace_id, actor_id, *, cursor=None, limit=100):
         from app.services.completion_work_status import read_work_status
 
@@ -645,7 +652,9 @@ class CompletionService:
         return await read_work_status(self, board, cursor=cursor, limit=limit)
 
     async def work_counts(self, board, *, invalid_candidate_ids=None):
-        counts = {"pending_count": 0, "actionable_count": 0, "failed_count": 0}
+        counts = {
+            "pending_count": 0, "actionable_count": 0, "failed_count": 0, "rework_count": 0
+        }
         for candidate in await self.repo.board_candidates(board.id):
             card = await self.policy_service.repo.card(candidate.card_id, board.id)
             if (
@@ -657,8 +666,15 @@ class CompletionService:
                 continue
             if candidate.status == "failed":
                 counts["failed_count"] += 1
+                from app.services.completion_rework import review_rework
+
+                failure, prior = await review_rework(self, candidate)
+                if failure is not None and prior is None:
+                    counts["rework_count"] += 1
             elif candidate.status in _PENDING:
                 counts["pending_count"] += 1
+                if await self.repo.active_rework(candidate, naive_now()):
+                    continue
                 attempt = await self.repo.active_attempt(candidate.id, lock=False)
                 if (
                     attempt is None
@@ -778,6 +794,8 @@ class CompletionService:
             )
             candidate = await self.current_candidate(board, card)
             if candidate is None:
+                continue
+            if await self.repo.active_rework(candidate, naive_now()):
                 continue
             prior = await self.repo.active_attempt(candidate.id)
             if prior and prior.expires_at.replace(tzinfo=None) > naive_now():
@@ -931,6 +949,8 @@ class CompletionService:
                 error_code="completion_result_stale",
             )
         result_data = data.model_dump(mode="json", exclude={"lease_token"})
+        if data.failure_class is None:
+            result_data.pop("failure_class", None)
         result_hash = digest(result_data)
         if attempt.result_hash:
             if attempt.result_hash != result_hash:

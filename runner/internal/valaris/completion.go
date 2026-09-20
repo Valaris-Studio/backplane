@@ -56,6 +56,8 @@ type CompletionWorkStatus struct {
 	PendingCount    int                  `json:"pending_count"`
 	ActionableCount int                  `json:"actionable_count"`
 	FailedCount     int                  `json:"failed_count"`
+	ReworkCount     int                  `json:"rework_count,omitempty"`
+	SupportsRework  bool                 `json:"-"`
 	Revision        string               `json:"revision,omitempty"`
 	Workflows       []CompletionWorkflow `json:"workflows,omitempty"`
 	NextCursor      *string              `json:"next_cursor,omitempty"`
@@ -95,6 +97,7 @@ func (s *CompletionWorkStatus) UnmarshalJSON(data []byte) error {
 		Pending    *int                 `json:"pending_count"`
 		Actionable *int                 `json:"actionable_count"`
 		Failed     *int                 `json:"failed_count"`
+		Rework     *int                 `json:"rework_count"`
 		Revision   string               `json:"revision"`
 		Workflows  []CompletionWorkflow `json:"workflows"`
 		NextCursor *string              `json:"next_cursor"`
@@ -102,10 +105,15 @@ func (s *CompletionWorkStatus) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
-	if wire.Pending == nil || wire.Actionable == nil || wire.Failed == nil || *wire.Pending < 0 || *wire.Actionable < 0 || *wire.Failed < 0 {
+	if wire.Pending == nil || wire.Actionable == nil || wire.Failed == nil || *wire.Pending < 0 || *wire.Actionable < 0 || *wire.Failed < 0 || (wire.Rework != nil && *wire.Rework < 0) {
 		return fmt.Errorf("completion work status is missing valid pending/actionable/failed counts")
 	}
 	s.PendingCount, s.ActionableCount, s.FailedCount = *wire.Pending, *wire.Actionable, *wire.Failed
+	s.ReworkCount = 0
+	s.SupportsRework = wire.Rework != nil
+	if wire.Rework != nil {
+		s.ReworkCount = *wire.Rework
+	}
 	s.Revision, s.Workflows, s.NextCursor = wire.Revision, wire.Workflows, wire.NextCursor
 	return nil
 }
@@ -166,6 +174,7 @@ type CompletionResult struct {
 	ContractHash    string                  `json:"contract_hash"`
 	SourceSHA       string                  `json:"source_sha"`
 	Outcome         string                  `json:"outcome"`
+	FailureClass    string                  `json:"failure_class,omitempty"`
 	Checks          []CompletionCheckResult `json:"checks"`
 	Summary         string                  `json:"summary"`
 	Artifacts       []CompletionArtifact    `json:"artifacts,omitempty"`
@@ -175,7 +184,15 @@ func (c *Client) completionURL(workspace, board string) string {
 	return fmt.Sprintf("%s/api/workspaces/%s/boards/%s/completion/work", c.baseURL, url.PathEscape(workspace), url.PathEscape(board))
 }
 func (c *Client) GetCompletionWork(ctx context.Context, workspace, board string) (*CompletionWorkStatus, error) {
-	status, err := jsonGet[*CompletionWorkStatus](ctx, c, c.completionURL(workspace, board))
+	return c.GetCompletionWorkPage(ctx, workspace, board, "")
+}
+
+func (c *Client) GetCompletionWorkPage(ctx context.Context, workspace, board, cursor string) (*CompletionWorkStatus, error) {
+	endpoint := c.completionURL(workspace, board)
+	if cursor != "" {
+		endpoint += "?cursor=" + url.QueryEscape(cursor)
+	}
+	status, err := jsonGet[*CompletionWorkStatus](ctx, c, endpoint)
 	if err != nil {
 		var apiErr *APIError
 		if errors.As(err, &apiErr) {
@@ -229,4 +246,24 @@ func (e *CompletionResultRejection) Error() string {
 		return "completion result rejected; the attempt was retired and reported usage recorded. Inspect the card's completion state, resolve changed context or configuration, then explicitly retry completion"
 	}
 	return "completion result rejected; inspect the card's current candidate and completion attempts before resuming"
+}
+
+type CompletionRework struct {
+	CandidateID     string `json:"candidate_id"`
+	CardID          string `json:"card_id"`
+	FailedAttemptID string `json:"failed_attempt_id"`
+	ExecutionID     string `json:"execution_id"`
+	Context         string `json:"context"`
+}
+
+func (c *Client) ClaimCompletionRework(ctx context.Context, workspace, board, card, candidate, failedAttempt, execution string) (*CompletionRework, error) {
+	endpoint := fmt.Sprintf("%s/api/workspaces/%s/boards/%s/completion/cards/%s/rework", c.baseURL, url.PathEscape(workspace), url.PathEscape(board), url.PathEscape(card))
+	var response struct {
+		Work *CompletionRework `json:"work"`
+	}
+	err := c.jsonRequestDecode(ctx, http.MethodPost, endpoint, map[string]string{"candidate_id": candidate, "failed_attempt_id": failedAttempt, "source_execution_id": execution}, &response)
+	if err != nil {
+		return nil, fmt.Errorf("claiming completion rework: %w", err)
+	}
+	return response.Work, nil
 }

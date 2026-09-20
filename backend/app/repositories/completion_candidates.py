@@ -126,7 +126,10 @@ class CompletionCandidateRepository:
                 )
                 .label("rank"),
             )
-            .where(CompletionAttempt.candidate_id.in_(candidate_ids))
+            .where(
+                CompletionAttempt.candidate_id.in_(candidate_ids),
+                CompletionAttempt.kind != "rework",
+            )
             .subquery()
         )
         rows = await self.db.scalars(
@@ -138,6 +141,46 @@ class CompletionCandidateRepository:
             .where(ranked.c.rank == 1)
         )
         return {row.candidate_id: row for row in rows}
+
+    async def rework_attempt(self, candidate_id, failed_attempt_id):
+        return await self.db.scalar(
+            select(CompletionAttempt).where(
+                CompletionAttempt.candidate_id == candidate_id,
+                CompletionAttempt.kind == "rework",
+                CompletionAttempt.result["failed_attempt_id"].as_string()
+                == str(failed_attempt_id),
+            )
+        )
+
+    async def execution_attempt(self, execution_id):
+        return await self.db.scalar(
+            select(CompletionAttempt).where(
+                CompletionAttempt.execution_id == execution_id
+            )
+        )
+
+    async def active_rework(self, candidate, now):
+        from app.models.agents.execution import ExecutionStatus
+
+        return await self.db.scalar(
+            select(CompletionAttempt)
+            .join(AgentExecution, CompletionAttempt.execution_id == AgentExecution.id)
+            .where(
+                or_(
+                    CompletionAttempt.candidate_id == candidate.id,
+                    CompletionAttempt.execution_id == candidate.source_execution_id,
+                ),
+                CompletionAttempt.board_id == candidate.board_id,
+                CompletionAttempt.workspace_id == candidate.workspace_id,
+                CompletionAttempt.kind == "rework",
+                CompletionAttempt.status == "dispatched",
+                CompletionAttempt.expires_at > now,
+                AgentExecution.status.in_(
+                    (ExecutionStatus.started, ExecutionStatus.running)
+                ),
+            )
+            .limit(1)
+        )
 
     async def history(self, board_id, card_id):
         return list(

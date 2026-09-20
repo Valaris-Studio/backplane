@@ -13,6 +13,8 @@ from app.services.completion_policy import CompletionPolicyService
 from app.services.completion import CompletionService
 from app.schemas.completion import (
     CompletionSubmit,
+    CompletionRework,
+    CompletionReworkResponse,
     CompletionLand,
     CompletionClaim,
     CompletionResult,
@@ -110,6 +112,19 @@ async def land_completion(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await CompletionService(db).land(
+        board_id, ctx.workspace.id, ctx.user.id, card_id, data
+    )
+
+
+@router.post("/cards/{card_id}/rework", response_model=CompletionReworkResponse)
+async def rework_completion(
+    card_id: uuid.UUID,
+    data: CompletionRework,
+    board_id: uuid.UUID = Depends(resolve_board_id),
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    return await CompletionService(db).rework(
         board_id, ctx.workspace.id, ctx.user.id, card_id, data
     )
 

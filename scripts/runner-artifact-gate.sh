@@ -49,7 +49,7 @@ suites = [root] if root.tag == 'testsuite' else list(root)
 assert sum(int(suite.get('tests', '0')) for suite in suites) > 0, 'artifact gate collected no tests'
 assert not any(int(suite.get('skipped', '0')) for suite in suites), 'artifact gate skipped a required acceptance test'
 required = {'pr-denied', 'review', 'validation', 'missing-runtime', 'budget-history',
-            'recovery', 'interactive', 'interactive-fresh'}
+            'recovery', 'failed-review-rework', 'interactive', 'interactive-fresh'}
 prefix = 'test_built_runner_real_api_readiness_and_preserved_completion['
 passed = set()
 for case in root.iter('testcase'):

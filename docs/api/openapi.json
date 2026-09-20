@@ -5952,6 +5952,78 @@
         "x-surface": "public"
       }
     },
+    "/api/workspaces/{slug}/boards/{board_id}/completion/cards/{card_id}/rework": {
+      "post": {
+        "tags": [
+          "completion"
+        ],
+        "summary": "Rework Completion",
+        "operationId": "rework_completion_api_workspaces__slug__boards__board_id__completion_cards__card_id__rework_post",
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Card Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRework"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionReworkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
     "/api/workspaces/{slug}/boards/{board_id}/completion/cards/{card_id}/retry": {
       "post": {
         "tags": [
@@ -21859,6 +21931,18 @@
             ],
             "title": "Outcome"
           },
+          "failure_class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "execution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Class"
+          },
           "checks": {
             "items": {
               "$ref": "#/components/schemas/CompletionCheckResult"
@@ -21912,6 +21996,91 @@
           "summary"
         ],
         "title": "CompletionResult"
+      },
+      "CompletionRework": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "failed_attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Failed Attempt Id"
+          },
+          "source_execution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Execution Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "failed_attempt_id",
+          "source_execution_id"
+        ],
+        "title": "CompletionRework"
+      },
+      "CompletionReworkResponse": {
+        "properties": {
+          "work": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompletionReworkWork"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work"
+        ],
+        "title": "CompletionReworkResponse"
+      },
+      "CompletionReworkWork": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "card_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Card Id"
+          },
+          "failed_attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Failed Attempt Id"
+          },
+          "execution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Execution Id"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "card_id",
+          "failed_attempt_id",
+          "execution_id",
+          "context"
+        ],
+        "title": "CompletionReworkWork"
       },
       "CompletionSubmit": {
         "properties": {
@@ -22068,6 +22237,11 @@
       },
       "CompletionWorkStatus": {
         "properties": {
+          "rework_count": {
+            "type": "integer",
+            "title": "Rework Count",
+            "default": 0
+          },
           "pending_count": {
             "type": "integer",
             "title": "Pending Count"

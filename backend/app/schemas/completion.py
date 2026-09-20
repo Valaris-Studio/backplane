@@ -142,12 +142,37 @@ class CompletionResult(CompletionSchema):
     contract_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     source_sha: str = Field(pattern=r"^[a-f0-9]{40}([a-f0-9]{24})?$")
     outcome: Literal["passed", "failed"]
+    failure_class: Literal["execution"] | None = None
     checks: list[CompletionCheckResult] = Field(default_factory=list, max_length=50)
     summary: str = Field(min_length=1, max_length=16384)
     artifacts: list[CompletionArtifact] = Field(default_factory=list, max_length=50)
     tokens_used: int = Field(default=0, ge=0)
     cost_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
     duration_seconds: float = Field(default=0, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def failure_class_requires_failed_outcome(self):
+        if self.failure_class is not None and self.outcome != "failed":
+            raise ValueError("A failure classification requires a failed outcome")
+        return self
+
+
+class CompletionRework(CompletionSchema):
+    candidate_id: uuid.UUID
+    failed_attempt_id: uuid.UUID
+    source_execution_id: uuid.UUID
+
+
+class CompletionReworkWork(CompletionSchema):
+    candidate_id: uuid.UUID
+    card_id: uuid.UUID
+    failed_attempt_id: uuid.UUID
+    execution_id: uuid.UUID
+    context: str
+
+
+class CompletionReworkResponse(CompletionSchema):
+    work: CompletionReworkWork | None
 
 
 class CompletionLand(CompletionSchema):
@@ -262,6 +287,7 @@ CompletionWorkCursor = Annotated[
 
 
 class CompletionWorkStatus(CompletionSchema):
+    rework_count: int = 0
     pending_count: int
     actionable_count: int
     failed_count: int

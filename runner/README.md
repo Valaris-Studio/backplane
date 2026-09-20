@@ -208,6 +208,20 @@ the token. Fix the indicated connection's repository access and pull-request
 read permissions, then rerun doctor. These read-only probes do not establish
 permission to push or merge; write access remains explicitly unverified.
 
+When an independent completion review fails, a compatible backend offers one
+implementation correction attempt for that failed review. The runner uses the
+board's configured source agent, with the failed card, candidate and full finding
+injected into its assignment. Normal iteration, timeout and budget limits still
+apply. The candidate remains unaccepted and dependent work stays blocked.
+
+After correcting evidence on the same revision, the source agent explicitly
+requests fresh independent review; changed source requires a new candidate.
+The runner never retries an unchanged failed review automatically. If the
+correction attempt stops without resolving the failure, the workflow calls for
+operator inspection instead of repeatedly launching paid work. Logs retain the
+candidate, finding and recovery action while unchanged prerequisite notices are
+suppressed.
+
 For servers, containers, and anything reproducible, name the config explicitly —
 this is the path Docker uses:
 
