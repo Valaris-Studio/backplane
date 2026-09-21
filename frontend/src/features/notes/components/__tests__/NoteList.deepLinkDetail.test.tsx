@@ -1,9 +1,15 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, waitFor } from "@/test/test-utils";
+import {
+  renderWithProviders,
+  screen,
+  waitFor,
+  userEvent,
+  stubReducedMotion,
+} from "@/test/test-utils";
 import type { Note, NoteSummary } from "@/types/note";
 
 // With the list paginated, a ?note= target is very often on a page that was
@@ -45,6 +51,7 @@ vi.mock("@/lib/clipboard", () => ({
 }));
 
 import { NoteList } from "../NoteList";
+import { NotificationItem } from "@/features/notifications/components/NotificationItem";
 
 function makeSummary(id: string, title: string): NoteSummary {
   return {
@@ -84,6 +91,25 @@ function renderList(initialEntry: string) {
         element={
           <>
             <NoteList slug="acme" />
+            <NotificationItem
+              notification={{
+                id: "notification-1",
+                recipient_user_id: "u1",
+                workspace_id: "ws-1",
+                board_id: null,
+                category: "mention",
+                actor_id: "u2",
+                is_agent_actor: false,
+                entity_type: "note",
+                entity_id: "n999",
+                params: { actor_name: "Jordan" },
+                link: { kind: "note", workspace_slug: "acme", note_id: "n999" },
+                read_at: "2026-04-01T00:00:00Z",
+                created_at: "2026-04-01T00:00:00Z",
+              }}
+              onMarkRead={() => {}}
+              onNavigate={() => {}}
+            />
             <LocationProbe />
           </>
         }
@@ -97,6 +123,8 @@ beforeEach(() => {
   noteQuery.mockReset();
   window.localStorage.clear();
 });
+
+afterEach(() => stubReducedMotion(false));
 
 describe("NoteList — ?note= resolves through the detail fetch, not list membership", () => {
   it("opens a note that is NOT on the loaded page", async () => {
@@ -151,4 +179,20 @@ describe("NoteList — ?note= resolves through the detail fetch, not list member
       expect(screen.getByTestId("location")).toHaveTextContent(/\/acme\/notes$/),
     );
   });
+});
+
+it("reopens the same note after closing its editor and clicking the notification again", async () => {
+  stubReducedMotion(true);
+  const detail = makeDetail("n999", "Mentioned note");
+  noteQuery.mockImplementation((_slug, noteId) => ({
+    data: noteId ? detail : undefined,
+  }));
+  renderList("/acme/notes?note=n999");
+  expect(await screen.findByDisplayValue("Mentioned note")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Close" }));
+  await waitFor(() =>
+    expect(screen.queryByDisplayValue("Mentioned note")).not.toBeInTheDocument(),
+  );
+  await userEvent.click(screen.getByText("Open", { exact: true }));
+  expect(await screen.findByDisplayValue("Mentioned note")).toBeInTheDocument();
 });

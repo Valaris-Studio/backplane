@@ -363,3 +363,34 @@ async def test_card_title_enriched_into_params(
     rows = await _rows_for(db_session, a.id)
     assert len(rows) == 1
     assert rows[0].params.get("card") == test_card.title
+
+
+@pytest.mark.asyncio
+async def test_note_mention_carries_note_title_and_resolvable_link(
+    db_session,
+    test_workspace,
+    test_board,
+    test_note,
+    test_user,
+):
+    mentioned = await _make_user(db_session, "note-mention@example.test")
+    await notify_new_mentions(
+        db_session,
+        workspace_id=test_workspace.id,
+        board_id=test_board.id,
+        actor_id=test_user.id,
+        entity_type="note",
+        entity_id=test_note.id,
+        card_id=None,
+        before_content="",
+        after_content=_doc_with_mentions(mentioned.id),
+    )
+    rows = await _rows_for(db_session, mentioned.id)
+    assert len(rows) == 1
+    assert rows[0].params["note"] == test_note.title
+    assert rows[0].link == {
+        "kind": "note",
+        "note_id": str(test_note.id),
+        "board_id": str(test_board.id),
+        "workspace_slug": test_workspace.slug,
+    }

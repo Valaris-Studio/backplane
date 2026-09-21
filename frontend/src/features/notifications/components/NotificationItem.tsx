@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
 import { Bot, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,11 @@ import { cn } from "@/lib/utils";
 import { formatRelative } from "@/lib/date-format";
 import { initials } from "@/features/timeline/utils/humanize";
 import type { NotificationRead } from "../api/notifications-api";
-import { isUnread, notificationCopy } from "../utils/category-copy";
+import {
+  isUnread,
+  mentionTargetLabel,
+  notificationCopy,
+} from "../utils/category-copy";
 import { linkToRoute } from "../utils/link-to-route";
 
 interface NotificationItemProps {
@@ -37,6 +41,11 @@ export function NotificationItem({
     (notification.params.actor_name as string | undefined) ??
     (notification.params.actor_email as string | undefined) ??
     null;
+
+  function followLink() {
+    if (unread) onMarkRead(notification.id);
+    onNavigate();
+  }
 
   function activate() {
     if (unread) onMarkRead(notification.id);
@@ -78,12 +87,12 @@ export function NotificationItem({
         </AvatarFallback>
       </Avatar>
 
-      <button
-        type="button"
-        onClick={activate}
-        className="min-w-0 flex-1 space-y-0.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-      >
-        <div className="flex items-baseline justify-between gap-2">
+      <div className="min-w-0 flex-1 space-y-0.5 text-left">
+        <button
+          type="button"
+          onClick={activate}
+          className="flex w-full items-baseline justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+        >
           <p
             className={cn(
               "truncate text-sm",
@@ -95,19 +104,39 @@ export function NotificationItem({
           <span className="shrink-0 text-[0.68rem] uppercase tracking-[0.12em] text-muted-foreground">
             {formatRelative(notification.created_at)}
           </span>
-        </div>
+        </button>
         {body ? (
           <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-            {body}
+            {notification.category === "mention" && route ? (
+              <Trans
+                i18nKey="notifications.category.mention.bodyLinked"
+                values={{ card: mentionTargetLabel(notification, t) }}
+                components={{
+                  target: (
+                    <Link
+                      to={route}
+                      onClick={followLink}
+                      className="text-primary hover:underline"
+                    />
+                  ),
+                }}
+              />
+            ) : (
+              body
+            )}
           </p>
         ) : null}
         {route ? (
-          <span className="mt-1 inline-flex items-center gap-0.5 text-xs font-medium text-primary">
+          <Link
+            to={route}
+            onClick={followLink}
+            className="mt-1 inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline"
+          >
             {t("notifications.open")}
             <ChevronRight className="h-3 w-3" />
-          </span>
+          </Link>
         ) : null}
-      </button>
+      </div>
 
       {unread ? (
         <Button

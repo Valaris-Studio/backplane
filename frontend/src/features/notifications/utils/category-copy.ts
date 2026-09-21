@@ -27,6 +27,10 @@ function interpolationParams(
       : t("notifications.actor.someone"));
   const derived: Record<string, unknown> = { actor };
 
+  if (notification.category === "mention") {
+    derived.card = mentionTargetLabel(notification, t);
+  }
+
   // The backend ships a raw decision token ("approved"/"rejected"). Localize it
   // before interpolation so es copy doesn't render an English token ("fue
   // approved"); the category body interpolates {{decisionLabel}}. Falls back to
@@ -38,6 +42,21 @@ function interpolationParams(
   }
 
   return { ...params, ...derived };
+}
+
+export function mentionTargetLabel(
+  notification: NotificationRead,
+  t: TFunction,
+): string {
+  const kind = notification.link?.kind ?? notification.entity_type;
+  const label =
+    kind === "note" ? notification.params.note : notification.params.card;
+  if (typeof label === "string" && label.trim()) return label;
+  return t(
+    kind === "note"
+      ? "notifications.mentionTarget.note"
+      : "notifications.mentionTarget.card",
+  );
 }
 
 function humanizeKey(category: string): string {
