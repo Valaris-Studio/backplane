@@ -3,11 +3,20 @@
 
 import uuid
 
-from sqlalchemy import Row, and_, func, select
+from sqlalchemy import Row, and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
-from app.models.skills.skill import BoardSkill, Skill, SkillVersion
+from app.models.skills.skill import (
+    SKILL_VERSION_MUTABLE_FIELDS,
+    BoardSkill,
+    Skill,
+    SkillAuditEvent,
+    SkillVersion,
+)
 from app.repositories.base import BaseRepository
+
+
+MAX_HISTORY_FETCH_SIZE = 101
 
 
 class SkillRepository(BaseRepository[Skill]):
@@ -56,6 +65,29 @@ class SkillRepository(BaseRepository[Skill]):
 class SkillVersionRepository(BaseRepository[SkillVersion]):
     model = SkillVersion
 
+    async def update(self, instance: SkillVersion, **kwargs) -> SkillVersion:
+        immutable_fields = kwargs.keys() - SKILL_VERSION_MUTABLE_FIELDS
+        if immutable_fields:
+            raise ValueError(f"Skill revision fields are immutable: {', '.join(sorted(immutable_fields))}")
+        return await super().update(instance, **kwargs)
+
+    async def delete(self, instance: SkillVersion) -> None:
+        raise ValueError("Skill revisions are immutable")
+
+    async def delete_by_id(self, id: uuid.UUID) -> None:
+        raise ValueError("Skill revisions are immutable")
+
+    async def list_history(
+        self, skill_id: uuid.UUID, *, limit: int = 50, before_version: int | None = None
+    ) -> list[SkillVersion]:
+        if not 1 <= limit <= MAX_HISTORY_FETCH_SIZE:
+            raise ValueError(f"History limit must be between 1 and {MAX_HISTORY_FETCH_SIZE}")
+        query = select(SkillVersion).where(SkillVersion.skill_id == skill_id)
+        if before_version is not None:
+            query = query.where(SkillVersion.version < before_version)
+        result = await self.db.scalars(query.order_by(SkillVersion.version.desc()).limit(limit))
+        return list(result.all())
+
     async def get_by_number(
         self, skill_id: uuid.UUID, version: int
     ) -> SkillVersion | None:
@@ -87,6 +119,40 @@ class SkillVersionRepository(BaseRepository[SkillVersion]):
             )
         )
         return result.scalar_one() or 0
+
+
+class SkillAuditEventRepository(BaseRepository[SkillAuditEvent]):
+    model = SkillAuditEvent
+
+    async def update(self, instance: SkillAuditEvent, **kwargs) -> SkillAuditEvent:
+        raise ValueError("Skill audit history is append-only")
+
+    async def delete(self, instance: SkillAuditEvent) -> None:
+        raise ValueError("Skill audit history is append-only")
+
+    async def delete_by_id(self, id: uuid.UUID) -> None:
+        raise ValueError("Skill audit history is append-only")
+
+    async def list_history(
+        self, skill_id: uuid.UUID, *, limit: int = 50, before_id: uuid.UUID | None = None
+    ) -> list[SkillAuditEvent]:
+        if not 1 <= limit <= MAX_HISTORY_FETCH_SIZE:
+            raise ValueError(f"History limit must be between 1 and {MAX_HISTORY_FETCH_SIZE}")
+        query = select(SkillAuditEvent).where(SkillAuditEvent.skill_id == skill_id)
+        if before_id is not None:
+            cursor = await self.db.scalar(select(SkillAuditEvent).where(
+                SkillAuditEvent.skill_id == skill_id, SkillAuditEvent.id == before_id
+            ))
+            if cursor is None:
+                return []
+            query = query.where(or_(
+                SkillAuditEvent.created_at < cursor.created_at,
+                and_(SkillAuditEvent.created_at == cursor.created_at, SkillAuditEvent.id < cursor.id),
+            ))
+        result = await self.db.scalars(query.order_by(
+            SkillAuditEvent.created_at.desc(), SkillAuditEvent.id.desc()
+        ).limit(limit))
+        return list(result.all())
 
 
 class BoardSkillRepository(BaseRepository[BoardSkill]):

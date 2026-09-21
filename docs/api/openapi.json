@@ -9732,14 +9732,13 @@
         "x-surface": "public"
       }
     },
-    "/api/workspaces/{slug}/skills/{skill_slug}/versions/{version}": {
+    "/api/workspaces/{slug}/skills/{skill_slug}/versions": {
       "get": {
         "tags": [
           "skills"
         ],
-        "summary": "Get Skill Version",
-        "description": "The one place file contents are served \u2014 verbatim.",
-        "operationId": "get_skill_version_api_workspaces__slug__skills__skill_slug__versions__version__get",
+        "summary": "List Skill Versions",
+        "operationId": "list_skill_versions_api_workspaces__slug__skills__skill_slug__versions_get",
         "parameters": [
           {
             "name": "skill_slug",
@@ -9751,21 +9750,41 @@
             }
           },
           {
-            "name": "version",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Version"
-            }
-          },
-          {
             "name": "slug",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before_version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Version"
             }
           }
         ],
@@ -9775,7 +9794,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillVersionDetailRead"
+                  "$ref": "#/components/schemas/SkillVersionPageRead"
                 }
               }
             }
@@ -9792,9 +9811,7 @@
           }
         },
         "x-surface": "public"
-      }
-    },
-    "/api/workspaces/{slug}/skills/{skill_slug}/versions": {
+      },
       "post": {
         "tags": [
           "skills"
@@ -9838,6 +9855,221 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SkillVersionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/skills/{skill_slug}/diff": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Diff Skill Versions",
+        "operationId": "diff_skill_versions_api_workspaces__slug__skills__skill_slug__diff_get",
+        "parameters": [
+          {
+            "name": "skill_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Skill Slug"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "from_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "From Version"
+            }
+          },
+          {
+            "name": "to_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "To Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDiffRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/skills/{skill_slug}/history": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "List Skill History",
+        "operationId": "list_skill_history_api_workspaces__slug__skills__skill_slug__history_get",
+        "parameters": [
+          {
+            "name": "skill_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Skill Slug"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillAuditPageRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/skills/{skill_slug}/versions/{version}": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Get Skill Version",
+        "description": "The complete version bundle, served verbatim.",
+        "operationId": "get_skill_version_api_workspaces__slug__skills__skill_slug__versions__version__get",
+        "parameters": [
+          {
+            "name": "skill_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Skill Slug"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionDetailRead"
                 }
               }
             }
@@ -28297,6 +28529,189 @@
         "title": "SensorManifestEntry",
         "description": "Manifest of a sensor reported by a Go agent via heartbeat.\n\nMirrors harness.SensorManifestEntry on the agent side \u2014 the platform\ntreats agents as the source of truth for which sensors are installed."
       },
+      "SkillActorRead": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "user_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Name"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "credential_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
+          },
+          "authentication_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authentication Method"
+          }
+        },
+        "type": "object",
+        "title": "SkillActorRead"
+      },
+      "SkillAuditEventRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillActorRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "skill_id",
+          "version",
+          "event_type",
+          "actor",
+          "reason",
+          "details",
+          "created_at"
+        ],
+        "title": "SkillAuditEventRead"
+      },
+      "SkillAuditPageRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillAuditEventRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_id"
+        ],
+        "title": "SkillAuditPageRead"
+      },
       "SkillCreate": {
         "properties": {
           "slug": {
@@ -28310,6 +28725,30 @@
             },
             "type": "array",
             "title": "Files"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
           }
         },
         "type": "object",
@@ -28318,6 +28757,32 @@
           "files"
         ],
         "title": "SkillCreate"
+      },
+      "SkillDiffRead": {
+        "properties": {
+          "from_version": {
+            "type": "integer",
+            "title": "From Version"
+          },
+          "to_version": {
+            "type": "integer",
+            "title": "To Version"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SkillFileDiffRead"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_version",
+          "to_version",
+          "files"
+        ],
+        "title": "SkillDiffRead"
       },
       "SkillFile": {
         "properties": {
@@ -28338,6 +28803,53 @@
         ],
         "title": "SkillFile"
       },
+      "SkillFileDiffRead": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted"
+            ],
+            "title": "Change"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "change",
+          "before",
+          "after"
+        ],
+        "title": "SkillFileDiffRead"
+      },
       "SkillProposalCreate": {
         "properties": {
           "slug": {
@@ -28351,6 +28863,30 @@
             },
             "type": "array",
             "title": "Files"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
           },
           "board_id": {
             "anyOf": [
@@ -28482,6 +29018,30 @@
             },
             "type": "array",
             "title": "Files"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
           }
         },
         "type": "object",
@@ -28513,6 +29073,122 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "created_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By User Id"
+          },
+          "created_by_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Agent Id"
+          },
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillActorRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Board Id"
+          },
+          "source_card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Card Id"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "delegation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegation Id"
           },
           "lint_warnings": {
             "items": {
@@ -28549,6 +29225,34 @@
         ],
         "title": "SkillVersionDetailRead"
       },
+      "SkillVersionPageRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillVersionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_version"
+        ],
+        "title": "SkillVersionPageRead"
+      },
       "SkillVersionRead": {
         "properties": {
           "id": {
@@ -28573,6 +29277,122 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "created_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By User Id"
+          },
+          "created_by_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Agent Id"
+          },
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillActorRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Board Id"
+          },
+          "source_card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Card Id"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "delegation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegation Id"
+          },
           "lint_warnings": {
             "items": {
               "type": "string"
@@ -28591,7 +29411,7 @@
           "lint_warnings"
         ],
         "title": "SkillVersionRead",
-        "description": "Version METADATA \u2014 file contents are heavy and ride only the version\ndetail endpoint, never listings or the skill detail."
+        "description": "Version metadata; file contents ride version detail and diff responses."
       },
       "StaleCardInfo": {
         "properties": {

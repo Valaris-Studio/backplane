@@ -16,7 +16,7 @@ import (
 func needsSetupDeps() WizardDeps {
 	deps := testDeps()
 	deps.MCPStatus = func() MCPConfigStatus {
-		return MCPConfigStatus{WriteTo: "/home/seba/.config/backplane/mcp-config.json"}
+		return MCPConfigStatus{WriteTo: "/home/operator/.config/backplane/mcp-config.json"}
 	}
 	deps.UvxAvailable = func() bool { return true }
 	deps.ValidateMCPServerDir = func(string) error { return nil }
@@ -42,7 +42,7 @@ func TestMCPConfigStatus_NeedsSetup(t *testing.T) {
 	}{
 		{"nothing found", MCPConfigStatus{}, true},
 		{"only the shipped template", MCPConfigStatus{Path: "/repo/configs/mcp-config.example.json", IsTemplate: true}, true},
-		{"a real config", MCPConfigStatus{Path: "/home/seba/.config/backplane/mcp-config.json"}, false},
+		{"a real config", MCPConfigStatus{Path: "/home/operator/.config/backplane/mcp-config.json"}, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestMCPStep_ExistingConfigIsExplicitlyConfirmed(t *testing.T) {
 
 	deps := needsSetupDeps()
 	deps.MCPStatus = func() MCPConfigStatus {
-		return MCPConfigStatus{Path: "/home/seba/.config/backplane/mcp-config.json"}
+		return MCPConfigStatus{Path: "/home/operator/.config/backplane/mcp-config.json"}
 	}
 
 	w := drive(atProvider(t, deps), key("enter"))
@@ -97,7 +97,7 @@ func TestMCPStep_ExistingConfigIsExplicitlyConfirmed(t *testing.T) {
 	if res.MCPWrite {
 		t.Error("a skipped step must not ask for a write")
 	}
-	if res.MCPConfigPath != "/home/seba/.config/backplane/mcp-config.json" {
+	if res.MCPConfigPath != "/home/operator/.config/backplane/mcp-config.json" {
 		t.Errorf("the discovered config should be carried through, got %q", res.MCPConfigPath)
 	}
 }
@@ -182,7 +182,7 @@ func TestMCPStep_CheckoutPathIsValidatedBeforeAdvancing(t *testing.T) {
 	})
 
 	t.Run("accepts a valid directory", func(t *testing.T) {
-		const dir = "/home/seba/Programming/valaris/internal/mcp-server"
+		const dir = "/home/operator/backplane/mcp-server"
 		var validated string
 		deps := needsSetupDeps()
 		deps.ValidateMCPServerDir = func(p string) error {
@@ -256,7 +256,7 @@ func TestMCPStep_ReviewRestatesTheOutcome(t *testing.T) {
 	})
 
 	t.Run("existing", func(t *testing.T) {
-		const existing = "/home/seba/.config/backplane/mcp-config.json"
+		const existing = "/home/operator/.config/backplane/mcp-config.json"
 		deps := needsSetupDeps()
 		deps.MCPStatus = func() MCPConfigStatus { return MCPConfigStatus{Path: existing} }
 

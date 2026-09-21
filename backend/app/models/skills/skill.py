@@ -3,7 +3,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -15,11 +15,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
+    inspect,
     true,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 from sqlalchemy.types import JSON
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -67,8 +69,7 @@ class Skill(Base, UUIDMixin, TimestampMixin):
     latest_published_version: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
-    # Provenance for catalog copies ("catalog:{id}@{version}"), not a foreign
-    # key — after activation the workspace copy is independent.
+    # Catalog/initial-proposal origin hint, never an authorization grant.
     origin: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -125,6 +126,66 @@ class SkillVersion(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), nullable=True
     )
     content_hash: Mapped[str] = mapped_column(String(64))
+    base_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Snapshot references survive cleanup of their source rows.
+    source_board_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    source_card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    source_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    delegation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+
+SKILL_VERSION_MUTABLE_FIELDS = frozenset({"status", "approval_id"})
+
+
+@event.listens_for(SkillVersion, "before_update")
+def prevent_revision_rewrite(mapper, connection, revision):
+    state = inspect(revision)
+    for attribute in state.mapper.column_attrs:
+        if (
+            attribute.key not in SKILL_VERSION_MUTABLE_FIELDS
+            and state.attrs[attribute.key].history.has_changes()
+        ):
+            raise ValueError(f"Skill revision {attribute.key} is immutable")
+
+
+@event.listens_for(SkillVersion, "before_delete")
+def prevent_revision_delete(mapper, connection, revision):
+    session = object_session(revision)
+    if session is not None and any(
+        isinstance(parent, Skill) and parent.id == revision.skill_id
+        for parent in session.deleted
+    ):
+        return
+    raise ValueError("Skill revisions are immutable")
+
+
+class SkillAuditEvent(Base, UUIDMixin):
+    __tablename__ = "skill_audit_events"
+    __table_args__ = (
+        Index("ix_skill_audit_events_history", "skill_id", "created_at", "id"),
+    )
+
+    skill_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE")
+    )
+    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64))
+    actor: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+
+
+@event.listens_for(SkillAuditEvent, "before_update")
+@event.listens_for(SkillAuditEvent, "before_delete")
+def prevent_audit_mutation(mapper, connection, audit):
+    raise ValueError("Skill audit history is append-only")
 
 
 class BoardSkill(Base):

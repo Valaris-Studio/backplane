@@ -246,7 +246,7 @@ func TestAvailableProviders_IsDeterministicallyOrdered(t *testing.T) {
 }
 
 func TestConfigCandidatePaths_PrefersTheMostSpecific(t *testing.T) {
-	paths := configCandidatePaths("/home/seba", "/work")
+	paths := configCandidatePaths("/home/operator", "/work")
 	if len(paths) == 0 {
 		t.Fatal("no candidate paths")
 	}

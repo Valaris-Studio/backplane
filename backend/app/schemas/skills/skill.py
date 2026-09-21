@@ -3,8 +3,9 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from app.core.json_response import UTCModel
 from app.schemas.bounded import Str255, Str1024
@@ -19,6 +20,8 @@ class SkillFile(UTCModel):
 class SkillCreate(UTCModel):
     slug: Str255
     files: list[SkillFile]
+    reason: Str1024 | None = None
+    base_version: int | None = Field(default=None, ge=1)
 
     @field_validator("slug")
     @classmethod
@@ -35,6 +38,8 @@ class SkillCreate(UTCModel):
 
 class SkillVersionCreate(UTCModel):
     files: list[SkillFile]
+    reason: Str1024 | None = None
+    base_version: int | None = Field(default=None, ge=1)
 
 
 class SkillProposalCreate(SkillCreate):
@@ -48,15 +53,33 @@ class SkillProposalRead(UTCModel):
     status: str
 
 
+class SkillActorRead(UTCModel):
+    user_id: uuid.UUID | None = None
+    user_name: str | None = None
+    agent_id: uuid.UUID | None = None
+    agent_name: str | None = None
+    credential_id: uuid.UUID | None = None
+    authentication_method: str | None = None
+
+
 class SkillVersionRead(UTCModel):
-    """Version METADATA — file contents are heavy and ride only the version
-    detail endpoint, never listings or the skill detail."""
+    """Version metadata; file contents ride version detail and diff responses."""
 
     id: uuid.UUID
     version: int
     status: str
     content_hash: str
     created_at: datetime
+    created_by_user_id: uuid.UUID | None = None
+    created_by_agent_id: uuid.UUID | None = None
+    approval_id: uuid.UUID | None = None
+    base_version: int | None = None
+    reason: str | None = None
+    provenance: SkillActorRead | None = None
+    source_board_id: uuid.UUID | None = None
+    source_card_id: uuid.UUID | None = None
+    source_execution_id: uuid.UUID | None = None
+    delegation_id: uuid.UUID | None = None
     # Tool names this version's prose references outside its declared
     # `toolsets` — a warning, never a rejection. [] when nothing is declared.
     lint_warnings: list[str]
@@ -68,6 +91,42 @@ class SkillVersionDetailRead(SkillVersionRead):
     files: list[SkillFile]
     # This version's own `toolsets:` declaration (the hand it plays in).
     toolsets: list[str]
+
+
+class SkillVersionPageRead(UTCModel):
+    items: list[SkillVersionRead]
+    next_before_version: int | None
+
+
+class SkillFileDiffRead(UTCModel):
+    path: str
+    change: Literal["added", "modified", "deleted"]
+    before: str | None
+    after: str | None
+
+
+class SkillDiffRead(UTCModel):
+    from_version: int
+    to_version: int
+    files: list[SkillFileDiffRead]
+
+
+class SkillAuditEventRead(UTCModel):
+    id: uuid.UUID
+    skill_id: uuid.UUID
+    version: int | None
+    event_type: str
+    actor: SkillActorRead | None
+    reason: str | None
+    details: dict | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SkillAuditPageRead(UTCModel):
+    items: list[SkillAuditEventRead]
+    next_before_id: uuid.UUID | None
 
 
 class SkillRead(UTCModel):

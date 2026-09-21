@@ -233,9 +233,9 @@ func TestResolveCredentials_ReadsOnlyTheInjectedHome(t *testing.T) {
 func TestCredentialsFilePath_FallsBackToHomeConfig(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
-	got := credentialsFilePath("/home/seba")
+	got := credentialsFilePath("/home/operator")
 
-	want := filepath.Join("/home/seba", ".config", "backplane", credentialsFilename)
+	want := filepath.Join("/home/operator", ".config", "backplane", credentialsFilename)
 	if got != want {
 		t.Errorf("credentialsFilePath = %q, want %q", got, want)
 	}

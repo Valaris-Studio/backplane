@@ -23,7 +23,7 @@ from app.models.kanban.completion import CompletionCandidate, CompletionAttempt
 from app.models.notes import Note
 from app.models.notifications import Notification, NotificationPreference
 from app.models.resources import Resource, ResourceType
-from app.models.skills.skill import BoardSkill, Skill, SkillVersion, SkillVersionStatus
+from app.models.skills.skill import BoardSkill, Skill, SkillAuditEvent, SkillVersion, SkillVersionStatus
 from app.models.user import User
 from app.models.webhooks.webhook import Webhook, WebhookEvent
 from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
@@ -72,6 +72,7 @@ __all__ = [
     "ConfigTemplateVersion",
     "BoardLoopTemplateBinding",
     "Skill",
+    "SkillAuditEvent",
     "SkillVersion",
     "SkillVersionStatus",
     "BoardSkill",

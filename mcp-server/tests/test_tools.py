@@ -712,17 +712,17 @@ async def test_update_card_with_pr_url_and_branch_name(mock_client, ctx):
         "test",
         "b1",
         "c1",
-        pr_url="https://github.com/Valaris-Studio/valaris-intern/pull/86",
+        pr_url="https://github.com/example/project/pull/86",
         branch_name="loop2/mcp-update-card-pr-url",
         ctx=ctx,
     )
 
     sent = mock_client.patch.call_args[0][1]
-    assert sent["pr_url"] == "https://github.com/Valaris-Studio/valaris-intern/pull/86"
+    assert sent["pr_url"] == "https://github.com/example/project/pull/86"
     assert sent["branch_name"] == "loop2/mcp-update-card-pr-url"
 
     read_back = json.loads(result)
-    assert read_back["pr_url"] == "https://github.com/Valaris-Studio/valaris-intern/pull/86"
+    assert read_back["pr_url"] == "https://github.com/example/project/pull/86"
     assert read_back["branch_name"] == "loop2/mcp-update-card-pr-url"
 
 

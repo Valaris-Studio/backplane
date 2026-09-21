@@ -523,7 +523,7 @@ func TestWrapHanging_DoesNotBreakLongTokens(t *testing.T) {
 // stray check. A token that cannot fit must arrive pre-shortened to the column
 // so nothing downstream is tempted to split it.
 func TestChecklistWrapped_NeverBreaksAPathAtAHyphen(t *testing.T) {
-	const path = "/home/operator/Programming/valaris/runner-cli/runner/configs/mcp-config.example.json"
+	const path = "/home/operator/projects/example/runner-checkout/runner/configs/mcp-config.example.json"
 	const width = 76
 
 	body := ChecklistWrapped([]ChecklistItem{
@@ -540,7 +540,7 @@ func TestChecklistWrapped_NeverBreaksAPathAtAHyphen(t *testing.T) {
 // Whatever shortening the path receives, it must still name one unambiguous
 // file: the leading directories and the full basename both survive.
 func TestChecklistWrapped_ShortenedPathStaysUnambiguous(t *testing.T) {
-	const path = "/home/operator/Programming/valaris/runner-cli/runner/configs/mcp-config.example.json"
+	const path = "/home/operator/projects/example/runner-checkout/runner/configs/mcp-config.example.json"
 
 	got := stripANSI(ChecklistWrapped([]ChecklistItem{
 		{Label: "mcp config", State: StateOK, Detail: path},
@@ -560,7 +560,7 @@ func TestChecklistWrapped_ContinuationsKeepTheHangingIndent(t *testing.T) {
 	got := stripANSI(ChecklistWrapped([]ChecklistItem{{
 		Label:  "mcp config",
 		State:  StateOK,
-		Detail: "/home/operator/Programming/valaris/runner-cli/runner/configs/mcp-config.example.json is the template shipped in every checkout",
+		Detail: "/home/operator/projects/example/runner-checkout/runner/configs/mcp-config.example.json is the template shipped in every checkout",
 	}}, PanelBodyWidth(76)))
 
 	lines := strings.Split(got, "\n")
@@ -583,7 +583,7 @@ func TestPanel_LongPathKeepsTheRightBorderStraight(t *testing.T) {
 
 	const width = 76
 	body := ChecklistWrapped([]ChecklistItem{
-		{Label: "mcp config", State: StateOK, Detail: "/home/operator/Programming/valaris/runner-cli/runner/configs/mcp-config.example.json"},
+		{Label: "mcp config", State: StateOK, Detail: "/home/operator/projects/example/runner-checkout/runner/configs/mcp-config.example.json"},
 		{Label: "work dir", State: StateOK, Detail: "/home/operator/backplane-runner/repos (outside any git worktree)"},
 	}, PanelBodyWidth(width))
 

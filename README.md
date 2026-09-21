@@ -284,7 +284,7 @@ for the pull-request lifecycle. Connecting through MCP **does not require a runn
 | `mcp-server/` | MCP server exposing the platform tool catalog to AI agents: on PyPI as [`backplane-mcp`](https://pypi.org/project/backplane-mcp/) ([README](mcp-server/README.md)) |
 | `runner/` | The autonomous runner (Go): polls for work, drives the coding agent, pushes branches, opens PRs |
 | `docs/` | References and historical design documents; follow each document's status notice |
-| `infra/`, `scripts/` | Provisioning and dev/smoke scripts |
+| `scripts/` | Development, verification, and packaging scripts |
 
 </details>
 
@@ -529,7 +529,7 @@ than the rest of the platform. Verify your first deployment carefully.
   Docker Compose builds them locally. Client artifacts are released separately:
   the runner as a multi-arch image (`ghcr.io/valaris-studio/backplane-runner`)
   and standalone binaries with checksums
-  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/SHA256SUMS)),
+  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/SHA256SUMS)),
   and the MCP server through `uvx backplane-mcp`.
 - **GitLab PAT connections are supported** for repository credentials and backend
   merge-queue plumbing. The runner forge driver for GitLab does not yet open,

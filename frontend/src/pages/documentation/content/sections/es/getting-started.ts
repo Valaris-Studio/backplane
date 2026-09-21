@@ -178,12 +178,12 @@ export const ES_GETTING_STARTED = {
     "This walkthrough proves a configured runner can authenticate, accept platform authority, claim eligible work, and report the result. The exact card movements, git actions, approvals, and pull-request behavior come from your saved lifecycle; they are not unconditional defaults.":
       "Este recorrido demuestra que un runner configurado puede autenticarse, aceptar la autoridad de la plataforma, asumir trabajo elegible e informar el resultado. Los movimientos exactos de tarjetas, las acciones de git, las aprobaciones y el comportamiento de los pull requests proceden del ciclo de vida guardado; no son valores predeterminados incondicionales.",
     "1. Obtain the published runner": "1. Obtén el runner publicado",
-    "Version 0.8.4 is published as checksummed macOS, Linux, and Windows binaries for arm64 and amd64. Select the filename for your host; this example is macOS arm64.":
-      "La versión 0.8.4 se publica como binarios de macOS, Linux y Windows para arm64 y amd64, con checksum. Selecciona el nombre de archivo para tu host; este ejemplo corresponde a macOS arm64.",
+    "Version 0.8.5 is published as checksummed macOS, Linux, and Windows binaries for arm64 and amd64. Select the filename for your host; this example is macOS arm64.":
+      "La versión 0.8.5 se publica como binarios de macOS, Linux y Windows para arm64 y amd64, con checksum. Selecciona el nombre de archivo para tu host; este ejemplo corresponde a macOS arm64.",
     "Download and verify the macOS arm64 binary": "Descarga y verifica el binario para macOS arm64",
     "Download and verify the Windows amd64 binary": "Descarga y verifica el binario para Windows amd64",
-    "A public container is also available at ghcr.io/valaris-studio/backplane-runner:0.8.4. A container deployment must mount both runner YAML and MCP JSON at the paths referenced by the YAML; the single-mount Compose profile does not do that completely.":
-      "También hay un contenedor público en ghcr.io/valaris-studio/backplane-runner:0.8.4. Un despliegue en contenedor debe montar tanto el YAML del runner como el JSON de MCP en las rutas indicadas por el YAML; el perfil de Compose con un solo montaje no lo hace por completo.",
+    "A public container is also available at ghcr.io/valaris-studio/backplane-runner:0.8.5. A container deployment must mount both runner YAML and MCP JSON at the paths referenced by the YAML; the single-mount Compose profile does not do that completely.":
+      "También hay un contenedor público en ghcr.io/valaris-studio/backplane-runner:0.8.5. Un despliegue en contenedor debe montar tanto el YAML del runner como el JSON de MCP en las rutas indicadas por el YAML; el perfil de Compose con un solo montaje no lo hace por completo.",
     "Pull the published container image": "Descarga la imagen publicada del contenedor",
     "2. Prepare the exported bundle": "2. Prepara el paquete exportado",
     "Download the runner-scoped bundle from the Launch runner wizard or the runner detail. Keep runner-laptop-seba.yaml beside mcp-config-laptop-seba.json. The YAML points at its sibling and both use $":

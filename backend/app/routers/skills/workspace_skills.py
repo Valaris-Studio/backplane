@@ -12,6 +12,8 @@ agent-originated changes arrive via the approvals path (W2 proposals), never
 by writing here directly.
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,16 +22,20 @@ from app.core.auth import forbid_agent_callers
 from app.core.workspace import WorkspaceContext, get_workspace, get_workspace_admin
 from app.database import get_db
 from app.schemas.skills.skill import (
+    SkillAuditPageRead,
     SkillCatalogEntryRead,
     SkillCreate,
+    SkillDiffRead,
     SkillProposalCreate,
     SkillProposalRead,
     SkillRead,
     SkillVersionCreate,
     SkillVersionDetailRead,
+    SkillVersionPageRead,
     SkillVersionRead,
 )
 from app.services.skills.catalog import SKILL_CATALOG
+from app.services.skills.history import SkillHistoryService
 from app.services.skills.skill_service import (
     SkillService,
     build_skill_list_item,
@@ -154,6 +160,45 @@ async def unarchive_skill(
     )
 
 
+@router.get("/{skill_slug}/versions", response_model=SkillVersionPageRead)
+async def list_skill_versions(
+    skill_slug: str,
+    limit: int = Query(default=50, ge=1, le=100),
+    before_version: int | None = Query(default=None, ge=1),
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> SkillVersionPageRead:
+    return await SkillHistoryService(db).list_versions(
+        ctx.workspace.id, skill_slug, limit=limit, before_version=before_version
+    )
+
+
+@router.get("/{skill_slug}/diff", response_model=SkillDiffRead)
+async def diff_skill_versions(
+    skill_slug: str,
+    from_version: int = Query(ge=1),
+    to_version: int = Query(ge=1),
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> SkillDiffRead:
+    return await SkillHistoryService(db).diff(
+        ctx.workspace.id, skill_slug, from_version, to_version
+    )
+
+
+@router.get("/{skill_slug}/history", response_model=SkillAuditPageRead)
+async def list_skill_history(
+    skill_slug: str,
+    limit: int = Query(default=50, ge=1, le=100),
+    before_id: uuid.UUID | None = None,
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> SkillAuditPageRead:
+    return await SkillHistoryService(db).list_events(
+        ctx.workspace.id, skill_slug, limit=limit, before_id=before_id
+    )
+
+
 @router.get(
     "/{skill_slug}/versions/{version}", response_model=SkillVersionDetailRead
 )
@@ -163,7 +208,7 @@ async def get_skill_version(
     ctx: WorkspaceContext = Depends(get_workspace),
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> SkillVersionDetailRead:
-    """The one place file contents are served — verbatim."""
+    """The complete version bundle, served verbatim."""
     service = SkillService(db)
     return build_version_detail_read(
         await service.get_version(ctx.workspace.id, skill_slug, version)
@@ -189,6 +234,8 @@ async def create_skill_version(
             skill_slug,
             [f.model_dump() for f in data.files],
             ctx.user.id,
+            reason=data.reason,
+            base_version=data.base_version,
         )
     )
 

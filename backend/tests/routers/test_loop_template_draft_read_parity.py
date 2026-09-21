@@ -245,7 +245,7 @@ async def test_lint_is_the_reference_implementation(
     """
     published = PUBLISHED_CONTENT.model_dump()
     draft = DRAFT_CONTENT.model_dump()
-    draft["system_prompt"] = "Clone https://github.com/Valaris-Studio/valaris-intern."
+    draft["system_prompt"] = "Clone https://github.com/example/project."
     template = ConfigTemplate(
         workspace_id=test_workspace.id,
         kind="loop",
@@ -265,7 +265,7 @@ async def test_lint_is_the_reference_implementation(
 
     assert response.status_code == 200, response.text
     matches = [finding.get("match") or "" for finding in response.json()["findings"]]
-    assert any("Valaris-Studio/valaris-intern" in match for match in matches), matches
+    assert any("example/project" in match for match in matches), matches
 
 
 async def test_unpublished_template_is_unchanged(
