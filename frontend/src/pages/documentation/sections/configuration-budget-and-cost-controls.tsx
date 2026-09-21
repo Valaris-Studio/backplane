@@ -15,6 +15,7 @@ import {
   CodeExample,
   HonestRemark,
   ImportantNote,
+  Screenshot,
 } from "../callouts";
 
 export function ConfigurationBudgetAndCostControls() {
@@ -45,7 +46,17 @@ export function ConfigurationBudgetAndCostControls() {
         <code>budget_usd</code>.
       </p>
 
-      <p>The panel reports the rolling budget status returned by the backend and lets an operator replace or clear the cap.</p>
+      <Screenshot
+        aspectRatio="4:3"
+        alt="Budget Status panel for one Runner with a configured cap"
+        caption="The panel reports the rolling budget status returned by the backend and lets an operator replace or clear the cap."
+        description={[
+          "Card header 'Budget Status' with a dollar icon and, when applicable, a status badge.",
+          "A usage row with the percentage used, spent and budget amounts, and a horizontal progress bar.",
+          "A three-column summary labeled 'Monthly Budget (USD)', 'Spent', and 'Remaining'.",
+          "A numeric budget field; changing it reveals the 'Save' button. Clearing the field saves a null cap.",
+        ]}
+      />
 
       <CodeExample language="json" title="Stored Runner registration fields">
         {`{

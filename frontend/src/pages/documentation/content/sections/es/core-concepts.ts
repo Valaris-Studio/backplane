@@ -354,8 +354,18 @@ export const ES_CORE_CONCEPTS = {
       ", estaciona esa tarjeta y continúa con otras tarjetas. La etiqueta sobrevive al reinicio del runner, aunque el token de reanudación del proveedor guardado en memoria no.",
     "Approval WebSocket events wake the runner for a near-immediate check; HTTP reads remain the canonical state check and fallback on every poll cycle. An approved request resumes the parked work when its session token is still available. A pending request or a temporary fetch error stays parked instead of being treated as failure.":
       "Los eventos WebSocket de aprobación despiertan al runner para una comprobación casi inmediata; las lecturas HTTP siguen siendo la comprobación canónica del estado y el fallback en cada ciclo de consulta. Una solicitud aprobada reanuda el trabajo estacionado cuando su token de sesión sigue disponible. Una solicitud pendiente o un error temporal de lectura permanece estacionado en vez de tratarse como fallo.",
+    "Approvals page with search, status and category filters, and a decision table":
+      "Página de aprobaciones con búsqueda, filtros de estado y categoría, y una tabla de decisiones",
     "The approvals page separates discovery from the decision dialog and keeps completed decisions readable.":
       "La página de aprobaciones separa el descubrimiento del diálogo de decisión y mantiene legibles las decisiones completadas.",
+    "Page heading 'Approvals' followed by search, Status, and Category filters plus a visible result count.":
+      "Encabezado 'Aprobaciones', seguido de búsqueda, filtros Estado y Categoría, y una cantidad visible de resultados.",
+    "Table columns: Status, Category, Description, Risk, Runner, Created, and Actions.":
+      "Columnas de la tabla: Estado, Categoría, Descripción, Riesgo, Runner, Creado y Acciones.",
+    "A pending row opens a dialog with the action description, optional details, a reason field, and Approve and Reject buttons.":
+      "Una fila pendiente abre un diálogo con la descripción de la acción, detalles opcionales, un campo de motivo y los botones Aprobar y Rechazar.",
+    "A decided row opens the same dialog read-only with decision, reviewer, timestamp, and reason.":
+      "Una fila decidida abre el mismo diálogo en modo de solo lectura con la decisión, quien revisó, la marca de tiempo y el motivo.",
     "Decision states": "Estados de decisión",
     "The data model exposes ": "El modelo de datos expone ",
     ". New requests receive an ": ". Las solicitudes nuevas reciben una marca ",

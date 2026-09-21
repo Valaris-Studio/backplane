@@ -4,7 +4,7 @@
 // Content adapted from docs/platform-source-of-truth.md §4 "What the Platform Does".
 
 import { SectionPage } from "../shell/SectionPage";
-import { ProTip } from "../callouts";
+import { ProTip, Screenshot } from "../callouts";
 
 export function IntroductionQuickTour() {
   return (
@@ -26,7 +26,18 @@ export function IntroductionQuickTour() {
         of their day.
       </p>
 
-      <p>The board is the operator's primary surface. Column types — not column names — drive pipeline behavior.</p>
+      <Screenshot
+        aspectRatio="16:9"
+        alt="Kanban board with five columns and several cards"
+        caption="The board is the operator's primary surface. Column types — not column names — drive pipeline behavior."
+        description={[
+          "Page header reads 'Platform Polish'.",
+          "Five columns in order: 'Backlog' (4 cards), 'Ready' (2 cards), 'In Progress' (1 card), 'Review' (1 card), 'Done' (6 cards).",
+          "Each card shows a title, a priority badge ('high', 'medium', or 'low'), and one or two participant avatars.",
+          "Top-right shows a 'Create card' button and a filter bar with 'Type', 'Priority', 'Assignee', 'Search'.",
+          "Left sidebar highlights the 'Boards' entry as active.",
+        ]}
+      />
 
       <h2 id="a-card-enters-the-pipeline">A card enters the pipeline</h2>
       <p>
@@ -49,7 +60,17 @@ export function IntroductionQuickTour() {
         column — typically <em>In Progress</em>.
       </p>
 
-      <p>The runner overview shows who is working on what, what it cost, and how long it took.</p>
+      <Screenshot
+        aspectRatio="16:9"
+        alt="Runner overview with KPI strip and runner table"
+        caption="The runner overview shows who is working on what, what it cost, and how long it took."
+        description={[
+          "KPI strip across the top reads 'Runners: 4', 'Success rate: 96%', 'Avg duration: 2m 14s', 'Total spend: $47.22'.",
+          "Runner table below lists four rows. The top row shows 'claude-sonnet-implementer' with status 'active' and current card 'Wire useDomainSync'.",
+          "Right panel titled 'Pending approvals' shows one pending approval with category 'bulk_change'.",
+          "Bottom strip titled 'Execution timeline' shows colored bars per role across the last hour.",
+        ]}
+      />
 
       <h2 id="the-stage-executes">The stage executes</h2>
       <p>
@@ -87,7 +108,19 @@ export function IntroductionQuickTour() {
         No polling, no wasted ticks.
       </p>
 
-      <p>Approvals show the action description and payload the runner requested — enough context to decide without reopening the card.</p>
+      <Screenshot
+        aspectRatio="4:3"
+        alt="Approval dialog showing a pending bulk-change approval"
+        caption="Approvals show the action description and payload the runner requested — enough context to decide without reopening the card."
+        description={[
+          "Dialog titled 'Approve bulk card deletion'.",
+          "Category badge reads 'bulk_change' in amber.",
+          "Risk score strip reads '0.72 / 1.00'.",
+          "Action description paragraph reads 'Delete 8 stale cards from the Backlog column older than 90 days'.",
+          "Payload JSON block shows the card IDs to be deleted.",
+          "Two buttons at the bottom: 'Approve' (primary) and 'Reject' (outline).",
+        ]}
+      />
 
       <h2 id="ship-and-repeat">Ship and repeat</h2>
       <p>

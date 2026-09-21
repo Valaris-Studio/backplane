@@ -19,8 +19,20 @@ export const PT_BR_INTRODUCTION = {
     Observers: "Observadores",
     " are anyone watching the activity stream: a teammate following a live run, a dashboard aggregating cost, a webhook forwarding events to Slack.":
       " são todas as pessoas ou sistemas que acompanham o fluxo de atividades: alguém da equipe seguindo uma execução ao vivo, um dashboard consolidando custos ou um webhook encaminhando eventos ao Slack.",
+    "Kanban board with a live pipeline run in progress":
+      "Quadro kanban com uma execução de pipeline em andamento",
     "The board view is the operator's primary surface — every runner action lands here as a card movement or note.":
       "A visualização do quadro é a principal área de trabalho do operador: cada ação de um runner aparece aqui como um movimento de cartão ou uma nota.",
+    "Kanban board titled 'Platform Polish' at the top.":
+      "Quadro kanban com o título 'Platform Polish' na parte superior.",
+    "Five columns: Backlog (3 cards), Ready (2), In Progress (1), Review (1), Done (4).":
+      "Cinco colunas: Backlog (3 cartões), Ready (2), In Progress (1), Review (1), Done (4).",
+    "The In Progress card is titled 'Wire useDomainSync for activity fan-out' and shows a green runner avatar plus a 'claimed 2m ago' timestamp.":
+      "O cartão em In Progress tem o título 'Wire useDomainSync for activity fan-out' e mostra o avatar verde de um runner, além da indicação 'assumido há 2 min'.",
+    "A toast in the bottom-right reads 'claude-sonnet-4 opened PR #214'.":
+      "Uma notificação no canto inferior direito informa 'claude-sonnet-4 abriu o PR #214'.",
+    "Sidebar shows Documentation highlighted as the current page would appear for a first-time reader.":
+      "A barra lateral mostra Documentação destacada, como a página atual apareceria para quem a acessa pela primeira vez.",
     "What the platform coordinates": "O que a plataforma coordena",
     "A kanban app built for human users can assume the page occasionally refreshes. Backplane can't. The primary operators are LLMs that retry on every error, work concurrently across pipeline stages, read fields by name from tool responses, and pay for every token. Those four properties reshape every layer:":
       "Um aplicativo kanban feito para pessoas pode pressupor que a página será atualizada de vez em quando. O Backplane não pode. Os principais operadores são LLMs que tentam novamente após cada erro, trabalham de forma simultânea em diferentes etapas do pipeline, leem campos pelo nome nas respostas das ferramentas e pagam por cada token. Essas quatro características transformam todas as camadas:",
@@ -111,8 +123,20 @@ export const PT_BR_INTRODUCTION = {
       "Todas as URLs da plataforma ficam sob o slug de um espaço de trabalho:",
     ". Inside a workspace you have boards, members, teams, a pipeline config, budgets, and activity history. Inside a board you have columns, cards, definitions, resources, notes, git repos, and alerts. The board view is where operators spend most of their day.":
       ". Dentro de um espaço de trabalho, há quadros, membros, equipes, uma configuração de pipeline, orçamentos e histórico de atividades. Dentro de um quadro, há colunas, cartões, definições, recursos, notas, repositórios git e alertas. A visualização do quadro é onde os operadores passam a maior parte do dia.",
+    "Kanban board with five columns and several cards":
+      "Quadro kanban com cinco colunas e vários cartões",
     "The board is the operator's primary surface. Column types — not column names — drive pipeline behavior.":
       "O quadro é a principal área de trabalho do operador. Os tipos de coluna, não seus nomes, determinam o comportamento do pipeline.",
+    "Page header reads 'Platform Polish'.":
+      "O cabeçalho da página mostra 'Platform Polish'.",
+    "Five columns in order: 'Backlog' (4 cards), 'Ready' (2 cards), 'In Progress' (1 card), 'Review' (1 card), 'Done' (6 cards).":
+      "Cinco colunas, nesta ordem: 'Backlog' (4 cartões), 'Ready' (2 cartões), 'In Progress' (1 cartão), 'Review' (1 cartão), 'Done' (6 cartões).",
+    "Each card shows a title, a priority badge ('high', 'medium', or 'low'), and one or two participant avatars.":
+      "Cada cartão mostra um título, um selo de prioridade ('high', 'medium' ou 'low') e um ou dois avatares de participantes.",
+    "Top-right shows a 'Create card' button and a filter bar with 'Type', 'Priority', 'Assignee', 'Search'.":
+      "No canto superior direito, aparecem o botão 'Criar cartão' e uma barra de filtros com 'Tipo', 'Prioridade', 'Responsável' e 'Buscar'.",
+    "Left sidebar highlights the 'Boards' entry as active.":
+      "A barra lateral esquerda destaca a opção 'Quadros' como ativa.",
     "A card enters the pipeline": "Um cartão entra no pipeline",
     "Someone — a human operator or an architect runner following the":
       "Alguém, seja um operador humano ou um runner arquiteto seguindo o prompt",
@@ -127,8 +151,18 @@ export const PT_BR_INTRODUCTION = {
     " participant slot is filled in a single transaction. Two runners racing for the same card lose one cleanly; the loser backs off and the winner moves the card into the next column — typically ":
       " do cartão é preenchido em uma única transação. Quando dois runners disputam o mesmo cartão, um deles perde de forma segura; ele recua, enquanto o vencedor move o cartão para a próxima coluna, normalmente ",
     "In Progress": "In Progress",
+    "Runner overview with KPI strip and runner table":
+      "Visão geral dos runners com faixa de KPIs e tabela de runners",
     "The runner overview shows who is working on what, what it cost, and how long it took.":
       "A visão geral dos runners mostra quem está trabalhando em cada item, quanto custou e quanto tempo levou.",
+    "KPI strip across the top reads 'Runners: 4', 'Success rate: 96%', 'Avg duration: 2m 14s', 'Total spend: $47.22'.":
+      "A faixa de KPIs no topo mostra 'Runners: 4', 'Taxa de sucesso: 96%', 'Duração média: 2 min 14 s' e 'Gasto total: US$ 47,22'.",
+    "Runner table below lists four rows. The top row shows 'claude-sonnet-implementer' with status 'active' and current card 'Wire useDomainSync'.":
+      "A tabela de runners abaixo contém quatro linhas. A primeira mostra 'claude-sonnet-implementer' com status 'active' e o cartão atual 'Wire useDomainSync'.",
+    "Right panel titled 'Pending approvals' shows one pending approval with category 'bulk_change'.":
+      "O painel à direita, intitulado 'Aprovações pendentes', mostra uma aprovação pendente da categoria 'bulk_change'.",
+    "Bottom strip titled 'Execution timeline' shows colored bars per role across the last hour.":
+      "A faixa inferior, intitulada 'Linha do tempo das execuções', mostra barras coloridas por função ao longo da última hora.",
     "The stage executes": "A etapa é executada",
     "The runner assembles a prompt — board definition, pinned notes, card description, prior review findings, platform-spliced post-process imperatives — and invokes the configured Claude Code or Codex CLI provider. If the board binds":
       "O runner monta um prompt com a definição do quadro, notas fixadas, descrição do cartão, constatações de revisões anteriores e instruções de pós-processamento inseridas pela plataforma, e invoca o provedor configurado de Claude Code ou Codex CLI. Se o quadro tiver ",
@@ -154,8 +188,22 @@ export const PT_BR_INTRODUCTION = {
       " e toma a decisão. O runner está inscrito em ",
     " on the WS bus, so the moment the decision lands the runner wakes and continues. No polling, no wasted ticks.":
       " no barramento WS; assim que a decisão chega, o runner desperta e continua. Sem polling e sem ciclos desperdiçados.",
+    "Approval dialog showing a pending bulk-change approval":
+      "Diálogo de aprovação mostrando uma alteração em massa pendente",
     "Approvals show the action description and payload the runner requested — enough context to decide without reopening the card.":
       "As aprovações mostram a descrição da ação e o payload solicitado pelo runner, com contexto suficiente para decidir sem reabrir o cartão.",
+    "Dialog titled 'Approve bulk card deletion'.":
+      "Diálogo intitulado 'Aprovar exclusão de cartões em massa'.",
+    "Category badge reads 'bulk_change' in amber.":
+      "O selo de categoria mostra 'bulk_change' em âmbar.",
+    "Risk score strip reads '0.72 / 1.00'.":
+      "A faixa de pontuação de risco mostra '0.72 / 1.00'.",
+    "Action description paragraph reads 'Delete 8 stale cards from the Backlog column older than 90 days'.":
+      "O parágrafo de descrição da ação informa 'Excluir 8 cartões inativos há mais de 90 dias da coluna Backlog'.",
+    "Payload JSON block shows the card IDs to be deleted.":
+      "O bloco de payload JSON mostra os IDs dos cartões que serão excluídos.",
+    "Two buttons at the bottom: 'Approve' (primary) and 'Reject' (outline).":
+      "Dois botões na parte inferior: 'Aprovar' (principal) e 'Rejeitar' (contorno).",
     "Ship and repeat": "Entregue e repita",
     "The runner pushes the branch, opens a PR, moves the card into the column configured in the stage's ":
       "O runner faz push da branch, abre um PR e move o cartão para a coluna configurada na ação ",
