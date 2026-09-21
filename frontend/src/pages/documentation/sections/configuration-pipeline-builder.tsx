@@ -10,6 +10,7 @@ import {
   CodeExample,
   HonestRemark,
   ImportantNote,
+  Screenshot,
   WhatThisIsNot,
 } from "../callouts";
 
@@ -35,7 +36,18 @@ export function ConfigurationPipelineBuilder() {
         <code>stages[].lifecycle</code> arrays back to the backend.
       </p>
 
-      <p>Graph, Tree, and the legacy Form are three editors over one lifecycle draft, not three pipeline formats.</p>
+      <Screenshot
+        aspectRatio="16:9"
+        alt="Pipeline page showing the Graph view and the Advanced control"
+        caption="Graph, Tree, and the legacy Form are three editors over one lifecycle draft, not three pipeline formats."
+        description={[
+          "The Pipeline tab shows Graph as the selected primary view and Advanced beside it.",
+          "The graph contains runner lanes, role nodes, decision nodes, terminal nodes, and failure-gap indicators.",
+          "Selecting Advanced reveals Tree and legacy Form links; Tree is selected by default.",
+          "A Manage prompts link sits beside the view controls.",
+          "No JSON transfer action is present.",
+        ]}
+      />
 
       <span id="stage-anatomy" />
       <h2 id="canonical-lifecycle">The lifecycle is the canonical path</h2>

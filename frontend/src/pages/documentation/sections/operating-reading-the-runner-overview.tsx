@@ -4,7 +4,7 @@
 // Content verified against RunnerConsoleOverview and AnalyticsDashboard.
 
 import { SectionPage } from "../shell/SectionPage";
-import { HonestRemark } from "../callouts";
+import { HonestRemark, Screenshot } from "../callouts";
 
 export function OperatingReadingTheRunnerOverview() {
   return (
@@ -21,7 +21,18 @@ export function OperatingReadingTheRunnerOverview() {
         the execution feed lives in Activity.
       </p>
 
-      <p>Overview is a health summary. Its metric cards link to the tabs that own the detail.</p>
+      <Screenshot
+        aspectRatio="16:9"
+        alt="Runner overview with five headline metrics, pending approvals, and analytics"
+        caption="Overview is a health summary. Its metric cards link to the tabs that own the detail."
+        description={[
+          "Runner Console tabs: Overview, Pipeline, Runners, and Activity, with Overview active.",
+          "An optional configuration-error alert links to Runners; a no-runners hint does the same.",
+          "Five metric cards: Total runners, Success rate, Average duration, Total tokens, and Total cost.",
+          "Pending approvals appears below the metrics, followed by the Analytics dashboard.",
+          "Analytics includes outcome metrics, execution totals, 30-day daily activity, and distribution by role or action.",
+        ]}
+      />
 
       <h2 id="headline-metrics">The five headline metrics</h2>
       <p>

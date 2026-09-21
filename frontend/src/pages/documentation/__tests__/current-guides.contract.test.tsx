@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { SUPPORTED_LANGUAGES } from "@/i18n/supported-languages";
 import { exportDocumentation } from "../agent-export";
+import { getDocumentationCopy } from "../content";
 import { DOC_SECTIONS } from "../routes";
 import { DocumentationSectionTranslationProvider } from "../section-localization";
 import { resolveDocumentationSection } from "../section-registry";
@@ -14,8 +15,9 @@ vi.mock("@/hooks/use-reduced-motion", () => ({ useReducedMotion: () => true }));
 vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => true }));
 
 describe("current product guides", () => {
-  it("renders every guide without unfinished screenshot frames in every locale", () => {
+  it("retains the 15 intentional preview screenshot placeholders in every locale", () => {
     for (const locale of SUPPORTED_LANGUAGES) {
+      let screenshotFrames = 0;
       for (const { slug } of DOC_SECTIONS) {
         const resolved = resolveDocumentationSection(locale, slug)!;
         const Component = resolved.Component;
@@ -27,20 +29,24 @@ describe("current product guides", () => {
           </MemoryRouter>,
         );
 
-        expect(html, `${locale}:${slug}`).not.toContain("data-screenshot-frame");
+        screenshotFrames += (html.match(/data-screenshot-frame=/g) ?? []).length;
       }
+      expect(screenshotFrames, locale).toBe(15);
     }
   });
 
-  it("exports finished guides and the supported runner providers in every locale", async () => {
+  it("exports the preview placeholders and supported runner providers in every locale", async () => {
     const corpus = await exportDocumentation();
     for (const locale of SUPPORTED_LANGUAGES) {
+      let screenshotMarkers = 0;
+      const placeholder = getDocumentationCopy(locale).shell.screenshotPlaceholder;
       for (const section of corpus.locales[locale]!) {
         expect(section.status, `${locale}:${section.slug}`).toBe(
           locale === "en" ? "source" : "translated",
         );
-        expect(section.markdown, `${locale}:${section.slug}`).not.toContain("[SCREENSHOT]");
+        screenshotMarkers += section.markdown.split(placeholder).length - 1;
       }
+      expect(screenshotMarkers, locale).toBe(15);
       for (const slug of ["what-backplane-is", "what-it-is-not", "quick-tour"]) {
         const guide = corpus.locales[locale]!.find((section) => section.slug === slug)!;
         expect(guide.markdown, `${locale}:${slug}`).toContain("Claude Code");

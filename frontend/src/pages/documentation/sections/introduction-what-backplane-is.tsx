@@ -7,6 +7,7 @@ import { SectionPage } from "../shell/SectionPage";
 import {
   CodeExample,
   HonestRemark,
+  Screenshot,
   WhatThisIsNot,
 } from "../callouts";
 
@@ -44,7 +45,18 @@ export function IntroductionWhatBackplaneIs() {
         aggregating cost, a webhook forwarding events to Slack.
       </p>
 
-      <p>The board view is the operator's primary surface — every runner action lands here as a card movement or note.</p>
+      <Screenshot
+        aspectRatio="16:9"
+        alt="Kanban board with a live pipeline run in progress"
+        caption="The board view is the operator's primary surface — every runner action lands here as a card movement or note."
+        description={[
+          "Kanban board titled 'Platform Polish' at the top.",
+          "Five columns: Backlog (3 cards), Ready (2), In Progress (1), Review (1), Done (4).",
+          "The In Progress card is titled 'Wire useDomainSync for activity fan-out' and shows a green runner avatar plus a 'claimed 2m ago' timestamp.",
+          "A toast in the bottom-right reads 'claude-sonnet-4 opened PR #214'.",
+          "Sidebar shows Documentation highlighted as the current page would appear for a first-time reader.",
+        ]}
+      />
 
       <h2 id="what-the-platform-coordinates">What the platform coordinates</h2>
       <p>
