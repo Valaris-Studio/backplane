@@ -11,7 +11,6 @@ import {
   DangerZone,
   HonestRemark,
   ImportantNote,
-  Screenshot,
 } from "../callouts";
 
 export function ConfigurationApprovalCategoriesAndRiskScoring() {
@@ -86,19 +85,7 @@ AUTO_APPROVE_THRESHOLD = 30`}
         that the runner carries across the gate.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Approval queue row expanded to show action payload and decision buttons"
-        caption="The risk score is shown next to the category so the operator can triage by blast radius, not arrival order."
-        description={[
-          "Page header 'Pending approvals' with a badge '3' next to it.",
-          "First queue row expanded. Category pill 'deletion' on the left.",
-          "Risk score '80' rendered as a red badge next to the category.",
-          "Agent name 'runner-prod', board name 'alpha', created timestamp '2 minutes ago'.",
-          "Expanded body shows 'Action: delete 14 cards tagged archive-2025' and a JSON payload preview.",
-          "Two buttons at the bottom: green 'Approve', red 'Reject', with a small line 'Expires in 23h 57m'.",
-        ]}
-      />
+      <p>The risk score is shown next to the category so the operator can triage by blast radius, not arrival order.</p>
 
       <DangerZone title="Reject is terminal, not a soft veto">
         Approving an approval sets status <code>approved</code>; rejecting

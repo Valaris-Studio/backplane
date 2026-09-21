@@ -8,13 +8,7 @@ export const ES_CONFIGURATION = {
     "Graph is the default operational view. Advanced opens Tree by default; the legacy Form remains available as an escape hatch while Tree earns trust. All three views read and save through": "Graph es la vista operativa predeterminada. Advanced abre Tree de forma predeterminada; el Form heredado sigue disponible como alternativa mientras Tree gana confianza. Las tres vistas leen y guardan mediante",
     ", so they serialize the same": ", por lo que serializan las mismas",
     " arrays back to the backend.": " y las envían al backend.",
-    "Pipeline page showing the Graph view and the Advanced control": "Página del pipeline con la vista Graph y el control Advanced",
     "Graph, Tree, and the legacy Form are three editors over one lifecycle draft, not three pipeline formats.": "Graph, Tree y el Form heredado son tres editores de un mismo borrador de ciclo de vida, no tres formatos de pipeline.",
-    "The Pipeline tab shows Graph as the selected primary view and Advanced beside it.": "La pestaña Pipeline muestra Graph como vista principal seleccionada y Advanced a su lado.",
-    "The graph contains runner lanes, role nodes, decision nodes, terminal nodes, and failure-gap indicators.": "El gráfico contiene carriles de runners, nodos de rol, nodos de decisión, nodos terminales e indicadores de rutas de fallo incompletas.",
-    "Selecting Advanced reveals Tree and legacy Form links; Tree is selected by default.": "Al seleccionar Advanced aparecen los enlaces Tree y Form heredado; Tree está seleccionado de forma predeterminada.",
-    "A Manage prompts link sits beside the view controls.": "El enlace Gestionar prompts aparece junto a los controles de vista.",
-    "No JSON transfer action is present.": "No hay ninguna acción para transferir JSON.",
     "The lifecycle is the canonical path": "El ciclo de vida es la ruta canónica",
     "Each stage has a free-form, pipeline-unique ": "Cada etapa tiene un ",
     " and an ordered ": " de formato libre y único en el pipeline, y una lista ",
@@ -96,20 +90,8 @@ export const ES_CONFIGURATION = {
       "El agente de Go también incluye fallbacks hardcodeados para las personas iniciales, de modo que un runner nuevo pueda ejecutar un ciclo antes de que la caché de la plataforma esté preparada. Es una medida de resiliencia, no una vía de escape: el principio de autoridad de la plataforma establece que la anulación en ",
     " is the source of truth in any case of disagreement.":
       " es la fuente de verdad ante cualquier discrepancia.",
-    "Prompt editor with a template on the left and a rendered preview on the right":
-      "Editor de prompts con la plantilla a la izquierda y una vista previa renderizada a la derecha",
     "The editor shows the raw template; the preview shows what the runner will send after variable substitution and imperative splicing.":
       "El editor muestra la plantilla sin procesar; la vista previa muestra lo que enviará el runner después de sustituir variables e insertar la instrucción imperativa.",
-    "Left pane titled 'Template' shows a multiline textarea with the raw Go template source including lines '{{.Title}}' and '{{.ProjectDirectives}}'.":
-      "El panel izquierdo, titulado 'Plantilla', muestra un área de texto multilínea con el código fuente sin procesar de la plantilla de Go, incluidas las líneas '{{.Title}}' y '{{.ProjectDirectives}}'.",
-    "Right pane titled 'Rendered preview' shows the same text with variables substituted against a sample card — '{{.Title}}' replaced by 'Wire activity fan-out'.":
-      "El panel derecho, titulado 'Vista previa renderizada', muestra el mismo texto con las variables sustituidas a partir de una tarjeta de ejemplo: '{{.Title}}' se reemplaza por 'Wire activity fan-out'.",
-    "A pill near the top reads 'Role: orchestrator / Stage: implement'.":
-      "Una insignia cerca de la parte superior dice 'Rol: orchestrator / Etapa: implement'.",
-    "Bottom bar shows two buttons: 'Save override' (primary) and 'Reset to default' (secondary).":
-      "La barra inferior muestra dos botones: 'Guardar anulación' (principal) y 'Restablecer valor predeterminado' (secundario).",
-    "A small green banner reads 'Post-process imperative: writes_code (auto-appended)'.":
-      "Un pequeño aviso verde dice 'Instrucción de posproceso: writes_code (agregada automáticamente)'.",
     "Template variables": "Variables de plantilla",
     "Templates are rendered with Go's ":
       "Las plantillas se renderizan con la sintaxis ",
@@ -340,22 +322,8 @@ export const ES_CONFIGURATION = {
       "Si un sensor responde correctamente con ",
     ", the failure is the sensor's actual verdict and the same path runs. The findings are attached to the execution record so the operator can inspect them in the UI without grepping the runner logs.":
       ", el fallo es el veredicto real del sensor y se ejecuta el mismo flujo. Los hallazgos se adjuntan al registro de ejecución para que el operador pueda revisarlos en la interfaz sin buscar en los logs del runner.",
-    "Pipeline builder stage editor with the Sensors tab active":
-      "Editor de etapas del constructor de pipelines con la pestaña Sensores activa",
     "The sensor picker only lists sensors the active runner has published. An unrecognized name fails validation at save time.":
       "El selector solo muestra los sensores publicados por el runner activo. Un nombre no reconocido provoca un error de validación al guardar.",
-    "A stage editor is open with tabs across the top: 'Discover', 'Claim', 'Git', 'LLM', 'Sensors', 'On success', 'On failure'.":
-      "Hay un editor de etapas abierto con las pestañas 'Descubrir', 'Tomar', 'Git', 'LLM', 'Sensores', 'Al completarse' y 'Al fallar' en la parte superior.",
-    "The 'Sensors' tab is active and shows two configured rows.":
-      "La pestaña 'Sensores' está activa y muestra dos filas configuradas.",
-    "First row shows 'go-test' with config 'packages: ./backend/...' and 'timeout: 120s'.":
-      "La primera fila muestra 'go-test' con la configuración 'packages: ./backend/...' y 'timeout: 120s'.",
-    "Second row shows 'conflict-check' with 'default_branch: main'.":
-      "La segunda fila muestra 'conflict-check' con 'default_branch: main'.",
-    "A disabled 'Add sensor' button is labelled 'No more sensors available from this runner'.":
-      "Un botón deshabilitado 'Agregar sensor' lleva la etiqueta 'No hay más sensores disponibles en este runner'.",
-    "A small info line below reads 'Catalog published by runner runner-prod at 14:02:11'.":
-      "Debajo aparece una pequeña línea informativa: 'Catálogo publicado por el runner runner-prod a las 14:02:11'.",
     "The catalog is published by runners, not the backend":
       "El catálogo lo publican los runners, no el backend",
     "If you hit \"save\" on a stage referencing ":
@@ -405,22 +373,8 @@ export const ES_CONFIGURATION = {
       "; el runner suscrito se activa en el mismo ciclo y vuelve a ingresar a la etapa mediante",
     ". No HTTP polling, no retry gymnastics — the request and the continuation share an approval ID that the runner carries across the gate.":
       ". No hay polling HTTP ni maniobras de reintento: la solicitud y la continuación comparten un ID de aprobación que el runner conserva al cruzar el control.",
-    "Approval queue row expanded to show action payload and decision buttons":
-      "Fila de la cola de aprobaciones expandida con el payload de la acción y los botones de decisión",
     "The risk score is shown next to the category so the operator can triage by blast radius, not arrival order.":
       "La puntuación de riesgo aparece junto a la categoría para que el operador pueda priorizar por alcance del impacto, no por orden de llegada.",
-    "Page header 'Pending approvals' with a badge '3' next to it.":
-      "Encabezado de página 'Aprobaciones pendientes' con una insignia '3' al lado.",
-    "First queue row expanded. Category pill 'deletion' on the left.":
-      "Primera fila de la cola expandida. A la izquierda aparece la insignia de categoría 'deletion'.",
-    "Risk score '80' rendered as a red badge next to the category.":
-      "La puntuación de riesgo '80' aparece como una insignia roja junto a la categoría.",
-    "Agent name 'runner-prod', board name 'alpha', created timestamp '2 minutes ago'.":
-      "Nombre del agente 'runner-prod', nombre del tablero 'alpha' y marca de creación 'hace 2 minutos'.",
-    "Expanded body shows 'Action: delete 14 cards tagged archive-2025' and a JSON payload preview.":
-      "El cuerpo expandido muestra 'Acción: eliminar 14 tarjetas con la etiqueta archive-2025' y una vista previa del payload JSON.",
-    "Two buttons at the bottom: green 'Approve', red 'Reject', with a small line 'Expires in 23h 57m'.":
-      "En la parte inferior hay dos botones: 'Aprobar' en verde y 'Rechazar' en rojo, junto con la línea 'Vence en 23 h 57 min'.",
     "Reject is terminal, not a soft veto":
       "El rechazo es definitivo, no un veto temporal",
     "Approving an approval sets status ":
@@ -471,18 +425,8 @@ export const ES_CONFIGURATION = {
     "The ": "El ",
     " on the Runner detail page shows Budget, Spent, and Remaining. With a configured cap it also shows percentage used, the spent-to-budget values, and a progress bar. An exceeded cap adds a warning badge; a null cap adds a No budget set badge. Editing the numeric field and selecting Save updates":
       " de la página de detalle del Runner muestra Presupuesto, Gastado y Restante. Cuando hay un límite configurado, también muestra el porcentaje usado, los valores de gasto y presupuesto, y una barra de progreso. Un límite excedido añade una insignia de advertencia; un límite null añade la insignia Sin presupuesto definido. Editar el campo numérico y seleccionar Guardar actualiza",
-    "Budget Status panel for one Runner with a configured cap":
-      "Panel Estado del presupuesto de un Runner con un límite configurado",
     "The panel reports the rolling budget status returned by the backend and lets an operator replace or clear the cap.":
       "El panel informa el estado móvil del presupuesto que devuelve el backend y permite que un operador reemplace o elimine el límite.",
-    "Card header 'Budget Status' with a dollar icon and, when applicable, a status badge.":
-      "Encabezado de tarjeta 'Estado del presupuesto' con un icono de dólar y, cuando corresponde, una insignia de estado.",
-    "A usage row with the percentage used, spent and budget amounts, and a horizontal progress bar.":
-      "Una fila de uso con el porcentaje utilizado, los importes gastado y presupuestado, y una barra de progreso horizontal.",
-    "A three-column summary labeled 'Monthly Budget (USD)', 'Spent', and 'Remaining'.":
-      "Un resumen de tres columnas con las etiquetas 'Presupuesto mensual (USD)', 'Gastado' y 'Restante'.",
-    "A numeric budget field; changing it reveals the 'Save' button. Clearing the field saves a null cap.":
-      "Un campo numérico de presupuesto; al modificarlo aparece el botón 'Guardar'. Vaciar el campo guarda un límite null.",
     "Stored Runner registration fields":
       "Campos almacenados del registro del Runner",
     "Rate limiting": "Limitación de solicitudes",
@@ -558,13 +502,7 @@ export const ES_CONFIGURATION = {
     "Connections and Runner forge drivers are different layers": "Las conexiones y los drivers de forge del Runner son capas diferentes",
     "A GitLab credential is real and can authenticate clone, push, and the backend merge queue even though the Runner has no GitLab forge driver. Conversely, selecting ": "Una credencial de GitLab es válida y puede autenticar operaciones de clone y push, además de la cola de merge del backend, aunque el Runner no tenga un driver de forge para GitLab. A la inversa, seleccionar ",
     " on a repository does not dynamically rebuild a Runner. Each Runner constructs one configured forge driver at startup.": " en un repositorio no reconstruye dinámicamente un Runner. Cada Runner crea un único driver de forge configurado al iniciarse.",
-    "Workspace integrations and board repository configuration": "Integraciones del espacio de trabajo y configuración del repositorio del tablero",
     "Credentials belong to the workspace; repositories bind to a matching provider credential on the board.": "Las credenciales pertenecen al espacio de trabajo; los repositorios se vinculan en el tablero a una credencial del proveedor correspondiente.",
-    "Workspace Settings shows connected forge accounts with provider, account, authentication kind, verification state, and a Verify action.": "La configuración del espacio de trabajo muestra las cuentas de forge conectadas, con el proveedor, la cuenta, el tipo de autenticación, el estado de verificación y la acción Verificar.",
-    "The Add access token dialog offers GitHub, GitLab, and Gitea; Gitea requires a base URL.": "El diálogo Agregar token de acceso ofrece GitHub, GitLab y Gitea; Gitea exige una URL base.",
-    "The board Git dialog lets the operator choose github, gitlab, gitea, bitbucket, or other as repository metadata.": "El diálogo Git del tablero permite elegir github, gitlab, gitea, bitbucket u other como metadato del repositorio.",
-    "When matching connections exist, the repository can be bound to one account.": "Cuando existen conexiones compatibles, el repositorio puede vincularse a una cuenta.",
-    "Repository discovery through a connected account is currently implemented only for GitHub.": "Actualmente, el descubrimiento de repositorios mediante una cuenta conectada solo está implementado para GitHub.",
     "Runner forge configuration": "Configuración del forge del Runner",
     "The Runner builds a ": "El Runner crea un ",
     " from": " a partir de",

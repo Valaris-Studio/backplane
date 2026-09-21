@@ -14,25 +14,13 @@ export const ES_INTRODUCTION = {
     " are humans with UI access; they configure pipelines, write prompts, and approve high-risk actions. ":
       " son personas con acceso a la interfaz; configuran pipelines, escriben prompts y aprueban acciones de alto riesgo. ",
     Runners: "Runners",
-    " are credentialed processes that execute roles on cards they claim — in practice, each runner today is a Claude CLI invocation wrapped in a Go client that knows how to speak MCP. ":
-      " son procesos con credenciales que ejecutan roles en las tarjetas que toman. En la práctica, hoy cada runner es una invocación de Claude CLI encapsulada en un cliente de Go que sabe comunicarse mediante MCP. ",
+    " are credentialed Go processes that execute configured roles with Claude Code or Codex CLI. They use the platform API to coordinate work and provide MCP tools to the coding-agent session. ":
+      " son procesos de Go con credenciales que ejecutan roles configurados con Claude Code o Codex CLI. Usan la API de la plataforma para coordinar el trabajo y proporcionan herramientas MCP a la sesión del agente de programación. ",
     Observers: "Observadores",
     " are anyone watching the activity stream: a teammate following a live run, a dashboard aggregating cost, a webhook forwarding events to Slack.":
       " son todas las personas o sistemas que siguen el flujo de actividad: alguien del equipo que observa una ejecución en vivo, un dashboard que consolida costos o un webhook que reenvía eventos a Slack.",
-    "Kanban board with a live pipeline run in progress":
-      "Tablero kanban con una ejecución de pipeline en curso",
     "The board view is the operator's primary surface — every runner action lands here as a card movement or note.":
       "La vista del tablero es la superficie principal del operador: cada acción de un runner aparece aquí como un movimiento de tarjeta o una nota.",
-    "Kanban board titled 'Platform Polish' at the top.":
-      "Tablero kanban con el título 'Platform Polish' en la parte superior.",
-    "Five columns: Backlog (3 cards), Ready (2), In Progress (1), Review (1), Done (4).":
-      "Cinco columnas: Backlog (3 tarjetas), Ready (2), In Progress (1), Review (1), Done (4).",
-    "The In Progress card is titled 'Wire useDomainSync for activity fan-out' and shows a green runner avatar plus a 'claimed 2m ago' timestamp.":
-      "La tarjeta de In Progress se titula 'Wire useDomainSync for activity fan-out' y muestra el avatar verde de un runner junto con la marca de tiempo 'tomada hace 2 min'.",
-    "A toast in the bottom-right reads 'claude-sonnet-4 opened PR #214'.":
-      "Una notificación en la esquina inferior derecha dice 'claude-sonnet-4 abrió el PR #214'.",
-    "Sidebar shows Documentation highlighted as the current page would appear for a first-time reader.":
-      "La barra lateral muestra Documentación resaltada, tal como vería la página actual una persona que llega por primera vez.",
     "What the platform coordinates": "Qué coordina la plataforma",
     "A kanban app built for human users can assume the page occasionally refreshes. Backplane can't. The primary operators are LLMs that retry on every error, work concurrently across pipeline stages, read fields by name from tool responses, and pay for every token. Those four properties reshape every layer:":
       "Una aplicación kanban creada para personas puede suponer que la página se actualiza de vez en cuando. Backplane no puede hacerlo. Sus operadores principales son LLMs que reintentan ante cada error, trabajan de forma concurrente en distintas etapas del pipeline, leen los campos por su nombre en las respuestas de las herramientas y pagan por cada token. Esas cuatro características transforman todas las capas:",
@@ -73,10 +61,8 @@ export const ES_INTRODUCTION = {
       "pipeline_config mínimo: una etapa de implementador",
     "Backplane is not autonomous by default, and not model-locked":
       "Backplane no es autónomo por defecto, y no está limitado a un modelo",
-    "Runners execute pipelines you configured — they don't invent objectives and they stop at the approval gates you defined. Model routing today goes through Claude via the ":
-      "Los runners ejecutan los pipelines que configuraste: no inventan objetivos y se detienen en los puntos de aprobación que definiste. Hoy el enrutamiento de modelos pasa por Claude mediante el subproceso de CLI ",
-    " CLI subprocess; per-role provider selection is the declared north star and the plumbing is partial.":
-      "; la selección de proveedor por rol es la dirección declarada del producto y su infraestructura todavía está incompleta.",
+    "Runners execute pipelines you configured — they don't invent objectives and they stop at the approval gates you defined. The runner supports Claude Code and Codex CLI, with provider and model routing configured by the operator.":
+      "Los runners ejecutan los pipelines que configuraste: no inventan objetivos y se detienen en los puntos de aprobación que definiste. El runner admite Claude Code y Codex CLI, con enrutamiento de proveedores y modelos configurado por el operador.",
     "From here, the rest of the documentation walks you through the core concepts (workspaces, runners, roles, prompts, approvals), a hands-on getting-started path, and the configuration surfaces where operators actually shape runner behavior.":
       "A partir de aquí, el resto de la documentación presenta los conceptos principales, como espacios de trabajo, runners, roles, prompts y aprobaciones; un recorrido práctico de primeros pasos; y las áreas de configuración donde los operadores definen realmente el comportamiento de los runners.",
   },
@@ -102,15 +88,13 @@ export const ES_INTRODUCTION = {
       "Backplane no ejecuta tu agente por vos. Vos traés el agente, ya sea un proceso runner, una sesión de Claude Code o cualquier cliente MCP, y Backplane le da un lugar donde conservar estado, recibir dirección y ser observado. Si lo que querés es un agente alojado llave en mano que invente su propio trabajo, ese es otro producto.",
     "Not model-locked — but not model-free either":
       "No está limitado a un modelo, pero tampoco es independiente de ellos",
-    "Today most stages route through Claude via the ":
-      "Hoy la mayoría de las etapas se enrutan a Claude mediante el subproceso de CLI ",
-    " CLI subprocess. Per-role provider and model configuration — implementer on Sonnet, reviewer on GPT-5, documentator on Gemini, all from the same runner — is the declared north star. The scoping document exists. The plumbing is partial. The platform is not structurally locked to one vendor, but the day you can route each role to its own model is still ahead, tracked under the LLM abstraction milestone.":
-      ". La configuración de proveedor y modelo por rol, con el implementador en Sonnet, el revisor en GPT-5 y el responsable de documentación en Gemini, todos desde el mismo runner, es la dirección declarada del producto. El documento de alcance existe. La infraestructura está incompleta. La plataforma no está estructuralmente ligada a un solo proveedor, pero todavía falta para poder enrutar cada rol a su propio modelo; ese trabajo se sigue en el hito de abstracción de LLM.",
-    "Not yet per-role LLM selection":
-      "La selección de LLM por rol todavía no está disponible",
+    "The runner currently supports Claude Code and Codex CLI. Operators configure provider and model routing, including per-role choices. A provider must be installed and authenticated on the runner host; connecting another MCP client does not add a runner provider.":
+      "El runner admite actualmente Claude Code y Codex CLI. Los operadores configuran el enrutamiento de proveedores y modelos, incluidas las opciones por rol. El proveedor debe estar instalado y autenticado en el host del runner; conectar otro cliente MCP no añade un proveedor al runner.",
+    "Provider configuration needs a supported driver":
+      "La configuración de proveedores requiere un driver compatible",
     "The ": "El campo ",
-    " field exists and accepts provider and model hints. The runner today passes them to Claude CLI regardless. Wiring alternative providers end-to-end is the next big structural work stream, not a configuration flag you can flip today.":
-      " existe y acepta indicaciones de proveedor y modelo. Hoy el runner las envía a Claude CLI de todos modos. Integrar proveedores alternativos de extremo a extremo es la próxima gran línea de trabajo estructural, no una opción de configuración que puedas activar hoy.",
+    " field configures stage execution. The runner resolves model tiers through its configured providers; only the installed Claude Code and Codex CLI drivers execute work today.":
+      " configura la ejecución de la etapa. El runner resuelve los niveles de modelo mediante sus proveedores configurados; actualmente, solo los drivers instalados de Claude Code y Codex CLI ejecutan el trabajo.",
     "Not a replacement for developer judgement":
       "No reemplaza el criterio de quienes desarrollan",
     "Approval gates, review cycles, and the human-authored pipeline config are where judgement lives. The runner executes; the operator decides what executing looks like. If a pipeline ships a bug, the pipeline is wrong — not the runner. If a reviewer role rubber-stamps everything, the prompt or the model selection is wrong. The platform gives you the levers; pulling them is still your job.":
@@ -127,20 +111,8 @@ export const ES_INTRODUCTION = {
       "Todas las URLs de la plataforma se encuentran bajo el slug de un espacio de trabajo:",
     ". Inside a workspace you have boards, members, teams, a pipeline config, budgets, and activity history. Inside a board you have columns, cards, definitions, resources, notes, git repos, and alerts. The board view is where operators spend most of their day.":
       ". Dentro de un espacio de trabajo hay tableros, miembros, equipos, una configuración de pipeline, presupuestos e historial de actividad. Dentro de un tablero hay columnas, tarjetas, definiciones, recursos, notas, repositorios git y alertas. La vista del tablero es donde los operadores pasan la mayor parte del día.",
-    "Kanban board with five columns and several cards":
-      "Tablero kanban con cinco columnas y varias tarjetas",
     "The board is the operator's primary surface. Column types — not column names — drive pipeline behavior.":
       "El tablero es la superficie principal del operador. Los tipos de columna, no sus nombres, determinan el comportamiento del pipeline.",
-    "Page header reads 'Platform Polish'.":
-      "El encabezado de la página muestra 'Platform Polish'.",
-    "Five columns in order: 'Backlog' (4 cards), 'Ready' (2 cards), 'In Progress' (1 card), 'Review' (1 card), 'Done' (6 cards).":
-      "Cinco columnas en este orden: 'Backlog' (4 tarjetas), 'Ready' (2 tarjetas), 'In Progress' (1 tarjeta), 'Review' (1 tarjeta), 'Done' (6 tarjetas).",
-    "Each card shows a title, a priority badge ('high', 'medium', or 'low'), and one or two participant avatars.":
-      "Cada tarjeta muestra un título, una etiqueta de prioridad ('high', 'medium' o 'low') y uno o dos avatares de participantes.",
-    "Top-right shows a 'Create card' button and a filter bar with 'Type', 'Priority', 'Assignee', 'Search'.":
-      "En la esquina superior derecha aparecen el botón 'Crear tarjeta' y una barra de filtros con 'Tipo', 'Prioridad', 'Responsable' y 'Buscar'.",
-    "Left sidebar highlights the 'Boards' entry as active.":
-      "La barra lateral izquierda resalta la opción 'Tableros' como activa.",
     "A card enters the pipeline": "Una tarjeta entra en el pipeline",
     "Someone — a human operator or an architect runner following the":
       "Alguien, ya sea un operador humano o un runner arquitecto que sigue el prompt",
@@ -155,21 +127,11 @@ export const ES_INTRODUCTION = {
     " participant slot is filled in a single transaction. Two runners racing for the same card lose one cleanly; the loser backs off and the winner moves the card into the next column — typically ":
       " de la tarjeta se completa en una sola transacción. Si dos runners compiten por la misma tarjeta, uno pierde de forma segura; el perdedor retrocede y el ganador mueve la tarjeta a la siguiente columna, normalmente ",
     "In Progress": "En curso",
-    "Runner overview with KPI strip and runner table":
-      "Vista general de runners con una franja de KPIs y una tabla de runners",
     "The runner overview shows who is working on what, what it cost, and how long it took.":
       "La vista general de runners muestra quién trabaja en cada elemento, cuánto costó y cuánto tiempo tomó.",
-    "KPI strip across the top reads 'Runners: 4', 'Success rate: 96%', 'Avg duration: 2m 14s', 'Total spend: $47.22'.":
-      "La franja de KPIs en la parte superior muestra 'Runners: 4', 'Tasa de éxito: 96%', 'Duración promedio: 2 min 14 s' y 'Gasto total: $47.22'.",
-    "Runner table below lists four rows. The top row shows 'claude-sonnet-implementer' with status 'active' and current card 'Wire useDomainSync'.":
-      "La tabla de runners contiene cuatro filas. La primera muestra 'claude-sonnet-implementer' con estado 'active' y la tarjeta actual 'Wire useDomainSync'.",
-    "Right panel titled 'Pending approvals' shows one pending approval with category 'bulk_change'.":
-      "El panel derecho, titulado 'Aprobaciones pendientes', muestra una aprobación pendiente de la categoría 'bulk_change'.",
-    "Bottom strip titled 'Execution timeline' shows colored bars per role across the last hour.":
-      "La franja inferior, titulada 'Línea de tiempo de ejecuciones', muestra barras de colores por rol durante la última hora.",
     "The stage executes": "La etapa se ejecuta",
-    "The runner assembles a prompt — board definition, pinned notes, card description, prior review findings, platform-spliced post-process imperatives — and invokes Claude CLI. If the board binds":
-      "El runner arma un prompt con la definición del tablero, las notas fijadas, la descripción de la tarjeta, los hallazgos de revisiones anteriores y las instrucciones de posproceso insertadas por la plataforma, e invoca Claude CLI. Si el tablero tiene vinculadas ",
+    "The runner assembles a prompt — board definition, pinned notes, card description, prior review findings, platform-spliced post-process imperatives — and invokes the configured Claude Code or Codex CLI provider. If the board binds":
+      "El runner arma un prompt con la definición del tablero, las notas fijadas, la descripción de la tarjeta, los hallazgos de revisiones anteriores y las instrucciones de posproceso insertadas por la plataforma, e invoca el proveedor configurado de Claude Code o Codex CLI. Si el tablero tiene vinculadas ",
     skills: "habilidades",
     " — versioned procedural playbooks from the workspace library — the runner materializes them into the working tree first, so the agent discovers them like project files. Every tool call the LLM makes goes through the Backplane MCP server, which routes it back to the backend. Every mutation publishes an ":
       " (manuales de procedimiento versionados de la biblioteca del espacio de trabajo), el runner las materializa primero en el árbol de trabajo, de modo que el agente las descubre como si fueran archivos del proyecto. Cada llamada a una herramienta que realiza el LLM pasa por el servidor MCP de Backplane, que la envía de vuelta al backend. Cada mutación publica un evento ",
@@ -192,22 +154,8 @@ export const ES_INTRODUCTION = {
       " y decide. El runner está suscrito a ",
     " on the WS bus, so the moment the decision lands the runner wakes and continues. No polling, no wasted ticks.":
       " en el bus de WS, por lo que se activa y continúa en cuanto llega la decisión. Sin polling y sin ciclos desperdiciados.",
-    "Approval dialog showing a pending bulk-change approval":
-      "Diálogo de aprobación que muestra un cambio masivo pendiente",
     "Approvals show the action description and payload the runner requested — enough context to decide without reopening the card.":
       "Las aprobaciones muestran la descripción de la acción y el payload solicitado por el runner, con suficiente contexto para decidir sin volver a abrir la tarjeta.",
-    "Dialog titled 'Approve bulk card deletion'.":
-      "Diálogo titulado 'Aprobar eliminación masiva de tarjetas'.",
-    "Category badge reads 'bulk_change' in amber.":
-      "La etiqueta de categoría muestra 'bulk_change' en ámbar.",
-    "Risk score strip reads '0.72 / 1.00'.":
-      "La franja de puntuación de riesgo muestra '0.72 / 1.00'.",
-    "Action description paragraph reads 'Delete 8 stale cards from the Backlog column older than 90 days'.":
-      "El párrafo de descripción de la acción dice 'Eliminar 8 tarjetas inactivas de la columna Backlog con más de 90 días'.",
-    "Payload JSON block shows the card IDs to be deleted.":
-      "El bloque de payload JSON muestra los IDs de las tarjetas que se eliminarán.",
-    "Two buttons at the bottom: 'Approve' (primary) and 'Reject' (outline).":
-      "Dos botones en la parte inferior: 'Aprobar' (principal) y 'Rechazar' (contorno).",
     "Ship and repeat": "Entrega y repite",
     "The runner pushes the branch, opens a PR, moves the card into the column configured in the stage's ":
       "El runner hace push de la rama, abre un PR y mueve la tarjeta a la columna configurada en la acción ",

@@ -66,22 +66,18 @@ export function IntroductionWhatItIsNot() {
 
       <h2 id="not-model-locked">Not model-locked — but not model-free either</h2>
       <p>
-        Today most stages route through Claude via the <code>claude</code> CLI
-        subprocess. Per-role provider and model configuration — implementer on
-        Sonnet, reviewer on GPT-5, documentator on Gemini, all from the same
-        runner — is the declared north star. The scoping document exists. The
-        plumbing is partial. The platform is not structurally locked to one
-        vendor, but the day you can route each role to its own model is still
-        ahead, tracked under the LLM abstraction milestone.
+        The runner currently supports Claude Code and Codex CLI. Operators
+        configure provider and model routing, including per-role choices. A
+        provider must be installed and authenticated on the runner host;
+        connecting another MCP client does not add a runner provider.
       </p>
 
-      <WhatThisIsNot title="Not yet per-role LLM selection">
+      <WhatThisIsNot title="Provider configuration needs a supported driver">
         <p>
-          The <code>pipeline_config.stages[*].llm</code> field exists and
-          accepts provider and model hints. The runner today passes them to
-          Claude CLI regardless. Wiring alternative providers end-to-end is
-          the next big structural work stream, not a configuration flag you
-          can flip today.
+          The <code>pipeline_config.stages[*].llm</code> field configures stage
+          execution. The runner resolves model tiers through its configured
+          providers; only the installed Claude Code and Codex CLI drivers
+          execute work today.
         </p>
       </WhatThisIsNot>
 
