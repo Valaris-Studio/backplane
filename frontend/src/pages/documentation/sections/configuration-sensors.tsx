@@ -6,7 +6,7 @@
 // docs/research/runner-pipeline-internals.md §4.
 
 import { SectionPage } from "../shell/SectionPage";
-import { CodeExample, FutureState, HonestRemark, Screenshot } from "../callouts";
+import { CodeExample, FutureState, HonestRemark } from "../callouts";
 
 export function ConfigurationSensors() {
   return (
@@ -122,19 +122,7 @@ export function ConfigurationSensors() {
         inspect them in the UI without grepping the runner logs.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Pipeline builder stage editor with the Sensors tab active"
-        caption="The sensor picker only lists sensors the active runner has published. An unrecognized name fails validation at save time."
-        description={[
-          "A stage editor is open with tabs across the top: 'Discover', 'Claim', 'Git', 'LLM', 'Sensors', 'On success', 'On failure'.",
-          "The 'Sensors' tab is active and shows two configured rows.",
-          "First row shows 'go-test' with config 'packages: ./backend/...' and 'timeout: 120s'.",
-          "Second row shows 'conflict-check' with 'default_branch: main'.",
-          "A disabled 'Add sensor' button is labelled 'No more sensors available from this runner'.",
-          "A small info line below reads 'Catalog published by runner runner-prod at 14:02:11'.",
-        ]}
-      />
+      <p>The sensor picker only lists sensors the active runner has published. An unrecognized name fails validation at save time.</p>
 
       <HonestRemark title="The catalog is published by runners, not the backend">
         If you hit "save" on a stage referencing <code>tsc-noemit</code> and

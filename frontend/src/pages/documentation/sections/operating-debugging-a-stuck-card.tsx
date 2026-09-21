@@ -4,7 +4,7 @@
 // Content verified against computeStuckReasons, CardDetailSheet, and Runner tabs.
 
 import { SectionPage } from "../shell/SectionPage";
-import { ProTip, Screenshot } from "../callouts";
+import { ProTip } from "../callouts";
 
 export function OperatingDebuggingAStuckCard() {
   return (
@@ -20,17 +20,7 @@ export function OperatingDebuggingAStuckCard() {
         panel because they are already terminal.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Card detail sheet with current stuck reasons and execution history"
-        caption="Stuck reasons are evidence to investigate, not a second scheduler."
-        description={[
-          "Card detail sheet with a Stuck Reasons section below pull-request context.",
-          "Possible rows include Blocked column, No hero assigned, Awaiting prompt, Changes requested, Recent failures, and Stale card.",
-          "Stages awaiting prompt appears separately with role, stage, and an Author prompt link.",
-          "The card's latest execution history remains visible below the diagnostic sections.",
-        ]}
-      />
+      <p>Stuck reasons are evidence to investigate, not a second scheduler.</p>
 
       <h2 id="reasons">The six current reasons</h2>
       <ul>

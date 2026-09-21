@@ -37,8 +37,8 @@ def _matches(findings, code: str) -> list[str]:
 def test_lint_flags_url_sha_orgrepo_path():
     """The Backplane binding values pasted into a kernel — AC #1."""
     kernel = (
-        "Repo: https://github.com/Valaris-Studio/valaris-intern\n"
-        "Clone Valaris-Studio/valaris-intern.git into place.\n"
+        "Repo: https://github.com/example/project\n"
+        "Clone example/project.git into place.\n"
         "Prod serves main at commit ce4ea8b4 today.\n"
         "CWD ~/backplane-runner/repos/loop/4ad6b3a4\n"
     )
@@ -46,7 +46,7 @@ def test_lint_flags_url_sha_orgrepo_path():
     findings = lint_repo_facts(kernel)
 
     assert {"url", "org_repo", "git_ref", "abs_path"} <= set(_codes(findings))
-    assert "https://github.com/Valaris-Studio/valaris-intern" in _matches(
+    assert "https://github.com/example/project" in _matches(
         findings, "url"
     )
     assert "ce4ea8b4" in _matches(findings, "git_ref")
@@ -157,7 +157,7 @@ def test_lint_repo_facts_in_slot_values_are_not_reported():
             SlotSpec(
                 name="REPO_URL",
                 kind="scalar",
-                default="https://github.com/Valaris-Studio/valaris-intern",
+                default="https://github.com/example/project",
             )
         ],
     )

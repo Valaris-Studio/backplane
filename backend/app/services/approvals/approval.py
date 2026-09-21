@@ -171,7 +171,6 @@ class ApprovalService:
         """
         # Lazy import: SkillService imports the approvals create path for
         # proposals, so a module-level import here would be circular.
-        from app.models.skills.skill import SkillVersionStatus
         from app.services.skills.skill_service import SkillService
 
         skill_service = SkillService(self.db)
@@ -200,12 +199,30 @@ class ApprovalService:
             # Reuse the direct-publish semantics: version status, the skill's
             # latest_published_version, and the `published` activity — the
             # board history must not depend on which path published.
+            await skill_service.record_approval(
+                approval.workspace_id,
+                skill.slug,
+                version.version,
+                user_id,
+                approval_id=approval.id,
+                reason=data.reason,
+            )
             await skill_service.publish_version(
-                approval.workspace_id, skill.slug, version.version, user_id
+                approval.workspace_id,
+                skill.slug,
+                version.version,
+                user_id,
+                approval_id=approval.id,
+                reason=data.reason,
             )
         elif data.decision == ApprovalStatus.rejected:
-            await skill_service.versions.update(
-                version, status=SkillVersionStatus.rejected.value
+            await skill_service.reject_version(
+                approval.workspace_id,
+                skill.slug,
+                version.version,
+                user_id,
+                approval_id=approval.id,
+                reason=data.reason,
             )
 
     # One category, one handler — dispatched by decide after the pending

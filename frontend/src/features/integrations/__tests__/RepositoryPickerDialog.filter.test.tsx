@@ -31,7 +31,7 @@ function repo(fullName: string): GitConnectionRepository {
 }
 
 const LOADED = [
-  "Valaris-Studio/valaris-intern",
+  "example/project",
   "Valaris-Studio/backplane-docs",
   "acme/website",
   "acme/billing-service",

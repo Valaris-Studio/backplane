@@ -19,31 +19,31 @@ export function GettingStartedYourFirstPipelineRun() {
 
       <h2 id="distribution">1. Obtain the published runner</h2>
       <p>
-        Version 0.8.4 is published as checksummed macOS, Linux, and Windows binaries
+        Version 0.8.5 is published as checksummed macOS, Linux, and Windows binaries
         for arm64 and amd64. Select the filename for your host; this example is
         macOS arm64.
       </p>
       <CodeExample language="bash" title="Download and verify the macOS arm64 binary">
-        {`curl -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/SHA256SUMS
-curl -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/backplane-runner-darwin-arm64
+        {`curl -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/SHA256SUMS
+curl -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/backplane-runner-darwin-arm64
 grep darwin-arm64 SHA256SUMS | shasum -a 256 -c -
 chmod +x backplane-runner-darwin-arm64
 ./backplane-runner-darwin-arm64 --version`}
       </CodeExample>
       <CodeExample language="powershell" title="Download and verify the Windows amd64 binary">
-        {`curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/SHA256SUMS
-curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.4/backplane-runner-windows-amd64.exe
+        {`curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/SHA256SUMS
+curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/backplane-runner-windows-amd64.exe
 (Get-FileHash backplane-runner-windows-amd64.exe -Algorithm SHA256).Hash -eq (Select-String windows-amd64 SHA256SUMS).Line.Split(" ")[0].ToUpper()
 .\\backplane-runner-windows-amd64.exe --version`}
       </CodeExample>
       <p>
         A public container is also available at
-        ghcr.io/valaris-studio/backplane-runner:0.8.4. A container deployment
+        ghcr.io/valaris-studio/backplane-runner:0.8.5. A container deployment
         must mount both runner YAML and MCP JSON at the paths referenced by the
         YAML; the single-mount Compose profile does not do that completely.
       </p>
       <CodeExample language="bash" title="Pull the published container image">
-        {`docker pull ghcr.io/valaris-studio/backplane-runner:0.8.4`}
+        {`docker pull ghcr.io/valaris-studio/backplane-runner:0.8.5`}
       </CodeExample>
 
       <h2 id="config">2. Prepare the exported bundle</h2>

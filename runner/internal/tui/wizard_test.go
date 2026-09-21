@@ -33,7 +33,7 @@ func testDeps() WizardDeps {
 		},
 		ValidateWorkDir: func(string) error { return nil },
 		Providers:       []string{"claude", "codex"},
-		DefaultWorkDir:  "/home/seba/backplane-runner/repos",
+		DefaultWorkDir:  "/home/operator/backplane-runner/repos",
 		DefaultModel:    "sonnet",
 		DefaultBudget:   5,
 		Version:         "v1.2.3",
@@ -955,7 +955,7 @@ func TestWizard_ResultCarriesConfigPathWhenSaving(t *testing.T) {
 	defer ForcePlain()()
 
 	deps := testDeps()
-	deps.ConfigPath = "/home/seba/.config/backplane/runner.yaml"
+	deps.ConfigPath = "/home/operator/.config/backplane/runner.yaml"
 	w := atReview(t, deps)
 	if !strings.Contains(w.View(), deps.ConfigPath) {
 		t.Errorf("review should show where the config would be written:\n%s", w.View())

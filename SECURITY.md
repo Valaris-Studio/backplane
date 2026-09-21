@@ -77,4 +77,4 @@ Backplane is an Open Source Preview. Its current security posture is:
 ## Supported versions
 
 Backplane has not cut a stable release yet. Security fixes land on the default
-branch. Once releases begin, this section will name the supported series.
+branch. Once stable releases begin, this section will name the supported series.

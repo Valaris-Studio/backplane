@@ -7,7 +7,6 @@ import { SectionPage } from "../shell/SectionPage";
 import {
   CodeExample,
   HonestRemark,
-  Screenshot,
   WhatThisIsNot,
 } from "../callouts";
 
@@ -37,26 +36,15 @@ export function IntroductionWhatBackplaneIs() {
       <p>
         Three kinds of actors share a workspace. <strong>Operators</strong> are
         humans with UI access; they configure pipelines, write prompts, and
-        approve high-risk actions. <strong>Runners</strong> are credentialed
-        processes that execute roles on cards they claim — in practice, each
-        runner today is a Claude CLI invocation wrapped in a Go client that
-        knows how to speak MCP. <strong>Observers</strong> are anyone watching
+        approve high-risk actions. <strong>Runners</strong> are credentialed Go
+        processes that execute configured roles with Claude Code or Codex CLI.
+        They use the platform API to coordinate work and provide MCP tools to
+        the coding-agent session. <strong>Observers</strong> are anyone watching
         the activity stream: a teammate following a live run, a dashboard
         aggregating cost, a webhook forwarding events to Slack.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Kanban board with a live pipeline run in progress"
-        caption="The board view is the operator's primary surface — every runner action lands here as a card movement or note."
-        description={[
-          "Kanban board titled 'Platform Polish' at the top.",
-          "Five columns: Backlog (3 cards), Ready (2), In Progress (1), Review (1), Done (4).",
-          "The In Progress card is titled 'Wire useDomainSync for activity fan-out' and shows a green runner avatar plus a 'claimed 2m ago' timestamp.",
-          "A toast in the bottom-right reads 'claude-sonnet-4 opened PR #214'.",
-          "Sidebar shows Documentation highlighted as the current page would appear for a first-time reader.",
-        ]}
-      />
+      <p>The board view is the operator's primary surface — every runner action lands here as a card movement or note.</p>
 
       <h2 id="what-the-platform-coordinates">What the platform coordinates</h2>
       <p>
@@ -132,10 +120,9 @@ export function IntroductionWhatBackplaneIs() {
       <WhatThisIsNot title="Backplane is not autonomous by default, and not model-locked">
         <p>
           Runners execute pipelines you configured — they don't invent
-          objectives and they stop at the approval gates you defined. Model
-          routing today goes through Claude via the <code>claude</code> CLI
-          subprocess; per-role provider selection is the declared north star
-          and the plumbing is partial.
+          objectives and they stop at the approval gates you defined. The
+          runner supports Claude Code and Codex CLI, with provider and model
+          routing configured by the operator.
         </p>
       </WhatThisIsNot>
 

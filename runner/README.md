@@ -38,11 +38,19 @@ The runner is **MIT-licensed** ([`LICENSE`](LICENSE)) while the platform core is
 AGPL-3.0. That is intentional: you should be able to embed, fork, or vendor the
 thing that runs on your machines without the platform's copyleft following it.
 
+## Release compatibility
+
+The current release pair is **runner 0.8.5** with **platform 0.1.2-preview.1**;
+MCP remains **0.8.0**. Upgrade the backend before upgrading the runner.
+Earlier runner artifacts remain available for reproducibility, but do not
+include the current completion-review recovery and dependency fixes.
+Use the versioned downloads linked from the platform rather than an older tag.
+
 ## Prerequisites
 
 | Requirement | Version / detail | Needed for |
 |---|---|---|
-| Go | 1.26.3+ (`go.mod`) | building from source |
+| Go | 1.26.8+ (`go.mod`) | building from source |
 | `claude` and/or `codex` | on `PATH` | the coding agent itself — whichever providers your config names |
 | `git` | any | cloning and pushing work |
 | `gh` (github forge) | authed via `gh auth login` or `GH_TOKEN` | opening, reviewing, and merging PRs |

@@ -4,7 +4,7 @@
 // Content verified against the activity API, feed hooks, and Timeline route.
 
 import { SectionPage } from "../shell/SectionPage";
-import { CodeExample, ImportantNote, Screenshot } from "../callouts";
+import { CodeExample, ImportantNote } from "../callouts";
 
 export function OperatingActivityHistoryAndAuditLogs() {
   return (
@@ -20,17 +20,7 @@ export function OperatingActivityHistoryAndAuditLogs() {
         use for audit questions after a live WebSocket event has passed.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="History feed with entity, action, and search controls"
-        caption="History uses server-side filters and bounded infinite scrolling rather than loading the workspace into the browser."
-        description={[
-          "Filter controls for Entity type and Action, plus a debounced Search field for activity summaries.",
-          "Reverse-chronological rows grouped by date, with icons, localized messages, actor context, and relative timestamps.",
-          "Resolvable card and note titles are links; repeated loop or cycle events can be grouped into one expandable row.",
-          "The bottom sentinel fetches the next page when more durable history is available.",
-        ]}
-      />
+      <p>History uses server-side filters and bounded infinite scrolling rather than loading the workspace into the browser.</p>
 
       <h2 id="query-behavior">Filtering and pagination</h2>
       <p>

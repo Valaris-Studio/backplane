@@ -4,7 +4,7 @@
 // Content verified against the approval service, UI, and runner park/resume path.
 
 import { SectionPage } from "../shell/SectionPage";
-import { DangerZone, ImportantNote, Screenshot } from "../callouts";
+import { DangerZone, ImportantNote } from "../callouts";
 
 export function CoreConceptsApprovals() {
   return (
@@ -57,17 +57,7 @@ export function CoreConceptsApprovals() {
         stays parked instead of being treated as failure.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Approvals page with search, status and category filters, and a decision table"
-        caption="The approvals page separates discovery from the decision dialog and keeps completed decisions readable."
-        description={[
-          "Page heading 'Approvals' followed by search, Status, and Category filters plus a visible result count.",
-          "Table columns: Status, Category, Description, Risk, Runner, Created, and Actions.",
-          "A pending row opens a dialog with the action description, optional details, a reason field, and Approve and Reject buttons.",
-          "A decided row opens the same dialog read-only with decision, reviewer, timestamp, and reason.",
-        ]}
-      />
+      <p>The approvals page separates discovery from the decision dialog and keeps completed decisions readable.</p>
 
       <h2 id="states">Decision states</h2>
       <p>

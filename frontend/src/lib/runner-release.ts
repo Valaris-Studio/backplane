@@ -11,7 +11,7 @@ export interface RunnerArtifact {
 // derives from it, and the getting-started walkthrough is contract-tested to
 // mention `runner/v<version>` — bump it here and the docs must move with it.
 export const RUNNER_RELEASE = {
-  version: "0.8.4",
+  version: "0.8.5",
   baseUrl: "https://storage.googleapis.com/backplane-artifacts/runner",
   artifacts: [
     { os: "macOS", arch: "arm64", filename: "backplane-runner-darwin-arm64" },

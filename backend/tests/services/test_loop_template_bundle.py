@@ -135,7 +135,7 @@ async def test_export_carries_leak_findings(
     """The receiving side must see the same warning the exporter saw, so the
     findings ride along in the file rather than living only in the export UI."""
     leaky = _content(
-        system_prompt="Clone https://github.com/Valaris-Studio/valaris-intern and go."
+        system_prompt="Clone https://github.com/example/project and go."
     )
     row = await _seed_draft(db_session, test_workspace, content=leaky)
 

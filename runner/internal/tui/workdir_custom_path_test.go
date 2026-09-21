@@ -69,7 +69,7 @@ func TestWorkDirStep_CustomPathRowRejectsGitWorktreePath(t *testing.T) {
 
 	deps := testDeps()
 	deps.ValidateWorkDir = func(path string) error {
-		if path == "/home/seba/live-checkout" {
+		if path == "/home/operator/live-checkout" {
 			return errors.New("inside a git worktree — a runner rooted here would reset your own work")
 		}
 		return nil
@@ -80,7 +80,7 @@ func TestWorkDirStep_CustomPathRowRejectsGitWorktreePath(t *testing.T) {
 	if !w.workDirStep.editing {
 		t.Fatal("enter on the custom-path row should open the editor")
 	}
-	w.workDirStep.input.SetValue("/home/seba/live-checkout")
+	w.workDirStep.input.SetValue("/home/operator/live-checkout")
 	w = drive(w, key("enter"), key("enter"))
 
 	if w.Step() != StepWorkDir {

@@ -81,6 +81,12 @@ def email_domain_allowed(email: str) -> bool:
 current_api_key_name: ContextVar[str | None] = ContextVar(
     "current_api_key_name", default=None
 )
+current_api_key_id: ContextVar[uuid.UUID | None] = ContextVar(
+    "current_api_key_id", default=None
+)
+current_authentication_method: ContextVar[str | None] = ContextVar(
+    "current_authentication_method", default=None
+)
 
 # Set when the API key is linked to a registered agent.
 current_agent_id: ContextVar[uuid.UUID | None] = ContextVar(
@@ -244,6 +250,11 @@ def extract_email_from_trusted_proxy_header(
 async def get_current_user(
     request: Request, db: AsyncSession = Depends(get_db, scope="function")
 ) -> User:
+    current_agent_id.set(None)
+    current_api_key_id.set(None)
+    current_api_key_name.set(None)
+    current_authentication_method.set(None)
+
     # API key auth: Bearer vlr_... tokens (prefix distinguishes from IAP OIDC JWTs)
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer vlr_"):
@@ -262,8 +273,6 @@ async def get_current_user(
         user = result.scalar_one_or_none()
         if not user:
             raise ForbiddenError("API key user not found")
-        current_api_key_name.set(api_key.name)
-
         # Look up linked agent for this API key
         from app.models.agents.agent import Agent
 
@@ -280,6 +289,9 @@ async def get_current_user(
                 raise ForbiddenError("Agent is deactivated")
             current_agent_id.set(agent.id)
 
+        current_api_key_id.set(api_key.id)
+        current_api_key_name.set(api_key.name)
+        current_authentication_method.set("api_key")
         return user
 
     path, client_ip = request.url.path, resolve_client_ip(request)
@@ -309,6 +321,7 @@ async def get_current_user(
                 raise ForbiddenError(
                     "Session user no longer exists", error_code="session_user_not_found"
                 )
+            current_authentication_method.set("session")
             return user
 
     if settings.is_development:
@@ -373,6 +386,7 @@ async def get_current_user(
         await db.flush()
         logger.info("auth provisioned user=%s tier=%s", email, tier)
 
+    current_authentication_method.set(tier)
     return user
 
 

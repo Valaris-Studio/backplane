@@ -4,8 +4,9 @@
 from app.models.skills.skill import (
     BoardSkill,
     Skill,
+    SkillAuditEvent,
     SkillVersion,
     SkillVersionStatus,
 )
 
-__all__ = ["BoardSkill", "Skill", "SkillVersion", "SkillVersionStatus"]
+__all__ = ["BoardSkill", "Skill", "SkillAuditEvent", "SkillVersion", "SkillVersionStatus"]

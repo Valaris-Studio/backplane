@@ -1914,7 +1914,7 @@ async def test_profile_is_member_readable(
 # hint into a control and break every author who names a URL on purpose.
 
 _LEAKY_PROMPT = (
-    "Clone https://github.com/Valaris-Studio/valaris-intern and reset to "
+    "Clone https://github.com/example/project and reset to "
     "commit ce4ea8b4.\nWork in ~/backplane-runner/repos/loop.\n"
 )
 

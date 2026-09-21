@@ -352,18 +352,8 @@ export const PT_BR_CORE_CONCEPTS = {
       ", estaciona o cartão e continua com outros cartões. O rótulo sobrevive a uma reinicialização do runner, embora o token de retomada do provedor mantido em memória não sobreviva.",
     "Approval WebSocket events wake the runner for a near-immediate check; HTTP reads remain the canonical state check and fallback on every poll cycle. An approved request resumes the parked work when its session token is still available. A pending request or a temporary fetch error stays parked instead of being treated as failure.":
       "Eventos WebSocket de aprovação acordam o runner para uma verificação quase imediata; leituras HTTP continuam sendo a verificação canônica do estado e o fallback em cada ciclo de consulta. Uma solicitação aprovada retoma o trabalho estacionado quando seu token de sessão ainda está disponível. Uma solicitação pendente ou um erro temporário de leitura permanece estacionado em vez de ser tratado como falha.",
-    "Approvals page with search, status and category filters, and a decision table":
-      "Página de aprovações com busca, filtros de status e categoria e uma tabela de decisões",
     "The approvals page separates discovery from the decision dialog and keeps completed decisions readable.":
       "A página de aprovações separa a descoberta da caixa de decisão e mantém legíveis as decisões concluídas.",
-    "Page heading 'Approvals' followed by search, Status, and Category filters plus a visible result count.":
-      "Cabeçalho 'Aprovações', seguido de busca, filtros Status e Categoria e uma contagem visível de resultados.",
-    "Table columns: Status, Category, Description, Risk, Runner, Created, and Actions.":
-      "Colunas da tabela: Status, Categoria, Descrição, Risco, Runner, Criado e Ações.",
-    "A pending row opens a dialog with the action description, optional details, a reason field, and Approve and Reject buttons.":
-      "Uma linha pendente abre uma caixa com a descrição da ação, detalhes opcionais, um campo de motivo e os botões Aprovar e Rejeitar.",
-    "A decided row opens the same dialog read-only with decision, reviewer, timestamp, and reason.":
-      "Uma linha decidida abre a mesma caixa em modo somente leitura com decisão, pessoa revisora, horário e motivo.",
     "Decision states": "Estados de decisão",
     "The data model exposes ": "O modelo de dados expõe ",
     ". New requests receive an ": ". Novas solicitações recebem uma marca ",

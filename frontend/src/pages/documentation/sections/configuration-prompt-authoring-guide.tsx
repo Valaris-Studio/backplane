@@ -10,7 +10,6 @@ import {
   HonestRemark,
   ImportantNote,
   ProTip,
-  Screenshot,
 } from "../callouts";
 
 export function ConfigurationPromptAuthoringGuide() {
@@ -59,18 +58,7 @@ export function ConfigurationPromptAuthoringGuide() {
         truth in any case of disagreement.
       </p>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Prompt editor with a template on the left and a rendered preview on the right"
-        caption="The editor shows the raw template; the preview shows what the runner will send after variable substitution and imperative splicing."
-        description={[
-          "Left pane titled 'Template' shows a multiline textarea with the raw Go template source including lines '{{.Title}}' and '{{.ProjectDirectives}}'.",
-          "Right pane titled 'Rendered preview' shows the same text with variables substituted against a sample card — '{{.Title}}' replaced by 'Wire activity fan-out'.",
-          "A pill near the top reads 'Role: orchestrator / Stage: implement'.",
-          "Bottom bar shows two buttons: 'Save override' (primary) and 'Reset to default' (secondary).",
-          "A small green banner reads 'Post-process imperative: writes_code (auto-appended)'.",
-        ]}
-      />
+      <p>The editor shows the raw template; the preview shows what the runner will send after variable substitution and imperative splicing.</p>
 
       <h2 id="template-variables">Template variables</h2>
       <p>

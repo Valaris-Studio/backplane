@@ -53,7 +53,7 @@ const DETAIL = {
 /** A leak finding as the backend emits it: {code, match, line, hint}. */
 const LEAK = {
   code: "org_repo",
-  match: "Valaris-Studio/valaris-intern",
+  match: "example/project",
   line: 4,
   hint: "Org/repo names are repo-specific; consider a slot.",
 };

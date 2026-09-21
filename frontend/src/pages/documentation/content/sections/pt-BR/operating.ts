@@ -12,20 +12,8 @@ export const PT_BR_OPERATING = {
     Activity: "Atividade",
     ". Overview is deliberately health-first. It summarizes active-runner metrics, configuration warnings, pending approvals, and execution analytics; runner management and teams live in Runners, while the execution feed lives in Activity.":
       ". A Visão geral prioriza deliberadamente a saúde do sistema. Ela resume métricas de runners ativos, alertas de configuração, aprovações pendentes e análises de execução; o gerenciamento de runners e equipes fica em Runners, enquanto o feed de execuções fica em Atividade.",
-    "Runner overview with five headline metrics, pending approvals, and analytics":
-      "Visão geral de runners com cinco métricas principais, aprovações pendentes e análises",
     "Overview is a health summary. Its metric cards link to the tabs that own the detail.":
       "A Visão geral é um resumo de saúde. Seus cartões de métricas levam às abas que contêm os detalhes.",
-    "Runner Console tabs: Overview, Pipeline, Runners, and Activity, with Overview active.":
-      "Abas do Console de runners: Visão geral, Pipeline, Runners e Atividade, com Visão geral ativa.",
-    "An optional configuration-error alert links to Runners; a no-runners hint does the same.":
-      "Um alerta opcional de erro de configuração leva a Runners; a indicação de que não há runners faz o mesmo.",
-    "Five metric cards: Total runners, Success rate, Average duration, Total tokens, and Total cost.":
-      "Cinco cartões de métricas: Total de runners, Taxa de sucesso, Duração média, Total de tokens e Custo total.",
-    "Pending approvals appears below the metrics, followed by the Analytics dashboard.":
-      "As aprovações pendentes aparecem abaixo das métricas, seguidas pelo dashboard de análises.",
-    "Analytics includes outcome metrics, execution totals, 30-day daily activity, and distribution by role or action.":
-      "As análises incluem métricas de resultado, totais de execução, atividade diária de 30 dias e distribuição por função ou ação.",
     "The five headline metrics": "As cinco métricas principais",
     "Total runners": "Total de runners",
     " is the count returned by the active-runner metrics query. Inactive runners are excluded from this Overview request. Clicking the card opens the Runners tab.":
@@ -59,18 +47,8 @@ export const PT_BR_OPERATING = {
   "debugging-a-stuck-card": {
     "Open the card detail sheet before guessing why work stopped. Its Stuck Reasons panel derives operator-facing signals from the current column, participants, recent card executions, latest review decision, skipped prompt stages, and live pipeline configuration. Done cards suppress the panel because they are already terminal.":
       "Abra o painel de detalhes do cartão antes de tentar adivinhar por que o trabalho parou. O painel Motivos do bloqueio deriva sinais para o operador a partir da coluna atual, dos participantes, das execuções recentes do cartão, da decisão de revisão mais recente, das etapas ignoradas por falta de prompt e da configuração vigente do pipeline. Cartões concluídos ocultam o painel porque já são terminais.",
-    "Card detail sheet with current stuck reasons and execution history":
-      "Painel de detalhes do cartão com os motivos atuais do bloqueio e o histórico de execuções",
     "Stuck reasons are evidence to investigate, not a second scheduler.":
       "Os motivos do bloqueio são evidências para investigar, não um segundo scheduler.",
-    "Card detail sheet with a Stuck Reasons section below pull-request context.":
-      "Painel de detalhes do cartão com uma seção Motivos do bloqueio abaixo do contexto do pull request.",
-    "Possible rows include Blocked column, No hero assigned, Awaiting prompt, Changes requested, Recent failures, and Stale card.":
-      "As linhas possíveis incluem Coluna bloqueada, Sem hero atribuído, Aguardando prompt, Alterações solicitadas, Falhas recentes e Cartão obsoleto.",
-    "Stages awaiting prompt appears separately with role, stage, and an Author prompt link.":
-      "As etapas que aguardam prompt aparecem separadamente com função, etapa e um link Criar prompt.",
-    "The card's latest execution history remains visible below the diagnostic sections.":
-      "O histórico de execuções mais recente do cartão permanece visível abaixo das seções de diagnóstico.",
     "The six current reasons": "Os seis motivos atuais",
     "Blocked column.": "Coluna bloqueada.",
     " The current column has": " A coluna atual tem",
@@ -129,22 +107,8 @@ export const PT_BR_OPERATING = {
       "; esse comportamento foi removido, e a entrada obsoleta ",
     " entry is evicted on mount.":
       " é eliminada durante a montagem.",
-    "Observer sheet docked to the right edge showing a live stream of events with namespace chips, a search box, and a buffered counter":
-      "Folha do Observador acoplada à borda direita, mostrando um fluxo de eventos ao vivo com chips de namespace, campo de busca e contador do buffer",
     "The panel is the fastest way to answer 'did the backend actually fire that event' without opening DevTools.":
       "O painel é a maneira mais rápida de responder 'o backend realmente disparou esse evento?' sem abrir o DevTools.",
-    "Right-side sheet roughly 420px wide, docked flush to the viewport edge, with a dark-surface background.":
-      "Folha do lado direito, com cerca de 420 px de largura, acoplada à borda da viewport e com fundo escuro.",
-    "Header reads 'Observer' with a pause button (showing two vertical bars) and a clear button (trash icon).":
-      "O cabeçalho mostra 'Observador', um botão de pausa com duas barras verticais e um botão de limpar com ícone de lixeira.",
-    "Filter chip row with no chip selected by default: 'All', 'Card', 'Runner', 'Execution', 'Approval', and — only after such traffic is seen — 'Other'.":
-      "Linha de chips de filtro sem nenhum selecionado por padrão: 'Todos', 'Cartão', 'Runner', 'Execução', 'Aprovação' e, somente após esse tráfego aparecer, 'Outros'.",
-    "Below the chips, a search input reading 'Search event type or id…' and a muted counter 'Showing 24 of 137 buffered (cap 1000)'.":
-      "Abaixo dos chips, um campo de busca com o texto 'Buscar tipo ou id do evento…' e um contador discreto 'Exibindo 24 de 137 no buffer (limite 1000)'.",
-    "Event list below showing rows in reverse-chronological order: 'card.moved  a1f3c2d4  12s ago', 'execution.started  9b7e1a05  14s ago', 'agent.heartbeat_received  4c2d8f61  16s ago'.":
-      "A lista de eventos abaixo mostra as linhas em ordem cronológica inversa: 'card.moved  a1f3c2d4  há 12 s', 'execution.started  9b7e1a05  há 14 s', 'agent.heartbeat_received  4c2d8f61  há 16 s'.",
-    "Each row carries a namespace badge, raw event type, full mono event_id, and relative timestamp; selecting it expands the JSON payload.":
-      "Cada linha contém um selo de namespace, o tipo raw do evento, o event_id completo em fonte monoespaçada e um horário relativo; selecioná-la expande o payload JSON.",
     "What streams through it": "O que passa pelo painel",
     "The panel subscribes to ": "O painel assina ",
     " and buffers the whole bus — the most recent 1000 events — but, with no chip selected, shows only four agentic namespaces by default:":
@@ -195,18 +159,8 @@ export const PT_BR_OPERATING = {
       " e publicam eventos ao vivo no bus. O Histórico do workspace em",
     " spans the workspace; a board's History tab scopes the same feed to that board. The stored feed is the source to use for audit questions after a live WebSocket event has passed.":
       " abrange todo o workspace; a aba Histórico de um quadro limita o mesmo feed àquele quadro. O feed armazenado é a fonte indicada para perguntas de auditoria depois que um evento WebSocket ao vivo já passou.",
-    "History feed with entity, action, and search controls":
-      "Feed de histórico com controles de entidade, ação e busca",
     "History uses server-side filters and bounded infinite scrolling rather than loading the workspace into the browser.":
       "O Histórico usa filtros do lado do servidor e rolagem infinita limitada, em vez de carregar todo o workspace no navegador.",
-    "Filter controls for Entity type and Action, plus a debounced Search field for activity summaries.":
-      "Controles de filtro para Tipo de entidade e Ação, além de um campo Busca com debounce para os resumos de atividade.",
-    "Reverse-chronological rows grouped by date, with icons, localized messages, actor context, and relative timestamps.":
-      "Linhas em ordem cronológica inversa agrupadas por data, com ícones, mensagens localizadas, contexto do autor e horários relativos.",
-    "Resolvable card and note titles are links; repeated loop or cycle events can be grouped into one expandable row.":
-      "Títulos resolvíveis de cartões e notas são links; eventos repetidos de um loop ou ciclo podem ser agrupados em uma linha expansível.",
-    "The bottom sentinel fetches the next page when more durable history is available.":
-      "O marcador inferior busca a próxima página quando existe mais histórico durável.",
     "Filtering and pagination": "Filtros e paginação",
     "Entity type, action, and search are sent as server-side query parameters. Search is debounced by 300 milliseconds. Each request asks for 50 rows using a ":
       "Tipo de entidade, ação e busca são enviados como parâmetros de consulta do servidor. A busca usa debounce de 300 milissegundos. Cada solicitação pede 50 linhas por meio de um cursor de horário ",

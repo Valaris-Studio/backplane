@@ -530,7 +530,7 @@ _SLOTS = [
         required=True,
         label="Repository clone URL",
         help="The BARE forge clone URL — it is pasted straight into `git clone`, so it must carry no annotation and end in `.git`.",
-        example="https://github.com/Valaris-Studio/valaris-intern.git",
+        example="https://github.com/example/project.git",
     ),
     SlotSpec(
         name="REPO_DIR",
@@ -538,7 +538,7 @@ _SLOTS = [
         required=True,
         label="Clone directory name",
         help="The directory name the clone lands in under the persistent working dir.",
-        example="valaris-intern",
+        example="project",
     ),
     SlotSpec(
         name="DEFAULT_BRANCH",

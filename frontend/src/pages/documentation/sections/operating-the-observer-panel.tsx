@@ -5,7 +5,7 @@
 // docs/platform-source-of-truth.md §4.7.
 
 import { SectionPage } from "../shell/SectionPage";
-import { HonestRemark, ProTip, Screenshot } from "../callouts";
+import { HonestRemark, ProTip } from "../callouts";
 
 export function OperatingTheObserverPanel() {
   return (
@@ -20,19 +20,7 @@ export function OperatingTheObserverPanel() {
         <code>observer.position</code> entry is evicted on mount.
       </p>
 
-      <Screenshot
-        aspectRatio="4:3"
-        alt="Observer sheet docked to the right edge showing a live stream of events with namespace chips, a search box, and a buffered counter"
-        caption="The panel is the fastest way to answer 'did the backend actually fire that event' without opening DevTools."
-        description={[
-          "Right-side sheet roughly 420px wide, docked flush to the viewport edge, with a dark-surface background.",
-          "Header reads 'Observer' with a pause button (showing two vertical bars) and a clear button (trash icon).",
-          "Filter chip row with no chip selected by default: 'All', 'Card', 'Runner', 'Execution', 'Approval', and — only after such traffic is seen — 'Other'.",
-          "Below the chips, a search input reading 'Search event type or id…' and a muted counter 'Showing 24 of 137 buffered (cap 1000)'.",
-          "Event list below showing rows in reverse-chronological order: 'card.moved  a1f3c2d4  12s ago', 'execution.started  9b7e1a05  14s ago', 'agent.heartbeat_received  4c2d8f61  16s ago'.",
-          "Each row carries a namespace badge, raw event type, full mono event_id, and relative timestamp; selecting it expands the JSON payload.",
-        ]}
-      />
+      <p>The panel is the fastest way to answer 'did the backend actually fire that event' without opening DevTools.</p>
 
       <h2 id="what-streams">What streams through it</h2>
       <p>

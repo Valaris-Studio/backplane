@@ -37,6 +37,7 @@ from app.repositories.kanban.board import BoardRepository
 from app.repositories.skills.skill import (
     BoardSkillRepository,
     SkillRepository,
+    SkillAuditEventRepository,
     SkillVersionRepository,
 )
 from app.schemas.approvals.approval import ApprovalCreate
@@ -250,6 +251,16 @@ def build_version_read(version: SkillVersion) -> SkillVersionRead:
         content_hash=version.content_hash,
         created_at=version.created_at,
         lint_warnings=version_lint_warnings(version),
+        created_by_user_id=version.created_by_user_id,
+        created_by_agent_id=version.created_by_agent_id,
+        approval_id=version.approval_id,
+        base_version=version.base_version,
+        reason=version.reason,
+        provenance=version.provenance,
+        source_board_id=version.source_board_id,
+        source_card_id=version.source_card_id,
+        source_execution_id=version.source_execution_id,
+        delegation_id=version.delegation_id,
     )
 
 
@@ -303,6 +314,7 @@ class SkillService:
         self.versions = SkillVersionRepository(db)
         self.bindings = BoardSkillRepository(db)
         self.activity = ActivityService(db)
+        self.audit = SkillAuditEventRepository(db)
 
     # --- workspace registry --------------------------------------------------
 
@@ -328,6 +340,8 @@ class SkillService:
         if existing is not None:
             return existing, False
 
+        if data.base_version is not None:
+            raise ValidationError("A new skill cannot name an existing base version")
         files = [f.model_dump() for f in data.files]
         manifest = validate_manifest(files)
         _warn_prose_outside_toolsets(data.slug, 1, files, manifest.toolsets)
@@ -338,13 +352,18 @@ class SkillService:
             description=manifest.description,
             created_by=user_id,
         )
-        await self.versions.create(
+        version = await self.versions.create(
             skill_id=skill.id,
             version=1,
             files=files,
             status=SkillVersionStatus.draft.value,
             created_by_user_id=user_id,
             content_hash=compute_content_hash(files),
+            reason=data.reason,
+            provenance=await self._actor_snapshot(user_id),
+        )
+        await self._record_event(
+            skill, "authored", user_id, version=version, reason=data.reason
         )
         await self.activity.record(
             workspace_id=workspace_id,
@@ -378,6 +397,7 @@ class SkillService:
                 archived_at=datetime.now(timezone.utc),
                 archived_by=user_id,
             )
+            await self._record_event(skill, "archived", user_id)
             await self.activity.record(
                 workspace_id=workspace_id,
                 actor_id=user_id,
@@ -397,6 +417,7 @@ class SkillService:
         skill = await self._get_skill(workspace_id, slug)
         if skill.archived_at is not None:
             await self.repo.update(skill, archived_at=None, archived_by=None)
+            await self._record_event(skill, "unarchived", user_id)
             await self.activity.record(
                 workspace_id=workspace_id,
                 actor_id=user_id,
@@ -427,8 +448,11 @@ class SkillService:
         slug: str,
         files: list[dict],
         user_id: uuid.UUID,
+        reason: str | None = None,
+        base_version: int | None = None,
     ) -> SkillVersion:
         skill = await self._get_skill(workspace_id, slug)
+        await self._validate_base_version(skill, base_version)
         manifest = validate_manifest(files)
         name, description = manifest.name, manifest.description
         next_version = await self.versions.max_version(skill.id) + 1
@@ -440,7 +464,11 @@ class SkillService:
             status=SkillVersionStatus.draft.value,
             created_by_user_id=user_id,
             content_hash=compute_content_hash(files),
+            base_version=base_version,
+            reason=reason,
+            provenance=await self._actor_snapshot(user_id),
         )
+        await self._record_event(skill, "authored", user_id, version=row, reason=reason)
         # The manifest frontmatter is authoritative for the skill's identity
         # fields, so a new version carries any rename with it.
         await self.repo.update(skill, name=name, description=description)
@@ -459,7 +487,14 @@ class SkillService:
         return row
 
     async def publish_version(
-        self, workspace_id: uuid.UUID, slug: str, version: int, user_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        slug: str,
+        version: int,
+        user_id: uuid.UUID,
+        *,
+        approval_id: uuid.UUID | None = None,
+        reason: str | None = None,
     ) -> SkillVersion:
         skill = await self._get_skill(workspace_id, slug)
         row = await self.versions.get_by_number(skill.id, version)
@@ -472,14 +507,20 @@ class SkillService:
 
         # Warn on publish, never reject: the operator chose this version.
         _warn_prose_outside_toolsets(slug, version, row.files, skill_toolsets(row))
-        row = await self.versions.update(
-            row, status=SkillVersionStatus.published.value
-        )
+        row = await self.versions.update(row, status=SkillVersionStatus.published.value)
         await self.repo.update(
             skill,
-            latest_published_version=max(
-                skill.latest_published_version or 0, version
-            ),
+            latest_published_version=max(skill.latest_published_version or 0, version),
+        )
+        # Refreshing the parent can expire an eagerly loaded version collection.
+        await self.db.refresh(row)
+        await self._record_event(
+            skill,
+            "published",
+            user_id,
+            version=row,
+            reason=reason,
+            details={"approval_id": str(approval_id) if approval_id else None},
         )
         await self.activity.record(
             workspace_id=workspace_id,
@@ -537,14 +578,20 @@ class SkillService:
             if pending is not None:
                 return pending, False
         else:
+            if data.base_version is not None:
+                raise ValidationError(
+                    "A new skill cannot name an existing base version"
+                )
             skill = await self.repo.create(
                 workspace_id=workspace_id,
                 slug=data.slug,
                 name=name,
                 description=description,
                 created_by=user_id,
+                origin=f"proposal:agent:{agent_id}",
             )
 
+        await self._validate_base_version(skill, data.base_version)
         next_version = await self.versions.max_version(skill.id) + 1
         _warn_prose_outside_toolsets(skill.slug, next_version, files, manifest.toolsets)
         row = await self.versions.create(
@@ -553,7 +600,12 @@ class SkillService:
             files=files,
             status=SkillVersionStatus.proposed.value,
             created_by_agent_id=agent_id,
+            created_by_user_id=user_id,
             content_hash=content_hash,
+            base_version=data.base_version,
+            reason=data.reason,
+            provenance=await self._actor_snapshot(user_id),
+            source_board_id=data.board_id,
         )
         # Through the approvals service so risk scoring runs — and the
         # skill_publication base score guarantees it lands pending, never
@@ -575,6 +627,17 @@ class SkillService:
             ),
         )
         await self.versions.update(row, approval_id=approval.id)
+        await self._record_event(
+            skill,
+            "authored",
+            user_id,
+            version=row,
+            reason=data.reason,
+            details={
+                "approval_id": str(approval.id),
+                "source_board_id": str(data.board_id) if data.board_id else None,
+            },
+        )
         return {
             "approval_id": approval.id,
             "skill_slug": skill.slug,
@@ -695,9 +758,7 @@ class SkillService:
         # pin-only PUT cannot silently re-enable a deliberately disabled skill.
         enabled_provided = "enabled" in payload.model_fields_set
         if payload.pinned_version is not None:
-            pinned = await self.versions.get_by_number(
-                skill.id, payload.pinned_version
-            )
+            pinned = await self.versions.get_by_number(skill.id, payload.pinned_version)
             if pinned is None:
                 raise ValidationError(
                     f"Skill {slug} has no version {payload.pinned_version}"
@@ -775,6 +836,7 @@ class SkillService:
                 # audit trail as the explicit endpoint — a skill reappearing
                 # in the listing with no activity row is an audit hole.
                 await self.repo.update(existing, archived_at=None, archived_by=None)
+                await self._record_event(existing, "unarchived", user_id)
                 await self.activity.record(
                     workspace_id=workspace_id,
                     actor_id=user_id,
@@ -801,13 +863,28 @@ class SkillService:
             origin=f"catalog:{catalog_id}@{entry.catalog_version}",
             created_by=user_id,
         )
-        await self.versions.create(
+        version = await self.versions.create(
             skill_id=skill.id,
             version=1,
             files=files,
             status=SkillVersionStatus.published.value,
             created_by_user_id=user_id,
             content_hash=compute_content_hash(files),
+            provenance=await self._actor_snapshot(user_id),
+        )
+        await self._record_event(
+            skill,
+            "authored",
+            user_id,
+            version=version,
+            details={"origin": skill.origin},
+        )
+        await self._record_event(
+            skill,
+            "published",
+            user_id,
+            version=version,
+            details={"origin": skill.origin},
         )
         await self.activity.record(
             workspace_id=workspace_id,
@@ -836,3 +913,99 @@ class SkillService:
         if skill is None:
             raise ResourceNotFoundError("Skill not found")
         return skill
+
+    async def _actor_snapshot(self, user_id: uuid.UUID) -> dict:
+        from app.core.auth import (
+            current_agent_id,
+            current_api_key_id,
+            current_authentication_method,
+        )
+        from app.repositories.agents.agent import AgentRepository
+        from app.repositories.user import UserRepository
+
+        user = await UserRepository(self.db).get_by_id(user_id)
+        agent_id = current_agent_id.get()
+        agent = await AgentRepository(self.db).get_by_id(agent_id) if agent_id else None
+        credential_id = current_api_key_id.get()
+        return {
+            "user_id": str(user_id),
+            "user_name": user.name if user else None,
+            "agent_id": str(agent_id) if agent_id else None,
+            "agent_name": agent.name if agent else None,
+            "credential_id": str(credential_id) if credential_id else None,
+            "authentication_method": current_authentication_method.get(),
+        }
+
+    async def _record_event(
+        self,
+        skill: Skill,
+        event_type: str,
+        user_id: uuid.UUID,
+        *,
+        version: SkillVersion | None = None,
+        reason: str | None = None,
+        details: dict | None = None,
+    ) -> None:
+        await self.audit.create(
+            skill_id=skill.id,
+            version=version.version if version else None,
+            event_type=event_type,
+            actor=await self._actor_snapshot(user_id),
+            reason=reason,
+            details=details,
+        )
+
+    async def reject_version(
+        self,
+        workspace_id: uuid.UUID,
+        slug: str,
+        version: int,
+        user_id: uuid.UUID,
+        *,
+        approval_id: uuid.UUID,
+        reason: str | None = None,
+    ) -> SkillVersion:
+        skill = await self._get_skill(workspace_id, slug)
+        row = await self.get_version(workspace_id, slug, version)
+        if row.status == SkillVersionStatus.rejected.value:
+            return row
+        row = await self.versions.update(row, status=SkillVersionStatus.rejected.value)
+        await self._record_event(
+            skill,
+            "rejected",
+            user_id,
+            version=row,
+            reason=reason,
+            details={"approval_id": str(approval_id)},
+        )
+        return row
+
+    async def _validate_base_version(
+        self, skill: Skill, base_version: int | None
+    ) -> None:
+        if (
+            base_version is not None
+            and await self.versions.get_by_number(skill.id, base_version) is None
+        ):
+            raise ValidationError("Base skill version not found")
+
+    async def record_approval(
+        self,
+        workspace_id: uuid.UUID,
+        slug: str,
+        version: int,
+        user_id: uuid.UUID,
+        *,
+        approval_id: uuid.UUID,
+        reason: str | None = None,
+    ) -> None:
+        skill = await self._get_skill(workspace_id, slug)
+        row = await self.get_version(workspace_id, slug, version)
+        await self._record_event(
+            skill,
+            "approved",
+            user_id,
+            version=row,
+            reason=reason,
+            details={"approval_id": str(approval_id)},
+        )

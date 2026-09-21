@@ -10,7 +10,6 @@ import {
   CodeExample,
   HonestRemark,
   ImportantNote,
-  Screenshot,
   WhatThisIsNot,
 } from "../callouts";
 
@@ -128,18 +127,7 @@ class GitRepo(Base, UUIDMixin, TimestampMixin):
         forge driver at startup.
       </ImportantNote>
 
-      <Screenshot
-        aspectRatio="16:9"
-        alt="Workspace integrations and board repository configuration"
-        caption="Credentials belong to the workspace; repositories bind to a matching provider credential on the board."
-        description={[
-          "Workspace Settings shows connected forge accounts with provider, account, authentication kind, verification state, and a Verify action.",
-          "The Add access token dialog offers GitHub, GitLab, and Gitea; Gitea requires a base URL.",
-          "The board Git dialog lets the operator choose github, gitlab, gitea, bitbucket, or other as repository metadata.",
-          "When matching connections exist, the repository can be bound to one account.",
-          "Repository discovery through a connected account is currently implemented only for GitHub.",
-        ]}
-      />
+      <p>Credentials belong to the workspace; repositories bind to a matching provider credential on the board.</p>
 
       <span id="branch-prefix-and-safety" />
       <h2 id="runner-forge">Runner forge configuration</h2>
