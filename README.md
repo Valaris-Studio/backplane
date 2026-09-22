@@ -312,6 +312,39 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+<details>
+<summary>Upgrading without breaking open browser tabs</summary>
+
+The production Compose stack retains retired frontend assets in the `frontend-assets`
+volume for seven days after replacement. Cleanup runs when the frontend starts;
+current assets are always available. Preserve this volume during upgrades. HTML
+revalidates on reload, while hashed assets remain immutable.
+
+For the first upgrade from a version without this volume, preserve the running
+image before rebuilding. The same procedure also carries history when moving to
+an empty volume:
+
+```bash
+docker tag "$(docker compose -f docker-compose.prod.yml images -q frontend)" backplane-frontend:previous
+PREVIOUS_FRONTEND_IMAGE=backplane-frontend:previous docker compose -f docker-compose.prod.yml build frontend
+docker compose -f docker-compose.prod.yml up -d --no-build frontend
+```
+
+Image-based deployments can supply the same `PREVIOUS_FRONTEND_IMAGE` build argument
+with the previously serving image's digest. They carry seven days of retired assets
+from the replacement build; deploy the built image promptly. Later builds preserve
+existing expiry dates. Serialize frontend deployments so each build uses the
+currently serving predecessor. For a rollback, rebuild the selected source with
+that same predecessor instead of switching traffic directly to an old image.
+
+If a tab outlives the retained assets, or a page encounters another rendering error,
+Backplane shows a recovery screen with a reload action and selectable error details.
+Reload is always user-controlled: save or copy accessible unsaved work first.
+Caught exceptions are logged in the browser console; reporting to your administrator
+is manual. No external error collection service is enabled.
+
+</details>
+
 **2. Create your admin account**
 
 Open **http://localhost:8080** or your `BACKPLANE_URL`.

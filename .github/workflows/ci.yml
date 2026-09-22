@@ -123,12 +123,21 @@ jobs:
         env:
           I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'HEAD^' }}
         run: pnpm vitest run
+      - name: Asset retention tests
+        run: python3 -m unittest discover -s frontend/tests
+      - name: Nginx asset and HTML contract
+        run: python3 frontend/tests/nginx-integration.py
       - name: Check generated product documentation
         working-directory: frontend
         run: pnpm docs:check
       - name: Build (typecheck + bundle)
         working-directory: frontend
         run: pnpm build
+      - name: Install deployment-test browser
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser survives frontend replacement
+        run: bash frontend/scripts/test-deployment.sh
 
   runner:
     name: Runner — go vet + tests
