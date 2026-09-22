@@ -8237,6 +8237,10 @@
     }
   },
   "notifications": {
+    "mentionTarget": {
+      "note": "esta nota",
+      "card": "este cartão"
+    },
     "title": "Notificações",
     "bellAria": "Notificações não lidas: {{count}}",
     "scopeAria": "Escopo das notificações",
@@ -8293,7 +8297,8 @@
       },
       "mention": {
         "title": "{{actor}} mencionou você",
-        "body": "Você foi mencionado em {{card}}."
+        "body": "Você foi mencionado em {{card}}.",
+        "bodyLinked": "Você foi mencionado em <target>{{card}}</target>."
       },
       "card_assigned": {
         "title": "Você foi adicionado a {{card}}",

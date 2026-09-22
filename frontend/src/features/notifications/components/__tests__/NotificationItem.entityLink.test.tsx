@@ -164,7 +164,7 @@ describe("NotificationItem entity links", () => {
       ),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /Jordan|added/i }));
+    await userEvent.click(screen.getByRole("link", { name: "Open" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/acme");
   });
 
@@ -187,5 +187,41 @@ describe("NotificationItem entity links", () => {
       `/acme/boards/${BOARD_ID}?card=deleted-card-id`,
     );
     expect(onNavigate).toHaveBeenCalled();
+  });
+});
+
+describe("mention targets", () => {
+  it.each([
+    ["card", { card: "Release checklist" }, "Release checklist"],
+    ["note", { note: "Release notes" }, "Release notes"],
+    ["note", {}, "this note"],
+    ["card", {}, "this card"],
+  ] as const)("renders a clickable %s target with params %j", async (kind, params, label) => {
+    const { onNavigate, onMarkRead } = renderItem(
+      makeNotification(
+        {
+          kind,
+          workspace_slug: "acme",
+          board_id: BOARD_ID,
+          ...(kind === "card" ? { card_id: CARD_ID } : { note_id: "note-1" }),
+        },
+        {
+          category: "mention",
+          entity_type: kind,
+          params: { actor_name: "Jordan", ...params },
+        },
+      ),
+    );
+    expect(screen.queryByText(/\{\{/)).not.toBeInTheDocument();
+    const target = screen.getByRole("link", { name: label });
+    const route = kind === "card"
+      ? `/acme/boards/${BOARD_ID}?card=${CARD_ID}`
+      : `/acme/boards/${BOARD_ID}/notes?note=note-1`;
+    expect(target).toHaveAttribute("href", route);
+    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute("href", route);
+    await userEvent.click(target);
+    expect(screen.getByTestId("location")).toHaveTextContent(route);
+    expect(onMarkRead).toHaveBeenCalledWith("n1");
+    expect(onNavigate).toHaveBeenCalledOnce();
   });
 });

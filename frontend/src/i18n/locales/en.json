@@ -8194,6 +8194,10 @@
     }
   },
   "notifications": {
+    "mentionTarget": {
+      "note": "this note",
+      "card": "this card"
+    },
     "title": "Notifications",
     "bellAria": "Notifications, {{count}} unread",
     "scopeAria": "Notification scope",
@@ -8250,7 +8254,8 @@
       },
       "mention": {
         "title": "{{actor}} mentioned you",
-        "body": "You were mentioned on {{card}}."
+        "body": "You were mentioned on {{card}}.",
+        "bodyLinked": "You were mentioned on <target>{{card}}</target>."
       },
       "card_assigned": {
         "title": "You were added to {{card}}",

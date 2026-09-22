@@ -45,6 +45,7 @@ async def notify_new_mentions(
     card/note write that called us stays durable."""
     from app.core.auth import current_agent_id
     from app.repositories.kanban.card import CardRepository
+    from app.repositories.notes.note import NoteRepository
     from app.services.notifications.generation import NotificationService
 
     try:
@@ -62,12 +63,20 @@ async def notify_new_mentions(
     # Resolve the deep-link card title ONCE (eager, greenlet-safe) so generation
     # needn't load the card for the mention category. card_id may be None for a
     # workspace/board-scoped note.
-    card_param: dict[str, str] = {}
+    display_params: dict[str, str] = {}
     link = _build_link(entity_type, entity_id, card_id, board_id)
     if card_id is not None:
         card = await CardRepository(db).get_by_id(card_id)
         if card is not None and card.title:
-            card_param["card"] = card.title
+            display_params["card"] = card.title
+    elif entity_type == "note":
+        try:
+            async with db.begin_nested():
+                note = await NoteRepository(db).get_by_id(entity_id)
+                if note is not None and note.title:
+                    display_params["note"] = note.title
+        except Exception:
+            logger.exception("mention note title lookup failed for %s", entity_id)
 
     is_agent_actor = current_agent_id.get() is not None
 
@@ -89,7 +98,7 @@ async def notify_new_mentions(
     # also stops one bad id from unwinding its siblings.
     service = NotificationService(db)
     for mentioned_user_id in new_ids:
-        params = {"mentioned_user_id": str(mentioned_user_id), **card_param}
+        params = {"mentioned_user_id": str(mentioned_user_id), **display_params}
         try:
             async with db.begin_nested():
                 await service.generate_for_event(

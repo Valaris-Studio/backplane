@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { renderWithProviders, screen, act } from "@/test/test-utils";
 import { App } from "@/App";
 import { api } from "@/lib/api";
@@ -14,6 +14,11 @@ vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => true }));
 vi.mock("@/hooks/use-reduced-motion", () => ({ useReducedMotion: () => true }));
 
 describe("App first-run bootstrap", () => {
+  beforeAll(async () => {
+    // Cold module transformation is not part of the bootstrap behavior under test.
+    await import("@/pages/documentation");
+  });
+
   it.each(["/documentation", "/documentation/what-backplane-is"])(
     "keeps public docs available on fresh instances: %s",
     async (path) => {

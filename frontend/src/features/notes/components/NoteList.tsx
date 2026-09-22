@@ -219,7 +219,7 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
   // links land here). With the list paginated, the target is often on a page
   // that was never fetched, so the id goes STRAIGHT to the detail query — list
   // membership is not a precondition for opening it. Mirrors BoardView's ?card=.
-  const deepLinkId = noteParam && noteParam !== selectedNoteId ? noteParam : null;
+  const deepLinkId = noteParam;
   const openNoteId = editorOpen ? selectedNoteId : null;
 
   // The one authoritative source of the body — for the deep link and for a

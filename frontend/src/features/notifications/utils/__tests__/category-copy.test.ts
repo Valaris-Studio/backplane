@@ -3,6 +3,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import i18n from "@/i18n/config";
+import { SUPPORTED_LANGUAGES } from "@/i18n/supported-languages";
 import { isUnread, notificationCopy } from "../category-copy";
 import type { NotificationRead } from "../../api/notifications-api";
 
@@ -122,5 +123,22 @@ describe("isUnread", () => {
     expect(
       isUnread(makeNotification({ read_at: new Date().toISOString() })),
     ).toBe(false);
+  });
+});
+
+describe("mention copy across supported locales", () => {
+  it.each(SUPPORTED_LANGUAGES)("renders old note mentions without placeholders in %s", async (locale) => {
+    await i18n.changeLanguage(locale);
+    const copy = notificationCopy(
+      makeNotification({
+        category: "mention",
+        entity_type: "note",
+        params: { actor_name: "Jordan" },
+        link: { kind: "note", note_id: "n1" },
+      }),
+      i18n.t.bind(i18n),
+    );
+    expect(copy.body).not.toMatch(/\{\{|<target>|notifications\./);
+    expect(copy.body).toContain(i18n.t("notifications.mentionTarget.note"));
   });
 });
