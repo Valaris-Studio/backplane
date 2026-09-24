@@ -1,4 +1,13 @@
 {
+  "pageRecovery": {
+    "title": "Não foi possível carregar esta página",
+    "moduleDescription": "Não foi possível carregar um arquivo necessário. Pode haver uma nova versão disponível ou sua conexão pode ter sido interrompida.",
+    "description": "Um erro inesperado interrompeu esta página. Você pode acessar outra seção ou recarregar a página.",
+    "unsavedWarning": "Recarregar pode descartar alterações não salvas. Salve ou copie o trabalho que ainda consegue acessar antes de recarregar.",
+    "reload": "Recarregar página",
+    "details": "Detalhes do erro",
+    "reportHelp": "Copie estes detalhes e compartilhe com seu administrador ao relatar o problema."
+  },
   "common": {
     "cancel": "Cancelar",
     "create": "Criar",

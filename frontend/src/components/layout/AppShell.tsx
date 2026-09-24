@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { RouteErrorBoundary } from "@/components/shared/PageErrorBoundary";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
@@ -90,9 +91,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
               {/* Boundary inside the chrome: navigating between top-level pages
                   suspends HERE so the sidebar/topbar stay put while the next
                   page's chunk loads. */}
+              <RouteErrorBoundary>
               <Suspense fallback={<RouteFallback />}>
                 {children ?? <Outlet />}
               </Suspense>
+              </RouteErrorBoundary>
             </div>
           </main>
         </div>

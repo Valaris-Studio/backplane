@@ -84,9 +84,13 @@ job_frontend() {
     pnpm audit || exit 1
     pnpm lint || exit 1
     pnpm vitest run || exit 1
+    python3 -m unittest discover -s tests || exit 1
+    python3 tests/nginx-integration.py || exit 1
     pnpm docs:check || exit 1
     # pnpm build is the ONLY typecheck — vitest does not typecheck.
     pnpm build || exit 1
+    pnpm exec playwright install chromium || exit 1
+    bash scripts/test-deployment.sh || exit 1
   )
 }
 

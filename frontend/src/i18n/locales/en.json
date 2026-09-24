@@ -1,4 +1,13 @@
 {
+  "pageRecovery": {
+    "title": "This page could not load",
+    "moduleDescription": "A required file could not be loaded. A new version may be available, or your connection may have been interrupted.",
+    "description": "An unexpected error interrupted this page. You can try another section or reload the page.",
+    "unsavedWarning": "Reloading may discard unsaved changes. Save or copy any work you can still access before reloading.",
+    "reload": "Reload page",
+    "details": "Error details",
+    "reportHelp": "Copy these details and share them with your administrator when reporting the problem."
+  },
   "common": {
     "cancel": "Cancel",
     "create": "Create",

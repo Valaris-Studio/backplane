@@ -1,3 +1,6 @@
+ARG PREVIOUS_FRONTEND_IMAGE=nginx:alpine
+FROM ${PREVIOUS_FRONTEND_IMAGE} AS previous
+
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -14,8 +17,18 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN pnpm build
 
+FROM python:3.12-alpine AS retained
+COPY --from=previous /usr/share/nginx/html /previous
+COPY --from=builder /app/dist /current
+COPY scripts/retain-assets.py /retain-assets.py
+RUN python /retain-assets.py /current /retained --previous /previous
+
 FROM nginx:alpine
+RUN apk add --no-cache python3
+COPY --from=retained /retained /usr/share/nginx/html/.asset-history
+COPY scripts/retain-assets.py /usr/local/bin/retain-assets.py
+COPY scripts/start-frontend.sh /usr/local/bin/start-frontend.sh
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf.template
 EXPOSE 8080
-CMD ["/bin/sh", "-c", "envsubst '${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "/usr/local/bin/start-frontend.sh"]

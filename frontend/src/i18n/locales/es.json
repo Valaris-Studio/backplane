@@ -1,4 +1,13 @@
 {
+  "pageRecovery": {
+    "title": "No se pudo cargar esta página",
+    "moduleDescription": "No se pudo cargar un archivo necesario. Puede haber una versión nueva o se puede haber interrumpido la conexión.",
+    "description": "Un error inesperado interrumpió esta página. Puedes ir a otra sección o recargar la página.",
+    "unsavedWarning": "Al recargar podrías perder los cambios sin guardar. Guarda o copia el trabajo al que aún puedas acceder antes de recargar.",
+    "reload": "Recargar página",
+    "details": "Detalles del error",
+    "reportHelp": "Copia estos detalles y compártelos con tu administrador al informar del problema."
+  },
   "common": {
     "cancel": "Cancelar",
     "create": "Crear",

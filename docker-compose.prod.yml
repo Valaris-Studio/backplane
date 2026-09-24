@@ -118,13 +118,18 @@ services:
 
   frontend:
     image: ${BACKPLANE_FRONTEND_IMAGE:-ghcr.io/valaris-studio/backplane-frontend:latest}
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        PREVIOUS_FRONTEND_IMAGE: ${PREVIOUS_FRONTEND_IMAGE:-nginx:alpine}
     pull_policy: build
     restart: unless-stopped
     ports:
       - "${BACKPLANE_HTTP_PORT:-8080}:8080"
     environment:
       BACKEND_URL: http://backend:8000
+    volumes:
+      - frontend-assets:/var/lib/backplane/frontend
     depends_on:
       # Gating on backend's health (not just container start) is what makes
       # first boot show "nothing until ready" instead of nginx proxying to a
@@ -164,3 +169,4 @@ volumes:
   postgres-data:
   backplane-storage:
   runner-repos:
+  frontend-assets:
