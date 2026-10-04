@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderWithProviders, screen } from "@/test/test-utils";
+import { renderWithProviders, screen, userEvent } from "@/test/test-utils";
 import type { Card, CardParticipant } from "@/types/kanban";
 import type { Note } from "@/types/note";
 import type { Execution } from "@/features/agents/api/agents";
@@ -32,6 +32,11 @@ const useNotesMock = vi.fn();
 vi.mock("@/features/notes/api/use-notes", () => ({
   useNotes: (...args: unknown[]) => useNotesMock(...args),
   useUpdateNote: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+const copyTextToClipboard = vi.fn<(text: string) => Promise<boolean>>();
+vi.mock("@/lib/clipboard", () => ({
+  copyTextToClipboard: (text: string) => copyTextToClipboard(text),
 }));
 
 import { CardDetailSheet } from "../CardDetailSheet";
@@ -185,12 +190,63 @@ describe("CardDetailSheet — agent info subtab", () => {
     expect(screen.getByText("No review decision recorded yet.")).toBeInTheDocument();
   });
 
-  it("renders executions + notes section titles and empty states when both hooks return []", () => {
+  it("renders the execution history title and empty state when the hook returns []", () => {
     renderSheet(makeCard());
     expect(screen.getByText("Execution history")).toBeInTheDocument();
     expect(screen.getByText("No executions recorded for this card yet.")).toBeInTheDocument();
-    expect(screen.getByText("Review & platform notes")).toBeInTheDocument();
-    expect(screen.getByText("No runner-authored notes linked to this card.")).toBeInTheDocument();
+  });
+
+  it("shows the card's branch_name in monospace next to the PR and copies it", async () => {
+    copyTextToClipboard.mockResolvedValue(true);
+    const user = userEvent.setup();
+    renderSheet(makeCard({ branch_name: "feat/login-fix" }));
+
+    const branch = screen.getByText("feat/login-fix");
+    expect(branch.tagName).toBe("CODE");
+    expect(branch.closest('[data-slot="agent-info-subtab"]')).not.toBeNull();
+
+    await user.click(screen.getByLabelText("Copy branch name"));
+    expect(copyTextToClipboard).toHaveBeenCalledWith("feat/login-fix");
+  });
+
+  it("renders no branch row when the card has no branch_name", () => {
+    renderSheet(makeCard({ branch_name: null }));
+    expect(screen.queryByLabelText("Copy branch name")).toBeNull();
+  });
+});
+
+describe("CardDetailSheet — linked notes", () => {
+  const sessionNote: Note = {
+    id: "note-s",
+    workspace_id: "ws-1",
+    board_id: "board-1",
+    card_id: "card-1",
+    title: "Session handoff",
+    content: "<p>Picked up over MCP.</p>",
+    pinned: false,
+    kind: "user_note",
+    failure_class: null,
+    findings: null,
+    source_execution_id: null,
+    created_by: "u1",
+    created_at: "2026-04-02T00:00:00Z",
+    updated_at: "2026-04-02T00:00:00Z",
+  };
+
+  it("lists linked notes in a card-level section, not under Runner activity", () => {
+    useNotesMock.mockReturnValue({ data: [sessionNote] });
+    renderSheet(makeCard());
+
+    expect(screen.getByText("Linked notes")).toBeInTheDocument();
+    const noteLink = screen.getByText("Session handoff");
+    expect(noteLink.closest('[data-slot="agent-info-subtab"]')).toBeNull();
+    expect(screen.queryByText("Review & platform notes")).toBeNull();
+  });
+
+  it("states the empty case without attributing notes to a runner", () => {
+    renderSheet(makeCard());
+    expect(screen.getByText("No notes linked to this card.")).toBeInTheDocument();
+    expect(screen.queryByText(/runner-authored/i)).toBeNull();
   });
 });
 

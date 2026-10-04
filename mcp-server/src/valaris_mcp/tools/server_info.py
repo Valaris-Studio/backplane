@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
 
 import httpx
 from mcp.server.fastmcp import Context
@@ -131,6 +132,7 @@ async def get_server_info(ctx: Context = None) -> str:
         },
         "listing_bytes": listing_bytes,
         "listing_tokens_estimate": round(listing_bytes / _BYTES_PER_TOKEN),
+        "default_board": asdict(app.default_board) if app.default_board is not None else None,
     }
 
     aliases = deprecated_aliases()

@@ -3,7 +3,7 @@
 # valaris_mcp module and the "valaris" MCP namespace are the permanent
 # technical namespace — see docs/branding.md.
 name = "backplane-mcp"
-version = "0.8.0"
+version = "0.8.1"
 description = "MCP server exposing Backplane platform tools for AI agents"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"

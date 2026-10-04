@@ -138,6 +138,69 @@ async def test_create_workspace_collision_409_surfaces_clean_error(mock_client, 
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "name, expected_slug",
+    [
+        ("Café Ñandú", "caf-and"),
+        ("  --Acme__Corp!!  ", "acme-corp"),
+        ("My WS", "my-ws"),
+    ],
+)
+async def test_create_workspace_derived_slug_is_valid_by_construction(
+    mock_client, ctx, name, expected_slug
+):
+    from valaris_mcp.tools.workspaces import create_workspace
+
+    import httpx
+
+    resp = httpx.Response(404, request=httpx.Request("GET", "http://test"))
+    mock_client.get.side_effect = httpx.HTTPStatusError(
+        "Not Found", request=resp.request, response=resp
+    )
+    mock_client.post.return_value = {"slug": expected_slug}
+
+    await create_workspace(name, ctx=ctx)
+
+    mock_client.get.assert_called_once_with(f"/workspaces/{expected_slug}")
+    mock_client.post.assert_called_once_with(
+        "/workspaces", {"name": name, "slug": expected_slug}
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("name", ["日本語", "!!!", "   "])
+async def test_create_workspace_refuses_name_without_derivable_slug_without_calling_api(
+    mock_client, ctx, name
+):
+    from valaris_mcp.tools.workspaces import create_workspace
+
+    result = json.loads(await create_workspace(name, ctx=ctx))
+
+    assert result["error"] is True
+    assert "explicit slug" in result["message"]
+    mock_client.get.assert_not_called()
+    mock_client.post.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_slug",
+    ["evil\nslug", 'quo"te', "has space", "UpperCase", "-lead", "trail-", "a--b", "../x"],
+)
+async def test_create_workspace_rejects_non_conforming_explicit_slug_without_calling_api(
+    mock_client, ctx, invalid_slug
+):
+    from valaris_mcp.tools.workspaces import create_workspace
+
+    result = json.loads(await create_workspace("My WS", slug=invalid_slug, ctx=ctx))
+
+    assert result["error"] is True
+    assert "slug" in result["message"]
+    mock_client.get.assert_not_called()
+    mock_client.post.assert_not_called()
+
+
+@pytest.mark.anyio
 async def test_add_workspace_member(mock_client, ctx):
     from valaris_mcp.tools.workspaces import add_workspace_member
 

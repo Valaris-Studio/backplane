@@ -40,8 +40,9 @@ thing that runs on your machines without the platform's copyleft following it.
 
 ## Release compatibility
 
-The current release pair is **runner 0.8.5** with **platform 0.1.2-preview.2**;
-MCP remains **0.8.0**. Upgrade the backend before upgrading the runner.
+The current release pair is **runner 0.8.5** with **platform 0.1.3-preview.1**;
+the current MCP server is **0.8.1**, and runner 0.8.5's generated configs pin
+0.8.0. Upgrade the backend before upgrading the runner.
 Earlier runner artifacts remain available for reproducibility, but do not
 include the current completion-review recovery and dependency fixes.
 Use the versioned downloads linked from the platform rather than an older tag.

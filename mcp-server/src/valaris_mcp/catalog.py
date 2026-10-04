@@ -23,6 +23,8 @@ from typing import Any, Iterable, Literal
 from mcp.server.fastmcp.utilities.func_metadata import func_metadata
 from mcp.types import ToolAnnotations
 
+from valaris_mcp.config import DefaultBoard
+
 GROUPS: tuple[str, ...] = (
     "Start here",
     "Work management",
@@ -465,6 +467,50 @@ def finalize_tool_surface(server: Any) -> None:
             # fn_metadata.arg_model, not this schema.
             if "default" in prop and prop["default"] is None:
                 del prop["default"]
+
+
+def install_board_defaults(server: Any, default_board: DefaultBoard | None) -> None:
+    """Make required workspace_slug/board_id optional and fill them from `default_board`.
+
+    Only parameters a tool REQUIRES are defaulted: an optional board_id means
+    "workspace scope" (notes, resources, activity), and filling it would
+    silently narrow the call. An explicit non-null argument always wins.
+    `None` leaves every schema and the call path untouched. Call once, at
+    startup.
+    """
+    if default_board is None:
+        return
+    defaults = {"workspace_slug": default_board.workspace_slug}
+    if default_board.board_id is not None:
+        defaults["board_id"] = default_board.board_id
+
+    fills: dict[str, dict[str, str]] = {}
+    for name, tool in server._tool_manager._tools.items():
+        required: list[str] = tool.parameters.get("required", [])
+        filled = {param: value for param, value in defaults.items() if param in required}
+        if not filled:
+            continue
+        fills[name] = filled
+        remaining = [param for param in required if param not in filled]
+        if remaining:
+            tool.parameters["required"] = remaining
+        else:
+            del tool.parameters["required"]
+        for param, value in filled.items():
+            tool.parameters["properties"][param]["default"] = value
+
+    manager = server._tool_manager
+    original = manager.call_tool
+
+    async def with_board_defaults(name, arguments, **kwargs):
+        missing = {
+            param: value
+            for param, value in fills.get(name, {}).items()
+            if arguments.get(param) is None
+        }
+        return await original(name, {**arguments, **missing}, **kwargs)
+
+    manager.call_tool = with_board_defaults
 
 
 def compact_listing_bytes(tools: Iterable[Any]) -> int:

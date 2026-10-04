@@ -127,12 +127,18 @@ jobs:
         run: python3 -m unittest discover -s frontend/tests
       - name: Nginx asset and HTML contract
         run: python3 frontend/tests/nginx-integration.py
+      - name: Mermaid bundle-isolation checker tests
+        working-directory: frontend
+        run: node --test scripts/check-mermaid-chunk.test.mjs
       - name: Check generated product documentation
         working-directory: frontend
         run: pnpm docs:check
       - name: Build (typecheck + bundle)
         working-directory: frontend
         run: pnpm build
+      - name: Mermaid stays out of eagerly loaded chunks
+        working-directory: frontend
+        run: pnpm check:mermaid-chunk
       - name: Install deployment-test browser
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium

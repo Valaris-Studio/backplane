@@ -4,6 +4,34 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-09-30
+
+### Added
+
+- A default board from `VALARIS_DEFAULT_WORKSPACE_SLUG`,
+  `VALARIS_DEFAULT_BOARD_ID` and `VALARIS_DEFAULT_BOARD_NAME` (set by a launcher that
+  starts one server per project folder). Tools that require
+  `workspace_slug`/`board_id` list them as optional with the default and fill
+  a missing or null argument from it; an explicit argument always wins, and an
+  optional `board_id` (workspace-scoped notes, resources, activity) is never
+  filled. The handshake instructions gain a `DEFAULT BOARD` section and
+  `get_server_info` reports `default_board` (null when unset). A workspace
+  alone keeps `board_id` required. A workspace slug outside the platform's
+  shape (lowercase letters, digits, inner hyphens), a board id that is not a
+  UUID, or a board id without a workspace is ignored with one stderr line and
+  the server still starts; the values are rendered as JSON literals, framed as
+  data. With none of them set, the instructions and every tool schema are
+  unchanged.
+
+### Fixed
+
+- `create_workspace` refuses a slug outside the platform's format
+  (`^[a-z0-9]+(-[a-z0-9]+)*$`) before any request, so a malformed slug is
+  never interpolated into the request path. A name with no derivable slug
+  (e.g. only non-ASCII characters) is refused with a request for an explicit
+  slug, instead of falling back to a shared `workspace` slug that could hand
+  back an unrelated existing workspace.
+
 ## [0.8.0] - 2026-09-13
 
 ### Changed
