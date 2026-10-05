@@ -1616,6 +1616,80 @@ async def test_put_loop_template_bind_with_self_merge_rails_auto_relaxes(
     assert test_board.enforce_done_merge_gate is False
 
 
+async def test_put_loop_template_bind_with_relax_false_keeps_the_gate_armed(
+    client: AsyncClient,
+    test_workspace: Workspace,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    """Card 0ea9f8ef: the bind step's decline rides the SAME lever as the raw
+    dialog's. A self_merge template bound with relax_done_merge_gate=false
+    still binds, but the override stays NULL and no relax is announced."""
+    response = await client.put(
+        _loop_url(test_board),
+        json={
+            "template": {
+                "source": "system",
+                "ref": "coding-loop-easy",
+                "slot_values": {"RUN_LABEL": "run-1"},
+            },
+            "relax_done_merge_gate": False,
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["loop_landing"] == "self_merge"
+    assert response.json()["template"]["ref"] == "coding-loop-easy"
+
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is None
+
+    relax_activity = await db_session.scalar(
+        select(Activity).where(
+            Activity.entity_id == test_board.id,
+            Activity.message_key == "activity.board.done_gate_auto_relaxed",
+        )
+    )
+    assert relax_activity is None
+
+
+async def test_put_loop_template_rerender_onto_self_merge_variant_never_relaxes(
+    client: AsyncClient,
+    test_workspace: Workspace,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    """Card 0ea9f8ef review: a RE-render (the bound view's slot save or
+    version update) seeds only derived rails, so switching the LANDING variant
+    to self_merge neither moves the stored landing nor relaxes the gate — no
+    relax can happen there unannounced."""
+    slots = {
+        "RUN_LABEL": "run-1",
+        "REPO_URL": "https://github.com/acme/ops",
+        "DEFAULT_BRANCH": "main",
+        "INTEGRATION_BRANCH": "develop",
+        "LANDING": "B",
+    }
+    template = {"source": "system", "ref": "coding-loop-standard"}
+    first = await client.put(
+        _loop_url(test_board),
+        json={"template": {**template, "slot_values": slots}, "loop_landing": "human"},
+    )
+    assert first.status_code in (200, 201), first.text
+    assert first.json()["loop_landing"] == "human"
+
+    response = await client.put(
+        _loop_url(test_board),
+        json={"template": {**template, "slot_values": {**slots, "LANDING": "A"}}},
+    )
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["loop_landing"] == "human"
+
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is None
+
+
 async def test_put_loop_agent_self_merge_save_never_auto_relaxes(
     agent_client: AsyncClient,
     test_board: Board,

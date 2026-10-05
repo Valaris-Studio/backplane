@@ -202,6 +202,7 @@ export function BoardLoopPanel({ board, open, onOpenChange }: Props) {
             templateRef={picked.ref}
             source={picked.source}
             expectedVersion={config?.version}
+            boardGateOverride={board.enforce_done_merge_gate}
             onBound={() => {
               setPicked(null);
               // Back to the server's answer: the save just made it `bound`.

@@ -16,22 +16,28 @@ import es from "@/i18n/locales/es.json";
  */
 const MISSING_DIACRITIC_FORMS = [
   "accion",
+  "agregalo",
+  "algun",
   "analisis",
   "aplicacion",
   "aprobacion",
+  "aqui",
+  "asi",
   "asignacion",
   "atras",
-  "avanzo",
   "autenticacion",
-  "automatico",
   "automaticamente",
-  "autonomo",
+  "automatico",
   "autonoma",
+  "autonomo",
+  "avanzo",
   "boton",
   "cancelacion",
   "categoria",
   "clasificacion",
   "codigo",
+  "coincidira",
+  "completalo",
   "conexion",
   "configuracion",
   "creacion",
@@ -39,55 +45,87 @@ const MISSING_DIACRITIC_FORMS = [
   "decidio",
   "decision",
   "definicion",
+  "dejalo",
   "descripcion",
   "despues",
+  "dia",
+  "dias",
+  "direccion",
   "documentacion",
   "duracion",
   "edicion",
   "ejecucion",
+  "ejecutara",
   "eliminacion",
+  "estan",
   "estandar",
+  "estara",
+  "exito",
+  "explicitamente",
+  "finalizacion",
   "funcion",
   "historico",
   "informacion",
   "integracion",
   "iteracion",
+  "linea",
   "maxima",
   "maximas",
   "maximo",
   "maximos",
+  "membresias",
   "metodo",
+  "metrica",
+  "metricas",
   "migracion",
   "minimo",
   "navegacion",
+  "ningun",
   "notificacion",
+  "numerico",
+  "numericos",
   "numero",
-  "operacion",
   "opcion",
+  "operacion",
   "pagina",
   "parametro",
   "parametros",
+  "podria",
   "posicion",
+  "proxima",
+  "proximo",
   "publico",
-  "rapido",
   "rapida",
-  "rapidos",
   "rapidas",
+  "rapido",
+  "rapidos",
   "razon",
   "revision",
+  "segun",
   "seleccion",
   "senal",
+  "sera",
   "sesion",
   "sincronizacion",
   "tamano",
   "tambien",
+  "tecnica",
+  "tecnicas",
+  "tecnico",
+  "tecnicos",
+  "telefono",
   "titulo",
-  "ultimo",
+  "todavia",
+  "transicion",
+  "traves",
   "ultima",
-  "ultimos",
   "ultimas",
-  "unico",
+  "ultimo",
+  "ultimos",
   "unica",
+  "unico",
+  "vacia",
+  "vacio",
   "validacion",
   "valido",
   "version",
@@ -147,6 +185,69 @@ describe("es.json orthography", () => {
       .map(([key, value]) => `${key}: ${value}`);
 
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Forms that are correct Spanish in one sense and a missing accent in another
+ * ("aun" = even / "aún" = still, "esta" = this / "está" = is, "mas" = but /
+ * "más" = more, "limite" = may limit / "límite" = limit). A plain denylist
+ * would false-fail the valid sense, so each is flagged only in the frames
+ * where it can only be the accented word.
+ */
+const AMBIGUOUS_FORM_CONTEXTS: Array<[string, RegExp]> = [
+  // "aun así" (even so) is correct unaccented; "aun no/sin" and a trailing
+  // "aun" can only mean "still".
+  ["aun = aún", /(?<![\p{L}_])aun(?:\s+(?:no|sin)(?![\p{L}_])|\s*[.!?]?$)/iu],
+  // A demonstrative needs a noun after it; a preposition, a location or a
+  // participle/adjective after "esta" makes it the verb. The word BEFORE is no
+  // signal: "no esta pantalla" is a demonstrative.
+  [
+    "esta = está",
+    /(?<![\p{L}_])esta\s+(?:en|dentro|vac[ií][oa]|activad[oa]|inactiv[oa]|congelad[oa]|bloquead[oa]|atascad[oa]|conectad[oa]|asignad[oa]|definid[oa]|autorad[oa]|disponible)(?![\p{L}_])/iu,
+  ],
+  // The adversative "mas" (but) is literary and never product copy; these
+  // frames are the comparative.
+  [
+    "mas = más",
+    /(?:(?<![\p{L}_])mas\s+(?:de|tarde|reciente|recientes)(?![\p{L}_])|(?<![\p{L}_])(?:cargar|carga|hay)\s+mas(?![\p{L}_])|(?<![\p{L}_])mas\s*[.!?]?$)/iu,
+  ],
+  // "que limite" / "no limites" are the verb; everywhere else it is the noun.
+  ["limite = límite", /(?<![\p{L}_])(?<!(?:que|no)\s)limites?(?![\p{L}_])/iu],
+  // Subjunctive "esté" after a "que" clause, followed by a state adjective
+  // or participle. The adjectives are listed rather than matched by suffix:
+  // the demonstrative "este" precedes nouns such as "estado" or "activo".
+  [
+    "este = esté",
+    /(?<![\p{L}_])que(?![\p{L}_])[^.!?]*?(?<![\p{L}_])este\s+(?:accesible|disponible|vac[ií][oa]|list[oa]|en|conectad[oa]|habilitad[oa]|deshabilitad[oa]|bloquead[oa]|configurad[oa])(?![\p{L}_])/iu,
+  ],
+];
+
+describe("es.json ambiguous forms in unambiguous frames", () => {
+  const catalog = flatten(es).filter(([key]) => !TECHNICAL_PROSE_KEYS.has(key));
+
+  it.each(AMBIGUOUS_FORM_CONTEXTS)("%s", (_rule, pattern) => {
+    const offenders = catalog
+      .filter(([, value]) => pattern.test(value.replace(TECHNICAL_FRAGMENT, " ")))
+      .map(([key, value]) => `${key}: ${value}`);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still accepts the valid unaccented senses", () => {
+    const validSenses = [
+      "aun así requiere un tick humano",
+      "esta tarjeta está en revisión",
+      "Los nombres los declara el servidor, no esta pantalla.",
+      "Lanza un runner para que limite el gasto",
+      "Verifica que este tablero tenga un repo vinculado.",
+      "Revisa que este estado vacío sea el esperado.",
+    ];
+    for (const sentence of validSenses) {
+      for (const [rule, pattern] of AMBIGUOUS_FORM_CONTEXTS) {
+        expect(pattern.test(sentence), `${rule} on "${sentence}"`).toBe(false);
+      }
+    }
   });
 });
 

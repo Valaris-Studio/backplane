@@ -112,22 +112,25 @@ async def test_rotate_agent_key_returns_the_new_key_once(mock_client, ctx):
 
 
 @pytest.mark.anyio
-async def test_rotate_agent_key_result_never_reaches_execution_tracking(mock_client):
-    """The raw key must not land in a persisted result_summary.
+@pytest.mark.parametrize("tool", ["rotate_agent_key", "create_agent"])
+async def test_raw_api_keys_never_reach_the_invocation_outcome(mock_client, tool):
+    """The invocation record keeps no summary of a result that carries a
+    once-only credential."""
+    from valaris_mcp.tracking import InvocationRecorder
 
-    Tracking opens an execution row only for tools carrying a workspace_slug;
-    rotate_agent_key is workspace-less, so after_tool_call has no active row
-    and never posts the result anywhere.
-    """
-    from valaris_mcp.tracking import ExecutionTracker
+    async def acknowledge(path, body):
+        return {"id": body["id"]}
 
-    tracker = ExecutionTracker(mock_client)
+    mock_client.post.side_effect = acknowledge
+    recorder = InvocationRecorder(mock_client, server_instance_id="test")
+    async with recorder.running():
+        call = recorder.begin(tool, {"agent_id": "a1"})
+        recorder.finish(call, '{"raw_api_key": "vk_new_secret_value"}')
+        await recorder.flush()
 
-    await tracker.before_tool_call("rotate_agent_key", {"agent_id": "a1"})
-    await tracker.after_tool_call("rotate_agent_key", '{"raw_api_key": "vk_new_secret_value"}')
-
-    posted = [str(call) for call in mock_client.post.call_args_list]
-    assert not any("vk_new_secret_value" in call for call in posted)
+    [posted] = mock_client.post.call_args_list
+    assert "vk_new_secret_value" not in str(posted)
+    assert posted.args[1]["result_summary"] is None
 
 
 @pytest.mark.anyio

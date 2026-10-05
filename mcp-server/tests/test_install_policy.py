@@ -37,12 +37,14 @@ CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PUBLISH_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publish-mcp-server.yml"
 CLOUDBUILD = REPO_ROOT / "cloudbuild.yaml"  # export-gated
 MAKEFILE = REPO_ROOT / "Makefile"
+VERIFY_ALL = REPO_ROOT / "scripts" / "verify-all.sh"
 
-# Lowest version that closes every advisory pip-audit reported on the HEAD lock.
+# Lowest version that closes every known advisory, except the pins waived in
+# WAIVED_BELOW_FLOOR.
 ADVISORY_FIX_FLOORS: dict[str, str] = {
     "mcp": "1.28.1",
     "click": "8.3.3",
-    "cryptography": "46.0.7",
+    "cryptography": "50.0.0",
     "idna": "3.15",
     "pyasn1": "0.6.4",
     "pydantic-settings": "2.14.2",
@@ -54,6 +56,13 @@ ADVISORY_FIX_FLOORS: dict[str, str] = {
     "starlette": "1.0.1",
     "urllib3": "2.7.0",
 }
+
+# Intel macOS only: cryptography 49+ ships no x86_64 wheel, so that fork of the
+# lock stays on 48.0.1. Its advisories (x509 path validation, PKCS#7 decryption;
+# no dependent calls either) are waived by exact id in the darwin-x86_64 audit
+# leg, and any other advisory there still fails it.
+WAIVED_BELOW_FLOOR: dict[str, str] = {"cryptography": "48.0.1"}
+INTEL_MAC_WAIVED_ADVISORIES = {"PYSEC-2026-3552", "PYSEC-2026-3553", "PYSEC-2026-3554"}
 
 # `uv sync --frozen` and `--locked` both refuse to re-resolve; either is acceptable.
 # The flag ORDER is pinned on purpose: one spelling across every surface keeps
@@ -72,9 +81,12 @@ def _parse_version(raw: str):
         return tuple(int(part) for part in re.findall(r"\d+", raw))
 
 
-def _locked_versions() -> dict[str, str]:
-    lock = tomllib.loads(UV_LOCK.read_text(encoding="utf-8"))
-    return {pkg["name"]: pkg["version"] for pkg in lock["package"]}
+def _locked_versions() -> dict[str, list[str]]:
+    # A forked lock pins one version per platform split, so a name can repeat.
+    locked: dict[str, list[str]] = {}
+    for pkg in tomllib.loads(UV_LOCK.read_text(encoding="utf-8"))["package"]:
+        locked.setdefault(pkg["name"], []).append(pkg["version"])
+    return locked
 
 
 def _block(text: str, header: str, next_header_pattern: str) -> str:
@@ -113,16 +125,99 @@ def test_lock_resolves_package_at_or_above_advisory_fix_floor(package: str) -> N
     if package not in locked:
         pytest.skip(f"{package} is not in uv.lock; nothing to audit")
     floor = ADVISORY_FIX_FLOORS[package]
-    assert _parse_version(locked[package]) >= _parse_version(floor), (
-        f"uv.lock pins {package}=={locked[package]}, advisories fixed in {floor}"
-    )
+    below = [v for v in locked[package] if _parse_version(v) < _parse_version(floor) and v != WAIVED_BELOW_FLOOR.get(package)]
+    assert below == [], f"uv.lock pins {package}=={below}, advisories fixed in {floor}"
+
+
+def test_waived_pins_are_still_locked() -> None:
+    # A waiver outliving its pin would silently cover a future regression.
+    locked = _locked_versions()
+    for package, version in WAIVED_BELOW_FLOOR.items():
+        assert version in locked.get(package, []), f"{package}=={version} is waived but no longer locked; drop the waiver"
 
 
 def test_lock_resolves_mcp_below_2() -> None:
     locked = _locked_versions()
-    assert _parse_version(locked["mcp"]) < _parse_version("2"), (
+    assert _parse_version(max(locked["mcp"], key=_parse_version)) < _parse_version("2"), (
         "mcp 2.0 removed mcp.server.fastmcp; the lock must stay on 1.x"
     )
+
+
+# `pip install backplane-mcp` must be served by wheels alone on every supported
+# host: a compiled dependency falling back to its sdist (cryptography needs Rust)
+# is a failed install. Values: marker environment, accepted wheel platform suffixes.
+SUPPORTED_HOSTS: dict[str, tuple[dict[str, str], tuple[str, ...]]] = {
+    "macos-arm64": ({"sys_platform": "darwin", "platform_system": "Darwin", "platform_machine": "arm64", "os_name": "posix"},
+                    ("macosx_*_arm64", "macosx_*_universal2")),
+    # Intel Macs: cryptography stopped shipping x86_64/universal2 wheels at 49.0.0.
+    "macos-x86_64": ({"sys_platform": "darwin", "platform_system": "Darwin", "platform_machine": "x86_64", "os_name": "posix"},
+                     ("macosx_*_x86_64", "macosx_*_universal2", "macosx_*_intel")),
+    "linux-x86_64": ({"sys_platform": "linux", "platform_system": "Linux", "platform_machine": "x86_64", "os_name": "posix"},
+                     ("manylinux*_x86_64",)),
+    "linux-aarch64": ({"sys_platform": "linux", "platform_system": "Linux", "platform_machine": "aarch64", "os_name": "posix"},
+                      ("manylinux*_aarch64",)),
+    "windows-amd64": ({"sys_platform": "win32", "platform_system": "Windows", "platform_machine": "AMD64", "os_name": "nt"},
+                      ("win_amd64",)),
+}
+SUPPORTED_PYTHONS = ("3.12", "3.13")
+
+
+def _runtime_packages(lock: dict, environment: dict[str, str]) -> list[dict]:
+    """Every locked package a plain (no extras) install of backplane-mcp pulls on `environment`."""
+    from packaging.markers import Marker
+
+    packages = {(pkg["name"], pkg["version"]): pkg for pkg in lock["package"]}
+    by_name: dict[str, list[dict]] = {}
+    for pkg in lock["package"]:
+        by_name.setdefault(pkg["name"], []).append(pkg)
+    root = next(pkg for pkg in lock["package"] if pkg.get("source", {}).get("editable") == ".")
+    reached: dict[tuple[str, str], dict] = {}
+    pending = [(root, [])]
+    while pending:
+        pkg, extras = pending.pop()
+        dependencies = list(pkg.get("dependencies", []))
+        for extra in extras:
+            dependencies += pkg.get("optional-dependencies", {}).get(extra, [])
+        for dependency in dependencies:
+            if "marker" in dependency and not Marker(dependency["marker"]).evaluate({**environment, "extra": ""}):
+                continue
+            target = packages[(dependency["name"], dependency["version"])] if "version" in dependency else by_name[dependency["name"]][0]
+            key = (target["name"], target["version"])
+            if key not in reached or dependency.get("extra"):
+                reached[key] = target
+                pending.append((target, dependency.get("extra", [])))
+    return list(reached.values())
+
+
+def _serves(wheel_url: str, python: str, platforms: tuple[str, ...]) -> bool:
+    from fnmatch import fnmatch
+
+    from packaging.utils import parse_wheel_filename
+
+    digits = python.replace(".", "")
+    for tag in parse_wheel_filename(wheel_url.rsplit("/", 1)[1])[3]:
+        platform_ok = tag.platform == "any" or any(fnmatch(tag.platform, pattern) for pattern in platforms)
+        exact_ok = tag.interpreter in ("py3", "py" + digits, "cp" + digits) and tag.abi in ("none", "abi3", "cp" + digits)
+        # abi3 wheels built for an older CPython serve every later one.
+        stable_abi_ok = tag.abi == "abi3" and tag.interpreter.startswith("cp3") and int(tag.interpreter[2:]) <= int(digits)
+        if platform_ok and (exact_ok or stable_abi_ok):
+            return True
+    return False
+
+
+@pytest.mark.parametrize("python", SUPPORTED_PYTHONS)
+@pytest.mark.parametrize("host", sorted(SUPPORTED_HOSTS))
+def test_lock_installs_from_wheels_alone_on_every_supported_host(host: str, python: str) -> None:
+    environment, platforms = SUPPORTED_HOSTS[host]
+    environment = {**environment, "python_version": python, "python_full_version": python + ".0",
+                   "implementation_name": "cpython", "platform_python_implementation": "CPython",
+                   "platform_release": "", "platform_version": "", "implementation_version": python + ".0"}
+    lock = tomllib.loads(UV_LOCK.read_text(encoding="utf-8"))
+    source_builds = [
+        f"{pkg['name']}=={pkg['version']}" for pkg in _runtime_packages(lock, environment)
+        if pkg.get("wheels") and not any(_serves(wheel["url"], python, platforms) for wheel in pkg["wheels"])
+    ]
+    assert source_builds == [], f"no {host} / CPython {python} wheel locked for: {source_builds}"
 
 
 # --- 2. lock consistency -----------------------------------------------------
@@ -161,13 +256,38 @@ def _assert_audits_frozen_export(block: str, label: str) -> None:
     assert "pip-audit --strict --no-deps -r" in block, f"{label} must run pip-audit strictly on the export"
 
 
+def _assert_audits_intel_mac_resolution(block: str, label: str) -> None:
+    # Every gate host is Linux or arm64 and pip-audit evaluates markers for the
+    # host, so the darwin-x86_64 fork is only audited if it is resolved for it.
+    compile_line = next((line for line in block.splitlines() if "uv pip compile" in line), "")
+    assert "--python-platform x86_64-apple-darwin" in compile_line and " -c " in compile_line, (
+        f"{label} must resolve the darwin-x86_64 fork, constrained to the frozen export"
+    )
+    audits = [line for line in block.splitlines() if "pip-audit --strict --no-deps -r" in line]
+    assert len(audits) == 2, f"{label} must audit both the host export and the darwin-x86_64 resolution"
+    waived = [set(re.findall(r"--ignore-vuln (\S+)", line)) for line in audits]
+    assert waived == [set(), INTEL_MAC_WAIVED_ADVISORIES], (
+        f"{label}: only the darwin-x86_64 audit may waive, and exactly {sorted(INTEL_MAC_WAIVED_ADVISORIES)}"
+    )
+
+
 def test_github_ci_mcp_job_audits_frozen_export() -> None:
-    _assert_audits_frozen_export(_workflow_job_block(CI_WORKFLOW, "mcp-server"), "ci.yml mcp-server job")
+    block = _workflow_job_block(CI_WORKFLOW, "mcp-server")
+    _assert_audits_frozen_export(block, "ci.yml mcp-server job")
+    _assert_audits_intel_mac_resolution(block, "ci.yml mcp-server job")
 
 
 def test_publish_workflow_test_job_audits_frozen_export() -> None:
     # The release gate must not publish a lock resolution CI would have flagged.
-    _assert_audits_frozen_export(_workflow_job_block(PUBLISH_WORKFLOW, "test"), "publish test job")
+    block = _workflow_job_block(PUBLISH_WORKFLOW, "test")
+    _assert_audits_frozen_export(block, "publish test job")
+    _assert_audits_intel_mac_resolution(block, "publish test job")
+
+
+def test_verify_all_mcp_job_audits_frozen_export() -> None:
+    block = _block(VERIFY_ALL.read_text(encoding="utf-8"), "\njob_mcp() {\n", r"^}")
+    _assert_audits_frozen_export(block, "verify-all.sh job_mcp")
+    _assert_audits_intel_mac_resolution(block, "verify-all.sh job_mcp")
 
 
 def test_publish_workflow_test_job_installs_from_lock() -> None:

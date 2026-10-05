@@ -170,7 +170,10 @@ function handlers(overrides: Parameters<typeof server.use> = []) {
   ];
 }
 
-function renderBind(onBound = vi.fn()) {
+function renderBind(
+  onBound = vi.fn(),
+  boardGateOverride: boolean | null = null,
+) {
   renderWithProviders(
     <Routes>
       <Route
@@ -182,6 +185,7 @@ function renderBind(onBound = vi.fn()) {
             templateRef={REF}
             source="system"
             expectedVersion={4}
+            boardGateOverride={boardGateOverride}
             onBound={onBound}
             onCancel={() => {}}
           />
@@ -768,5 +772,208 @@ describe("TemplateBindStep — proposed published fit", () => {
     await userEvent.type(screen.getByLabelText(/Objective/), " changed");
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.getByTestId("bind-save")).toBeDisabled();
+  });
+});
+
+// Card 0ea9f8ef — binding a self_merge template relaxes the board's done gate
+// server-side (the landing arrives in the bind's rails). The bind step must
+// say so before Apply and carry a decline as relax_done_merge_gate: false,
+// exactly the lever BoardLoopDialog already uses.
+describe("TemplateBindStep — done-gate relax notice", () => {
+  const CONFIG_URL = `/api/workspaces/${SLUG}/config`;
+  const GIT_REPOS_URL = `/api/workspaces/${SLUG}/boards/${BOARD_UUID}/git-repos`;
+  const POLICY_URL = `/api/workspaces/${SLUG}/boards/${BOARD_UUID}/completion/policy`;
+  const SELF_MERGE_DETAIL = {
+    ...TEMPLATE_DETAIL,
+    content: {
+      ...TEMPLATE_DETAIL.content,
+      rails_defaults: { ...TEMPLATE_DETAIL.content.rails_defaults, loop_landing: "self_merge" },
+    },
+  };
+  const NO_POLICY = {
+    override: null,
+    workspace_policy: null,
+    effective_policy: null,
+    origin: "legacy",
+    policy_hash: null,
+    capabilities: {},
+    incompatibilities: [],
+  };
+
+  function gateHandlers({
+    detail = SELF_MERGE_DETAIL as typeof TEMPLATE_DETAIL,
+    workspaceGate = true,
+    repos = [{ id: "repo-1", slug: "ops-repo" }],
+    policy = NO_POLICY as Record<string, unknown>,
+  } = {}) {
+    const puts: Record<string, unknown>[] = [];
+    server.use(...handlers());
+    server.use(
+      http.get(DETAIL_URL, () => HttpResponse.json(detail)),
+      http.get(CONFIG_URL, () =>
+        HttpResponse.json({ enforce_done_merge_gate: workspaceGate, version: 1 }),
+      ),
+      http.get(GIT_REPOS_URL, () => HttpResponse.json(repos)),
+      http.get(POLICY_URL, () => HttpResponse.json(policy)),
+      http.put(LOOP_URL, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        puts.push(body);
+        return HttpResponse.json({ ...body, version: 5 });
+      }),
+    );
+    return puts;
+  }
+
+  async function applyTemplate() {
+    await userEvent.type(await screen.findByLabelText(/Objective/), "Ship it");
+    await waitFor(() => expect(screen.getByTestId("bind-save")).toBeEnabled());
+    await userEvent.click(screen.getByTestId("bind-save"));
+  }
+
+  it("states before Apply that binding turns the board's done gate off", async () => {
+    gateHandlers();
+    renderBind();
+
+    const offer = await screen.findByTestId("board-loop-relax-gate-offer");
+    expect(offer).toHaveAttribute("role", "status");
+    expect(offer).toHaveTextContent(/applying this template turns the done gate off/i);
+    expect(offer).toHaveTextContent(/without a merged PR/i);
+    expect(
+      screen.getByRole("button", { name: "Keep the gate on" }),
+    ).toBeEnabled();
+  });
+
+  it("accepting is the default: Apply relaxes as before, with no decline on the wire", async () => {
+    const puts = gateHandlers();
+    renderBind();
+
+    await screen.findByTestId("board-loop-relax-gate-offer");
+    await applyTemplate();
+
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.loop_landing).toBe("self_merge");
+    expect(puts[0]).not.toHaveProperty("relax_done_merge_gate");
+  });
+
+  it("a decline keeps the gate on: Apply sends relax_done_merge_gate=false", async () => {
+    const puts = gateHandlers();
+    renderBind();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Keep the gate on" }),
+    );
+    expect(screen.getByTestId("board-loop-relax-gate-declined")).toBeVisible();
+    await applyTemplate();
+
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.relax_done_merge_gate).toBe(false);
+  });
+
+  it("re-accepting after a decline drops the decline from the wire", async () => {
+    const puts = gateHandlers();
+    renderBind();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Keep the gate on" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Turn the gate off when applying" }),
+    );
+    await applyTemplate();
+
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).not.toHaveProperty("relax_done_merge_gate");
+  });
+
+  it("is keyboard-operable and hands focus to the button that undoes the choice", async () => {
+    gateHandlers();
+    renderBind();
+
+    const keep = await screen.findByRole("button", { name: "Keep the gate on" });
+    keep.focus();
+    await userEvent.keyboard("{Enter}");
+
+    const accept = await screen.findByRole("button", {
+      name: "Turn the gate off when applying",
+    });
+    expect(accept).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(
+      await screen.findByRole("button", { name: "Keep the gate on" }),
+    ).toHaveFocus();
+  });
+
+  it("states the conflict instead of offering a relax on an explicitly enforced board", async () => {
+    const puts = gateHandlers();
+    renderBind(vi.fn(), true);
+
+    expect(
+      await screen.findByTestId("board-loop-enforced-gate-warning"),
+    ).toHaveTextContent(/explicitly enforced/i);
+    expect(screen.queryByTestId("board-loop-relax-gate-offer")).toBeNull();
+    await applyTemplate();
+    await waitFor(() => expect(puts).toHaveLength(1));
+  });
+
+  it("stays silent when a completion policy governs the board", async () => {
+    let policyServed = false;
+    gateHandlers();
+    server.use(
+      http.get(POLICY_URL, () => {
+        policyServed = true;
+        return HttpResponse.json({
+          ...NO_POLICY,
+          effective_policy: { version: 1, landing_actor: "human" },
+          origin: "board",
+        });
+      }),
+    );
+    renderBind();
+
+    await screen.findByLabelText(/Objective/);
+    await waitFor(() => expect(policyServed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(screen.queryByTestId("board-loop-relax-gate-offer")).toBeNull();
+  });
+
+  it("stays silent on a board with no linked repo — the gate cannot bite there", async () => {
+    let reposServed = false;
+    gateHandlers();
+    server.use(
+      http.get(GIT_REPOS_URL, () => {
+        reposServed = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    renderBind();
+
+    await screen.findByLabelText(/Objective/);
+    await waitFor(() => expect(reposServed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(screen.queryByTestId("board-loop-relax-gate-offer")).toBeNull();
+  });
+
+  it("never relaxes unannounced: a self_merge Apply with no notice on screen sends the decline", async () => {
+    // The server's implicit stamp is only consent where the notice was shown;
+    // if the gate inputs could not be read, the notice never rendered, so the
+    // bind must not let the server relax on the operator's behalf.
+    const puts = gateHandlers();
+    server.use(http.get(CONFIG_URL, () => new HttpResponse(null, { status: 503 })));
+    renderBind();
+
+    await applyTemplate();
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(screen.queryByTestId("board-loop-relax-gate-offer")).toBeNull();
+    expect(puts[0]!.relax_done_merge_gate).toBe(false);
+  });
+
+  it("stays silent for a template that does not self-merge", async () => {
+    const puts = gateHandlers({ detail: TEMPLATE_DETAIL });
+    renderBind();
+
+    await applyTemplate();
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(screen.queryByTestId("board-loop-relax-gate-offer")).toBeNull();
+    expect(puts[0]).not.toHaveProperty("relax_done_merge_gate");
   });
 });

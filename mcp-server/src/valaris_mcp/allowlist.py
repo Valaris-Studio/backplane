@@ -134,7 +134,7 @@ def install_hand(server: Any, hand: HandState) -> None:
     `enable_toolsets` widen shows on the very next list/call. Mirrors
     `install_tracking`'s monkey-patch shape — FastMCP exposes no public middleware
     in the version pinned here. Install order is set in `server.py`: hand first
-    (inner), tracking second (outer), so the tracker records denials for
+    (inner), tracking second (outer), so the recorder records denials for
     forensics. The registry itself (`_tools`) is untouched so get_server_info can
     still report the full surface.
     """

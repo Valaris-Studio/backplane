@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import contextlib
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from valaris_mcp.server import AppContext
+from valaris_mcp.tracking import InvocationRecorder
 
 try:
     from valaris_mcp.hand import HandState
@@ -28,14 +31,24 @@ class MockContext:
 
 
 def make_ctx(client_mock: AsyncMock, hand: HandState | None = None) -> MockContext:
-    tracker_mock = AsyncMock()
+    recorder_mock = MagicMock(spec=InvocationRecorder)
+    recorder_mock.health.return_value = {
+        "recorded": 0,
+        "unconfirmed": 0,
+        "queued": 0,
+        "last_error": None,
+        "circuit_open": False,
+        "durable_retry": False,
+    }
+    recorder_mock.begin.return_value = SimpleNamespace(id="test-invocation")
+    recorder_mock.running.side_effect = lambda *args, **kwargs: contextlib.nullcontext()
     # Unrestricted by default: no toolset layer, no allowlist.
     if HandState is None:
-        app = AppContext(client=client_mock, tracker=tracker_mock)
+        app = AppContext(client=client_mock, recorder=recorder_mock)
     else:
         app = AppContext(
             client=client_mock,
-            tracker=tracker_mock,
+            recorder=recorder_mock,
             hand=hand if hand is not None else HandState(None, None, None),
         )
     ctx = MockContext(request_context=MagicMock())

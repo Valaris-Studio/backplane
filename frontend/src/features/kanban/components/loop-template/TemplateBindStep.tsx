@@ -20,6 +20,11 @@ import {
 } from "@/features/loop-templates/api/loop-templates";
 import { useLoopTemplateDetail } from "@/features/loop-templates/hooks/useLoopTemplateDetail";
 import { useSaveBoardLoop } from "@/features/kanban/api/use-board-loop";
+import { useCompletionPolicy } from "@/features/kanban/api/use-completion";
+import { useWorkspaceConfig } from "@/features/agents/hooks/useWorkspaceConfig";
+import { useGitRepos } from "@/features/git/api/use-git-repos";
+import { resolveDoneGate } from "@/features/kanban/utils/done-gate";
+import { LoopDoneGateRelaxOffer } from "../LoopDoneGateRelaxOffer";
 import {
   initialSlotValues,
   missingRequired,
@@ -36,6 +41,8 @@ interface Props {
   templateRef: string;
   source: "system" | "workspace";
   expectedVersion?: number;
+  /** The board's `enforce_done_merge_gate` override (null = inherit). */
+  boardGateOverride?: boolean | null;
   onBound: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -71,6 +78,7 @@ export function TemplateBindStep({
   templateRef,
   source,
   expectedVersion,
+  boardGateOverride,
   onBound,
   onCancel,
   onDirtyChange,
@@ -170,6 +178,26 @@ export function TemplateBindStep({
 
   const saveLoop = useSaveBoardLoop(slug, boardUuid);
 
+  // Binding a self_merge template relaxes the done gate server-side under the
+  // same conditions BoardLoopDialog announces: no completion policy, gate
+  // resolves ON, a repo linked. Unknown inputs hide the notice.
+  const { data: workspaceConfig } = useWorkspaceConfig(slug);
+  const { data: boardRepos } = useGitRepos(slug, boardUuid);
+  const policyQuery = useCompletionPolicy(slug, boardUuid);
+  const [relaxGateDeclined, setRelaxGateDeclined] = useState(false);
+  const landsSelfMerge = proposal.loop_config.loop_landing === "self_merge";
+  const doneGateArmed =
+    resolveDoneGate(boardGateOverride, workspaceConfig?.enforce_done_merge_gate) &&
+    (boardRepos?.length ?? 0) > 0;
+  const policyKnownAbsent =
+    policyQuery.isSuccess && policyQuery.data.effective_policy == null;
+  const gateNoticeApplies = landsSelfMerge && doneGateArmed && policyKnownAbsent;
+  const showEnforcedConflict = gateNoticeApplies && boardGateOverride === true;
+  const showRelaxOffer = gateNoticeApplies && boardGateOverride !== true;
+  // Only a relax the operator SAW and left accepted may happen; anything else
+  // (declined, or a notice that never rendered) is sent as the decline.
+  const relaxAccepted = showRelaxOffer && !relaxGateDeclined;
+
   const handleSave = () => {
     setSaveError(null);
     const missing = missingRequired(slots, values);
@@ -197,6 +225,9 @@ export function TemplateBindStep({
           slot_values: slotValues,
         },
         ...resolveRails(content, slots, values),
+        ...(landsSelfMerge && !relaxAccepted
+          ? { relax_done_merge_gate: false }
+          : {}),
         ...(expectedVersion !== undefined
           ? { expected_version: expectedVersion }
           : {}),
@@ -331,6 +362,24 @@ export function TemplateBindStep({
       {proposalBlocked && <p role="status" className="text-sm text-destructive">{t("completionPolicy.fitBlocked")}</p>}
       {(proposedFit.data?.preview.findings ?? []).map((finding, index) => <p className="text-sm text-destructive" key={`${finding.code}-${index}`}>{finding.message}</p>)}
       {proposedChecks.some((check) => check.status === "warn") && <p className="text-sm text-muted-foreground">{t("completionPolicy.fitWarnings")}</p>}
+      {showEnforcedConflict ? (
+        <div
+          data-testid="board-loop-enforced-gate-warning"
+          role="status"
+          className="rounded-md border border-amber-300/60 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <p>{t("boardLoop.templates.bind.relaxGate.enforcedConflict")}</p>
+        </div>
+      ) : null}
+      {showRelaxOffer ? (
+        <LoopDoneGateRelaxOffer
+          declined={relaxGateDeclined}
+          onDeclinedChange={setRelaxGateDeclined}
+          disabled={saveLoop.isPending}
+          notice={t("boardLoop.templates.bind.relaxGate.notice")}
+          acceptLabel={t("boardLoop.templates.bind.relaxGate.accept")}
+        />
+      ) : null}
       {saveError ? <FieldError messages={saveError} /> : null}
 
       <div className="flex justify-end gap-2 border-t pt-3">

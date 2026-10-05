@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -59,8 +61,11 @@ def test_claim_card_is_a_deprecated_alias():
 
 
 def test_removal_version_is_the_next_minor():
-    major, minor, patch = DEPRECATION_REMOVAL_VERSION.split(".")
-    assert (major, minor, patch) == ("0", "9", "0")
+    # Aliases live until the minor after the package's own version: a release
+    # that reaches the removal version must delete them or postpone it.
+    released = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
+    major, minor, _patch = map(int, released["project"]["version"].split("."))
+    assert DEPRECATION_REMOVAL_VERSION == f"{major}.{minor + 1}.0"
 
 
 # ---------- registration marker ----------

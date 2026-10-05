@@ -29,8 +29,8 @@ def server(monkeypatch, mock_client, ctx):
     monkeypatch.setattr(server_module, "ValarisClient", lambda: mock_client)
     monkeypatch.setattr(
         server_module,
-        "ExecutionTracker",
-        lambda _client: ctx.request_context.lifespan_context.tracker,
+        "InvocationRecorder",
+        lambda _client, **_: ctx.request_context.lifespan_context.recorder,
     )
     monkeypatch.delenv("VALARIS_MCP_ALLOWLIST", raising=False)
     monkeypatch.setenv("VALARIS_MCP_TOOLSETS", "all")
@@ -164,15 +164,15 @@ async def test_existing_protocol_failure_preserves_content_and_structured_conten
     assert result.isError is True
     assert result.content[0].text == "Permission denied"
     assert result.structuredContent == {"reason": "forbidden"}
-    observed = ctx.request_context.lifespan_context.tracker.after_tool_call.call_args.args[1]
+    observed = ctx.request_context.lifespan_context.recorder.finish.call_args.args[1]
     assert observed.isError is True
 
 
 @pytest.mark.anyio
-async def test_converted_error_retains_structured_receipt_and_tracker_signal(server, ctx):
+async def test_converted_error_retains_structured_receipt_and_recorder_signal(server, ctx):
     payload = json.dumps({"error": True, "message": "Rejected"})
     result = await call(server, "receipt", {"payload": payload})
     assert result.content[0].text == payload
     assert result.structuredContent == {"result": payload}
-    observed = ctx.request_context.lifespan_context.tracker.after_tool_call.call_args.args[1]
+    observed = ctx.request_context.lifespan_context.recorder.finish.call_args.args[1]
     assert observed.isError is True

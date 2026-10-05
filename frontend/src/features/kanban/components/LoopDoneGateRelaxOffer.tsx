@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +10,9 @@ interface Props {
   declined: boolean;
   onDeclinedChange: (declined: boolean) => void;
   disabled?: boolean;
+  /** Surface-specific copy; defaults to the loop dialog's "saving" wording. */
+  notice?: string;
+  acceptLabel?: string;
 }
 
 /**
@@ -31,8 +35,20 @@ export function LoopDoneGateRelaxOffer({
   declined,
   onDeclinedChange,
   disabled,
+  notice,
+  acceptLabel,
 }: Props) {
   const { t } = useTranslation();
+  // The clicked button unmounts on every toggle; without the handoff a
+  // keyboard user's focus falls to <body>. Keyed on an actual change (not a
+  // mount flag, which StrictMode's double effect would trip) so opening the
+  // surface never steals focus.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const previousDeclined = useRef(declined);
+  useEffect(() => {
+    if (previousDeclined.current !== declined) toggleRef.current?.focus();
+    previousDeclined.current = declined;
+  }, [declined]);
 
   return (
     <div
@@ -43,7 +59,7 @@ export function LoopDoneGateRelaxOffer({
       {/* The consequence copy stays visible in BOTH states: an operator
           reconsidering a decline needs the stakes restated, not just a
           button label. */}
-      <p>{t("boardLoop.relaxGate.notice")}</p>
+      <p>{notice ?? t("boardLoop.relaxGate.notice")}</p>
       {declined ? (
         <>
           <p data-testid="board-loop-relax-gate-declined" className="font-medium">
@@ -53,11 +69,12 @@ export function LoopDoneGateRelaxOffer({
             type="button"
             size="sm"
             variant="outline"
+            ref={toggleRef}
             data-testid="board-loop-relax-gate-accept"
             disabled={disabled}
             onClick={() => onDeclinedChange(false)}
           >
-            {t("boardLoop.relaxGate.accept")}
+            {acceptLabel ?? t("boardLoop.relaxGate.accept")}
           </Button>
         </>
       ) : (
@@ -65,6 +82,7 @@ export function LoopDoneGateRelaxOffer({
           type="button"
           size="sm"
           variant="outline"
+          ref={toggleRef}
           data-testid="board-loop-relax-gate-undo"
           disabled={disabled}
           onClick={() => onDeclinedChange(true)}

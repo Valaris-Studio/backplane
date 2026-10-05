@@ -1,987 +1,701 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Tests for per-tool-call execution tracking.
+"""Canonical invocation outcomes, recorded off the tool call's hot path."""
 
-See `valaris_mcp/tracking.py` module docstring for scoping rationale
-(card d8797e78 — the old per-session model wedged the backend busy-gate).
-"""
-from __future__ import annotations
-
+import asyncio
 import json
-from unittest.mock import AsyncMock, patch
+import logging
+import time
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
+import anyio
 import httpx
 import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, ImageContent, TextContent
 
-from valaris_mcp.tracking import ExecutionTracker
+from valaris_mcp.results import normalize_tool_result
+from valaris_mcp.server import install_tracking
+from valaris_mcp.tracking import InvocationRecorder
 
 pytestmark = pytest.mark.anyio
 
 
-def _make_tracker(client, api_key="vlr_test1234abcd"):
-    with patch("valaris_mcp.tracking.API_KEY", api_key):
-        return ExecutionTracker(client)
+def client():
+    async def acknowledge(path, body):
+        return {"id": body["id"]}
 
+    return AsyncMock(post=AsyncMock(side_effect=acknowledge))
 
-async def _setup(client, agent_id="agent-222", exec_id_seq=("exec-001",)):
-    """Prime a tracker with agent lookup + a queued POST response."""
-    client.get = AsyncMock(return_value=[
-        {"id": agent_id, "api_key_prefix": "vlr_test", "is_active": True},
-    ])
-    exec_ids = list(exec_id_seq)
 
-    async def _post(path, body):
-        if path.endswith("/executions"):
-            return {"id": exec_ids.pop(0), "agent_id": agent_id, "status": "started"}
-        return {}
+def bodies(api):
+    for call in api.post.call_args_list:
+        assert call.args[0] == "/me/mcp-invocations"
+    api.get.assert_not_called()
+    api.patch.assert_not_called()
+    return [call.args[1] for call in api.post.call_args_list]
 
-    client.post = AsyncMock(side_effect=_post)
-    client.patch = AsyncMock(return_value={"status": "completed"})
-    return _make_tracker(client)
 
+def invocation(api):
+    rows = {body["id"]: body for body in bodies(api)}
+    assert len(rows) == 1
+    return next(iter(rows.values()))
 
-# ---------- Identity + disable ----------
 
+@asynccontextmanager
+async def started(api, **options):
+    recorder = InvocationRecorder(api, server_instance_id="server-under-test", **options)
+    async with recorder.running():
+        yield recorder
 
-async def test_tracker_disabled_without_api_key():
-    client = AsyncMock()
-    tracker = _make_tracker(client, api_key="")
-    assert tracker._disabled is True
 
+async def record(recorder, name, arguments, result, error=None):
+    call = recorder.begin(name, arguments)
+    recorder.finish(call, result, error=error)
+    await recorder.flush()
+    return call
 
-async def test_tracker_enabled_with_api_key():
-    client = AsyncMock()
-    tracker = _make_tracker(client)
-    assert tracker._disabled is False
 
+def wrapped(recorder, call_tool):
+    server = SimpleNamespace(_tool_manager=SimpleNamespace(call_tool=call_tool))
+    install_tracking(server, recorder)
+    return server._tool_manager.call_tool
 
-async def test_discover_agent_id_matches_prefix():
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=[
-        {"id": "agent-111", "api_key_prefix": "vlr_aaaa"},
-        {"id": "agent-222", "api_key_prefix": "vlr_test"},
-    ])
-    tracker = _make_tracker(client)
-    await tracker._discover_agent_id()
-    assert tracker._agent_id == "agent-222"
 
-
-async def test_discover_agent_id_is_cached():
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=[
-        {"id": "agent-222", "api_key_prefix": "vlr_test"},
-    ])
-    tracker = _make_tracker(client)
-    await tracker._discover_agent_id()
-    await tracker._discover_agent_id()
-    assert client.get.call_count == 1
-
-
-async def test_discover_agent_id_no_match_disables():
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=[
-        {"id": "agent-111", "api_key_prefix": "vlr_aaaa"},
-    ])
-    tracker = _make_tracker(client, api_key="vlr_xxxx9999")
-    await tracker._discover_agent_id()
-    assert tracker._disabled is True
-
-
-async def test_discover_agent_id_failure_disables():
-    client = AsyncMock()
-    client.get = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
-    tracker = _make_tracker(client)
-    await tracker._discover_agent_id()
-    assert tracker._disabled is True
-
-
-# ---------- Per-call lifecycle ----------
-
-
-async def test_before_tool_call_starts_one_execution():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default", "board_id": "b1"})
-
-    exec_calls = [c for c in client.post.call_args_list if c.args[0].endswith("/executions")]
-    assert len(exec_calls) == 1
-    path, body = exec_calls[0].args
-    assert path == "/agents/agent-222/executions"
-    assert body["action"] == "mcp_session"
-    assert body["workspace_slug"] == "default"
-    assert body["board_id"] == "b1"
-    assert tracker._active["execution_id"] == "exec-001"
-
-
-async def test_after_tool_call_finalizes_and_clears():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", '{"name": "Board"}')
-
-    client.patch.assert_called_once()
-    patch_path, patch_body = client.patch.call_args.args
-    assert patch_path == "/agents/agent-222/executions/exec-001"
-    assert patch_body["status"] == "completed"
-    assert patch_body["tools_used"] == ["get_board"]
-    assert patch_body["tool_calls_count"] == 1
-    assert "duration_seconds" in patch_body
-
-    invocation_calls = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ]
-    assert len(invocation_calls) == 1
-    path, invocations = invocation_calls[0].args
-    assert path == "/agents/agent-222/executions/exec-001/tool-invocations"
-    assert len(invocations) == 1
-    assert invocations[0]["tool_name"] == "get_board"
-    assert invocations[0]["status"] == "completed"
-
-    assert tracker._active is None
-
-
-async def test_each_call_gets_its_own_execution():
-    """Regression guard for card d8797e78 — no row outlives its call."""
-    client = AsyncMock()
-    tracker = await _setup(client, exec_id_seq=("exec-1", "exec-2"))
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", "{}")
-    await tracker.before_tool_call("list_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call("list_cards", "[]")
-
-    exec_creates = [c for c in client.post.call_args_list if c.args[0].endswith("/executions")]
-    assert len(exec_creates) == 2
-    assert client.patch.call_count == 2
-    patched_ids = {c.args[0].rsplit("/", 1)[-1] for c in client.patch.call_args_list}
-    assert patched_ids == {"exec-1", "exec-2"}
-
-
-async def test_skips_tracking_tools():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("log_execution_start", {"agent_id": "a1", "action": "x"})
-    assert tracker._active is None
-    client.post.assert_not_called()
-
-
-async def test_defers_when_no_workspace_slug():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_workspaces", {})
-    assert tracker._active is None
-    client.post.assert_not_called()
-    await tracker.after_tool_call("list_workspaces", "[]")
-    client.patch.assert_not_called()
-
-
-# ---------- Card ID extraction ----------
-
-
-async def test_captures_card_id_on_create():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("create_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("create_card", json.dumps({"id": "card-123"}))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == ["card-123"]
-
-
-async def test_captures_card_ids_from_bulk():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("bulk_create_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "bulk_create_cards",
-        json.dumps({"cards": [{"id": "c1"}, {"id": "c2"}]}),
-    )
-    patch_body = client.patch.call_args.args[1]
-    assert set(patch_body["cards_affected"]) == {"c1", "c2"}
-
-
-async def test_ignores_non_card_tools_for_extraction():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_boards", {"workspace_slug": "default"})
-    await tracker.after_tool_call("list_boards", json.dumps({"id": "board-1"}))
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == []
-
-
-# ---------- Truncation ----------
-
-
-async def test_arguments_summary_truncated():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    long_args = {"workspace_slug": "default", "data": "x" * 500}
-    await tracker.before_tool_call("create_card", long_args)
-    await tracker.after_tool_call("create_card", "{}")
-
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocations = invocation_post.args[1]
-    assert len(invocations[0]["arguments_summary"]) <= 200
-
-
-async def test_result_summary_truncated():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call("list_cards", "y" * 1000)
-
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocations = invocation_post.args[1]
-    assert len(invocations[0]["result_summary"]) <= 500
-
-
-# ---------- Error isolation ----------
-
-
-async def test_before_swallows_post_failure():
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=[
-        {"id": "agent-222", "api_key_prefix": "vlr_test"},
-    ])
-    client.post = AsyncMock(side_effect=httpx.ConnectError("down"))
-    tracker = _make_tracker(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    assert tracker._active is None
-
-
-async def test_after_swallows_parse_errors():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("create_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("create_card", "not json {{{")
-    client.patch.assert_called_once()
-
-
-async def test_after_swallows_patch_failure():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    client.patch = AsyncMock(side_effect=RuntimeError("500"))
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", "{}")
-    assert tracker._active is None
-
-
-async def test_after_without_matching_before_is_noop():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.after_tool_call("get_board", "{}")
-    client.patch.assert_not_called()
-
-
-# ---------- Error-result detection (card b59bd8b2) ----------
-#
-# handle_api_errors (errors.py) never raises on an httpx error — it returns a
-# JSON string like {"error": true, "status": 422, "message": "...",
-# "error_code": "pr_url_missing"}. after_tool_call must inspect that payload
-# and record "failed", not "completed", on both the execution PATCH and the
-# tool-invocation POST. Idempotent-create success payloads (no "error" key)
-# must keep recording "completed".
-
-
-async def test_after_tool_call_records_failed_on_error_result():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    error_result = json.dumps({
-        "error": True,
-        "status": 422,
-        "message": "pr_url is required to move to this column",
-        "error_code": "pr_url_missing",
-    })
-    await tracker.after_tool_call("update_card", error_result)
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocations = invocation_post.args[1]
-    assert invocations[0]["status"] == "failed"
-
-
-async def test_after_tool_call_error_message_includes_status_and_error_code():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    error_result = json.dumps({
-        "error": True,
-        "status": 422,
-        "message": "pr_url is required to move to this column",
-        "error_code": "pr_url_missing",
-    })
-    await tracker.after_tool_call("update_card", error_result)
-
-    patch_body = client.patch.call_args.args[1]
-    assert "422" in patch_body["error_message"]
-    assert "pr_url_missing" in patch_body["error_message"]
-
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocations = invocation_post.args[1]
-    assert "422" in invocations[0]["error_message"]
-    assert "pr_url_missing" in invocations[0]["error_message"]
-
-
-async def test_after_tool_call_error_message_omits_error_code_when_absent():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    error_result = json.dumps({
-        "error": True,
-        "message": "Cannot reach the Valaris API. Is the server running?",
-    })
-    await tracker.after_tool_call("get_board", error_result)
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert "Cannot reach the Valaris API" in patch_body["error_message"]
-
-
-async def test_idempotent_create_returning_existing_entity_stays_completed():
-    """Idempotency invariant (card d... idempotent mutations): a retried
-    add_card_participant that returns the pre-existing participant is a
-    normal success payload with no "error" key, so it must record as
-    "completed", not "failed".
-    """
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("add_card_participant", {"workspace_slug": "default"})
-    existing_participant_result = json.dumps({
-        "id": "participant-1",
-        "card_id": "card-123",
-        "user_id": "user-456",
-        "role": "assignee",
-    })
-    await tracker.after_tool_call("add_card_participant", existing_participant_result)
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocations = invocation_post.args[1]
-    assert invocations[0]["status"] == "completed"
-
-
-async def test_create_workspace_duplicate_slug_stays_completed():
-    """The idempotency invariant's real at-risk shape: create_workspace
-    (tools/workspaces.py) reports an existing slug as a *string*-valued
-    "error" alongside the entity it found — nothing failed, nothing raised,
-    and the caller got the workspace it asked for. Only handle_api_errors'
-    boolean `"error": true` means failure.
-
-    Classification is asserted directly: create_workspace takes no
-    workspace_slug, so before_tool_call defers and never opens an execution
-    row to inspect.
-    """
-    duplicate_result = json.dumps({
-        "error": "Workspace with slug 'existing' already exists",
-        "existing": {"id": "ws-1", "slug": "existing", "name": "Existing"},
-    })
-    assert ExecutionTracker._classify_result(duplicate_result) == ("completed", None)
-
-
-async def test_string_valued_error_key_stays_completed():
-    """Guards the boundary from the other side: only the boolean means
-    failure, so a tool that happens to carry a descriptive "error" string
-    is never recorded as a failed execution.
-    """
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "get_board", json.dumps({"error": "some descriptive text", "id": "board-1"})
+def http_error(status):
+    request = httpx.Request("POST", "http://test/api/me/mcp-invocations")
+    return httpx.HTTPStatusError(
+        str(status), request=request, response=httpx.Response(status, request=request)
     )
 
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert "error_message" not in patch_body
+
+# --- outcome content ---------------------------------------------------------
 
 
-async def test_after_tool_call_non_json_string_result_stays_completed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", "not json {{{")
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-
-
-async def test_after_tool_call_unrecognised_non_str_result_stays_completed():
-    """A value that is neither text nor MCP content (an int here) carries no
-    error payload to inspect, so it records as a plain success. Content lists
-    are NOT in this bucket — see the converted-results section below.
-    """
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call("list_cards", 42)
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert "error_message" not in patch_body
+@pytest.mark.parametrize("names", [("get_board", "get_board"), ("get_board", "list_cards")])
+async def test_interleaved_calls_keep_identity_timing_and_outcome(names):
+    api = client()
+    async with started(api) as recorder:
+        first = recorder.begin(names[0], {"workspace_slug": "one"})
+        second = recorder.begin(names[1], {"workspace_slug": "two"})
+        assert first.id != second.id
+        recorder.finish(first, '{"id":"first"}')
+        recorder.finish(second, "boom", error=RuntimeError("boom"))
+        await recorder.flush()
+    rows = bodies(api)
+    assert [body["id"] for body in rows] == [first.id, second.id]
+    assert [body["tool_name"] for body in rows] == list(names)
+    assert [body["workspace_slug"] for body in rows] == ["one", "two"]
+    assert [body["status"] for body in rows] == ["completed", "failed"]
+    assert rows[0]["started_at"] <= rows[1]["started_at"]
+    assert all(body["duration_seconds"] >= 0 for body in rows)
+    assert rows[1]["error_message"] == "boom"
+    assert {body["server_instance_id"] for body in rows} == {"server-under-test"}
 
 
-async def test_after_tool_call_json_list_result_stays_completed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call("list_cards", json.dumps([{"id": "card-1"}]))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-
-
-async def test_after_tool_call_dict_without_error_key_stays_completed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", json.dumps({"name": "Board", "id": "b1"}))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-
-
-async def test_after_tool_call_falsy_error_key_stays_completed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", json.dumps({"error": False, "id": "b1"}))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-
-
-async def test_patch_and_invocation_status_agree_on_error():
-    """Both status sites must agree — no split-brain between the execution
-    row and its tool-invocation row.
-    """
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    error_result = json.dumps({"error": True, "status": 500, "message": "boom"})
-    await tracker.after_tool_call("update_card", error_result)
-
-    patch_body = client.patch.call_args.args[1]
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    invocation_status = invocation_post.args[1][0]["status"]
-    assert patch_body["status"] == invocation_status == "failed"
-
-
-# ---------- finalize (shutdown) ----------
-
-
-async def test_finalize_is_noop_when_no_active_call():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.finalize()
-    client.patch.assert_not_called()
-
-
-async def test_finalize_aborts_inflight_call():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    # Process is shutting down before after_tool_call fires
-    await tracker.finalize()
-    client.patch.assert_called_once()
-    body = client.patch.call_args.args[1]
-    assert body["status"] == "aborted"
-
-
-async def test_finalize_noop_when_disabled():
-    client = AsyncMock()
-    tracker = _make_tracker(client, api_key="")
-    await tracker.finalize()
-
-
-# ---------- Server wiring ----------
-
-
-async def test_install_tracking_wraps_call_tool():
-    from valaris_mcp.server import install_tracking
-    tracker = AsyncMock()
-    original_call_tool = AsyncMock(return_value="result")
-
-    class FakeToolManager:
-        call_tool = original_call_tool
-
-    class FakeServer:
-        _tool_manager = FakeToolManager()
-
-    install_tracking(FakeServer(), tracker)
-
-    result = await FakeServer._tool_manager.call_tool("get_board", {"workspace_slug": "x"})
-    tracker.before_tool_call.assert_called_once_with("get_board", {"workspace_slug": "x"})
-    tracker.after_tool_call.assert_called_once_with("get_board", "result")
-    assert result == "result"
-
-
-def test_app_context_has_tracker():
-    from valaris_mcp.server import AppContext
-    client = AsyncMock()
-    tracker = AsyncMock(spec=ExecutionTracker)
-    ctx = AppContext(client=client, tracker=tracker)
-    assert ctx.tracker is tracker
-
-
-# ---------- Converted results (cards 6a25bc2f / 8ddbedac) ----------
-#
-# `install_tracking` wraps `_tool_manager.call_tool`, but `FastMCP.call_tool`
-# invokes the manager with `convert_result=True`, so the value reaching
-# `after_tool_call` is what `FuncMetadata.convert_result` produced — never the
-# tool's raw JSON string:
-#   - `list[TextContent]`                 tool without an output schema (every
-#                                         tool in this server)
-#   - `(list[TextContent], dict)`         tool with an output schema
-#   - `CallToolResult`                    passthrough
-# The tracker must unwrap the TextContent text before classifying, extracting
-# card ids and summarising — otherwise every row is "completed", no card is
-# ever attributed and result_summary is a `[TextContent(...)]` repr.
-
-ERROR_PAYLOAD = {
-    "error": True,
-    "status": 422,
-    "message": "pr_url is required to move to this column",
-    "error_code": "pr_url_missing",
-}
-ERROR_MESSAGE = "422 pr_url is required to move to this column pr_url_missing"
-
-
-def _text(payload) -> TextContent:
-    return TextContent(type="text", text=json.dumps(payload))
-
-
-def _invocation(client) -> dict:
-    invocation_post = [
-        c for c in client.post.call_args_list
-        if c.args[0].endswith("/tool-invocations")
-    ][0]
-    return invocation_post.args[1][0]
-
-
-async def test_after_tool_call_content_list_error_records_failed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("update_card", [_text(ERROR_PAYLOAD)])
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == ERROR_MESSAGE
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert invocation["error_message"] == ERROR_MESSAGE
-
-
-async def test_after_tool_call_content_list_captures_card_id():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("create_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("create_card", [_text({"id": "card-123"})])
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == ["card-123"]
-
-
-async def test_after_tool_call_content_list_captures_bulk_card_ids():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("bulk_create_cards", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "bulk_create_cards", [_text({"cards": [{"id": "c1"}, {"id": "c2"}]})]
+async def test_native_context_is_captured_at_call_start_and_posted_flat():
+    api = client()
+    contexts = iter(
+        [
+            {
+                "harness": "claude_code",
+                "native_call_id": "toolu_1",
+                "client_name": "claude-code",
+                "client_version": "2.1.0",
+            },
+            {},
+        ]
     )
-
-    patch_body = client.patch.call_args.args[1]
-    assert set(patch_body["cards_affected"]) == {"c1", "c2"}
-
-
-async def test_after_tool_call_content_list_summary_is_the_text_not_the_repr():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    board_json = json.dumps({"id": "b1", "name": "Board"})
-    await tracker.after_tool_call("get_board", [TextContent(type="text", text=board_json)])
-
-    assert _invocation(client)["result_summary"] == board_json
+    async with started(api, native_context=lambda _arguments: next(contexts)) as recorder:
+        await record(recorder, "get_card", {}, "{}")
+        await record(recorder, "get_card", {}, "{}")
+    native, plain = bodies(api)
+    assert native["harness"] == "claude_code"
+    assert native["native_call_id"] == "toolu_1"
+    assert native["client_name"] == "claude-code"
+    assert native["client_version"] == "2.1.0"
+    assert "native_context" not in native
+    assert "harness" not in plain and "native_call_id" not in plain
 
 
-async def test_after_tool_call_content_list_summary_truncates_the_text_at_500():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("list_cards", {"workspace_slug": "default"})
-    long_text = "y" * 1000
-    await tracker.after_tool_call("list_cards", [TextContent(type="text", text=long_text)])
+async def test_native_context_sees_the_call_arguments():
+    api = client()
+    seen = []
 
-    assert _invocation(client)["result_summary"] == long_text[:500]
+    def context(arguments):
+        seen.append(arguments)
+        return {"arguments_fingerprint": "f" * 64}
+
+    async with started(api, native_context=context) as recorder:
+        await record(recorder, "get_card", {"card_id": "c1"}, "{}")
+    assert seen == [{"card_id": "c1"}]
+    assert invocation(api)["arguments_fingerprint"] == "f" * 64
 
 
-async def test_after_tool_call_structured_tuple_error_records_failed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "update_card", ([_text(ERROR_PAYLOAD)], {"result": json.dumps(ERROR_PAYLOAD)})
+@pytest.mark.parametrize("name", ["list_workspaces", "get_server_info", "log_execution_start"])
+async def test_calls_without_workspace_are_recorded(name):
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, name, {}, "[]")
+    body = invocation(api)
+    assert body["workspace_slug"] is None
+    assert body["tool_name"] == name
+    assert body["status"] == "completed"
+    assert api.post.await_count == 1
+
+
+ERROR = '{"error":true,"status":422,"message":"missing PR","error_code":"pr_url_missing"}'
+TEXT = TextContent(type="text", text=ERROR)
+IMAGE = ImageContent(type="image", data="aGk=", mimeType="image/png")
+
+
+@pytest.mark.parametrize(
+    "result,summary,status",
+    [
+        (ERROR, ERROR, "failed"),
+        ([TEXT], ERROR, "failed"),
+        (([TEXT], {"result": ERROR}), ERROR, "failed"),
+        (CallToolResult(content=[TEXT]), ERROR, "failed"),
+        (CallToolResult(content=[], isError=True), None, "failed"),
+        (
+            [TextContent(type="text", text="one"), IMAGE, TextContent(type="text", text="two")],
+            "one\ntwo",
+            "completed",
+        ),
+        ([IMAGE], None, "completed"),
+        ([], None, "completed"),
+        ((), None, "completed"),
+        (42, None, "completed"),
+        ("not json", "not json", "completed"),
+        (
+            '{"error":"already exists","existing":{}}',
+            '{"error":"already exists","existing":{}}',
+            "completed",
+        ),
+        ('{"error":false}', '{"error":false}', "completed"),
+        ("[]", "[]", "completed"),
+        ("{}", "{}", "completed"),
+    ],
+)
+async def test_result_shapes_preserve_normalization_and_classification(result, summary, status):
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, "tool", {}, result)
+    body = invocation(api)
+    assert body["result_summary"] == summary
+    assert body["status"] == status
+    if status == "failed" and summary:
+        assert "422" in body["error_message"]
+        assert "pr_url_missing" in body["error_message"]
+    normalized = normalize_tool_result(result)
+    if status == "failed" and isinstance(result, (list, tuple, CallToolResult)):
+        assert normalized.isError
+    else:
+        assert normalized is result
+
+
+async def test_summaries_and_exception_reason_are_bounded():
+    api = client()
+    async with started(api) as recorder:
+        await record(
+            recorder, "tool", {"data": "a" * 1000}, "b" * 1000, error=RuntimeError("c" * 1000)
+        )
+    body = invocation(api)
+    assert len(body["arguments_summary"]) == 200
+    assert body["result_summary"] == "b" * 500
+    assert body["error_message"] == "c" * 500
+
+
+@pytest.mark.parametrize("unsafe,encoded", [("\x00", "\\u0000"), ("\ud800", "\\ud800")])
+async def test_unsupported_summary_text_is_escaped_without_changing_tool_result(unsafe, encoded):
+    api = client()
+    result = CallToolResult(content=[TextContent(type="text", text="prefix" + unsafe + "x" * 700)])
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, AsyncMock(return_value=result))
+        returned = await call_tool("tool", {"value": unsafe})
+        await recorder.flush()
+    assert returned is result and returned.content[0].text == "prefix" + unsafe + "x" * 700
+    body = invocation(api)
+    assert body["result_summary"] == ("prefix" + encoded + "x" * 700)[:500]
+    assert unsafe not in body["arguments_summary"]
+    body["result_summary"].encode("utf-8")
+    assert api.post.await_count == recorder.health()["recorded"] == 1
+
+
+@pytest.mark.parametrize("unsafe,encoded", [("\x00", "\\u0000"), ("\ud800", "\\ud800")])
+async def test_unsupported_exception_summary_is_escaped_without_changing_exception(
+    unsafe, encoded
+):
+    api = client()
+    error = RuntimeError("prefix" + unsafe)
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, AsyncMock(side_effect=error))
+        with pytest.raises(RuntimeError) as raised:
+            await call_tool("tool", {})
+        await recorder.flush()
+    assert raised.value is error
+    body = invocation(api)
+    assert body["error_message"] == body["result_summary"] == "prefix" + encoded
+    assert body["status"] == "failed"
+
+
+# --- delivery ----------------------------------------------------------------
+
+
+async def test_recording_retry_uses_exact_same_outcome_and_identity():
+    api = client()
+    acknowledge = api.post.side_effect
+
+    async def lost_ack(path, body):
+        if api.post.await_count == 1:
+            raise httpx.ReadError("response lost")
+        return await acknowledge(path, body)
+
+    api.post.side_effect = lost_ack
+    async with started(api) as recorder:
+        await record(recorder, "get_board", {}, "{}")
+    assert api.post.await_count == 2
+    assert api.post.call_args_list[0] == api.post.call_args_list[1]
+    assert recorder.health()["recorded"] == 1
+    assert recorder.health()["unconfirmed"] == 0
+
+
+async def test_success_survives_recording_failure_with_content_free_health(caplog):
+    api = client()
+    api.post.side_effect = httpx.ConnectError("private token and content")
+    result = [TextContent(type="text", text='{"id":"saved"}')]
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, AsyncMock(return_value=result))
+        assert await call_tool("save", {}) is result
+        await recorder.flush()
+    assert api.post.await_count == 2
+    assert recorder.health()["unconfirmed"] == 1
+    assert recorder.health()["last_error"] == "transport_error"
+    assert "private token" not in caplog.text
+    assert "unconfirmed" in caplog.text
+
+
+async def test_recording_deadline_is_bounded():
+    api = client()
+
+    async def hang(*args):
+        await anyio.sleep_forever()
+
+    api.post.side_effect = hang
+    async with started(api, record_timeout=0.02) as recorder:
+        with anyio.fail_after(0.5):
+            await record(recorder, "tool", {}, "{}")
+    assert recorder.health()["unconfirmed"] == 1
+    assert recorder.health()["last_error"] == "timeout"
+
+
+async def test_acknowledgement_must_match_and_diagnostics_do_not_grow_per_call(caplog):
+    api = client()
+    api.post.side_effect = None
+    api.post.return_value = {"id": "wrong"}
+    async with started(api) as recorder:
+        for _ in range(5):
+            await record(recorder, "tool", {}, "success")
+    assert api.post.await_count == 10
+    assert recorder.health()["recorded"] == 0
+    assert recorder.health()["unconfirmed"] == 5
+    assert recorder.health()["last_error"] == "invalid_acknowledgement"
+    assert len(caplog.records) == 3  # first, second, fourth gap
+
+
+async def test_tool_response_never_waits_on_a_slow_backend():
+    api = client()
+    acknowledge = api.post.side_effect
+
+    async def slow(path, body):
+        await anyio.sleep(0.2)
+        return await acknowledge(path, body)
+
+    api.post.side_effect = slow
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, AsyncMock(return_value="done"))
+        began = time.monotonic()
+        results = await asyncio.gather(*(call_tool("tool", {"n": n}) for n in range(5)))
+        elapsed = time.monotonic() - began
+        assert results == ["done"] * 5
+        assert elapsed < 0.2, elapsed
+        assert recorder.health()["queued"] >= 4
+    # Leaving `running` flushed the queue before returning.
+    assert recorder.health()["recorded"] == 5
+
+
+async def test_full_queue_drops_outcomes_without_blocking_the_call():
+    api = client()
+    gate = anyio.Event()
+    acknowledge = api.post.side_effect
+
+    async def blocked(path, body):
+        await gate.wait()
+        return await acknowledge(path, body)
+
+    api.post.side_effect = blocked
+    async with started(api, max_queued=2) as recorder:
+        call_tool = wrapped(recorder, AsyncMock(return_value="done"))
+        with anyio.fail_after(0.5):
+            for _ in range(6):
+                await call_tool("tool", {})
+        assert recorder.health()["last_error"] == "queue_full"
+        gate.set()
+    health = recorder.health()
+    assert health["recorded"] + health["unconfirmed"] == 6
+    assert health["unconfirmed"] >= 3
+
+
+@pytest.mark.parametrize("status", [404, 405, 401, 403])
+async def test_breaker_stops_posting_after_an_endpoint_or_credential_rejection(caplog, status):
+    api = client()
+    api.post.side_effect = http_error(status)
+    with caplog.at_level(logging.WARNING, logger="valaris_mcp.tracking"):
+        async with started(api, breaker_cooldown=60) as recorder:
+            for _ in range(4):
+                await record(recorder, "tool", {}, "{}")
+            health = recorder.health()
+    assert api.post.await_count == 1
+    assert health["circuit_open"] is True
+    assert health["unconfirmed"] == 4
+    assert health["last_error"] == "circuit_open"
+    paused = [record for record in caplog.records if "paused" in record.getMessage()]
+    assert len(paused) == 1
+
+
+async def test_breaker_closes_after_its_cooldown():
+    api = client()
+    acknowledge = api.post.side_effect
+    api.post.side_effect = http_error(404)
+    async with started(api, breaker_cooldown=0.05) as recorder:
+        await record(recorder, "tool", {}, "{}")
+        await record(recorder, "tool", {}, "{}")
+        assert api.post.await_count == 1
+        await anyio.sleep(0.08)
+        api.post.side_effect = acknowledge
+        await record(recorder, "tool", {}, "{}")
+    assert api.post.await_count == 2
+    assert recorder.health()["recorded"] == 1
+    assert recorder.health()["circuit_open"] is False
+
+
+@pytest.mark.parametrize("status", [422, 409])
+async def test_other_client_errors_neither_retry_nor_open_the_breaker(status):
+    api = client()
+    api.post.side_effect = http_error(status)
+    async with started(api) as recorder:
+        await record(recorder, "tool", {}, "{}")
+        await record(recorder, "tool", {}, "{}")
+    assert api.post.await_count == 2
+    assert recorder.health()["circuit_open"] is False
+
+
+async def test_shutdown_flushes_queued_outcomes():
+    api = client()
+    recorder = InvocationRecorder(api, server_instance_id="s")
+    async with recorder.running():
+        for _ in range(3):
+            recorder.finish(recorder.begin("tool", {}), "{}")
+    assert api.post.await_count == 3
+    assert recorder.health()["recorded"] == 3
+
+
+async def test_shutdown_flush_is_bounded_and_counts_what_it_abandons():
+    api = client()
+
+    async def hang(*args):
+        await anyio.sleep_forever()
+
+    api.post.side_effect = hang
+    recorder = InvocationRecorder(api, server_instance_id="s", record_timeout=30)
+    with anyio.fail_after(1):
+        async with recorder.running(flush_deadline=0.05):
+            for _ in range(3):
+                recorder.finish(recorder.begin("tool", {}), "{}")
+    assert recorder.health()["unconfirmed"] == 3
+    assert recorder.health()["last_error"] == "shutdown"
+    recorder.finish(recorder.begin("late", {}), "{}")
+    assert recorder.health()["last_error"] == "recorder_closed"
+
+
+# --- the wrapper ---------------------------------------------------------------
+
+
+async def test_cancellation_records_aborted_and_clears_request_correlation():
+    from valaris_mcp.client import current_invocation_id
+
+    api = client()
+    entered = asyncio.Event()
+
+    async def running(name, arguments):
+        assert current_invocation_id.get() is not None
+        entered.set()
+        await asyncio.Future()
+
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, running)
+        task = asyncio.create_task(call_tool("tool", {}))
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await recorder.flush()
+    assert invocation(api)["status"] == "aborted"
+    assert current_invocation_id.get() is None
+    assert recorder.health()["recorded"] == 1
+
+
+async def test_anyio_cancellation_is_recorded_then_propagates():
+    api = client()
+
+    async def running(name, arguments):
+        await anyio.sleep_forever()
+
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, running)
+        with anyio.move_on_after(0.01) as cancelled:
+            await call_tool("tool", {})
+        await recorder.flush()
+    assert cancelled.cancel_called
+    assert invocation(api)["status"] == "aborted"
+
+
+@pytest.mark.parametrize("same_name", [False, True])
+async def test_concurrent_wrapped_calls_keep_correlation_and_results(same_name):
+    from valaris_mcp.client import current_invocation_id
+
+    api = client()
+    arrived = asyncio.Event()
+    contexts = {}
+
+    async def running(name, arguments):
+        contexts[arguments["which"]] = current_invocation_id.get()
+        if len(contexts) == 2:
+            arrived.set()
+        await arrived.wait()
+        if arguments["which"] == "failure":
+            raise RuntimeError("own error")
+        return "own success"
+
+    async with started(api) as recorder:
+        call_tool = wrapped(recorder, running)
+        with anyio.fail_after(2):
+            results = await asyncio.gather(
+                call_tool("first", {"which": "success"}),
+                call_tool("first" if same_name else "second", {"which": "failure"}),
+                return_exceptions=True,
+            )
+        await recorder.flush()
+    assert results[0] == "own success" and isinstance(results[1], RuntimeError)
+    rows = {body["id"]: body for body in bodies(api)}
+    assert len(rows) == 2
+    assert rows[contexts["success"]]["result_summary"] == "own success"
+    assert rows[contexts["failure"]]["error_message"] == "own error"
+    assert current_invocation_id.get() is None
+
+
+async def test_backend_requests_during_the_tool_carry_the_invocation_header():
+    from valaris_mcp.client import ValarisClient
+
+    seen = []
+
+    def handler(request):
+        seen.append((request.url.path, request.headers.get("X-Backplane-Invocation-ID")))
+        body = json.loads(request.content) if request.content else {}
+        return httpx.Response(200, json={"id": body.get("id")})
+
+    backend = ValarisClient()
+    backend._http = httpx.AsyncClient(
+        base_url="http://test", transport=httpx.MockTransport(handler)
     )
+    recorder = InvocationRecorder(backend, server_instance_id="s")
 
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == ERROR_MESSAGE
-    assert _invocation(client)["status"] == "failed"
+    async def tool(name, arguments):
+        await backend.get("/workspaces/x/boards")
+        return "ok"
+
+    async with recorder.running():
+        call_tool = wrapped(recorder, tool)
+        await call_tool("list_boards", {})
+    await backend.close()
+    tool_request, receipt = seen
+    assert tool_request[0] == "/api/workspaces/x/boards"
+    assert tool_request[1] is not None
+    # The receipt is posted from the background task, outside the call.
+    assert receipt == ("/api/me/mcp-invocations", None)
 
 
-async def test_after_tool_call_structured_tuple_captures_card_id():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("create_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "create_card", ([_text({"id": "card-123"})], {"result": '{"id": "card-123"}'})
+async def test_fastmcp_converted_result_keeps_error_receipt():
+    api = client()
+    server = FastMCP("tracking-test")
+
+    @server.tool()
+    async def update_card() -> str:
+        return ERROR
+
+    async with started(api) as recorder:
+        install_tracking(server, recorder)
+        result = await server.call_tool("update_card", {})
+        await recorder.flush()
+    assert isinstance(result, CallToolResult) and result.isError
+    assert result.content[0].text == ERROR
+    assert invocation(api)["status"] == "failed"
+
+
+# --- secrets never reach an outcome -----------------------------------------------
+
+SECRET = "SENTINEL-WEBHOOK-SECRET"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"workspace_slug": "w", "url": "https://x", "events": ["card.moved"], "secret": SECRET},
+        {"workspace_slug": "w", "webhook_id": "h1", "secret": SECRET, "is_active": True},
+        {"nested": {"Authorization": SECRET, "items": [{"api_key": SECRET}]}},
+        {"PASSWORD": SECRET, "private_key": SECRET, "apiKey": SECRET, "db_passwd": SECRET},
+        {"access_token": SECRET, "credentials": {"user": "u"}},
+    ],
+)
+async def test_secret_arguments_are_redacted_by_key_name(arguments):
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, "create_webhook", arguments, "{}")
+    body = invocation(api)
+    assert SECRET not in body["arguments_summary"]
+    assert "[redacted]" in body["arguments_summary"]
+
+
+async def test_webhook_tools_never_record_their_secret_end_to_end():
+    from valaris_mcp.tools.webhooks import create_webhook, update_webhook
+
+    api = client()
+    server = FastMCP("webhook-secret-test")
+    server.add_tool(create_webhook)
+    server.add_tool(update_webhook)
+    backend = AsyncMock()
+    backend.ws = lambda slug: f"/workspaces/{slug}"
+    backend.post.return_value = {"id": "h1", "secret": SECRET}
+    backend.patch.return_value = {"id": "h1", "secret": SECRET}
+    lifespan = SimpleNamespace(client=backend)
+    from mcp.server.lowlevel.server import request_ctx
+    from mcp.shared.context import RequestContext
+
+    token = request_ctx.set(
+        RequestContext(request_id=1, meta=None, session=AsyncMock(), lifespan_context=lifespan)
     )
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == ["card-123"]
-
-
-async def test_after_tool_call_structured_tuple_summary_is_the_unstructured_text():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    board_json = json.dumps({"id": "b1"})
-    await tracker.after_tool_call(
-        "get_board", ([TextContent(type="text", text=board_json)], {"result": board_json})
-    )
-
-    assert _invocation(client)["result_summary"] == board_json
-
-
-async def test_after_tool_call_call_tool_result_error_records_failed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("update_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("update_card", CallToolResult(content=[_text(ERROR_PAYLOAD)]))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == ERROR_MESSAGE
-    assert _invocation(client)["status"] == "failed"
-
-
-async def test_after_tool_call_call_tool_result_captures_card_id():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("create_card", {"workspace_slug": "default"})
-    await tracker.after_tool_call("create_card", CallToolResult(content=[_text({"id": "card-123"})]))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == ["card-123"]
-
-
-async def test_after_tool_call_call_tool_result_summary_is_the_text():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    board_json = json.dumps({"id": "b1"})
-    await tracker.after_tool_call(
-        "get_board", CallToolResult(content=[TextContent(type="text", text=board_json)])
-    )
-
-    assert _invocation(client)["result_summary"] == board_json
-
-
-async def test_after_tool_call_multi_text_content_joins_texts_with_newlines():
-    """Pinned choice: every TextContent text, in order, newline-joined."""
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call(
-        "get_board",
-        [TextContent(type="text", text="first"), TextContent(type="text", text="second")],
-    )
-
-    assert _invocation(client)["result_summary"] == "first\nsecond"
-
-
-async def test_after_tool_call_multi_text_content_skips_non_text_blocks():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    image = ImageContent(type="image", data="aGk=", mimeType="image/png")
-    await tracker.after_tool_call(
-        "get_board",
-        [TextContent(type="text", text="first"), image, TextContent(type="text", text="second")],
-    )
-
-    assert _invocation(client)["result_summary"] == "first\nsecond"
-
-
-async def test_after_tool_call_image_only_content_stays_completed_with_no_summary():
-    """Pinned choice: no textual payload → result_summary is None."""
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    image = ImageContent(type="image", data="aGk=", mimeType="image/png")
-    await tracker.after_tool_call("get_board", [image])
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert "error_message" not in patch_body
-    invocation = _invocation(client)
-    assert invocation["status"] == "completed"
-    assert invocation["result_summary"] is None
-
-
-async def test_after_tool_call_empty_content_list_stays_completed_with_no_summary():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", [])
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    invocation = _invocation(client)
-    assert invocation["status"] == "completed"
-    assert invocation["result_summary"] is None
-
-
-async def test_after_tool_call_empty_tuple_result_still_finalizes_the_row():
-    """An empty structured result has no unstructured half to read; the row
-    must still close rather than the unwrap blowing up inside the swallowed
-    try and leaving the execution open forever."""
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", ())
-
-    client.patch.assert_called_once()
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert _invocation(client)["result_summary"] is None
-
-
-async def test_after_tool_call_content_list_success_payload_stays_completed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", [_text({"id": "b1", "name": "Board"})])
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert "error_message" not in patch_body
-
-
-# ---------- Exception path (card 8ddbedac) ----------
-#
-# The tracked wrapper forwards a raised exception as `error=` alongside its
-# text. A denial JSON is `{"error": "tool_not_allowed", ...}` (a string, not
-# the boolean True), so payload inspection alone would classify it as a
-# success; an `error` always classifies the row "failed".
-
-
-async def test_after_tool_call_with_error_records_failed_with_the_exception_message():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", "boom", error=RuntimeError("boom"))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == "boom"
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert invocation["error_message"] == "boom"
-
-
-async def test_after_tool_call_with_denial_error_records_failed_and_keeps_the_denial_json():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_card", {"workspace_slug": "default"})
-    denial_json = json.dumps({
-        "error": "tool_not_allowed",
-        "tool": "get_card",
-        "allowlist": [],
-        "toolsets": ["cards"],
-    })
-    await tracker.after_tool_call("get_card", denial_json, error=PermissionError(denial_json))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert "tool_not_allowed" in patch_body["error_message"]
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert "tool_not_allowed" in invocation["error_message"]
-    assert invocation["result_summary"] == denial_json
-
-
-async def test_after_tool_call_error_message_from_exception_is_truncated_at_500():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    long_text = "e" * 1000
-    await tracker.after_tool_call("get_board", long_text, error=RuntimeError(long_text))
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["error_message"] == long_text[:500]
-
-
-async def test_after_tool_call_with_blank_exception_records_the_exception_type():
-    """`str(RuntimeError())` is empty; an empty error_message would drop the
-    key and leave a failed row with no reason, so the type name stands in."""
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("get_board", {"workspace_slug": "default"})
-    await tracker.after_tool_call("get_board", "", error=RuntimeError())
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == "RuntimeError"
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert invocation["error_message"] == "RuntimeError"
-
-
-# ---------- End to end through the real FastMCP (card 6a25bc2f) ----------
-#
-# `FastMCP.call_tool` is the path the lowlevel server drives; it converts the
-# tool's return value before the tracked wrapper ever sees it. A throwaway
-# server (never the valaris singleton) proves the wiring, not a hand-built
-# shape.
-
-
-def _probe_server() -> FastMCP:
-    server = FastMCP("probe")
-
-    # structured_output=False mirrors this server's tools: no output schema,
-    # so the manager hands back a bare `list[TextContent]`.
-    @server.tool(name="create_card", structured_output=False)
-    async def create_card(workspace_slug: str, title: str) -> str:
-        return json.dumps({"id": "card-e2e", "title": title})
-
-    @server.tool(name="update_card", structured_output=False)
-    async def update_card(workspace_slug: str, card_id: str) -> str:
-        return json.dumps(ERROR_PAYLOAD)
-
-    # Default structured output: a `-> str` tool gets a wrapped
-    # `{"result": ...}` schema, so the manager hands back the tuple shape.
-    @server.tool(name="move_card")
-    async def move_card(workspace_slug: str, card_id: str) -> str:
-        return json.dumps({"id": "card-moved"})
-
-    @server.tool(name="raise_probe", structured_output=False)
-    async def raise_probe(workspace_slug: str) -> str:
-        raise ValueError("kaboom")
-
-    return server
-
-
-async def test_fastmcp_call_tool_success_is_attributed_to_the_created_card():
-    from valaris_mcp.server import install_tracking
-
-    client = AsyncMock()
-    tracker = await _setup(client)
-    server = _probe_server()
-    install_tracking(server, tracker)
-
-    await server.call_tool("create_card", {"workspace_slug": "default", "title": "Probe"})
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "completed"
-    assert patch_body["cards_affected"] == ["card-e2e"]
-    invocation = _invocation(client)
-    assert invocation["status"] == "completed"
-    assert invocation["result_summary"] == json.dumps({"id": "card-e2e", "title": "Probe"})
-
-
-async def test_fastmcp_call_tool_error_payload_is_recorded_as_failed():
-    from valaris_mcp.server import install_tracking
-
-    client = AsyncMock()
-    tracker = await _setup(client)
-    server = _probe_server()
-    install_tracking(server, tracker)
-
-    await server.call_tool("update_card", {"workspace_slug": "default", "card_id": "c1"})
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == ERROR_MESSAGE
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert invocation["result_summary"] == json.dumps(ERROR_PAYLOAD)
-
-
-async def test_fastmcp_call_tool_structured_output_is_attributed_to_the_card():
-    from valaris_mcp.server import install_tracking
-
-    client = AsyncMock()
-    tracker = await _setup(client)
-    server = _probe_server()
-    install_tracking(server, tracker)
-
-    await server.call_tool("move_card", {"workspace_slug": "default", "card_id": "c1"})
-
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["cards_affected"] == ["card-moved"]
-    assert _invocation(client)["result_summary"] == json.dumps({"id": "card-moved"})
-
-
-async def test_fastmcp_call_tool_raising_tool_body_is_recorded_as_failed():
-    """Tool.run wraps a raising body in ToolError("Error executing tool
-    <name>: <cause>") before the tracked wrapper sees it; that text is the
-    row's reason and the error propagates to the caller unchanged."""
-    from mcp.server.fastmcp.exceptions import ToolError
-
-    from valaris_mcp.server import install_tracking
-
-    client = AsyncMock()
-    tracker = await _setup(client)
-    server = _probe_server()
-    install_tracking(server, tracker)
-
-    with pytest.raises(ToolError) as excinfo:
-        await server.call_tool("raise_probe", {"workspace_slug": "default"})
-
-    tool_error_text = str(excinfo.value)
-    assert tool_error_text == "Error executing tool raise_probe: kaboom"
-    client.patch.assert_called_once()
-    patch_body = client.patch.call_args.args[1]
-    assert patch_body["status"] == "failed"
-    assert patch_body["error_message"] == tool_error_text
-    invocation = _invocation(client)
-    assert invocation["status"] == "failed"
-    assert invocation["error_message"] == tool_error_text
-    assert invocation["result_summary"] == tool_error_text
-
-
-async def test_explicit_protocol_error_without_json_records_failed():
-    client = AsyncMock()
-    tracker = await _setup(client)
-    await tracker.before_tool_call("probe", {"workspace_slug": "default"})
-    await tracker.after_tool_call("probe", CallToolResult(
-        content=[TextContent(type="text", text="Permission denied")], isError=True,
-    ))
-    assert client.patch.call_args.args[1]["status"] == "failed"
-    assert _invocation(client)["error_message"] == "Permission denied"
+    try:
+        async with started(api) as recorder:
+            install_tracking(server, recorder)
+            await server.call_tool(
+                "create_webhook",
+                {"workspace_slug": "w", "url": "https://x", "events": ["a"], "secret": SECRET},
+            )
+            await server.call_tool(
+                "update_webhook", {"workspace_slug": "w", "webhook_id": "h1", "secret": SECRET}
+            )
+            await recorder.flush()
+    finally:
+        request_ctx.reset(token)
+    rows = bodies(api)
+    assert [row["tool_name"] for row in rows] == ["create_webhook", "update_webhook"]
+    assert SECRET not in json.dumps(rows)
+
+
+async def test_validation_error_input_values_are_redacted():
+    from valaris_mcp.tools.webhooks import create_webhook
+
+    api = client()
+    server = FastMCP("validation-secret-test")
+    server.add_tool(create_webhook)
+    async with started(api) as recorder:
+        install_tracking(server, recorder)
+        with pytest.raises(Exception) as raised:
+            await server.call_tool(
+                "create_webhook",
+                {"workspace_slug": "w", "url": "https://x", "events": ["a"], "secret": [SECRET]},
+            )
+        await recorder.flush()
+    assert SECRET in str(raised.value)  # the caller still sees its own error
+    body = invocation(api)
+    assert body["status"] == "failed"
+    assert SECRET not in json.dumps(body)
+    assert "input_value=[redacted]" in body["error_message"]
+
+
+# --- lifecycle edges ---------------------------------------------------------------
+
+
+async def test_running_reraises_the_lifespan_error_itself():
+    recorder = InvocationRecorder(client(), server_instance_id="s")
+    with pytest.raises(RuntimeError, match="lifespan failed"):
+        async with recorder.running():
+            raise RuntimeError("lifespan failed")
+
+
+async def test_abandoned_outcomes_are_not_also_reported_as_queued():
+    api = client()
+
+    async def hang(*args):
+        await anyio.sleep_forever()
+
+    api.post.side_effect = hang
+    recorder = InvocationRecorder(api, server_instance_id="s", record_timeout=30)
+    async with recorder.running(flush_deadline=0.05):
+        for _ in range(3):
+            recorder.finish(recorder.begin("tool", {}), "{}")
+    assert recorder.health()["unconfirmed"] == 3
+    assert recorder.health()["queued"] == 0
+
+
+# --- signed URLs (bearer credentials) ------------------------------------------------
+
+SIGNED_GCS = (
+    "https://storage.googleapis.com/b/o.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256"
+    "&X-Goog-Credential=sa%40p.iam%2F20261003%2Fauto%2Fstorage%2Fgoog4_request"
+    "&X-Goog-Expires=900&X-Goog-Signature=0123abcdSIGNATURE"
+)
+SIGNED_SECRETS = ("0123abcdSIGNATURE", "sa%40p.iam")
+
+
+@pytest.mark.parametrize("tool", ["get_download_url", "get_upload_url"])
+async def test_signed_url_tools_keep_their_status_but_never_a_result_summary(tool):
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, tool, {"workspace_slug": "w"}, json.dumps({"url": SIGNED_GCS}))
+    body = invocation(api)
+    assert body["status"] == "completed"
+    assert body["result_summary"] is None
+
+
+@pytest.mark.parametrize(
+    "signed",
+    [
+        SIGNED_GCS,
+        "https://acct.blob.core.windows.net/c/f?sv=2024-01-01&sig=AZURESECRET%3D",
+        "https://cdn.example/f?Expires=1&Signature=CLOUDFRONTSECRET&Key-Pair-Id=K",
+    ],
+)
+async def test_signed_url_query_values_are_redacted_from_any_summary(signed):
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, "get_resource", {"link": signed}, json.dumps({"link": signed}))
+        await record(recorder, "get_resource", {}, "failed", error=RuntimeError(f"GET {signed} 500"))
+    rows = bodies(api)
+    text = json.dumps(rows)
+    for secret in (*SIGNED_SECRETS, "AZURESECRET", "CLOUDFRONTSECRET"):
+        assert secret not in text
+    assert "[redacted]" in rows[0]["arguments_summary"]
+    assert "[redacted]" in rows[0]["result_summary"]
+    assert "[redacted]" in rows[1]["error_message"]
+
+
+async def test_ordinary_query_strings_are_recorded_unchanged():
+    result = json.dumps({"link": "https://example.test/search?q=sig&page=2&design=Signature"})
+    api = client()
+    async with started(api) as recorder:
+        await record(recorder, "get_resource", {}, result)
+    assert invocation(api)["result_summary"] == result

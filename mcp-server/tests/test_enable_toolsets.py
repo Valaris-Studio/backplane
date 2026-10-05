@@ -19,7 +19,7 @@ import dataclasses
 import inspect
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from mcp.server.fastmcp import FastMCP
@@ -470,7 +470,7 @@ async def test_install_hand_deny_all_sentinel_lists_nothing_even_after_widening(
 def test_app_context_carries_the_hand_state():
     assert "hand" in {field.name for field in dataclasses.fields(AppContext)}
     state = _hand_state()(None, None, None)
-    app = AppContext(client=AsyncMock(), tracker=AsyncMock(), hand=state)
+    app = AppContext(client=AsyncMock(), recorder=MagicMock(), hand=state)
     assert app.hand is state
 
 
@@ -968,7 +968,9 @@ async def test_two_sequential_lifespans_on_the_singleton_leave_one_wrapper_layer
     monkeypatch.delenv(TOOLSETS_ENV, raising=False)
     monkeypatch.delenv(ALLOWLIST_ENV, raising=False)
     monkeypatch.setattr(server_module, "ValarisClient", lambda: AsyncMock())
-    monkeypatch.setattr(server_module, "ExecutionTracker", lambda client: AsyncMock())
+    recorder = MagicMock()
+    recorder.running.side_effect = lambda *args, **kwargs: contextlib.nullcontext()
+    monkeypatch.setattr(server_module, "InvocationRecorder", lambda client, **_: recorder)
     manager = restore_singleton_manager
 
     async with app_lifespan(mcp) as first:

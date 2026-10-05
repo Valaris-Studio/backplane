@@ -30,8 +30,15 @@ TRACKER_RELEASE = "0.7.2"
 # Audit T03 (card b24a2fb8): streamable-http never started — host/port were
 # passed to FastMCP.run() instead of mcp.settings.
 HTTP_TRANSPORT_RELEASE = "0.7.3"
-CURRENT_RELEASE = "0.8.0"
-CURRENT_RELEASE_DATE = "2026-09-13"
+# Paged list_notes + catalog upgrade; the README upgrade section documents it.
+NOTES_PAGING_RELEASE = "0.8.0"
+NOTES_PAGING_RELEASE_DATE = "2026-09-13"
+# Default board context + create_workspace slug refusal.
+DEFAULT_BOARD_RELEASE = "0.8.1"
+DEFAULT_BOARD_RELEASE_DATE = "2026-09-30"
+# Queued invocation recording with agent-neutral native context.
+CURRENT_RELEASE = "0.9.0"
+CURRENT_RELEASE_DATE = "2026-10-02"
 # One line that restores the pre-0.6.0 full surface for an unchanged config.
 FULL_SURFACE_ONE_LINER = '"VALARIS_MCP_TOOLSETS": "all"'
 
@@ -77,7 +84,7 @@ def test_readme_upgrade_section_covers_the_current_release():
     text = README_PATH.read_text()
     assert f"### Upgrading from {HTTP_TRANSPORT_RELEASE}" in text
     section = text.split(f"### Upgrading from {HTTP_TRANSPORT_RELEASE}", 1)[1].split("### Upgrading", 1)[0]
-    for term in (CURRENT_RELEASE, "Breaking", "list_notes", "next_offset", "summary_only", "backend", "restart", "ProseMirror"):
+    for term in (NOTES_PAGING_RELEASE, "Breaking", "list_notes", "next_offset", "summary_only", "backend", "restart", "ProseMirror"):
         assert term in section
 
 
@@ -346,9 +353,9 @@ def test_readme_install_distinguishes_unpublished_candidate_and_pins_source_revi
     assert re.search(r"wheel|checkout|source", install, re.I)
 
 
-def test_current_release_documents_note_paging_and_catalog_upgrade():
+def test_notes_paging_release_documents_note_paging_and_catalog_upgrade():
     text = _changelog_text()
-    start = _release_heading_re(CURRENT_RELEASE).search(text)
+    start = _release_heading_re(NOTES_PAGING_RELEASE).search(text)
     assert start, "0.8.0 must have a release entry"
     end = _release_heading_re(HTTP_TRANSPORT_RELEASE).search(text).start()
     section = text[start.start():end]
@@ -363,8 +370,58 @@ def test_retained_aliases_have_a_future_removal_version():
     assert tuple(map(int, DEPRECATION_REMOVAL_VERSION.split("."))) > tuple(map(int, CURRENT_RELEASE.split(".")))
 
 
-def test_current_release_explains_failure_receipts_and_disabled_tools():
-    entry = _changelog_text().split(f"## [{CURRENT_RELEASE}]", 1)[1].split("\n## [", 1)[0]
+def test_notes_paging_release_explains_failure_receipts_and_disabled_tools():
+    entry = _changelog_text().split(f"## [{NOTES_PAGING_RELEASE}]", 1)[1].split("\n## [", 1)[0]
     upgrade = README_PATH.read_text().split(f"### Upgrading from {HTTP_TRANSPORT_RELEASE}", 1)[1].split("### Upgrading", 1)[0]
     assert "isError" in entry and "disabled_reason" in entry
     assert "isError" in upgrade and "receipt" in upgrade
+
+
+def test_notes_paging_release_heading_keeps_its_date():
+    text = _changelog_text()
+    heading = _release_heading_re(NOTES_PAGING_RELEASE).search(text)
+    heading_line = text[heading.start() : text.index("\n", heading.start())]
+    assert NOTES_PAGING_RELEASE_DATE in heading_line, heading_line
+
+
+def test_default_board_release_adds_the_default_board_and_fixes_the_slug_refusal():
+    text = _changelog_text()
+    start = _release_heading_re(DEFAULT_BOARD_RELEASE).search(text).start()
+    end = _release_heading_re(NOTES_PAGING_RELEASE).search(text).start()
+    section = text[start:end]
+    assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Added", "Fixed"]
+    for term in ("VALARIS_DEFAULT_WORKSPACE_SLUG", "VALARIS_DEFAULT_BOARD_ID", "DEFAULT BOARD", "default_board"):
+        assert term in section
+    assert "create_workspace" in section and "slug" in section
+    heading_line = text[start : text.index("\n", start)]
+    assert DEFAULT_BOARD_RELEASE_DATE in heading_line, heading_line
+
+
+def test_current_release_queues_invocation_records_with_native_context():
+    text = _changelog_text()
+    start = _release_heading_re(CURRENT_RELEASE).search(text).start()
+    end = _release_heading_re(DEFAULT_BOARD_RELEASE).search(text).start()
+    section = text[start:end]
+    assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Changed", "Fixed", "Security"]
+    assert "get_download_url" in section and "X-Goog-Signature" in section
+    for term in ("background queue", "native_call_id", "server_instance_id", "mcp_session", "cryptography"):
+        assert term in section
+    from valaris_mcp.catalog import DEPRECATION_REMOVAL_VERSION
+
+    assert f"postponed to {DEPRECATION_REMOVAL_VERSION}" in section
+    # Only what 0.8.1 users actually had.
+    assert "BACKPLANE_CAPTURE_" not in section
+    # Released means released: nothing waits unreleased above it, and what
+    # 0.8.1 shipped is not announced again.
+    assert "## [Unreleased]" not in text[:start]
+    assert "VALARIS_DEFAULT_WORKSPACE_SLUG" not in section
+
+
+def test_readme_upgrade_section_covers_the_invocation_recording_switch():
+    section = _readme_section(f"### Upgrading from {DEFAULT_BOARD_RELEASE.rsplit('.', 1)[0]}.x")
+    for term in ("mcp_session", "/api/me/mcp-invocations", "404", "invocation_tracking"):
+        assert term in section
+    from valaris_mcp.catalog import DEPRECATION_REMOVAL_VERSION
+
+    assert f"postponed to {DEPRECATION_REMOVAL_VERSION}" in section
+    assert "BACKPLANE_CAPTURE_" not in section
