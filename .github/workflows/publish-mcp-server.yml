@@ -39,6 +39,11 @@ jobs:
         run: |
           uv export --frozen --no-hashes --no-emit-project --extra dev -o /tmp/mcp-lock-requirements.txt
           uvx pip-audit --strict --no-deps -r /tmp/mcp-lock-requirements.txt
+          # pip-audit judges markers for this host, so the Intel-mac fork of the lock
+          # (cryptography 48.0.1: no x86_64 wheel after it) is resolved from the same
+          # pins and audited too; only its three known cryptography advisories are waived.
+          uv pip compile pyproject.toml --extra dev --python-platform x86_64-apple-darwin --python-version 3.12 -c /tmp/mcp-lock-requirements.txt --no-header --no-annotate -q -o /tmp/mcp-lock-darwin-x86_64.txt
+          uvx pip-audit --strict --no-deps -r /tmp/mcp-lock-darwin-x86_64.txt --ignore-vuln PYSEC-2026-3552 --ignore-vuln PYSEC-2026-3553 --ignore-vuln PYSEC-2026-3554
 
   build:
     name: Build wheel + sdist

@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+
 import httpx
 
 from valaris_mcp.config import AGENT_EMAIL, API_BASE_URL, API_KEY, IAP_AUDIENCE
+
+
+current_invocation_id: ContextVar[str | None] = ContextVar("current_invocation_id", default=None)
 
 
 class ValarisClient:
@@ -68,6 +73,10 @@ class ValarisClient:
         return {"Authorization": f"Bearer {token}"}
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
+        headers = dict(kwargs.pop("headers", None) or {})
+        if invocation_id := current_invocation_id.get():
+            headers["X-Backplane-Invocation-ID"] = invocation_id
+        kwargs["headers"] = headers
         if IAP_AUDIENCE and not API_KEY:
             kwargs.setdefault("headers", {}).update(self._get_iap_headers())
         resp = await self._http.request(method, f"/api{path}", **kwargs)

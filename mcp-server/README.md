@@ -208,6 +208,27 @@ intersection; `enabled_tools` is the hand after it.
 
 ## Upgrading
 
+### Upgrading from 0.8.x
+
+No configuration changes. What behaves differently:
+
+- Tool calls are recorded as private invocation records
+  (`POST /api/me/mcp-invocations`, see
+  [Invocation records](#invocation-records)) instead of
+  one `mcp_session` execution per call. With a registered agent's key, 0.8.x
+  added those rows to the agent's executions; 0.9.0 adds none. Executions the
+  runner logs itself (`log_execution_start`, `log_execution_update`) are
+  unchanged.
+- Recording needs a backend that provides this endpoint. Against one that
+  does not, the endpoint answers 404: recording pauses for five minutes at
+  a time with one log line, and every tool keeps working. `get_server_info`
+  shows the counts under `invocation_tracking`.
+- `create_agent`, `rotate_agent_key`, `get_download_url` and `get_upload_url`
+  outcomes keep no result summary, and signed-URL query values are redacted
+  from every summary.
+- The deprecated aliases from 0.7.0 still work; their removal is
+  postponed to 0.10.0. Migrate to the canonical tools before that release.
+
 ### Upgrading from 0.7.3
 
 **Breaking:** 0.8.0 changes `list_notes` from a bare array to a paged object:
@@ -218,7 +239,7 @@ field and repeat the call using `offset=next_offset` and the same filters until
 for editable content. Restart pagination if notes change during traversal.
 
 The deprecated aliases from 0.7.0 remain callable; their planned removal is
-postponed to 0.9.0. Migrate to the canonical tools before that release.
+postponed to 0.10.0. Migrate to the canonical tools before that release.
 
 Upgrade the backend alongside the MCP package: paging and bulk repository
 validation require the matching backend support. The raw HTTP notes API keeps
@@ -326,3 +347,37 @@ create fields. An unknown slug or a repository not attached to the target
 board rejects the whole batch with 422, without creating cards. The historical
 single-card `create_card` fallback is unchanged. Bulk creation is still not
 idempotent: retrying a successful batch creates duplicates.
+
+## Invocation records
+
+Every tool call is recorded as one private invocation outcome
+(`POST /api/me/mcp-invocations`) owned by the authenticated key. Recording
+never delays the tool response: the outcome is queued in process and posted by
+a background task, at most twice, within a short deadline. The queue is
+bounded; when it is full, the backend rejects the endpoint (404/405) or the
+credential (401/403), the outcome is dropped and counted instead, and a 401/403
+or 404/405 pauses posting for five minutes with a single log line. On shutdown
+the queue is flushed for up to two seconds. `get_server_info` reports the
+counts under `invocation_tracking`; nothing is retried durably.
+
+While a tool runs, every backend request it makes carries
+`X-Backplane-Invocation-ID`, so a backend that records invocations can
+attribute those requests to the call.
+
+Each outcome also carries an agent-neutral native context, so a backend can
+correlate each MCP call with the coding agent's own record of it:
+
+| Field | Source |
+|---|---|
+| `client_name`, `client_version` | MCP `initialize` `clientInfo` |
+| `harness` | `claude-code` → `claude_code`; `codex-mcp-client` → `codex_cli`; anything else → null |
+| `native_call_id` | request `_meta`: Claude Code `claudecode/toolUseId`, Codex `callId` |
+| `server_instance_id` | a UUID generated once per server process |
+
+`native_call_id` is the id the agent's own hooks and telemetry use for the same
+tool call (Claude's `tool_use_id`, Codex's `call_id`; the OpenTelemetry GenAI
+`gen_ai.tool.call.id`). Every Codex host initializes MCP
+servers as `codex-mcp-client`, so Codex Desktop calls are reported as
+`codex_cli`. Agent-key invocations are recorded but never attributed
+to a person. No configuration is needed; unknown clients are recorded
+without a harness.

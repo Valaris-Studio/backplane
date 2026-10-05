@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, Check, Hash, Link2, MoreVertical, Trash2, Unlink, X, UserPlus } from "lucide-react";
+import { AlertTriangle, Check, Copy, Hash, Link2, MoreVertical, Trash2, Unlink, X, UserPlus } from "lucide-react";
 import {
   useUpdateCard,
   useAddParticipant,
@@ -127,6 +127,7 @@ export function CardDetailSheet({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [idCopied, setIdCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [branchCopied, setBranchCopied] = useState(false);
   const { data: members } = useMembers(slug);
   // Card-scoped: the backend filters by this card, so a done card's full
   // pipeline history is returned regardless of how old it is (was empty before —
@@ -279,6 +280,15 @@ export function CardDetailSheet({
       if (!copiedSuccessfully) return;
       setIdCopied(true);
       window.setTimeout(() => setIdCopied(false), 1500);
+    });
+  }
+
+  function copyBranchName() {
+    if (!card?.branch_name) return;
+    void copyTextToClipboard(card.branch_name).then((copiedSuccessfully) => {
+      if (!copiedSuccessfully) return;
+      setBranchCopied(true);
+      window.setTimeout(() => setBranchCopied(false), 1500);
     });
   }
 
@@ -782,6 +792,27 @@ export function CardDetailSheet({
                 ) : (
                   <p className="text-xs text-muted-foreground">{t("agentic.card.prNone")}</p>
                 )}
+                {card?.branch_name ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">{t("agentic.card.branchLabel")}</span>
+                    <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 font-mono">
+                      {card.branch_name}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0"
+                      aria-label={t("agentic.card.copyBranch")}
+                      onClick={copyBranchName}
+                    >
+                      {branchCopied ? (
+                        <Check className="h-3 w-3 text-[color:var(--color-success)]" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               <StuckReasonsPanel reasons={stuckReasons} suppressed={isDoneColumn} />
@@ -875,91 +906,88 @@ export function CardDetailSheet({
                   </p>
                 )}
               </div>
-
-              {/* Review & platform notes */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t("agentic.card.notesTitle")}
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    disabled={updateNote.isPending}
-                    onClick={() => {
-                      setNoteLinkError(null);
-                      setLinkNoteOpen(true);
-                    }}
-                  >
-                    {t("agentic.card.linkNote")}
-                  </Button>
-                </div>
-                {/* Row-unlink failures happen with the picker closed — the
-                    picker renders its own copy of this message while open. */}
-                {noteLinkErrorMessage && !linkNoteOpen ? (
-                  <p role="alert" className="text-xs text-destructive">
-                    {noteLinkErrorMessage}
-                  </p>
-                ) : null}
-                {sortedCardNotes.length > 0 ? (
-                  <>
-                    <ul className="space-y-1">
-                      {sortedCardNotes.map((note) => (
-                        <li
-                          key={note.id}
-                          className="flex items-center justify-between gap-2 text-xs"
-                        >
-                          {/* House rule: link the note to its element. A note
-                              that records a pipeline verdict links to the
-                              execution that produced it; otherwise to the board
-                              notes page. */}
-                          <EntityLink
-                            {...(note.source_execution_id
-                              ? { type: "execution", id: note.source_execution_id, slug }
-                              : { type: "note", id: note.id, slug, boardId })}
-                            className="truncate text-primary hover:underline"
-                          >
-                            {note.title}
-                          </EntityLink>
-                          <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-                            {formatDate(note.created_at)}
-                            {/* Immutable kinds (review_verdict): the backend
-                                403s any update, unlink included — offer no
-                                affordance. */}
-                            {isImmutableNoteKind(note.kind) ? null : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                aria-label={t("agentic.card.unlinkNote")}
-                                disabled={updateNote.isPending}
-                                onClick={() => setNoteCardLink(note.id, null)}
-                              >
-                                <Unlink className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    {(cardNotes?.length ?? 0) > sortedCardNotes.length ? (
-                      <Link
-                        to={`/${slug}/boards/${boardId}/notes`}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        {t("cards.viewAllNotes")}
-                      </Link>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {t("agentic.card.notesEmpty")}
-                  </p>
-                )}
-              </div>
             </div>
           </AgentInfoSubtab>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">{t("cards.linkedNotesTitle")}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled={updateNote.isPending}
+                onClick={() => {
+                  setNoteLinkError(null);
+                  setLinkNoteOpen(true);
+                }}
+              >
+                {t("agentic.card.linkNote")}
+              </Button>
+            </div>
+            {/* Row-unlink failures happen with the picker closed — the
+                picker renders its own copy of this message while open. */}
+            {noteLinkErrorMessage && !linkNoteOpen ? (
+              <p role="alert" className="text-xs text-destructive">
+                {noteLinkErrorMessage}
+              </p>
+            ) : null}
+            {sortedCardNotes.length > 0 ? (
+              <>
+                <ul className="space-y-1">
+                  {sortedCardNotes.map((note) => (
+                    <li
+                      key={note.id}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      {/* House rule: link the note to its element. A note
+                          that records a pipeline verdict links to the
+                          execution that produced it; otherwise to the board
+                          notes page. */}
+                      <EntityLink
+                        {...(note.source_execution_id
+                          ? { type: "execution", id: note.source_execution_id, slug }
+                          : { type: "note", id: note.id, slug, boardId })}
+                        className="truncate text-primary hover:underline"
+                      >
+                        {note.title}
+                      </EntityLink>
+                      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                        {formatDate(note.created_at)}
+                        {/* Immutable kinds (review_verdict): the backend
+                            403s any update, unlink included — offer no
+                            affordance. */}
+                        {isImmutableNoteKind(note.kind) ? null : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            aria-label={t("agentic.card.unlinkNote")}
+                            disabled={updateNote.isPending}
+                            onClick={() => setNoteCardLink(note.id, null)}
+                          >
+                            <Unlink className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {(cardNotes?.length ?? 0) > sortedCardNotes.length ? (
+                  <Link
+                    to={`/${slug}/boards/${boardId}/notes`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {t("cards.viewAllNotes")}
+                  </Link>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t("cards.linkedNotesEmpty")}
+              </p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <label htmlFor={fieldId("column")} className="text-sm font-medium">

@@ -83,11 +83,16 @@ describe("LaunchRunnerWizard bind step semantics", () => {
     await waitFor(() => expect(screen.getByTestId("wizard-next")).toBeEnabled());
     fireEvent.click(screen.getByTestId("wizard-next"));
 
+    // Next advances only after two sequential round trips (create team, then
+    // add member); await each one so no single waitFor spans the whole chain.
+    await waitFor(() => expect(capture.teamCreates).toBe(1));
+    await waitFor(() =>
+      expect(capture.memberBodies).toEqual([{ agent_id: "ag1", roles: [] }]),
+    );
     await waitFor(() =>
       expect(screen.getByTestId("wizard-step-config")).toBeInTheDocument(),
     );
     expect(capture.teamCreates).toBe(1);
-    expect(capture.memberBodies).toEqual([{ agent_id: "ag1", roles: [] }]);
   });
 
   it("shows the all-roles hint while zero roles are selected", async () => {

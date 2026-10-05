@@ -84,59 +84,59 @@
   },
   "deprecated": {
     "append_note": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "update_note(mode='append')"
     },
     "check_loop_template_fit": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_loop_template(view='fit', board_id=...)"
     },
     "claim_card": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "next_assignment (runners) or move_card + add_card_participant (interactive)"
     },
     "delete_webhook": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "update_webhook(delete=True)"
     },
     "get_board_loop_binding": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_board_loop_binding_raw"
     },
     "get_loop_template_profile": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_loop_template(view='profile')"
     },
     "get_workspace_cost": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_workspace_metrics(view='cost')"
     },
     "get_workspace_velocity": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_workspace_metrics(view='velocity')"
     },
     "hard_delete_agent": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "update_agent(hard_delete=True)"
     },
     "lint_loop_template": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_loop_template(view='lint')"
     },
     "list_skill_bindings": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "list_skill_bindings_raw"
     },
     "preview_loop_template": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "get_loop_template(view='preview')"
     },
     "remove_card_participants_by_role": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "remove_card_participant(pipeline_role=...)"
     },
     "replace_note_section": {
-      "removed_in": "0.9.0",
+      "removed_in": "0.10.0",
       "replacement": "update_note(mode='section')"
     }
   },

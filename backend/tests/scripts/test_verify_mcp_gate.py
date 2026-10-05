@@ -23,9 +23,9 @@ import sys
 name = Path(sys.argv[0]).name
 args = sys.argv[1:]
 if name == "uv":
-    stage = {"sync": "sync", "export": "export", "build": "build", "run": "tests"}[args[0]]
+    stage = {"sync": "sync", "export": "export", "build": "build", "run": "tests", "pip": "darwin-compile"}[args[0]]
 elif name == "uvx":
-    stage = "audit"
+    stage = "darwin-audit" if Path(args[args.index("-r") + 1]).name.endswith("darwin-x86_64.txt") else "audit"
 else:
     stage = "legacy"
 with open(os.environ["COMMAND_LOG"], "a") as log:
@@ -40,11 +40,19 @@ if stage == "export":
         Path(args[args.index("--output-file") + 1]).write_text(requirements)
     else:
         print(requirements, end="")
+if stage == "darwin-compile":
+    assert Path(args[args.index("-c") + 1]).read_text() == "locked-package==1.2.3\n"
+    Path(args[args.index("-o") + 1]).write_text("locked-package==1.2.3\ncryptography==48.0.1\n")
 if stage == "audit":
     assert Path(args[args.index("-r") + 1]).read_text() == "locked-package==1.2.3\n"
+if stage == "darwin-audit":
+    assert Path(args[args.index("-r") + 1]).read_text() == "locked-package==1.2.3\ncryptography==48.0.1\n"
 if name == "python" and args[:1] == ["-c"]:
     sys.exit(1)  # The old optional-build path must not qualify a candidate.
 '''
+
+
+STAGES = ["sync", "tests", "export", "audit", "darwin-compile", "darwin-audit", "build"]
 
 
 @pytest.fixture
@@ -88,25 +96,33 @@ def run_gate(tmp_path):
 def test_mcp_gate_qualifies_locked_dependencies_tests_audit_and_wheel(run_gate, existing_venv):
     result, commands, repo = run_gate(existing_venv=existing_venv)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert [command["stage"] for command in commands] == ["sync", "tests", "export", "audit", "build"]
+    assert [command["stage"] for command in commands] == STAGES
     assert all(Path(command["cwd"]).resolve() == (repo / "mcp-server").resolve() for command in commands)
-    sync, tests, export, audit, build = [command["args"] for command in commands]
+    sync, tests, export, audit, darwin_compile, darwin_audit, build = [command["args"] for command in commands]
     assert sync == ["sync", "--frozen", "--extra", "dev"]
     assert tests[0] == "run"
     assert {"--frozen", "--no-sync"} & set(tests)
     assert tests[-6:] == ["python", "-m", "pytest", "tests/", "--tb=short", "-q"]
     assert {"--frozen", "--no-hashes", "--no-emit-project", "--extra", "dev"} <= set(export)
     assert audit[:3] == ["pip-audit", "--strict", "--no-deps"]
+    assert "--ignore-vuln" not in audit
+    # The Intel-mac fork is resolved from the export's pins, then audited with exact waivers.
+    assert darwin_compile[:2] == ["pip", "compile"]
+    assert darwin_compile[darwin_compile.index("--python-platform") + 1] == "x86_64-apple-darwin"
+    assert darwin_compile[darwin_compile.index("-c") + 1] == export[export.index("-o") + 1]
+    assert darwin_audit[:3] == ["pip-audit", "--strict", "--no-deps"]
+    assert darwin_audit[darwin_audit.index("-r") + 1] == darwin_compile[darwin_compile.index("-o") + 1]
+    waived = [darwin_audit[i + 1] for i, arg in enumerate(darwin_audit) if arg == "--ignore-vuln"]
+    assert sorted(waived) == ["PYSEC-2026-3552", "PYSEC-2026-3553", "PYSEC-2026-3554"]
     assert build[:2] == ["build", "--wheel"]
     assert "All gates passed" in result.stdout
 
 
-@pytest.mark.parametrize("stage", ["sync", "tests", "export", "audit", "build"])
+@pytest.mark.parametrize("stage", STAGES)
 def test_mcp_gate_failure_cannot_report_success_or_run_later_stages(run_gate, stage):
     result, commands, _ = run_gate(fail_stage=stage)
     assert result.returncode != 0, result.stdout
-    expected = ["sync", "tests", "export", "audit", "build"]
-    assert [command["stage"] for command in commands] == expected[:expected.index(stage) + 1]
+    assert [command["stage"] for command in commands] == STAGES[:STAGES.index(stage) + 1]
     assert "All gates passed" not in result.stdout
     assert "1 job(s) failed" in result.stdout
 

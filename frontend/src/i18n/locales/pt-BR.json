@@ -1038,6 +1038,11 @@
         "fills": "Preenche: {{slots}}",
         "save": "Aplicar template",
         "saveFailed": "Não foi possível aplicar o template. Tente novamente.",
+        "relaxGate": {
+          "notice": "Este template permite que o loop mescle o próprio trabalho e mova os próprios cartões para Concluído. Ao aplicar este template, o portão de Concluído é desativado neste quadro, e os cartões poderão chegar a Concluído sem um PR mesclado. A configuração do espaço de trabalho não muda.",
+          "accept": "Desativar o portão ao aplicar",
+          "enforcedConflict": "O portão de Concluído deste quadro está imposto explicitamente: ele continuará ativado e este loop não poderá mover cartões para Concluído, pois o template mescla sem um PR revisado. Altere o portão nas configurações do quadro ou escolha uma opção de aterrissagem que não faça auto-merge."
+        },
         "status": {
           "ok": "OK",
           "missing": "Faltando",
@@ -1174,6 +1179,8 @@
     "heroExists": "O cartão já tem um responsável principal",
     "viewApproval": "Ver aprovação",
     "viewAllNotes": "Ver todas as notas",
+    "linkedNotesTitle": "Notas vinculadas",
+    "linkedNotesEmpty": "Nenhuma nota está vinculada a este cartão.",
     "actions": {
       "delete": "Excluir cartão",
       "more": "Ações do cartão",
@@ -7738,8 +7745,6 @@
       "subtabTitle": "Atividade do Runner",
       "participantsTitle": "Runners participantes",
       "participantsEmpty": "Nenhum runner participante.",
-      "notesTitle": "Notas de revisão e da plataforma",
-      "notesEmpty": "Nenhuma nota escrita por runner está vinculada a este cartão.",
       "linkNote": "Vincular nota",
       "unlinkNote": "Desvincular nota",
       "notePickerDescription": "Vincule uma nota deste quadro a este cartão.",
@@ -7751,6 +7756,8 @@
       "prStateMerged": "Merge concluído",
       "prStateClosed": "Fechado",
       "prNone": "Nenhum pull request está vinculado a este cartão.",
+      "branchLabel": "Branch",
+      "copyBranch": "Copiar nome da branch",
       "executionsTitle": "Histórico de execuções",
       "executionsEmpty": "Nenhuma execução registrada para este cartão ainda.",
       "executionLink": "Ver execução",

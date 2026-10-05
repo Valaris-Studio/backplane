@@ -1014,6 +1014,11 @@
         "fills": "Fills: {{slots}}",
         "save": "Apply template",
         "saveFailed": "Could not apply the template. Please try again.",
+        "relaxGate": {
+          "notice": "This template lets the loop merge its own work and move its own cards to Done. Applying this template turns the done gate off for this board, so cards can reach Done without a merged PR. The workspace setting is unchanged.",
+          "accept": "Turn the gate off when applying",
+          "enforcedConflict": "This board's done gate is explicitly enforced, so it stays on and this loop cannot move cards to Done — the template merges without a reviewed PR. Change the gate in Board Settings or pick a landing option that does not self-merge."
+        },
         "status": {
           "ok": "OK",
           "missing": "Missing",
@@ -1149,6 +1154,8 @@
     "heroExists": "Card already has a primary owner",
     "viewApproval": "View approval",
     "viewAllNotes": "View all notes",
+    "linkedNotesTitle": "Linked notes",
+    "linkedNotesEmpty": "No notes linked to this card.",
     "actions": {
       "delete": "Delete card",
       "more": "Card actions",
@@ -7706,8 +7713,6 @@
       "subtabTitle": "Runner activity",
       "participantsTitle": "Runner participants",
       "participantsEmpty": "No runner participants.",
-      "notesTitle": "Review & platform notes",
-      "notesEmpty": "No runner-authored notes linked to this card.",
       "linkNote": "Link note",
       "unlinkNote": "Unlink note",
       "notePickerDescription": "Attach a note from this board to this card.",
@@ -7719,6 +7724,8 @@
       "prStateMerged": "Merged",
       "prStateClosed": "Closed",
       "prNone": "No pull request linked to this card.",
+      "branchLabel": "Branch",
+      "copyBranch": "Copy branch name",
       "executionsTitle": "Execution history",
       "executionsEmpty": "No executions recorded for this card yet.",
       "executionLink": "View execution",

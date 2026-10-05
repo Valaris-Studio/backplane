@@ -13,6 +13,10 @@ from valaris_mcp.errors import handle_api_errors
 from valaris_mcp.server import AppContext, mcp
 
 
+# Mirrors the backend's SLUG_FORMAT, which WorkspaceCreate enforces.
+_SLUG_FORMAT = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
 def _slugify(name: str) -> str:
     """Derive a URL-friendly slug from a workspace name."""
     slug = name.lower().strip()
@@ -125,6 +129,26 @@ async def create_workspace(
     client = app.client
 
     slug = slug.strip() if slug else _slugify(name)
+    # No shared fallback: a constant slug would collide across unrelated
+    # non-ASCII names and hand back whichever workspace already owns it.
+    if not slug:
+        return json.dumps(
+            {
+                "error": True,
+                "message": f"Cannot derive a slug from name {name!r}: pass an explicit slug (lowercase letters, digits and single hyphens).",
+            },
+            indent=2,
+        )
+    # Checked before the existence probe: a malformed slug would otherwise be
+    # interpolated into the GET path (e.g. "../x").
+    if not _SLUG_FORMAT.match(slug):
+        return json.dumps(
+            {
+                "error": True,
+                "message": f"Invalid slug {slug!r}: use lowercase letters, digits and single hyphens (^[a-z0-9]+(-[a-z0-9]+)*$).",
+            },
+            indent=2,
+        )
 
     # Check if workspace already exists
     try:

@@ -1,0 +1,5882 @@
+{
+  "input_schemas": {
+    "activate_catalog_skill": {
+      "properties": {
+        "catalog_id": {
+          "description": "Catalog entry id, from list_skill_catalog.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "catalog_id"
+      ],
+      "type": "object"
+    },
+    "add_card_dependency": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Dependent card UUID or id prefix.",
+          "type": "string"
+        },
+        "depends_on_card_id": {
+          "description": "Prerequisite card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "depends_on_card_id"
+      ],
+      "type": "object"
+    },
+    "add_card_participant": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "pipeline_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stage role for role-aware filters (planner, implementer, reviewer, ... or custom; max 64 chars)."
+        },
+        "role": {
+          "default": "hero",
+          "description": "hero (responsible)|viewer|stakeholder|helper.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "User UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "user_id"
+      ],
+      "type": "object"
+    },
+    "add_team_member": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Single role (legacy; prefer roles)."
+        },
+        "roles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One or more of orchestrator|reviewer|documentator|custom."
+        },
+        "team_id": {
+          "description": "Team UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "team_id",
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "add_workspace_member": {
+      "properties": {
+        "role": {
+          "default": "member",
+          "description": "owner|admin|member|viewer (default member).",
+          "type": "string"
+        },
+        "user_email": {
+          "description": "Email of the user to add.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "user_email"
+      ],
+      "type": "object"
+    },
+    "append_note": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "content": {
+          "description": "Blocks to append (markdown recommended).",
+          "type": "string"
+        },
+        "note_id": {
+          "description": "Note UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "note_id",
+        "content"
+      ],
+      "type": "object"
+    },
+    "apply_loop_template_fixes": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "fix_ids": {
+          "description": "`fix_id` values from check_loop_template_fit.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "template_ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "template_ref",
+        "fix_ids"
+      ],
+      "type": "object"
+    },
+    "archive_loop_template": {
+      "properties": {
+        "archived": {
+          "default": true,
+          "description": "False to restore.",
+          "type": "boolean"
+        },
+        "ref": {
+          "description": "Workspace template UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "bulk_create_cards": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "cards": {
+          "description": "Each: column_id, title (required); description, card_type (task|issue|feature|bug), priority (none|low|medium|high|urgent), due_date (YYYY-MM-DD), status, labels, git_repo_slug. Nothing else.",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "cards"
+      ],
+      "type": "object"
+    },
+    "bulk_set_card_dependencies": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "depends_on_card_ids": {
+          "description": "Complete prerequisite list (UUIDs or id prefixes); empty clears the set.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "depends_on_card_ids"
+      ],
+      "type": "object"
+    },
+    "cancel_execution": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "execution_id": {
+          "description": "Execution UUID (list_executions status='inflight' finds zombies).",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "description": "Recorded as output_summary.",
+          "type": "string"
+        },
+        "status": {
+          "default": "aborted",
+          "description": "aborted (default)|completed|failed; non-terminal values are rejected.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id",
+        "execution_id"
+      ],
+      "type": "object"
+    },
+    "cancel_merge_queue_entry": {
+      "properties": {
+        "entry_id": {
+          "description": "Entry UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "entry_id"
+      ],
+      "type": "object"
+    },
+    "check_loop_template_fit": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "template_ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "template_ref"
+      ],
+      "type": "object"
+    },
+    "claim_card": {
+      "properties": {
+        "agent_id": {
+          "description": "Claiming runner's UUID.",
+          "type": "string"
+        },
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "create_agent": {
+      "properties": {
+        "agent_type": {
+          "description": "coding|manager|reviewer|secretary|improver.",
+          "type": "string"
+        },
+        "allowed_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Action allowlist (None = all)."
+        },
+        "allowed_workspaces": {
+          "description": "Workspace slugs the runner may see; must be non-empty.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "budget_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Spending cap in USD."
+        },
+        "description": {
+          "default": "",
+          "description": "What it does.",
+          "type": "string"
+        },
+        "max_requests_per_minute": {
+          "default": 100,
+          "description": "Rate limit.",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "agent_type",
+        "allowed_workspaces"
+      ],
+      "type": "object"
+    },
+    "create_board": {
+      "properties": {
+        "coding_standards": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free text."
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Hard constraints."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"key\", \"value\"?}]."
+        },
+        "decisions": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"decision\", \"rationale\"?}]."
+        },
+        "definition_content": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Raw dict for other definition keys."
+        },
+        "description": {
+          "default": "",
+          "description": "Board purpose.",
+          "type": "string"
+        },
+        "exclusions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Out-of-scope items."
+        },
+        "milestones": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"title\", \"date\", \"type\"?}]."
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "objectives": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"text\", \"priority\"?}]."
+        },
+        "references": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"url\", \"label\"?}]."
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Definition scope/summary."
+        },
+        "skip_default_columns": {
+          "default": false,
+          "description": "Skip the default typed columns (To Do/In Progress/Blocked/Done).",
+          "type": "boolean"
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL slug; the idempotency key."
+        },
+        "stakeholders": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"name\", \"role\"?, \"member_id\"?, \"channel_id\"?}]."
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tags."
+        },
+        "tech_stack": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[\"python\", \"react\", ...]."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "name"
+      ],
+      "type": "object"
+    },
+    "create_card": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_type": {
+          "default": "task",
+          "description": "task|issue|feature|bug.",
+          "type": "string"
+        },
+        "column_id": {
+          "description": "Target column UUID.",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "Card description.",
+          "type": "string"
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "YYYY-MM-DD."
+        },
+        "git_repo_slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target repo slug on multi-repo boards; omit for the primary repo."
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Label strings."
+        },
+        "priority": {
+          "default": "none",
+          "description": "none|low|medium|high|urgent.",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short state label. Max 255 characters."
+        },
+        "title": {
+          "description": "Max 500 characters.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "column_id",
+        "title"
+      ],
+      "type": "object"
+    },
+    "create_channel": {
+      "properties": {
+        "channel_type": {
+          "description": "email|slack|whatsapp|phone|website|other.",
+          "type": "string"
+        },
+        "contact_value": {
+          "description": "Address or identifier (email, phone number, URL).",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "Description.",
+          "type": "string"
+        },
+        "metadata_json": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Extra metadata dict."
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "name",
+        "channel_type",
+        "contact_value"
+      ],
+      "type": "object"
+    },
+    "create_column": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Hex color for the header."
+        },
+        "column_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "backlog|active|review|done|blocked; drives runner discovery and movement."
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "create_git_repo": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "default_branch": {
+          "default": "main",
+          "description": "Default branch name.",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "Optional description.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "github|gitlab|bitbucket|gitea|other.",
+          "type": "string"
+        },
+        "require_branch_protection": {
+          "default": true,
+          "description": "Runner arms branch protection at first clone (default True); False for human-owned repos.",
+          "type": "boolean"
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-card git_repo_slug selector on multi-repo boards; derived from name when omitted."
+        },
+        "url": {
+          "description": "Repository URL.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "name",
+        "url",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "create_loop_template": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{system_prompt, loop_prompt, slots, tools, rails_defaults, ...}."
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{emoji, tagline, tags}."
+        },
+        "slug": {
+          "description": "URL-safe, unique in the workspace.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "slug",
+        "name"
+      ],
+      "type": "object"
+    },
+    "create_note": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "card_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Card to link; needs board_id and a card on this board (else 422; unknown or cross-workspace card 404)."
+        },
+        "content": {
+          "default": "",
+          "description": "Body as markdown (HTML, plain text or ProseMirror JSON also accepted).",
+          "type": "string"
+        },
+        "kind": {
+          "default": "user_note",
+          "description": "user_note (default) or a structural kind: plan, rework_brief, review_verdict, ...",
+          "type": "string"
+        },
+        "pinned": {
+          "default": false,
+          "description": "Pin the note to the top.",
+          "type": "boolean"
+        },
+        "title": {
+          "description": "Note title.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "title"
+      ],
+      "type": "object"
+    },
+    "create_prompt_config": {
+      "properties": {
+        "agent_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "coding|manager|reviewer|secretary|improver."
+        },
+        "content": {
+          "description": "Prompt template text.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Unique slug.",
+          "type": "string"
+        },
+        "stage": {
+          "description": "e.g. implement|review|plan.",
+          "type": "string"
+        },
+        "team_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Team UUID scope."
+        },
+        "team_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "e.g. orchestrator|reviewer."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "name",
+        "slug",
+        "stage",
+        "content"
+      ],
+      "type": "object"
+    },
+    "create_resource": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Description."
+        },
+        "gcs_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Storage path from get_upload_url (uploaded files)."
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Metadata dict."
+        },
+        "name": {
+          "description": "Resource name.",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parent folder UUID."
+        },
+        "resource_type": {
+          "default": "file",
+          "description": "file|folder.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "name"
+      ],
+      "type": "object"
+    },
+    "create_team": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID to scope the team to."
+        },
+        "description": {
+          "default": "",
+          "description": "What it does.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Team name.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "name"
+      ],
+      "type": "object"
+    },
+    "create_webhook": {
+      "properties": {
+        "events": {
+          "description": "Event names; see ENUMS in the server instructions.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "secret": {
+          "description": "HMAC signing secret.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Delivery URL (https-only outside development).",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "url",
+        "events",
+        "secret"
+      ],
+      "type": "object"
+    },
+    "create_workspace": {
+      "properties": {
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "slug": {
+          "default": "",
+          "description": "URL slug; derived from name if omitted.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "deactivate_team": {
+      "properties": {
+        "team_id": {
+          "description": "Team UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "team_id"
+      ],
+      "type": "object"
+    },
+    "decide_approval": {
+      "properties": {
+        "approval_id": {
+          "description": "Approval UUID.",
+          "type": "string"
+        },
+        "decision": {
+          "description": "approved|rejected.",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional reason."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "approval_id",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "delete_board": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "delete_card": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "delete_channel": {
+      "properties": {
+        "channel_id": {
+          "description": "Channel UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "channel_id"
+      ],
+      "type": "object"
+    },
+    "delete_column": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "column_id": {
+          "description": "Column UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "column_id"
+      ],
+      "type": "object"
+    },
+    "delete_git_repo": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "repo_id": {
+          "description": "Git repo UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "repo_id"
+      ],
+      "type": "object"
+    },
+    "delete_note": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "note_id": {
+          "description": "Note UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "note_id"
+      ],
+      "type": "object"
+    },
+    "delete_prompt_config": {
+      "properties": {
+        "config_id": {
+          "description": "Prompt config UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "config_id"
+      ],
+      "type": "object"
+    },
+    "delete_resource": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "resource_id": {
+          "description": "Resource UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "delete_webhook": {
+      "properties": {
+        "webhook_id": {
+          "description": "Webhook UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "webhook_id"
+      ],
+      "type": "object"
+    },
+    "delete_workspace": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "duplicate_loop_template": {
+      "properties": {
+        "new_slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Slug for the copy; omit to derive one."
+        },
+        "ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "enable_toolsets": {
+      "properties": {
+        "toolset_ids": {
+          "description": "Toolset ids to add: all, default, or any group or category id listed under get_server_info.toolsets.available.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "toolset_ids"
+      ],
+      "type": "object"
+    },
+    "enqueue_for_merge": {
+      "properties": {
+        "card_id": {
+          "description": "Original (parent) card UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "enqueue_pr_for_merge": {
+      "properties": {
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "git_repo_id": {
+          "description": "Board git repo UUID.",
+          "type": "string"
+        },
+        "integration_branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target branch; defaults to the repo's integration, then default, branch."
+        },
+        "pr_branch": {
+          "description": "PR head branch.",
+          "type": "string"
+        },
+        "pr_url": {
+          "description": "PR URL.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "card_id",
+        "git_repo_id",
+        "pr_url",
+        "pr_branch"
+      ],
+      "type": "object"
+    },
+    "export_loop_template": {
+      "properties": {
+        "template_ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Source workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "template_ref"
+      ],
+      "type": "object"
+    },
+    "export_pipeline_bundle": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Source workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "freeze_board": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "get_agent_budget_status": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "get_agent_config": {
+      "properties": {},
+      "type": "object"
+    },
+    "get_approval_status": {
+      "properties": {
+        "approval_id": {
+          "description": "Approval UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "approval_id"
+      ],
+      "type": "object"
+    },
+    "get_board": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "summary_only": {
+          "default": false,
+          "description": "Per-column card counts + priority/status breakdowns, no cards.",
+          "type": "boolean"
+        },
+        "titles_only": {
+          "default": false,
+          "description": "Slim each card to id/title/status/priority/labels.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_board_health": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_board_loop": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_board_loop_binding": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "include_diff": {
+          "default": false,
+          "description": "Also fetch the prompt diff and slot delta.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_board_loop_binding_raw": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "include_diff": {
+          "default": false,
+          "description": "Also fetch the prompt diff and slot delta vs. the current version (skipped when `diff_available` is false).",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_card": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "get_card_dependency_status": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "get_card_verdict": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "get_completion_policy": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID/slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_completion_status": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID/slug.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "get_definition": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_download_url": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "resource_id": {
+          "description": "Resource UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "get_loop_template": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID/slug; required for fit, optional for preview."
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True=draft, false=published. Default: false for full, true for rehearsal."
+        },
+        "include_archived": {
+          "default": false,
+          "description": "full: also resolve archived templates.",
+          "type": "boolean"
+        },
+        "include_prompts": {
+          "default": true,
+          "description": "preview: false omits large prompt bodies, keeping findings/slots/rails/tools.",
+          "type": "boolean"
+        },
+        "loop_config": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "fit/preview: unsaved loop rails."
+        },
+        "ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "slot_values": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "fit/preview: proposed slots; missing values use autofill, then defaults."
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "fit/preview: exact published version; requires draft=false."
+        },
+        "view": {
+          "default": "full",
+          "description": "full (default)|profile|preview|fit|lint.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "get_loop_template_profile": {
+      "properties": {
+        "ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "get_merge_queue_entry": {
+      "properties": {
+        "entry_id": {
+          "description": "Entry UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "entry_id"
+      ],
+      "type": "object"
+    },
+    "get_note": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "format": {
+          "default": "prosemirror",
+          "description": "prosemirror (default, raw JSON) or markdown.",
+          "type": "string"
+        },
+        "note_id": {
+          "description": "Note UUID or id prefix (resolved within the same scope).",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "note_id"
+      ],
+      "type": "object"
+    },
+    "get_pipeline_sensors": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_project_context": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "get_prompt_config": {
+      "properties": {
+        "config_id": {
+          "description": "Prompt config UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "config_id"
+      ],
+      "type": "object"
+    },
+    "get_resource": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "resource_id": {
+          "description": "Resource UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "get_server_info": {
+      "properties": {},
+      "type": "object"
+    },
+    "get_skill": {
+      "properties": {
+        "file_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Return this one file in full."
+        },
+        "slug": {
+          "description": "Skill slug.",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Omit for the latest published; pass explicitly for a draft."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "slug"
+      ],
+      "type": "object"
+    },
+    "get_team": {
+      "properties": {
+        "team_id": {
+          "description": "Team UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "team_id"
+      ],
+      "type": "object"
+    },
+    "get_upload_url": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "content_type": {
+          "description": "MIME type.",
+          "type": "string"
+        },
+        "filename": {
+          "description": "File name.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "filename",
+        "content_type"
+      ],
+      "type": "object"
+    },
+    "get_webhook": {
+      "properties": {
+        "webhook_id": {
+          "description": "Webhook UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "webhook_id"
+      ],
+      "type": "object"
+    },
+    "get_workspace": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_workspace_config": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_workspace_cost": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_workspace_metrics": {
+      "properties": {
+        "view": {
+          "default": "all",
+          "description": "\"all\" (default), \"velocity\" (velocity + quality only) or \"cost\" (spend only).",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_workspace_summary": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "get_workspace_velocity": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "hard_delete_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "description": "Must be True.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "import_loop_template": {
+      "properties": {
+        "bundle": {
+          "additionalProperties": true,
+          "description": "Envelope from export_loop_template.",
+          "type": "object"
+        },
+        "dry_run": {
+          "default": true,
+          "description": "False to apply.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Target workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "bundle"
+      ],
+      "type": "object"
+    },
+    "import_pipeline_bundle": {
+      "properties": {
+        "bundle": {
+          "additionalProperties": true,
+          "description": "The envelope from export_pipeline_bundle.",
+          "type": "object"
+        },
+        "dry_run": {
+          "default": true,
+          "description": "Preview only (default). false applies.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Target workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "bundle"
+      ],
+      "type": "object"
+    },
+    "lint_loop_template": {
+      "properties": {
+        "template_ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "template_ref"
+      ],
+      "type": "object"
+    },
+    "list_activity": {
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Activity action; see ENUMS in the server instructions."
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scope to one board."
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Activity entity_type; see ENUMS in the server instructions."
+        },
+        "limit": {
+          "default": 50,
+          "description": "1-100, default 50.",
+          "type": "integer"
+        },
+        "search": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free-text over summaries."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_agents": {
+      "properties": {
+        "include_inactive": {
+          "default": false,
+          "description": "Also return deactivated runners.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "list_approvals": {
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "pending|approved|rejected|expired|auto_approved."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_boards": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_card_dependencies": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "list_cards": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "list_channels": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_documentation": {
+      "properties": {
+        "limit": {
+          "default": 20,
+          "description": "Maximum sections, from 1 to 100.",
+          "type": "integer"
+        },
+        "locale": {
+          "default": "en",
+          "description": "Registered documentation locale (en, es, pt-BR).",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Section offset, starting at zero.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "list_executions": {
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only this runner."
+        },
+        "card_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "That card's history, ignoring limit, capped at the newest 200 rows."
+        },
+        "limit": {
+          "default": 20,
+          "description": "Default 20, caps at 200.",
+          "type": "integer"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pipeline role."
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "started|running|completed|failed|aborted|skipped, or 'inflight' = all active rows workspace-wide, ignoring limit."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_git_repos": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "list_loop_template_versions": {
+      "properties": {
+        "ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "list_loop_templates": {
+      "properties": {
+        "include_archived": {
+          "default": false,
+          "description": "Also list archived workspace templates.",
+          "type": "boolean"
+        },
+        "q": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free-text filter over name and slug."
+        },
+        "sort": {
+          "default": "name",
+          "description": "name|updated_at|boards_using.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_merge_queue": {
+      "properties": {
+        "merged_within_hours": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Also include entries merged within 1..720 hours."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_notes": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "card_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only notes linked to this card on this board (needs board_id)."
+        },
+        "kinds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Match any listed note kind (e.g. plan, review_verdict)."
+        },
+        "limit": {
+          "default": 25,
+          "description": "Page size, 1\u2013100; default 25.",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Zero-based offset; follow next_offset with the same filters.",
+          "type": "integer"
+        },
+        "pinned_only": {
+          "default": false,
+          "description": "Only pinned notes.",
+          "type": "boolean"
+        },
+        "q": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Case-insensitive substring search in title and plain-text body, before paging."
+        },
+        "summary_only": {
+          "default": true,
+          "description": "Omit bodies by default; use get_note(format=\"markdown\") to read one.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug (without board_id, workspace-level notes only).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_prompt_configs": {
+      "properties": {
+        "team_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter, e.g. orchestrator|reviewer."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_resources": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parent folder UUID."
+        },
+        "resource_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "file|folder."
+        },
+        "search": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Name search."
+        },
+        "tag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tag filter."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_skill_bindings": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "list_skill_bindings_raw": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "list_skill_catalog": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_skills": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID or slug: return its effective set."
+        },
+        "include_archived": {
+          "default": false,
+          "description": "Include archived skills (workspace listing only).",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_teams": {
+      "properties": {
+        "include_inactive": {
+          "default": false,
+          "description": "Include inactive teams.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_webhooks": {
+      "properties": {
+        "is_active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "true = active only, false = inactive only."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_workspace_members": {
+      "properties": {
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Max members returned."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Case-insensitive name/email search (capped autocomplete match)."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "list_workspaces": {
+      "properties": {},
+      "type": "object"
+    },
+    "log_execution_start": {
+      "properties": {
+        "action": {
+          "description": "Short action name, e.g. 'review_pr'.",
+          "type": "string"
+        },
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "card_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Card UUID if card-scoped; marks it actively worked."
+        },
+        "input_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full rendered prompt."
+        },
+        "input_summary": {
+          "description": "What the runner was asked to do.",
+          "type": "string"
+        },
+        "parent_execution_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Execution UUID this retries."
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pipeline role, e.g. 'implementer'."
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Coding-agent session id."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "agent_id",
+        "action",
+        "input_summary"
+      ],
+      "type": "object"
+    },
+    "log_execution_update": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "cards_affected": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Card UUIDs touched."
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cost in USD."
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Wall-clock seconds."
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Details when failed."
+        },
+        "execution_id": {
+          "description": "From log_execution_start.",
+          "type": "string"
+        },
+        "input_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full rendered prompt."
+        },
+        "output_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What was accomplished."
+        },
+        "ship_warnings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Non-fatal stage issues (amber chips); status stays as given."
+        },
+        "status": {
+          "description": "completed|failed|running.",
+          "type": "string"
+        },
+        "tokens_used": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Input + output tokens."
+        },
+        "tool_calls_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total tool calls."
+        },
+        "tools_used": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MCP tool names invoked."
+        }
+      },
+      "required": [
+        "agent_id",
+        "execution_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "move_card": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "column_id": {
+          "description": "Target column UUID.",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fractional index (midpoint between neighbours); omitted appends."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "column_id"
+      ],
+      "type": "object"
+    },
+    "next_assignment": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Restrict the scan to one board UUID."
+        },
+        "role_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A role the runner holds in its team, instead of its primary."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "pause_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "preview_loop_template": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board to render for."
+        },
+        "include_prompts": {
+          "default": true,
+          "description": "False to omit prompt bodies.",
+          "type": "boolean"
+        },
+        "slot_values": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Slot name -> value."
+        },
+        "template_ref": {
+          "description": "System slug or template UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "template_ref"
+      ],
+      "type": "object"
+    },
+    "propose_skill": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Originating board."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Omit to use SKILL.md frontmatter."
+        },
+        "files": {
+          "description": "[{\"path\", \"content\"}], SKILL.md plus support files, verbatim.",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Omit to use SKILL.md frontmatter."
+        },
+        "slug": {
+          "description": "Skill slug to create or version.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "slug",
+        "files"
+      ],
+      "type": "object"
+    },
+    "publish_loop_template": {
+      "properties": {
+        "expected_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optimistic lock."
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Changelog line (<= 500 chars)."
+        },
+        "ref": {
+          "description": "Workspace template UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "read_documentation": {
+      "properties": {
+        "limit": {
+          "default": 12000,
+          "description": "Maximum characters, from 1 to 30000.",
+          "type": "integer"
+        },
+        "locale": {
+          "default": "en",
+          "description": "Registered documentation locale (en, es, pt-BR).",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Character offset for continuing a section.",
+          "type": "integer"
+        },
+        "slug": {
+          "description": "Section slug returned by list_documentation.",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Version from list_documentation; mismatches fail explicitly."
+        }
+      },
+      "required": [
+        "slug"
+      ],
+      "type": "object"
+    },
+    "remove_card_dependency": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Dependent card UUID or id prefix.",
+          "type": "string"
+        },
+        "depends_on_card_id": {
+          "description": "Prerequisite card UUID or id prefix.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "depends_on_card_id"
+      ],
+      "type": "object"
+    },
+    "remove_card_participant": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "pipeline_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stage role to clear \u2014 planner, implementer, reviewer, rework_mediator or custom; instead of user_id."
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Participant's user UUID (one person)."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "remove_card_participants_by_role": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "pipeline_role": {
+          "description": "Stage role to clear.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "pipeline_role"
+      ],
+      "type": "object"
+    },
+    "remove_skill_binding": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "skill_slug": {
+          "description": "Bound skill slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "skill_slug"
+      ],
+      "type": "object"
+    },
+    "remove_team_member": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "team_id": {
+          "description": "Team UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "team_id",
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "remove_workspace_member": {
+      "properties": {
+        "user_id": {
+          "description": "User UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "user_id"
+      ],
+      "type": "object"
+    },
+    "reorder_columns": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "column_ids": {
+          "description": "All column UUIDs on the board, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "column_ids"
+      ],
+      "type": "object"
+    },
+    "replace_note_section": {
+      "properties": {
+        "anchor_heading": {
+          "description": "Heading text without the leading # marks.",
+          "type": "string"
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "content": {
+          "default": "",
+          "description": "New section body (markdown recommended); empty clears it.",
+          "type": "string"
+        },
+        "note_id": {
+          "description": "Note UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "note_id",
+        "anchor_heading"
+      ],
+      "type": "object"
+    },
+    "request_approval": {
+      "properties": {
+        "action_description": {
+          "description": "What will happen, for humans.",
+          "type": "string"
+        },
+        "action_payload": {
+          "additionalProperties": true,
+          "description": "JSON of the action to run if approved.",
+          "type": "object"
+        },
+        "agent_id": {
+          "description": "Requesting runner UUID.",
+          "type": "string"
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "category": {
+          "description": "deletion|bulk_change|deployment|schema_change|permission_change|external_action.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "category",
+        "action_description",
+        "action_payload",
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "request_landing": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID/slug.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "restart_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "restore_loop_template_version": {
+      "properties": {
+        "ref": {
+          "description": "Workspace template UUID or slug.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Published version number to stage.",
+          "type": "integer"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref",
+        "version"
+      ],
+      "type": "object"
+    },
+    "resume_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "resume_cost_breaker": {
+      "properties": {
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "retry_completion": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID/slug.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "rotate_agent_key": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "search_cards": {
+      "properties": {
+        "assignee_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Participant user/runner UUID."
+        },
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "card_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "task|issue|feature|bug."
+        },
+        "column_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Column UUID."
+        },
+        "column_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "backlog|active|review|done|blocked."
+        },
+        "exclude_column_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exclude columns of this type."
+        },
+        "has_assignee": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True = has a hero, False = unassigned."
+        },
+        "include_untyped": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Include untyped (human-only) columns; default True. Pass False when picking work to execute."
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cards carrying this label."
+        },
+        "limit": {
+          "default": 50,
+          "description": "1-100, default 50.",
+          "type": "integer"
+        },
+        "overdue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True for cards past their due date."
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "none|low|medium|high|urgent."
+        },
+        "q": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Text to match in titles and descriptions."
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Status string."
+        },
+        "summary_only": {
+          "default": false,
+          "description": "Drop description/participants/derived fields.",
+          "type": "boolean"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "set_board_loop": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "budget_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cumulative budget since enable (>0)."
+        },
+        "completion_query": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{label, exclude_column_type:\"done\"}; zero matches stops; {} clears."
+        },
+        "detach_template": {
+          "default": false,
+          "description": "Remove binding, retain rendered text; overrides template_ref.",
+          "type": "boolean"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True=start/resume, false=stop; omitted=config only."
+        },
+        "expected_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last-read loop version; stale=409."
+        },
+        "iteration_delay_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Iteration cooldown (>=0)."
+        },
+        "iteration_timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Session timeout (>=1)."
+        },
+        "loop_landing": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Legacy human|self_merge|merge_queue. Human self_merge saves auto-relax the Done merge gate."
+        },
+        "loop_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Iteration prompt."
+        },
+        "max_blocked_on_human": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Consecutive blocked_on_human stop threshold; 0=park only."
+        },
+        "max_consecutive_failures": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Failure breaker (>=1)."
+        },
+        "max_iterations": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Iterations/process (>=1)."
+        },
+        "merge_gate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "forge_ci (require green CI before queue merge)|none."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tier (premium/mid/low) or model ID."
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Coding agent (empty=runner default)."
+        },
+        "reason": {
+          "default": "",
+          "description": "Stop reason; saved only on enabled-to-disabled transition.",
+          "type": "string"
+        },
+        "relax_done_merge_gate": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "False declines self_merge auto-relax for this save."
+        },
+        "skills_proposal_enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allow runner propose_skill; default true."
+        },
+        "slot_values": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full replacement {SLOT_NAME:value}; alone re-renders the binding."
+        },
+        "starvation_policy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "park (sleep when idle)|always_run."
+        },
+        "system_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Session system prompt."
+        },
+        "template_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "System slug/workspace UUID to bind; owns prompts/tools (raw edits:422 alongside bind,409 later)."
+        },
+        "template_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "system (default)|workspace."
+        },
+        "template_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Published version; omitted=newest."
+        },
+        "tools": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replacement mcp__valaris__* allowlist; []=full surface."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "set_skill_binding": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "clear_pin": {
+          "default": false,
+          "description": "Remove the pin; exclusive with pinned_version.",
+          "type": "boolean"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Active on the board."
+        },
+        "pinned_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Version to pin."
+        },
+        "skill_slug": {
+          "description": "Workspace skill slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "skill_slug"
+      ],
+      "type": "object"
+    },
+    "submit_completion_candidate": {
+      "properties": {
+        "artifacts": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Artifacts: [{name, uri, sha256}]."
+        },
+        "board_id": {
+          "description": "Board UUID/slug.",
+          "type": "string"
+        },
+        "card_id": {
+          "description": "Card UUID.",
+          "type": "string"
+        },
+        "checks": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Checks: [{id, source_sha, exit_code, output}]."
+        },
+        "source_execution_id": {
+          "description": "This iteration's runner-supplied execution UUID.",
+          "type": "string"
+        },
+        "source_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Evidence source commit SHA (full)."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id",
+        "source_execution_id"
+      ],
+      "type": "object"
+    },
+    "unfreeze_board": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "update_agent": {
+      "properties": {
+        "agent_id": {
+          "description": "Runner UUID.",
+          "type": "string"
+        },
+        "allowed_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New action allowlist."
+        },
+        "allowed_workspaces": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replacement allowlist; non-empty."
+        },
+        "budget_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New spending cap."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "hard_delete": {
+          "default": false,
+          "description": "True permanently erases the runner (unrecoverable); alone, with no other field.",
+          "type": "boolean"
+        },
+        "is_active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "False disables (reversible)."
+        },
+        "max_requests_per_minute": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New rate limit."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "type": "object"
+    },
+    "update_board": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "done_merge_gate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "inherit|enforced|off. Gates RUNNER moves into done on a merged PR with an approving verdict (humans never gated; no linked repo = exempt); inherit follows the workspace flag."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replaces the tag list."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "update_card": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "branch_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch the work landed on."
+        },
+        "card_id": {
+          "description": "Card UUID or id prefix.",
+          "type": "string"
+        },
+        "card_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "task|issue|feature|bug."
+        },
+        "clear_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "due_date",
+                  "status",
+                  "labels",
+                  "pr_url",
+                  "branch_name",
+                  "git_repo_slug"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Nullable fields to set to null: due_date, status, labels, pr_url, branch_name, git_repo_slug. Omit to preserve existing values."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "YYYY-MM-DD."
+        },
+        "git_repo_slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target repo slug on multi-repo boards."
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replaces the whole label list."
+        },
+        "pr_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PR the card shipped as; prefer it over a link in the description."
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "none|low|medium|high|urgent."
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short state label. Max 255 characters."
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Max 500 characters."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "card_id"
+      ],
+      "type": "object"
+    },
+    "update_channel": {
+      "properties": {
+        "channel_id": {
+          "description": "Channel UUID.",
+          "type": "string"
+        },
+        "channel_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "email|slack|whatsapp|phone|website|other."
+        },
+        "contact_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New address or identifier."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "metadata_json": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Shallow-merged per key; set a key to null to remove it."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "channel_id"
+      ],
+      "type": "object"
+    },
+    "update_column": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New hex color."
+        },
+        "column_id": {
+          "description": "Column UUID.",
+          "type": "string"
+        },
+        "column_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "backlog|active|review|done|blocked, or \"null\" to clear the type and make the column human-only (runners skip it)."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "column_id"
+      ],
+      "type": "object"
+    },
+    "update_definition": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "coding_standards": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free-text conventions."
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Hard constraints."
+        },
+        "content": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Raw dict for keys with no dedicated param."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"key\", \"value\"?}]."
+        },
+        "decisions": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"decision\", \"rationale\"?}]."
+        },
+        "exclusions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Out-of-scope items."
+        },
+        "milestones": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"title\", \"date\", \"type\"?}]."
+        },
+        "objectives": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"text\", \"priority\"?}]."
+        },
+        "references": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"url\", \"label\"?}]."
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Summary paragraph."
+        },
+        "stakeholders": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[{\"name\", \"role\"?, \"member_id\"?, \"channel_id\"?}]."
+        },
+        "tech_stack": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[\"python\", \"react\", ...]."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "update_git_repo": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "default_branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New default branch."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "integration_branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Staging branch that git.base_ref=\"integration_branch\" stages fork from; empty keeps default_branch."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New provider."
+        },
+        "repo_id": {
+          "description": "Git repo UUID.",
+          "type": "string"
+        },
+        "require_branch_protection": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Toggle the policy."
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New board-unique slug; changes which cards' git_repo_slug resolve here."
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New URL."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id",
+        "repo_id"
+      ],
+      "type": "object"
+    },
+    "update_loop_template": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full replacement body."
+        },
+        "expected_updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optimistic lock: `draft_updated_at` last read; 409 on conflict."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New display name."
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full replacement {emoji, tagline, tags}."
+        },
+        "ref": {
+          "description": "Workspace template UUID or slug.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "update_note": {
+      "properties": {
+        "anchor_heading": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "mode=\"section\" only: heading text without the leading # marks (trimmed, case-insensitive)."
+        },
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "card_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Card to link (must be on the note's board); omit to keep the current link."
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Body as markdown (HTML, plain text or ProseMirror JSON also accepted); required for mode=\"append\"."
+        },
+        "detach_card": {
+          "default": false,
+          "description": "Clear the card link; wins over card_id.",
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "replace",
+          "description": "\"replace\" (whole body), \"append\" (blocks at the end), or \"section\" (under anchor_heading).",
+          "type": "string"
+        },
+        "note_id": {
+          "description": "Note UUID.",
+          "type": "string"
+        },
+        "pinned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pin state."
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New title."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "note_id"
+      ],
+      "type": "object"
+    },
+    "update_prompt_config": {
+      "properties": {
+        "agent_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "coding|manager|reviewer|secretary|improver."
+        },
+        "config_id": {
+          "description": "Prompt config UUID.",
+          "type": "string"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New prompt text."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New name."
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New slug."
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New stage."
+        },
+        "team_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New team UUID."
+        },
+        "team_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New team role filter."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "config_id"
+      ],
+      "type": "object"
+    },
+    "update_resource": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Board UUID if board-scoped."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Shallow-merged per key; only `tags` survives validation, and a tags array replaces the whole list."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New name."
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New parent folder UUID (moves it)."
+        },
+        "resource_id": {
+          "description": "Resource UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "update_team": {
+      "properties": {
+        "board_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New board scope."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New name."
+        },
+        "team_id": {
+          "description": "Team UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "team_id"
+      ],
+      "type": "object"
+    },
+    "update_webhook": {
+      "properties": {
+        "delete": {
+          "default": false,
+          "description": "True permanently removes the webhook (no undo); alone, with no other field. Prefer is_active=false to pause.",
+          "type": "boolean"
+        },
+        "events": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "REPLACES the whole subscription list."
+        },
+        "is_active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "false pauses deliveries, true resumes."
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New HMAC secret; update the receiver too."
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New delivery URL."
+        },
+        "webhook_id": {
+          "description": "Webhook UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "webhook_id"
+      ],
+      "type": "object"
+    },
+    "update_workspace_config": {
+      "properties": {
+        "card_cooldown_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Wait before re-offering a released card."
+        },
+        "commit_message_template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Runner commit message template."
+        },
+        "cost_circuit_breaker": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{enabled, threshold_usd_per_15min, action: alert|pause|kill_runner}."
+        },
+        "expected_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "409 when the stored version differs."
+        },
+        "max_rework_attempts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-card rework cap."
+        },
+        "model_pricing": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-model $/token overrides, merged over defaults."
+        },
+        "pipeline_config": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "{\"stages\": [{role, discover, claim, git, llm, on_success}], \"scheduling\"?}; llm.context_sources[] = {\"kind\", \"filter\"?, \"as\"?} with kind card_notes|board_definition|pinned_notes|sibling_cards|board_snapshot|review_history."
+        },
+        "pr_description_template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PR description template."
+        },
+        "role_labels": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-role display labels, e.g. {\"implementer\": \"Coder\"}."
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug"
+      ],
+      "type": "object"
+    },
+    "update_workspace_member": {
+      "properties": {
+        "role": {
+          "description": "owner|admin|member|viewer.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Member's user UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "user_id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "validate_board_dependencies": {
+      "properties": {
+        "board_id": {
+          "description": "Board UUID.",
+          "type": "string"
+        },
+        "workspace_slug": {
+          "description": "Workspace slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_slug",
+        "board_id"
+      ],
+      "type": "object"
+    },
+    "whoami": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "instructions": "MCP server for the Backplane platform \u2014 an agentic project management system for software factory operations.\n\nENTITY HIERARCHY:\n  Workspace \u2192 Boards (projects), Notes, Resources, Channels, Members\n  Board \u2192 Columns \u2192 Cards, plus Definitions, Notes, Resources, Git Repos, Activity\n\nROLES & WORKFLOWS:\n  This server supports 4 specialized roles, each with dedicated prompts:\n\n  Project Initializer (prompt: init_project)\n    Bootstrap a project from a brief \u2192 board, columns, definition, cards, notes, channels.\n\n  Secretary / Manager (prompts: standup, triage, status)\n    Analyze board state, generate reports, identify risks, suggest actions.\n\n  Architect / Orchestrator (prompts: plan_work, decompose_card, sprint)\n    Decompose objectives into cards, break down large cards, plan sprints.\n\n  Coding Agent (prompts: pickup, implement, ship)\n    Claim cards, implement changes, move through the board lifecycle.\n\n    Pickup (Pipeline mode): `next_assignment` is THE\n    pickup path \u2014 never search+claim manually. The backend scheduler\n    applies all role-aware filters (column type, label, participant,\n    untyped-column exclusion, role-scoped preconditions like open-PR\n    gating) and atomically returns one reserved card plus its bundled\n    context (board, column, repo, default branch, stage_action).\n    Pickup (Loop mode): the board's configured prompt owns selection,\n    dependency checks and search_cards + move_card. There is no atomic reservation;\n    do not call next_assignment. completion_query stops the run; it is not\n    a selection filter. Apply the prompt's scope to every candidate read.\n    Pickup (Interactive agents/humans): claiming = move_card into the\n    column resolved by column_type (never by column NAME) +\n    add_card_participant (see the pickup prompt). Never call\n    `next_assignment` interactively.\n\nGETTING STARTED:\n  1. Start any workflow with get_project_context \u2014 returns definition, board summary, notes, git repos, and recent activity in one call.\n  2. Use the appropriate prompt for your role (e.g., invoke the \"standup\" prompt).\n  3. Follow the phased instructions in the prompt (GATHER \u2192 ANALYZE \u2192 ACT \u2192 VERIFY).\n\nCOMPOSITE TOOLS (use these to reduce round-trips):\n  get_project_context: Full board briefing in one call (definition + summary + notes + repos + activity)\n  next_assignment: Backend-owned scheduler \u2014 atomically reserve the next eligible card for a role; replaces runner-side search+claim\n  search_cards: Text search and filter cards (by priority, type, status, label, assignee, overdue)\n  get_board_health: Computed metrics \u2014 health score, stale/overdue/unassigned cards, velocity\n  bulk_create_cards: Create up to 50 cards in one request (essential for plan_work)\n  list_executions: Run history for a workspace (status/runner/role/card filters compose; status=\"inflight\" surfaces zombie rows \u2014 verify a row's agent_id before cancel_execution)\n  list_approvals: Discover approval requests without an approval_id in hand (status=\"pending\" for approvers), then decide_approval\n\nCOMMON WORKFLOWS:\n  New project: init_project prompt, or manually: create_board \u2192 create_column \u00d7 N \u2192 update_definition \u2192 create_card \u00d7 N\n  Daily standup: standup prompt, or: get_board_health \u2192 get_workspace_metrics \u2192 list_activity \u2192 create_note\n  Sprint planning: sprint prompt, or: get_project_context \u2192 move_card \u00d7 N into the sprint staging column (the backlog-typed column nearest the active-typed one by position; boards with a single backlog-typed column skip the move and mark sprint membership via due_date + a \"sprint\" label) \u2192 add_card_participant\n  Card lifecycle: interactive pickup \u2192 implement \u2192 ship prompts; pipeline mode uses next_assignment \u2192 log_execution_start and configured stages; loop mode follows its configured prompt and backend completion gates\n\nCOMPLETION POLICY:\n  get_completion_policy resolves board > workspace > legacy whole-object policy.\n  get_completion_status reads current exact candidate acceptance and public attempts.\n  submit_completion_candidate records this source execution and the real open PR\n  or operator-selected evidence. request_landing requests authorized queue landing.\n  retry_completion schedules a fresh failed phase. Independent source review and\n  exact merged-commit validation are separate gates. A merge alone is not Done.\n  Only human workspace admins select policy or evidence-only mode. Review/validation\n  claim, lease and result operations belong to the runner control plane, never tools.\n\nSKILLS:\n  Skills are versioned procedural knowledge bundles \u2014 a SKILL.md plus text support files \u2014 living in the workspace library. Boards select from that library via bindings; a board's EFFECTIVE set is its enabled bindings resolved to a published version (pin or latest). list_skills(board_id) shows the effective set; list_skill_bindings_raw shows the raw operator rows.\n  Interactive agents install skills themselves: list_skills for the board's effective set \u2192 get_skill for each \u2192 write every file verbatim into your local skills dir. Pipeline/loop runners skip this \u2014 the runner pre-materializes the board's effective set into the repo automatically.\n  Credential identity controls skill authoring: propose_skill requires a\nrunner-bound key. A human-key interactive AI receives 403 on that tool;\nprepare the bundle for an authorized human workspace admin to create a draft and publish in the workspace\nSkills Library. No MCP draft-authoring tool exists. Runner proposals wait for\nhuman approval; no agent session publishes. Loop runners may propose only\non boards with skills_proposal_enabled (see set_board_loop).\n  Authoring, editing, and archiving skills are deliberately human/UI-only \u2014 no MCP tools exist for them; catalog activation (activate_catalog_skill) also rejects runner-bound callers.\n\nDISCOVERY & IDENTITY:\n  get_server_info: this server's version + full tool surface + which tools are enabled in THIS session (toolsets \u2229 allowlist) + backend reachability. Call it when a tool seems \"missing\" \u2014 usually a toolset outside the current hand (widen with enable_toolsets) or version/allowlist drift, not an actual gap. Retired tools stay callable for one minor version as deprecated aliases (deprecated_aliases names them with their replacement); they are outside every toolset and every result they return carries `_deprecated`.\n  Toolsets: the initial hand comes from VALARIS_MCP_TOOLSETS (unset = the interactive default hand; a runner launch that sets only VALARIS_MCP_ALLOWLIST gets every toolset \u2014 the allowlist is its hand). To use a tool outside the hand, call enable_toolsets(toolset_ids=[...]) \u2014 it widens THIS session at runtime and the server requests tools/list_changed, but notification delivery does not prove your client refreshed its catalog. If tools remain absent, apply enable_toolsets.restart_env to the MCP server startup configuration, restart the server/connection and start a new agent session (remote HTTP requires the server operator). The allowlist is a ceiling it never lifts. get_server_info.toolsets shows what is loaded and what else exists.\n  whoami: the current user behind this session (id/email/name) \u2014 distinct from get_agent_config (the runner's identity).\n  list_workspace_members: resolve members by name/email \u2192 user_id (get_workspace does NOT return members). Needed before adding card participants.\n\nNEAR-NEIGHBOUR TOOLS (pick by contract, not by name):\n  Merge queue: enqueue_pr_for_merge enqueues a card's PR for the first time; enqueue_for_merge only re-queues an EXISTING entry after conflict consolidation (404 without one).\n  Board loop: get_board_loop is the complete loop config (prompts, tools, rails, state); get_board_loop_binding_raw is only the raw template binding (template, version, slot values, drift) and 404s not_bound on raw prompts. Edit either via set_board_loop.\n  Loop templates (ref = system slug or template UUID): get_loop_template(view=...) is every read \u2014 \"full\" (default), \"profile\" (identity + track record), \"preview\" (render prompts for a board without binding), \"fit\" (board pre-flight; apply_loop_template_fixes closes its fix_ids), \"lint\" (repo-specific facts); export_loop_template/import_loop_template move a template envelope between workspaces (import is a dry run by default). Creating, editing, publishing, duplicating, archiving, restoring, importing and apply_loop_template_fixes are admin + human keys only (runner keys get 403). The fit, preview and lint views, export and apply_fixes act on the DRAFT half; binding a board reads the PUBLISHED version, so a draft-only requirement means \"publish first\".\n  Runner levers: pause_agent for containment (in-flight card still finishes; cancel_execution ends a stuck one), update_agent(is_active=false) for retirement, restart_agent to relaunch on fresh config, update_agent(hard_delete=true) only to erase a runner that should never have existed. get_agent_budget_status is the per-runner spend view; get_workspace_metrics(view=\"cost\") the workspace-wide one.\n\nKEY CONVENTIONS:\n  - All tools require workspace_slug \u2014 get it from list_workspaces\n  - Cards need column_id \u2014 get it from get_board which returns columns with their IDs\n  - Columns carry a semantic column_type (backlog, active, review, done, blocked, or null = untyped) \u2014 resolve movement/claim targets by column_type, never by display name\n  - card_id on card and dependency tools, and note_id on get_note, accept a full UUID or a unique id PREFIX (\u22654 chars) resolved within the board/scope; an ambiguous prefix errors listing the candidates.\n  - Card dependencies gate next_assignment: a card is eligible only once every prerequisite sits in a done-typed column. get_card_dependency_status answers \"is it unblocked?\"; run validate_board_dependencies before sprint planning or when a card seems stuck.\n  - On rework, clear the stale stage by pipeline_role (remove_card_participant(pipeline_role=...)), not by user_id \u2014 in multi-runner deployments the implementer is a different user than the mediator.\n  - move_card uses fractional indexing: position is a float between neighbors\n  - Notes and Resources have dual scope: pass board_id for board-level, omit for workspace-level\n  - Reading notes: get_note(note_id) for one note; add format=\"markdown\" for readable, token-cheap content instead of raw ProseMirror JSON. list_notes(summary_only=True) drops bodies when you only need titles.\n  - Writing notes: send bodies as markdown (#\u2013### headings, **bold**, *italic*, `code`, fenced code, -/1. lists, [links](url), > quotes); the backend normalizes markdown, HTML, plain text or ProseMirror JSON into canonical ProseMirror \u2014 never hand-encode ProseMirror. update_note has three modes: mode=\"replace\" (default) REPLACES the whole body; mode=\"append\" adds blocks at the end (additive \u2014 a retry appends twice); mode=\"section\" + anchor_heading rewrites one heading's section (idempotent). Prefer append/section for logs, trackers and long pinned notes.\n  - Definitions are per-board: content is structured JSON (shallow-merged on update)\n  - Definition content schema: objectives, tech_stack, constraints, no_gos, acceptance_criteria, timeline, team, references\n\nENUMS:\n  card_type: task, issue, feature, bug\n  priority: none, low, medium, high, urgent\n  participant_role: hero (responsible), viewer, stakeholder, helper\n  member_role: owner, admin, member, viewer\n  channel_type: email, slack, whatsapp, phone, website, other\n  resource_type: file, folder\n  git_provider: github, gitlab, bitbucket, gitea, other\n  entity_type (activity): board, column, card, note, resource, definition, channel, git_repo, workspace, member, agent\n  action (activity): created, updated, deleted, moved, uploaded, archived, added_member, removed_member, dependency_added, dependency_removed, dependencies_replaced\n  webhook events: activity.<entity>.<action> (e.g. activity.card.moved, activity.note.updated; member events are activity.member.added_member / activity.member.removed_member), approval.created, approval.updated, execution.started, execution.completed, agent.status_changed, config.changed, cost.threshold_crossed. Bare card.*/column.* names are deprecated aliases of activity.card.*/activity.column.*."
+}
