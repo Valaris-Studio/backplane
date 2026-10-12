@@ -2,14 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.core.auth import current_agent_id, get_current_user
 from app.core.workspace import enforce_agent_scope
 from app.database import get_db
@@ -21,10 +18,9 @@ from app.exceptions import (
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.resources.resource import validate_storage_filename
+from app.services.storage.local import hardened_file_response, local_storage_path
 
 router = APIRouter(prefix="/api/local-storage", tags=["local-storage"])
-
-FORBIDDEN_SEGMENTS = {"..", "~"}
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB — cap unbounded PUT buffering (DoS)
 
@@ -49,19 +45,6 @@ async def _read_capped_body(request: Request) -> bytes:
     return b"".join(chunks)
 
 
-def _safe_path(file_path: str) -> Path:
-    if any(seg in FORBIDDEN_SEGMENTS for seg in Path(file_path).parts):
-        raise ForbiddenError("Invalid path")
-    # LOCAL_STORAGE_DIR defaults to a RELATIVE path ("data/resources") that
-    # resolves against the process CWD — same hazard class as the runner
-    # base_dir incident. Deployments should pin an absolute dir.
-    base = Path(settings.LOCAL_STORAGE_DIR)
-    resolved = (base / file_path).resolve()
-    if not resolved.is_relative_to(base.resolve()):
-        raise ForbiddenError("Invalid path")
-    return resolved
-
-
 async def _enforce_tenancy(file_path: str, user: User, db: AsyncSession) -> None:
     """Allow only the two minted key shapes, then require workspace membership.
 
@@ -70,11 +53,11 @@ async def _enforce_tenancy(file_path: str, user: User, db: AsyncSession) -> None
     else legitimate exists under LOCAL_STORAGE_DIR, so every other shape is
     refused outright. The previous scan-every-segment model stayed permissive
     when no segment resolved to a workspace, serving arbitrary non-traversal
-    paths to any authed caller — agent allowlists never consulted. Media
-    filenames are not validated at mint time (20aae3ac), so this serving-side
-    shape check is the security boundary. Split on "/" as POSIX key segments,
-    never Path: Path collapses `//` and is platform-dependent, and Windows
-    self-hosters exist.
+    paths to any authed caller — agent allowlists never consulted. Keys minted
+    before mint-time filename validation (20aae3ac) still exist, so this
+    serving-side shape check stays the security boundary. Split on "/" as
+    POSIX key segments, never Path: Path collapses `//` and is
+    platform-dependent, and Windows self-hosters exist.
     """
     segments = file_path.split("/")
     if any(not segment for segment in segments):
@@ -120,7 +103,7 @@ async def upload_file(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _enforce_tenancy(file_path, user, db)
-    dest = _safe_path(file_path)
+    dest = local_storage_path(file_path)
     body = await _read_capped_body(request)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(body)
@@ -134,11 +117,7 @@ async def download_file(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _enforce_tenancy(file_path, user, db)
-    dest = _safe_path(file_path)
+    dest = local_storage_path(file_path)
     if not dest.is_file():
         raise ResourceNotFoundError("File not found")
-    # identity opts this response out of GZipMiddleware (it skips anything with
-    # a Content-Encoding already set): re-gzipping uploads wastes CPU and, on
-    # the streaming branch, strips Content-Length — breaking range/resumable
-    # downloads. Files ship byte-identical.
-    return FileResponse(dest, headers={"Content-Encoding": "identity"})
+    return hardened_file_response(dest, file_path.rsplit("/", 1)[-1])

@@ -40,10 +40,9 @@ async def add_card_dependency(
     depends_on_card_id: str,
     ctx: Context = None,
 ) -> str:
-    """Declare that card_id depends on depends_on_card_id, gating scheduler pickup until the prerequisite satisfies its effective completion policy. Idempotent: re-adding returns the existing edge (200); cycles and self-deps are 422.
+    """Make card_id depend on depends_on_card_id; the scheduler holds it until the prerequisite completes. Idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Dependent card UUID or id prefix.
         depends_on_card_id: Prerequisite card UUID or id prefix.
@@ -70,10 +69,9 @@ async def remove_card_dependency(
     depends_on_card_id: str,
     ctx: Context = None,
 ) -> str:
-    """Remove a depends-on edge. Idempotent: a missing edge is a no-op success.
+    """Remove a depends-on edge; idempotent.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Dependent card UUID or id prefix.
         depends_on_card_id: Prerequisite card UUID or id prefix.
@@ -108,10 +106,9 @@ async def list_card_dependencies(
     card_id: str,
     ctx: Context = None,
 ) -> str:
-    """List a card's dependency edges both ways: depends_on (prerequisites) and blocks (dependents).
+    """List a card's edges both ways: depends_on (prerequisites) and blocks (dependents).
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
     """
@@ -130,10 +127,9 @@ async def validate_board_dependencies(
     board_id: str,
     ctx: Context = None,
 ) -> str:
-    """Check a board's whole dependency graph for faults. Read-only. ok=True when clean; otherwise cycles (mutually dependent cards, never eligible), conflicts (done cards with undone prerequisites) and orphans (edges pointing off-board), each with a summary.
+    """Check a board's dependency graph (read-only) for cycles, conflicts and orphans; ok=True when clean. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -151,10 +147,9 @@ async def get_card_dependency_status(
     card_id: str,
     ctx: Context = None,
 ) -> str:
-    """Report whether a card is unblocked: satisfied (every prerequisite meets its effective completion policy), total_prerequisites, blocking (undone prerequisites with title/status/column_type) and blocks_count.
+    """Report whether a card is unblocked (every prerequisite meets its completion policy) and what still blocks it. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
     """
@@ -204,10 +199,9 @@ async def get_card_verdict(
     card_id: str,
     ctx: Context = None,
 ) -> str:
-    """Fetch the latest review verdict on a card (decision and reasoning) before reworking it. 404 when the card has no verdict yet.
+    """Fetch a card's latest review verdict (decision, reasoning); 404 when it has none.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
     """
@@ -230,13 +224,12 @@ async def bulk_set_card_dependencies(
     depends_on_card_ids: list[str],
     ctx: Context = None,
 ) -> str:
-    """Atomically replace a card's whole depends-on set in one call; use it to declare a DAG from the planner stage. The set is validated for cycles and tenancy before anything changes; on rejection existing edges stay.
+    """Atomically replace a card's whole depends-on set; cycles reject the call and leave the existing edges. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
-        depends_on_card_ids: Complete prerequisite list (UUIDs or id prefixes); empty clears the set.
+        depends_on_card_ids: Full prerequisite list (UUIDs or id prefixes); [] clears it.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client

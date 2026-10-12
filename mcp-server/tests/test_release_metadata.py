@@ -31,14 +31,20 @@ TRACKER_RELEASE = "0.7.2"
 # passed to FastMCP.run() instead of mcp.settings.
 HTTP_TRANSPORT_RELEASE = "0.7.3"
 # Paged list_notes + catalog upgrade; the README upgrade section documents it.
+# Changelog dates are PyPI publish dates, which the root CHANGELOG.md also uses.
 NOTES_PAGING_RELEASE = "0.8.0"
-NOTES_PAGING_RELEASE_DATE = "2026-09-13"
+NOTES_PAGING_RELEASE_DATE = "2026-09-15"
 # Default board context + create_workspace slug refusal.
 DEFAULT_BOARD_RELEASE = "0.8.1"
 DEFAULT_BOARD_RELEASE_DATE = "2026-09-30"
 # Queued invocation recording with agent-neutral native context.
-CURRENT_RELEASE = "0.9.0"
-CURRENT_RELEASE_DATE = "2026-10-02"
+INVOCATION_RECORDING_RELEASE = "0.9.0"
+INVOCATION_RECORDING_RELEASE_DATE = "2026-10-04"
+# String params keep JSON text, slim note receipts, card column labels.
+WP1_RELEASE = "0.9.1"
+# Wire-budget headroom: usage guidance moved off tools/list into the docs.
+CURRENT_RELEASE = "0.9.2"
+CURRENT_RELEASE_DATE = "2026-10-07"
 # One line that restores the pre-0.6.0 full surface for an unchanged config.
 FULL_SURFACE_ONE_LINER = '"VALARIS_MCP_TOOLSETS": "all"'
 
@@ -397,19 +403,47 @@ def test_default_board_release_adds_the_default_board_and_fixes_the_slug_refusal
     assert DEFAULT_BOARD_RELEASE_DATE in heading_line, heading_line
 
 
-def test_current_release_queues_invocation_records_with_native_context():
+def test_current_release_moves_usage_guidance_off_the_wire_without_renames():
     text = _changelog_text()
     start = _release_heading_re(CURRENT_RELEASE).search(text).start()
+    end = _release_heading_re(WP1_RELEASE).search(text).start()
+    section = text[start:end]
+    assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Added", "Changed", "Fixed", "Upgrade notes"]
+    for term in ("See docs.", "mcp-tool-catalog#tool-<name>", "anchor_heading", "trimmed", "No tool, parameter", "upload_resource"):
+        assert term in section
+    assert "## [Unreleased]" not in text[:start]
+
+
+def test_wp1_release_fixes_string_params_note_receipts_and_card_columns():
+    text = _changelog_text()
+    start = _release_heading_re(WP1_RELEASE).search(text).start()
+    end = _release_heading_re(INVOCATION_RECORDING_RELEASE).search(text).start()
+    section = text[start:end]
+    assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Changed", "Fixed"]
+    for term in ("return_content", "content_chars", "update_note", "description", "column_name", "column_type"):
+        assert term in section
+    assert "## [Unreleased]" not in text[:start]
+
+
+def test_invocation_recording_release_queues_invocation_records_with_native_context():
+    text = _changelog_text()
+    start = _release_heading_re(INVOCATION_RECORDING_RELEASE).search(text).start()
     end = _release_heading_re(DEFAULT_BOARD_RELEASE).search(text).start()
     section = text[start:end]
     assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Changed", "Fixed", "Security"]
     assert "get_download_url" in section and "X-Goog-Signature" in section
     for term in ("background queue", "native_call_id", "server_instance_id", "mcp_session", "cryptography"):
         assert term in section
+    # The public changelog names no private backend migration: an older
+    # backend's behaviour is the contract, not the migration that adds it.
+    assert "only loses the records, never a tool call" in section
+    assert "migration" not in section.lower()
+    heading_line = text[start : text.index("\n", start)]
+    assert INVOCATION_RECORDING_RELEASE_DATE in heading_line, heading_line
     from valaris_mcp.catalog import DEPRECATION_REMOVAL_VERSION
 
     assert f"postponed to {DEPRECATION_REMOVAL_VERSION}" in section
-    # Only what 0.8.1 users actually had.
+    # Only what 0.8.1 users actually had: the capture bridge never shipped.
     assert "BACKPLANE_CAPTURE_" not in section
     # Released means released: nothing waits unreleased above it, and what
     # 0.8.1 shipped is not announced again.
@@ -419,7 +453,7 @@ def test_current_release_queues_invocation_records_with_native_context():
 
 def test_readme_upgrade_section_covers_the_invocation_recording_switch():
     section = _readme_section(f"### Upgrading from {DEFAULT_BOARD_RELEASE.rsplit('.', 1)[0]}.x")
-    for term in ("mcp_session", "/api/me/mcp-invocations", "404", "invocation_tracking"):
+    for term in ("mcp_session", "/api/me/mcp-invocations", "provides this endpoint", "404", "invocation_tracking"):
         assert term in section
     from valaris_mcp.catalog import DEPRECATION_REMOVAL_VERSION
 

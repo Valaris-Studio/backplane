@@ -20,14 +20,11 @@ async def next_assignment(
     board_id: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Atomically reserve the next eligible card for a pipeline runner; role filters, untyped-column exclusion and role preconditions are applied server-side.
-
-    Returns card, board, column, repo, effective role, stage_action and a reservation (id + expires_at; auto-expires so a crashed runner cannot starve the board), or {"status": "no_work"} (sleep, retry). Idempotent while reserved; 409 = in-flight execution on another card (403 owner not a member, 404 unknown runner).
+    """Atomically reserve the next eligible card for a pipeline runner (role filters applied server-side); returns the card bundle or {"status": "no_work"}. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         agent_id: Runner UUID.
-        role_override: A role the runner holds in its team, instead of its primary.
+        role_override: A team role to take instead of the primary.
         board_id: Restrict the scan to one board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context

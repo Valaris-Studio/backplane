@@ -61,7 +61,6 @@ async def get_definition(
     """Get a board's definition: scope plus structured content.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -89,11 +88,9 @@ async def update_definition(
     content: dict | None = None,
     ctx: Context = None,
 ) -> str:
-    """Upsert a board's definition. Shallow merge: only given keys are replaced.
-    Explicit params win over the same key in `content`.
+    """Upsert a board's definition; shallow merge, and explicit params win over the same key in `content`. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         scope: Summary paragraph.
         objectives: [{"text", "priority"?}].

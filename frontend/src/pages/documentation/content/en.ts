@@ -3,6 +3,10 @@
 
 import type { DocumentationLocaleCopy } from "./types";
 
+// Shared with routes.ts so the section's English source title lives only in
+// this content catalog, not as copy in the route table.
+export const NOTES_SECTION_TITLE = "Notes (editing, media, and Markdown)";
+
 export const EN_DOCUMENTATION: DocumentationLocaleCopy = {
   locale: "en",
   version: "2026-08-25.1",
@@ -102,6 +106,7 @@ export const EN_DOCUMENTATION: DocumentationLocaleCopy = {
     approvals: "Approvals",
     "loop-mode": "Loop Mode",
     skills: "Skills (versioned procedural knowledge)",
+    notes: NOTES_SECTION_TITLE,
     "install-with-docker-compose": "Install with Docker Compose",
     "securing-a-self-hosted-deployment": "Securing a Self-Hosted Deployment",
     "upgrading-backplane": "Upgrading Backplane",

@@ -23,11 +23,7 @@ from valaris_mcp.server import AppContext, mcp
 @mcp.tool()
 @handle_api_errors
 async def get_workspace_config(workspace_slug: str, ctx: Context = None) -> str:
-    """Read the workspace config: pipeline_config, max_rework_attempts, card_cooldown_hours, commit/PR templates, model_pricing, cost_circuit_breaker, role_labels, version (bumps on every update).
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Read the workspace config and its version (send it back as expected_version on update). See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get(f"{client.ws(workspace_slug)}/config")
@@ -49,20 +45,15 @@ async def update_workspace_config(
     expected_version: int | None = None,
     ctx: Context = None,
 ) -> str:
-    """PATCH the workspace config; omitted fields stay unchanged. Requires admin/owner.
-
-    Not pre-validated: a malformed payload returns the backend validator's 422 error list as message. Pass {} to clear a dict field. Stage edits: read with get_workspace_config, mutate, send back the whole pipeline_config.
+    """PATCH the workspace config (admin/owner); omitted fields stay unchanged and pipeline_config is replaced whole. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         max_rework_attempts: Per-card rework cap.
         card_cooldown_hours: Wait before re-offering a released card.
         commit_message_template: Runner commit message template.
         pr_description_template: PR description template.
         model_pricing: Per-model $/token overrides, merged over defaults.
-        pipeline_config: {"stages": [{role, discover, claim, git, llm, on_success}],
-            "scheduling"?}; llm.context_sources[] = {"kind", "filter"?, "as"?} with
-            kind card_notes|board_definition|pinned_notes|sibling_cards|board_snapshot|review_history.
+        pipeline_config: {"stages": [{role, discover, claim, git, llm, on_success}], "scheduling"?}.
         cost_circuit_breaker: {enabled, threshold_usd_per_15min, action: alert|pause|kill_runner}.
         role_labels: Per-role display labels, e.g. {"implementer": "Coder"}.
         expected_version: 409 when the stored version differs.
@@ -107,7 +98,7 @@ async def update_workspace_config(
 @mcp.tool()
 @handle_api_errors
 async def export_pipeline_bundle(workspace_slug: str, ctx: Context = None) -> str:
-    """Export a portable bundle (pipeline_config, derived setup_contract, workspace-scoped prompt_configs) for import_pipeline_bundle on another workspace. Platform-default prompts are excluded; they re-seed on the target.
+    """Export a portable pipeline bundle (pipeline_config, setup_contract, workspace prompt configs) for import_pipeline_bundle. See docs.
 
     Args:
         workspace_slug: Source workspace slug.
@@ -126,14 +117,12 @@ async def import_pipeline_bundle(
     dry_run: bool = True,
     ctx: Context = None,
 ) -> str:
-    """Import a pipeline bundle into a workspace. DRY-RUN BY DEFAULT: inspect the preview, then re-call with dry_run=false. Requires admin/owner.
-
-    Checks: envelope (400), pipeline validation (422), expected_pipeline_version vs the target (409). Apply is atomic; re-import is idempotent.
+    """Import a pipeline bundle (admin/owner). DRY-RUN BY DEFAULT: re-call with dry_run=false to apply atomically. See docs.
 
     Args:
         workspace_slug: Target workspace slug.
         bundle: The envelope from export_pipeline_bundle.
-        dry_run: Preview only (default). false applies.
+        dry_run: Preview only; false applies.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -155,11 +144,7 @@ async def import_pipeline_bundle(
 @mcp.tool()
 @handle_api_errors
 async def get_pipeline_sensors(workspace_slug: str, ctx: Context = None) -> str:
-    """List the sensors runners in this workspace have registered — what pipeline_config.stages[*].sensors[*].name is validated against. Deduped union; the first runner to report a name wins.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """List runner-registered sensors: the names pipeline_config.stages[*].sensors[*].name is validated against. See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get(f"{client.ws(workspace_slug)}/sensors")
@@ -169,13 +154,7 @@ async def get_pipeline_sensors(workspace_slug: str, ctx: Context = None) -> str:
 @mcp.tool()
 @handle_api_errors
 async def resume_cost_breaker(workspace_slug: str, ctx: Context = None) -> str:
-    """Clear a tripped cost circuit breaker so runners can pick up work again — use when next_assignment returns 423 for every runner.
-
-    An acknowledgement, not a mute: the next spend over the threshold re-trips it. Threshold/action are unchanged (update_workspace_config). Admin/owner only. Returns {status: "resumed", workspace_id}.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Clear a tripped cost circuit breaker (admin/owner); it re-trips on the next spend over the threshold. See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.post(f"{client.ws(workspace_slug)}/cost-breaker/resume")

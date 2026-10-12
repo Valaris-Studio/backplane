@@ -102,6 +102,7 @@ export const PT_BR_DOCUMENTATION: DocumentationLocaleCopy = {
     approvals: "Aprovações",
     "loop-mode": "Modo de loop",
     skills: "Habilidades (conhecimento procedural versionado)",
+    notes: "Notas (edição, mídia e Markdown)",
     "install-with-docker-compose": "Instalação com Docker Compose",
     "securing-a-self-hosted-deployment": "Proteção de uma implantação auto-hospedada",
     "upgrading-backplane": "Atualização do Backplane",

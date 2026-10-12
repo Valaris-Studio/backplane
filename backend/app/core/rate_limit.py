@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import re
 import time
 from collections import defaultdict
 
@@ -22,6 +23,13 @@ API_KEY_LIMIT = 100
 # be trusted across replicas or restarts).
 LOGIN_LIMIT = 10
 WINDOW_SECONDS = 60
+# Rendering one image-heavy note issues a request per image, so durable media
+# reads get their own per-identity bucket instead of eating the API budget.
+MEDIA_LIMIT = 600
+MEDIA_BUCKET = "media:"
+_MEDIA_READ_PATH = re.compile(
+    r"^/api/workspaces/[^/]+/(?:media/(?!upload-url$)[^/]+/.+|resources/[^/]+/content)$"
+)
 
 
 # Counter state lives in-process (instance-local dict). On multi-replica
@@ -41,6 +49,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests: dict[str, list[float]] = defaultdict(list)
 
     def _get_client_key(self, request: Request) -> tuple[str, int]:
+        key, limit = self._identity_key(request)
+        # Anonymous callers keep the tight per-IP budget: they are denied
+        # anyway, and a bigger bucket would only help a scraper.
+        if (
+            key.startswith(("user:", "apikey:"))
+            and request.method == "GET"
+            and _MEDIA_READ_PATH.match(request.url.path)
+        ):
+            return f"{MEDIA_BUCKET}{key}", MEDIA_LIMIT
+        return key, limit
+
+    def _identity_key(self, request: Request) -> tuple[str, int]:
         # The login endpoint is always keyed by client IP with its own tight
         # bucket — before any cookie or trusted-header check. A valid session
         # (or API key) must not raise the budget for password guessing.

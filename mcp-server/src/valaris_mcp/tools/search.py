@@ -32,12 +32,9 @@ async def search_cards(
     limit: int = 50,
     ctx: Context = None,
 ) -> str:
-    """Search and filter cards on a board by text, priority, type, status, label, assignee, column, column type, or overdue.
-
-    Use summary_only=True to browse or triage (full cards carry descriptions and participants and overflow on busy boards), then get_card for the one you need. Both modes include column_name and column_type.
+    """Search a board's cards by text and filters. Browse with summary_only=True (full cards can overflow), then get_card. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         q: Text to match in titles and descriptions.
         priority: none|low|medium|high|urgent.
@@ -49,11 +46,10 @@ async def search_cards(
         column_id: Column UUID.
         column_type: backlog|active|review|done|blocked.
         exclude_column_type: Exclude columns of this type.
-        include_untyped: Include untyped (human-only) columns; default True. Pass
-            False when picking work to execute.
+        include_untyped: Include untyped (human-only) columns; default True. Pass False when picking work.
         overdue: True for cards past their due date.
-        summary_only: Drop description/participants/derived fields.
-        limit: 1-100, default 50.
+        summary_only: Drop description/participants/derived fields; column_name/column_type stay.
+        limit: 1-100.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Download, X } from "lucide-react";
 import { getFileIcon } from "@/lib/file-icons";
 import { formatBytes } from "@/lib/format";
+import { isSafeMediaUrl, resolveMediaSrc } from "@/lib/media-src";
 
 export function FileAttachmentView({ node, deleteNode, editor }: NodeViewProps) {
   const { t } = useTranslation();
@@ -27,7 +28,7 @@ export function FileAttachmentView({ node, deleteNode, editor }: NodeViewProps) 
   }
 
   function handleClick() {
-    if (src) window.open(src, "_blank", "noopener");
+    if (isSafeMediaUrl(src)) window.open(resolveMediaSrc(src), "_blank", "noopener");
   }
 
   return (

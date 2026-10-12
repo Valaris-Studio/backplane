@@ -83,6 +83,9 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
         description: "The URL slug identifying the workspace.",
       },
     ],
+    gotchas: [
+      "board_stats gives each board's card_count, overdue_count and cards by column_type (untyped included); activity_trend covers 30 days of {day, count}, with quiet days zero-filled.",
+    ],
     examplePrompt:
       "Using the Backplane MCP, get a summary of the <workspace> workspace and highlight anything that changed recently.",
     related: ["get_project_context", "list_boards", "list_activity"],
@@ -107,6 +110,7 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
     ],
     gotchas: [
       "Not idempotent: if the slug is already taken you get an error payload embedding the existing workspace, not a success.",
+      "A non-member asking for a taken slug gets a 409 that reveals nothing about the existing workspace.",
     ],
     examplePrompt:
       "Using the Backplane MCP, create a workspace named <Name>, then add <email> as an admin.",
@@ -432,6 +436,7 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
       "Human keys only — the backend 403s runner callers on every board update, so a runner cannot rewrite board metadata or loosen the done-merge gate that judges its own moves.",
       "tags replaces the whole list — send the full set you want to keep.",
       "Changing done_merge_gate requires workspace admin or owner. A board with no linked git repo remains exempt because it cannot produce a mergeable PR.",
+      "The done merge gate needs a merged PR with an approving review verdict before a runner may move the card into done.",
     ],
     examplePrompt:
       "Using the Backplane MCP, rename the <board> board in <workspace> to <New Name> and set its tags to <tags>.",
@@ -459,6 +464,7 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
       "Requires workspace admin or owner. Idempotent — freezing a frozen board is a no-op.",
       "Mutations on a frozen board fail with 409 and error_code board_frozen — stop retrying and surface the state instead.",
       "Runners stop picking up the board's cards immediately; in-flight executions may still report telemetry.",
+      "Reads and telemetry — execution logging and approvals — stay open while a board is frozen.",
     ],
     examplePrompt:
       "Using the Backplane MCP, freeze the <board> board in <workspace> so no more changes land while we review it.",
@@ -680,10 +686,12 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
       "Idempotent — setting the current state is a no-op (no version bump).",
       "Enabling requires a configured non-empty loop_prompt; otherwise the backend rejects with 422.",
       "Passing nothing at all (no config field and no enabled flag) returns an error instead of a silent no-op.",
-      "Config writes are last-write-wins — there is no optimistic lock, so coordinate prompt edits out of band.",
+      "Pass expected_version from your last read to get a 409 instead of clobbering a concurrent edit; without it, config writes are last-write-wins.",
       "Requires member or better; runner keys inherit their creating user's role.",
       "Binding a template makes it own system_prompt/loop_prompt/tools: sending those in the same call is 422, and sending them later on a bound board is 409 (detach first with detach_template=true).",
       "slot_values is a FULL REPLACE of the binding's values — read them back with get_board_loop_binding_raw and send the whole object.",
+      "A human session saving loop_landing=\"self_merge\" auto-relaxes the board's Done merge gate; pass relax_done_merge_gate=false to keep it armed.",
+      "When one call carries config fields and enabled, the config is saved first, so a rejected state change still leaves the config edit in place.",
     ],
     examplePrompt:
       "Using the Backplane MCP, stop the loop on the <board> board in <workspace> with the reason <reason>.",
@@ -860,7 +868,7 @@ export const WORKSPACES_BOARDS_TOOL_DOCS: ToolDoc[] = [
       },
     ],
     gotchas: [
-      "The backend does not validate the list: nonexistent ids are silently skipped, omitted columns keep their old positions, and ids are never checked against this board — a partial or mixed-up list yields an unpredictable order. Always send exactly this board's full column id list.",
+      "Ids that are not columns of this board (unknown or foreign) are rejected with 422 before anything moves. Omitted columns keep their old positions, so a partial list yields an unpredictable order — always send exactly this board's full column id list.",
     ],
     examplePrompt:
       "Using the Backplane MCP, get the <board> board in <workspace> and reorder its columns so <column> comes first.",

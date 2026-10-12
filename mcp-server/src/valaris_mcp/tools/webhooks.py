@@ -25,7 +25,6 @@ async def create_webhook(
     """Create a webhook delivering workspace events to a URL, HMAC-SHA256 signed with the secret.
 
     Args:
-        workspace_slug: Workspace slug.
         url: Delivery URL (https-only outside development).
         events: Event names; see ENUMS in the server instructions.
         secret: HMAC signing secret.
@@ -55,7 +54,6 @@ async def list_webhooks(
     """List a workspace's webhooks.
 
     Args:
-        workspace_slug: Workspace slug.
         is_active: true = active only, false = inactive only.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -85,11 +83,9 @@ async def get_webhook(
     webhook_id: str,
     ctx: Context = None,
 ) -> str:
-    """Read one webhook's URL, events, active state, and delivery health;
-    not-found under another workspace's slug.
+    """Read one webhook's URL, events, active state and delivery health. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         webhook_id: Webhook UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -110,16 +106,15 @@ async def update_webhook(
     delete: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Update a webhook; only passed fields change. is_active=false pauses deliveries reversibly; delete=true removes the registration for good (deliveries stop at once; an already-deleted webhook reports so) and accepts no other field.
+    """Update a webhook; only passed fields change. delete=true removes it permanently (alone). See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         webhook_id: Webhook UUID.
         url: New delivery URL.
         events: REPLACES the whole subscription list.
-        secret: New HMAC secret; update the receiver too.
+        secret: New HMAC secret.
         is_active: false pauses deliveries, true resumes.
-        delete: True permanently removes the webhook (no undo); alone, with no other field. Prefer is_active=false to pause.
+        delete: True removes it permanently; alone. Pause with is_active=false instead.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -172,7 +167,6 @@ async def delete_webhook(workspace_slug: str, webhook_id: str, ctx: Context = No
     """Permanently remove a webhook; an already-deleted one reports so.
 
     Args:
-        workspace_slug: Workspace slug.
         webhook_id: Webhook UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context

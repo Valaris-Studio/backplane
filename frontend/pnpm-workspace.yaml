@@ -19,6 +19,12 @@ allowBuilds:
 # pnpm-workspace.yaml overrides; keep the two in sync
 # (backend/tests/test_pnpm_config_drift.py pins them equal).
 overrides:
+  # Keep Mammoth's v1 CLI API while removing the unpatched sprintf-js dependency.
+  "mammoth>argparse": 2.0.1
+  # Reject inherited trust settings in diagram math (GHSA-238p-pmpm-9mq7).
+  "mermaid>katex": 0.18.2
+  # Bound indexed source-map section offsets (GHSA-68fv-2mgg-jv7q).
+  source-map-js: 1.2.2
   # Mammoth parses uploaded DOCX XML; older releases have CPU/memory DoS issues.
   "@xmldom/xmldom": 0.8.15
   "@tiptap/core": 3.30.5

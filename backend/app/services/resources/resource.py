@@ -7,13 +7,20 @@ import uuid
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import BadRequestError, ResourceNotFoundError, ValidationError
+from app.exceptions import (
+    BadRequestError,
+    ResourceNotFoundError,
+    StorageBackendUnavailableError,
+    ValidationError,
+)
 from app.models.activity import ActivityAction, ActivityEntityType
 from app.models.resources.resource import ResourceType
 from app.repositories.resources.resource import ResourceRepository
 from app.schemas.resources.resource import ResourceCreate, ResourceMetadata, ResourceUpdate
 from app.services.activity import ActivityService
+from app.services.gcs import ObjectStoreUnavailableError
 from app.services.kanban.freeze_guard import assert_board_not_frozen
+from app.services.storage.objects import stat_stored_object
 from app.utils import shallow_merge_dicts
 
 
@@ -82,13 +89,21 @@ class ResourceService:
         if data.metadata:
             metadata = self._validate_metadata(data.metadata)
 
+        is_file = data.resource_type == ResourceType.file
         gcs_path = data.gcs_path
-        if not gcs_path and data.resource_type == ResourceType.file:
+        if not gcs_path and is_file:
             gcs_path = f"{workspace_id}/{uuid.uuid4()}/{self._key_segment(data.name)}"
         # Both branches, not just the supplied one: the generated key
         # interpolates the caller's chosen name, so it needs the same invariant.
-        if gcs_path and data.resource_type == ResourceType.file:
+        if gcs_path and is_file:
             gcs_path = self._validate_gcs_path(gcs_path, workspace_id)
+
+        mime_type = data.mime_type if is_file else None
+        size_bytes = data.size_bytes if is_file else None
+        if data.gcs_path and is_file:
+            # A supplied key names an upload that already happened, so the
+            # stored object, not the caller, is authoritative for its facts.
+            mime_type, size_bytes = await self._uploaded_object_facts(gcs_path, mime_type)
 
         resource = await self.repo.create(
             workspace_id=workspace_id,
@@ -96,9 +111,9 @@ class ResourceService:
             parent_id=data.parent_id,
             resource_type=data.resource_type,
             name=data.name,
-            gcs_path=gcs_path if data.resource_type == ResourceType.file else None,
-            mime_type=data.mime_type if data.resource_type == ResourceType.file else None,
-            size_bytes=data.size_bytes if data.resource_type == ResourceType.file else None,
+            gcs_path=gcs_path if is_file else None,
+            mime_type=mime_type,
+            size_bytes=size_bytes,
             uploaded_by=user_id,
             meta=metadata,
             description=data.description,
@@ -120,6 +135,21 @@ class ResourceService:
         )
 
         return resource
+
+    @staticmethod
+    async def _uploaded_object_facts(
+        gcs_path: str, declared_mime_type: str | None
+    ) -> tuple[str | None, int | None]:
+        try:
+            stat = await stat_stored_object(gcs_path)
+        except ObjectStoreUnavailableError:
+            raise StorageBackendUnavailableError() from None
+        if stat is None:
+            raise ValidationError(
+                "No uploaded object at gcs_path — upload the file first",
+                error_code="object_not_uploaded",
+            )
+        return stat.content_type or declared_mime_type, stat.size_bytes
 
     async def list_resources(
         self,
@@ -151,6 +181,10 @@ class ResourceService:
             return []
 
         if parent_id:
+            if workspace_id is not None:
+                # The folder must sit inside this route's scope, or a known
+                # folder id lists another board's or workspace's children.
+                await self._get_scoped(parent_id, workspace_id, board_id)
             return await self.repo.list_by_parent(parent_id)
         if board_id:
             return await self.repo.list_root_by_board(board_id)
@@ -171,10 +205,30 @@ class ResourceService:
             raise ResourceNotFoundError("Resource not found")
         return resource
 
-    async def get_resource_for_signing(
-        self, resource_id: uuid.UUID, workspace_id: uuid.UUID
+    async def get_board_resource(
+        self, resource_id: uuid.UUID, workspace_id: uuid.UUID, board_id: uuid.UUID
     ):
         resource = await self.get_resource(resource_id, workspace_id)
+        # Board routes serve only that board's resources; workspace-level ones
+        # (board_id None) belong to the workspace routes.
+        if resource.board_id != board_id:
+            raise ResourceNotFoundError("Resource not found")
+        return resource
+
+    async def _get_scoped(
+        self, resource_id: uuid.UUID, workspace_id: uuid.UUID, board_id: uuid.UUID | None
+    ):
+        if board_id is None:
+            return await self.get_resource(resource_id, workspace_id)
+        return await self.get_board_resource(resource_id, workspace_id, board_id)
+
+    async def get_resource_for_signing(
+        self,
+        resource_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
+    ):
+        resource = await self._get_scoped(resource_id, workspace_id, board_id)
         if not resource.gcs_path:
             raise BadRequestError("Resource has no file")
         # Rows stored before the create-time guard can carry a foreign key, and
@@ -189,10 +243,9 @@ class ResourceService:
         workspace_id: uuid.UUID,
         user_id: uuid.UUID,
         data: ResourceUpdate,
+        board_id: uuid.UUID | None = None,
     ):
-        resource = await self.repo.get_by_id(resource_id)
-        if not resource or resource.workspace_id != workspace_id:
-            raise ResourceNotFoundError("Resource not found")
+        resource = await self._get_scoped(resource_id, workspace_id, board_id)
         await assert_board_not_frozen(self.db, resource.board_id)
 
         update_data = data.model_dump(exclude_unset=True)
@@ -232,10 +285,9 @@ class ResourceService:
         resource_id: uuid.UUID,
         workspace_id: uuid.UUID,
         user_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
     ):
-        resource = await self.repo.get_by_id(resource_id)
-        if not resource or resource.workspace_id != workspace_id:
-            raise ResourceNotFoundError("Resource not found")
+        resource = await self._get_scoped(resource_id, workspace_id, board_id)
         await assert_board_not_frozen(self.db, resource.board_id)
 
         name = resource.name

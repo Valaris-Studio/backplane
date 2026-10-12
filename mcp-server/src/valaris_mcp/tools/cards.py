@@ -36,7 +36,6 @@ async def list_cards(workspace_slug: str, board_id: str, ctx: Context) -> str:
     """List every card on a board, grouped by column.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -90,7 +89,6 @@ async def get_card(workspace_slug: str, board_id: str, card_id: str, ctx: Contex
     """Get one card with full details (participants, markdown description).
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
     """
@@ -126,7 +124,6 @@ async def create_card(
     """Create a card in a column.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         column_id: Target column UUID.
         title: Max 500 characters.
@@ -136,7 +133,7 @@ async def create_card(
         due_date: YYYY-MM-DD.
         status: Short state label. Max 255 characters.
         labels: Label strings.
-        git_repo_slug: Target repo slug on multi-repo boards; omit for the primary repo.
+        git_repo_slug: Repo slug on multi-repo boards; omit for the primary.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -188,29 +185,21 @@ async def update_card(
     clear_fields: list[ClearableCardField] | None = None,
     ctx: Context = None,
 ) -> str:
-    """Update card fields; omitted or null values keep existing values.
-
-    To clear nullable values, pass clear_fields=["due_date"] (or another
-    supported field). Do not also set a non-null value for a cleared field.
-    Clear a description with description=""; clear labels with labels=[] or
-    clear_fields=["labels"] (JSON null). Repeating a clear is safe.
+    """Update card fields; omitted or null values keep existing values. Clear via clear_fields, description="" or labels=[]. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
         title: Max 500 characters.
-        description: New description.
         card_type: task|issue|feature|bug.
         priority: none|low|medium|high|urgent.
         due_date: YYYY-MM-DD.
         status: Short state label. Max 255 characters.
         labels: Replaces the whole label list.
-        pr_url: PR the card shipped as; prefer it over a link in the description.
+        pr_url: PR the card shipped as.
         branch_name: Branch the work landed on.
         git_repo_slug: Target repo slug on multi-repo boards.
-        clear_fields: Nullable fields to set to null: due_date, status, labels,
-            pr_url, branch_name, git_repo_slug. Omit to preserve existing values.
+        clear_fields: Nullable fields to null: due_date, status, labels, pr_url, branch_name, git_repo_slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -260,7 +249,6 @@ async def delete_card(workspace_slug: str, board_id: str, card_id: str, ctx: Con
     """Delete a card permanently.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
     """
@@ -282,10 +270,9 @@ async def move_card(
     position: float | None = None,
     ctx: Context = None,
 ) -> str:
-    """Move a card to another column and/or position. Omit position to append to the end of the target column.
+    """Move a card to another column and/or position; omitted position appends. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
         column_id: Target column UUID.
@@ -313,15 +300,14 @@ async def add_card_participant(
     pipeline_role: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Add a participant to a card. Idempotent: an existing row keeps its pipeline_role unless it was NULL, which is backfilled.
+    """Add a participant to a card. Idempotent; a NULL pipeline_role on an existing row is backfilled. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
         user_id: User UUID.
         role: hero (responsible)|viewer|stakeholder|helper.
-        pipeline_role: Stage role for role-aware filters (planner, implementer, reviewer, ... or custom; max 64 chars).
+        pipeline_role: Stage role (planner, implementer, reviewer, ... or custom; max 64 chars).
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -344,14 +330,13 @@ async def remove_card_participant(
     pipeline_role: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Remove participants from a card: one person by user_id, or every holder of a pipeline_role (e.g. drop the stale implementer before rework; idempotent — a no-op when nobody holds it). Exactly one selector.
+    """Remove one participant by user_id, or every holder of a pipeline_role (pass exactly one). Idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
         user_id: Participant's user UUID (one person).
-        pipeline_role: Stage role to clear — planner, implementer, reviewer, rework_mediator or custom; instead of user_id.
+        pipeline_role: Stage role whose holders are all removed (planner, implementer, ... or custom); instead of user_id.
     """
     if bool(user_id) == bool(pipeline_role):
         return json.dumps(
@@ -381,7 +366,6 @@ async def remove_card_participants_by_role(
     """Remove every participant holding a pipeline_role. Idempotent.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID.
         pipeline_role: Stage role to clear.
@@ -405,7 +389,6 @@ async def claim_card(
     """Make a runner the hero of one card and move it to In Progress; 409 if already claimed.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         card_id: Card UUID.
         agent_id: Claiming runner's UUID.

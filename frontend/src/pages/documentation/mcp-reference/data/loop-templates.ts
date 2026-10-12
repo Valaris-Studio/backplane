@@ -491,6 +491,7 @@ export const LOOP_TEMPLATES_TOOL_DOCS: ToolDoc[] = [
       "A matching slug in the target makes this action=updated — the existing DRAFT is overwritten. Check diff_summary in the dry run first.",
       "Runner callers are refused with 403 by design: a runner must not import the prompt that governs it. Envelope mismatch → 400; unrenderable template → 422.",
       "Bundles over ~64 KB are better sent to POST /loop-templates/import directly — large JSON bodies through MCP have been seen to garble.",
+      "The dry run also returns leak_findings — the repo-fact lint hints export_loop_template reports, as warnings only.",
     ],
     danger:
       "With dry_run=false a slug collision OVERWRITES the target workspace's existing draft for that slug. Export a backup bundle from the target first.",

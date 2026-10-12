@@ -1787,7 +1787,11 @@
     "attachFile": "Adjuntar archivo",
     "uploading": "Subiendo...",
     "fileTooLarge": "El archivo es demasiado grande. El tamaño máximo es 50 MB.",
-    "imageUploadError": "Error al subir la imagen",
+    "uploadFailedTitle": "No se pudo subir {{name}}",
+    "uploadStorageUnavailable": "El almacenamiento de archivos no está disponible por el momento. No se agregó nada; inténtalo de nuevo en unos instantes.",
+    "uploadRejected": "El servidor no aceptó este archivo, así que no se agregó nada.",
+    "uploadFailed": "La subida no terminó, así que no se agregó nada. Revisa tu conexión e inténtalo de nuevo.",
+    "uploadRetry": "Reintentar",
     "mermaid": "Diagrama",
     "mermaidEdit": "Editar diagrama",
     "mermaidError": "Error en el diagrama",
@@ -2905,6 +2909,9 @@
       },
       "update_workspace_member": {
         "summary": "Cambia el rol de un miembro existente del espacio de trabajo."
+      },
+      "upload_resource": {
+        "summary": "Subir un archivo como recurso en una sola llamada."
       },
       "validate_board_dependencies": {
         "summary": "Validar las dependencias del tablero para detectar ciclos, conflictos y elementos huérfanos."

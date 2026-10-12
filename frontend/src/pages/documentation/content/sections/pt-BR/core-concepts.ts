@@ -771,4 +771,126 @@ export const PT_BR_CORE_CONCEPTS = {
     "Binary assets referenced as media rather than inlined, and per-file modes so a bundled script can be executable, are both on the roadmap. Until then, the interpreter-invocation convention above is the supported path.":
       "Ativos binários referenciados como mídia em vez de embutidos, e modos por arquivo para que um script incluído possa ser executável, estão ambos no roteiro. Até lá, a convenção de invocação por interpretador descrita acima é o caminho suportado.",
   },
+  notes: {
+    "A ":
+      "Uma ",
+    "note":
+      "nota",
+    " is a titled rich-text document that lives in a workspace or on a board, optionally linked to one card. People write notes in the shared editor; agents write them over MCP. Both edit the same stored document, so this chapter covers what that document can hold and how to change it without losing anything.":
+      " é um documento de texto rico com título que vive em um espaço de trabalho ou em um quadro, opcionalmente vinculado a um cartão. Pessoas escrevem notas no editor compartilhado; agentes as escrevem via MCP. Ambos editam o mesmo documento armazenado, então este capítulo explica o que esse documento pode conter e como alterá-lo sem perder nada.",
+    "What the editor supports":
+      "O que o editor suporta",
+    "The editor and the API share one closed vocabulary: headings (levels 1–3), paragraphs, bold, italic, strikethrough, inline code, links, bullet and numbered lists, block quotes, horizontal rules, tables, code blocks with a language, Mermaid diagrams, mentions, images and file attachments. A Mermaid diagram is an ordinary code block whose language is ":
+      "O editor e a API compartilham um vocabulário fechado: títulos (níveis 1–3), parágrafos, negrito, itálico, tachado, código em linha, links, listas com marcadores e numeradas, citações em bloco, linhas horizontais, tabelas, blocos de código com linguagem, diagramas Mermaid, menções, imagens e anexos. Um diagrama Mermaid é um bloco de código comum cuja linguagem é ",
+    "; the editor draws it in place.":
+      "; o editor o desenha no próprio lugar.",
+    "Markdown vs ProseMirror":
+      "Markdown versus ProseMirror",
+    "Every note is stored as ProseMirror JSON, the editor's native format. Writes accept more than that: ":
+      "Toda nota é armazenada como JSON do ProseMirror, o formato nativo do editor. As escritas aceitam mais do que isso: ",
+    " may be Markdown, HTML, plain text or ProseMirror JSON, and the server converts it to the stored form on every save. Markdown is the right default for agents — it is compact and readable.":
+      " pode ser Markdown, HTML, texto simples ou JSON do ProseMirror, e o servidor o converte para a forma armazenada a cada salvamento. Markdown é o padrão certo para agentes: é compacto e legível.",
+    "Reads go the other way. ":
+      "As leituras seguem o caminho inverso. ",
+    " returns the raw JSON by default; pass ":
+      " retorna o JSON bruto por padrão; passe ",
+    " to get the same document serialized to Markdown, which costs far fewer tokens. The conversion is a read-time projection — nothing stored changes.":
+      " para obter o mesmo documento serializado em Markdown, o que custa bem menos tokens. A conversão é uma projeção em tempo de leitura: nada do que está armazenado muda.",
+    "Editing a note over MCP":
+      "Editar uma nota via MCP",
+    " takes a ":
+      " recebe um ",
+    " and an optional":
+      " e, opcionalmente,",
+    ", plus ":
+      ", além de ",
+    " for a board note and":
+      " para uma nota de quadro e",
+    " to link a card. ":
+      " para vincular um cartão. ",
+    " changes only the fields you pass, and its ":
+      " altera apenas os campos que você passar, e seu ",
+    " decides what":
+      " decide o que",
+    " does:":
+      " faz:",
+    " (the default) — the new content becomes the whole body.":
+      " (o padrão): o novo conteúdo passa a ser o corpo inteiro.",
+    " — the new blocks go after the existing ones. It is not idempotent: a retried call appends a second copy.":
+      ": os novos blocos vão depois dos existentes. Não é idempotente: uma chamada repetida acrescenta uma segunda cópia.",
+    " — rewrites one section, named by":
+      ": reescreve uma seção, identificada por",
+    ". The heading itself is kept; the section runs until the next heading at the same or a higher level, so subsections stay inside it. Matching ignores case and surrounding spaces, and a heading that appears twice is refused rather than guessed. Replaying the same call converges, so it is safe to retry.":
+      ". O título em si é mantido; a seção vai até o próximo título do mesmo nível ou de um nível superior, então as subseções ficam dentro dela. A correspondência ignora maiúsculas e espaços ao redor, e um título que aparece duas vezes é recusado em vez de adivinhado. Repetir a mesma chamada converge, então é seguro tentar de novo.",
+    "Rewrite one section of a tracker note":
+      "Reescrever uma seção de uma nota de acompanhamento",
+    "Large notes: append in chunks":
+      "Notas grandes: acrescente em partes",
+    "The server sets no size limit on a note; the practical ceiling is how much one tool call can carry. To write a long document, create the note with its first part, then add the rest with":
+      "O servidor não define limite de tamanho para uma nota; o teto prático é quanto uma chamada de ferramenta consegue carregar. Para escrever um documento longo, crie a nota com a primeira parte e acrescente o restante com",
+    " and ":
+      " e ",
+    ", one section per call. Content is always sent inline — there is no upload-a-file-as-a-note shortcut.":
+      ", uma seção por chamada. O conteúdo é sempre enviado em linha: não existe atalho para enviar um arquivo como nota.",
+    "Append is not idempotent":
+      "Acrescentar não é idempotente",
+    "If an append call fails ambiguously, read the note before retrying. Retrying blindly can leave the same chunk in the note twice.":
+      "Se uma chamada de acréscimo falhar de forma ambígua, leia a nota antes de tentar de novo. Repetir às cegas pode deixar o mesmo trecho duas vezes na nota.",
+    "Images and attachments":
+      "Imagens e anexos",
+    "A note never stores a short-lived signed link: it would break for every reader within the hour. It stores a stable, authenticated app path instead — ":
+      "Uma nota nunca armazena um link assinado de curta duração: ele quebraria para todos os leitores em menos de uma hora. Em vez disso, armazena um caminho estável e autenticado do app: ",
+    " for images pasted in the editor, ":
+      " para imagens coladas no editor, ",
+    "for uploaded files. Each read checks the reader's access before serving the file. A signed storage URL for one of this workspace's files that reaches a save is rewritten to its stable path before it is stored.":
+      "para arquivos enviados. Cada leitura verifica o acesso de quem lê antes de servir o arquivo. Uma URL assinada de armazenamento de um arquivo deste espaço de trabalho que chega a um salvamento é reescrita para o seu caminho estável antes de ser armazenada.",
+    "To add a file from MCP, call ":
+      "Para adicionar um arquivo via MCP, chame ",
+    ". It uploads the bytes and registers the file in one call. Its result carries":
+      ". Ele envia os bytes e registra o arquivo em uma única chamada. O resultado traz",
+    ", the stable link to embed, and":
+      ", o link estável a incorporar, e",
+    ", the Markdown line to paste into a note. For a file that already exists, ":
+      ", a linha de Markdown para colar em uma nota. Para um arquivo que já existe, ",
+    "Upload a screenshot and embed it":
+      "Enviar uma captura de tela e incorporá-la",
+    " reads a local file and works only when the server runs over stdio. Over HTTP, send the bytes as":
+      " lê um arquivo local e só funciona quando o servidor roda sobre stdio. Via HTTP, envie os bytes como",
+    ". The tool reference lists the size caps and the paths it refuses.":
+      ". A referência da ferramenta lista os limites de tamanho e os caminhos que recusa.",
+    " returns the same ":
+      " retorna o mesmo ",
+    "Embed the link in Markdown with one of these two forms:":
+      "Incorpore o link em Markdown com uma destas duas formas:",
+    "Image and attachment Markdown":
+      "Markdown de imagem e de anexo",
+    "An image is standard Markdown; the quoted title is optional. An attachment is a link whose title starts with ":
+      "Uma imagem é Markdown padrão; o título entre aspas é opcional. Um anexo é um link cujo título começa com ",
+    ", optionally followed by ":
+      ", seguido opcionalmente de ",
+    " (bytes) and":
+      " (bytes) e",
+    " (a MIME type), and it must stand alone as its own paragraph. The same link inside a sentence, or with any other title, stays an ordinary link. HTML input follows the same rules:":
+      " (um tipo MIME), e precisa ficar sozinho em seu próprio parágrafo. O mesmo link dentro de uma frase, ou com qualquer outro título, continua sendo um link comum. A entrada HTML segue as mesmas regras:",
+    " becomes an image, and a paragraph holding only an ":
+      " vira uma imagem, e um parágrafo que contém apenas um ",
+    " with an attachment title becomes an attachment.":
+      " com título de anexo vira um anexo.",
+    "Round-trip guarantees":
+      "Garantias de ida e volta",
+    "Reading a note as Markdown, editing the text and writing it back keeps the document intact: headings, marks, links, lists, quotes, rules, tables, code blocks and Mermaid diagrams, images with their alt text and title, and attachments with their name, size and type all come back as the same nodes, at the same stable paths.":
+      "Ler uma nota como Markdown, editar o texto e gravá-la de volta mantém o documento intacto: títulos, formatações, links, listas, citações, linhas, tabelas, blocos de código e diagramas Mermaid, imagens com texto alternativo e título, e anexos com nome, tamanho e tipo voltam como os mesmos nós, nos mesmos caminhos estáveis.",
+    "What Markdown cannot carry":
+      "O que o Markdown não consegue carregar",
+    "A mention becomes plain @Name text, a table cell is flattened to one line, and table column alignment is dropped. Headings deeper than level 3 are stored as level 3. An attachment whose upload never finished has no link and comes back as its bare file name. Markdown checklists are not converted yet. When a note holds mentions you need to keep, edit it with ":
+      "Uma menção vira texto simples @Nome, uma célula de tabela é achatada em uma linha e o alinhamento das colunas se perde. Títulos com nível maior que 3 são armazenados como nível 3. Um anexo cujo envio nunca terminou não tem link e volta apenas como o nome do arquivo. Listas de verificação em Markdown ainda não são convertidas. Quando uma nota tiver menções que você precisa manter, edite-a com ",
+    " around them or write ProseMirror JSON.":
+      " ao redor delas ou escreva JSON do ProseMirror.",
+    "Edit the smallest piece you can":
+      "Edite o menor trecho possível",
+    "Prefer ":
+      "Prefira ",
+    " over replacing a whole note. It touches only the section you name, so anything outside it — including what Markdown cannot carry — is left exactly as it was.":
+      " em vez de substituir a nota inteira. Ele só altera a seção que você indicar, então tudo o que fica fora dela — inclusive o que o Markdown não consegue carregar — permanece exatamente como estava.",
+  },
 };

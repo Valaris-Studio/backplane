@@ -20,11 +20,7 @@ _DONE_MERGE_GATE_VALUES = {"inherit": None, "enforced": True, "off": False}
 @mcp.tool()
 @handle_api_errors
 async def list_boards(workspace_slug: str, ctx: Context) -> str:
-    """List the boards in a workspace.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """List the boards in a workspace."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     boards = await client.get(f"{client.ws(workspace_slug)}/boards")
@@ -50,13 +46,12 @@ async def get_board(
     titles_only: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Get a board with its columns and their cards. On large boards pass summary_only or titles_only; summary_only wins when both are set.
+    """Get a board with its columns and cards; on large boards pass summary_only (wins) or titles_only. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
-        summary_only: Per-column card counts + priority/status breakdowns, no cards.
-        titles_only: Slim each card to id/title/status/priority/labels.
+        summary_only: Per-column counts and breakdowns only.
+        titles_only: Slim cards to id/title/status/priority/labels.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -112,17 +107,12 @@ async def create_board(
     definition_content: dict | None = None,
     ctx: Context = None,
 ) -> str:
-    """Create a board, optionally with its structured definition in the same call.
-
-    Idempotent only when slug is given (an existing board with that slug is returned); without slug every call mints a new board. Definition fields upsert either way.
+    """Create a board, optionally with its definition. Idempotent only with slug. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
-        name: Display name.
         slug: URL slug; the idempotency key.
         description: Board purpose.
-        tags: Tags.
-        skip_default_columns: Skip the default typed columns (To Do/In Progress/Blocked/Done).
+        skip_default_columns: Skip the default typed columns.
         scope: Definition scope/summary.
         objectives: [{"text", "priority"?}].
         exclusions: Out-of-scope items.
@@ -189,19 +179,12 @@ async def update_board(
     done_merge_gate: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Update a board's name, description, tags, or done-merge-gate override. Omitted fields are unchanged.
-
-    Human keys only (runners get 403). done_merge_gate needs workspace admin/owner.
+    """Update a board's name, description, tags or done_merge_gate; omitted fields are unchanged. Human keys only. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
-        name: New display name.
-        description: New description.
         tags: Replaces the tag list.
-        done_merge_gate: inherit|enforced|off. Gates RUNNER moves into done on a
-            merged PR with an approving verdict (humans never gated; no linked
-            repo = exempt); inherit follows the workspace flag.
+        done_merge_gate: inherit|enforced|off (admin/owner): gates runner moves into done.
     """
     if done_merge_gate is not None and done_merge_gate not in _DONE_MERGE_GATE_VALUES:
         return json.dumps(
@@ -234,12 +217,9 @@ async def update_board(
 @mcp.tool()
 @handle_api_errors
 async def freeze_board(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Freeze a board: every mutation returns 409 board_frozen and the scheduler stops handing out its cards until unfreeze_board.
-
-    Reads and telemetry (execution logging, approvals) stay open. Workspace admin/owner. Idempotent.
+    """Freeze a board (admin/owner; idempotent): mutations get 409 board_frozen and pickup stops until unfreeze_board. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -255,12 +235,9 @@ async def freeze_board(workspace_slug: str, board_id: str, ctx: Context = None) 
 @mcp.tool()
 @handle_api_errors
 async def unfreeze_board(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Unfreeze a frozen board, reopening mutations and scheduling.
-
-    Workspace owner only (admins can freeze but not unfreeze). Idempotent.
+    """Unfreeze a board, reopening mutations and pickup. Workspace owner only; idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -273,10 +250,9 @@ async def unfreeze_board(workspace_slug: str, board_id: str, ctx: Context = None
 @mcp.tool()
 @handle_api_errors
 async def get_board_loop(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Read loop config: state, prompts, provider/model, tools, caps, disabled_reason, version and template (null for raw prompts). Unconfigured=404.
+    """Read a board's effective loop config, incl. version, disabled_reason and template (null for raw prompts); 404 until configured. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -350,13 +326,12 @@ async def set_board_loop(
     expected_version: int | None = None,
     ctx: Context = None,
 ) -> str:
-    """Edit loop config/state. Omitted fields persist; edits apply next iteration. Enable is idempotent, requiring nonempty loop_prompt. Config saves before state. When running in loop mode: call this with enabled=false and a concise reason when the objective is complete or you are blocked.
+    """Edit a board's loop config and/or state; omitted fields persist. When running in loop mode: call this with enabled=false and a concise reason when the objective is complete or you are blocked. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         enabled: True=start/resume, false=stop; omitted=config only.
-        reason: Stop reason; saved only on enabled-to-disabled transition.
+        reason: Stop reason (kept on disable).
         loop_prompt: Iteration prompt.
         system_prompt: Session system prompt.
         provider: Coding agent (empty=runner default).
@@ -369,16 +344,16 @@ async def set_board_loop(
         max_consecutive_failures: Failure breaker (>=1).
         max_blocked_on_human: Consecutive blocked_on_human stop threshold; 0=park only.
         starvation_policy: park (sleep when idle)|always_run.
-        loop_landing: Legacy human|self_merge|merge_queue. Human self_merge saves auto-relax the Done merge gate.
+        loop_landing: Legacy human|self_merge|merge_queue.
         merge_gate: forge_ci (require green CI before queue merge)|none.
         completion_query: {label, exclude_column_type:"done"}; zero matches stops; {} clears.
         skills_proposal_enabled: Allow runner propose_skill; default true.
         relax_done_merge_gate: False declines self_merge auto-relax for this save.
-        template_ref: System slug/workspace UUID to bind; owns prompts/tools (raw edits:422 alongside bind,409 later).
+        template_ref: System slug or workspace UUID to bind.
         template_source: system (default)|workspace.
         template_version: Published version; omitted=newest.
-        slot_values: Full replacement {SLOT_NAME:value}; alone re-renders the binding.
-        detach_template: Remove binding, retain rendered text; overrides template_ref.
+        slot_values: Full replacement {SLOT_NAME:value}.
+        detach_template: Drop the binding, keep the rendered text.
         expected_version: Last-read loop version; stale=409.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -477,12 +452,9 @@ async def set_board_loop(
 @mcp.tool()
 @handle_api_errors
 async def delete_board(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Permanently delete a board and everything scoped to it. IRREVERSIBLE — confirm the board_id first.
-
-    Cascades to columns, cards, notes, definition, git-repo bindings, resources; activity/execution history is kept but unlinked.
+    """Permanently delete a board and everything scoped to it; IRREVERSIBLE, confirm the board_id first. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context

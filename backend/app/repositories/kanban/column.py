@@ -18,7 +18,11 @@ class ColumnRepository(BaseRepository[Column]):
         result = await self.db.execute(
             select(Column)
             .where(Column.id == id)
-            .options(selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.user), selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.agent))
+            .options(
+                selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.user),
+                selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.agent),
+                selectinload(Column.cards).selectinload(Card.column),
+            )
         )
         return result.scalar_one_or_none()
 

@@ -31,7 +31,6 @@ async def log_execution_start(
     """Log the start of a runner execution; returns execution_id for log_execution_update.
 
     Args:
-        workspace_slug: Workspace slug.
         agent_id: Runner UUID.
         action: Short action name, e.g. 'review_pr'.
         input_summary: What the runner was asked to do.
@@ -87,7 +86,7 @@ async def log_execution_update(
     ship_warnings: list[str] | None = None,
     ctx: Context = None,
 ) -> str:
-    """Record an execution's status, result, or error at completion, failure, or a checkpoint.
+    """Record an execution's status, result or error at completion, failure or a checkpoint. See docs.
 
     Args:
         agent_id: Runner UUID.
@@ -140,13 +139,12 @@ async def cancel_execution(
     reason: str = "",
     ctx: Context = None,
 ) -> str:
-    """Force a stuck 'running' execution to a terminal status, clearing the
-    agent_busy 409 guard that stalls the pipeline.
+    """Force a stuck execution to a terminal status, clearing the agent_busy 409 guard. See docs.
 
     Args:
         agent_id: Runner UUID.
-        execution_id: Execution UUID (list_executions status='inflight' finds zombies).
-        status: aborted (default)|completed|failed; non-terminal values are rejected.
+        execution_id: Execution UUID.
+        status: aborted|completed|failed.
         reason: Recorded as output_summary.
     """
     if status not in _TERMINAL_STATUSES:
@@ -185,18 +183,14 @@ async def list_executions(
     limit: int = 20,
     ctx: Context = None,
 ) -> str:
-    """List runner execution history for a workspace, newest first. Rows are
-    heavy (full input_prompt); keep limit small. Before cancel_execution on a
-    row, verify its agent_id/card_id match the scope you meant.
+    """List a workspace's runner executions, newest first. Rows are heavy; keep limit small. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         agent_id: Only this runner.
-        status: started|running|completed|failed|aborted|skipped, or 'inflight' =
-            all active rows workspace-wide, ignoring limit.
+        status: started|running|completed|failed|aborted|skipped, or inflight (every active row; ignores limit).
         role: Pipeline role.
-        card_id: That card's history, ignoring limit, capped at the newest 200 rows.
-        limit: Default 20, caps at 200.
+        card_id: That card's history; ignores limit, newest 200 rows.
+        limit: Caps at 200.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -218,9 +212,7 @@ async def list_executions(
 @mcp.tool()
 @handle_api_errors
 async def get_agent_config(ctx: Context = None) -> str:
-    """Get the runner identity linked to this API key (agent_id, allowed_workspaces,
-    allowed_actions); falls back to the user identity when no runner is linked.
-    """
+    """Get the runner identity (agent_id, allowed workspaces/actions) linked to this API key, or the user identity when none is linked."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     try:
@@ -257,7 +249,6 @@ async def create_agent(
     """Create a runner identity; raw_api_key is returned exactly once.
 
     Args:
-        name: Display name.
         agent_type: coding|manager|reviewer|secretary|improver.
         allowed_workspaces: Workspace slugs the runner may see; must be non-empty.
         description: What it does.
@@ -302,18 +293,16 @@ async def update_agent(
     hard_delete: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Update a runner's profile or constraints; only passed fields change. is_active=false is the reversible retirement; hard_delete=true erases the runner instead (API key, executions, approvals, team memberships — unrecoverable; 409 while a card is in flight) and accepts no other field.
+    """Update a runner's profile or constraints; only passed fields change. hard_delete=true erases it (alone). See docs.
 
     Args:
         agent_id: Runner UUID.
-        name: New display name.
-        description: New description.
         allowed_workspaces: Replacement allowlist; non-empty.
         allowed_actions: New action allowlist.
         max_requests_per_minute: New rate limit.
         budget_usd: New spending cap.
         is_active: False disables (reversible).
-        hard_delete: True permanently erases the runner (unrecoverable); alone, with no other field.
+        hard_delete: True erases the runner (unrecoverable); alone.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -397,8 +386,7 @@ async def pause_agent(
     agent_id: str,
     ctx: Context = None,
 ) -> str:
-    """Stop a runner from picking up new cards (idempotent); its in-flight card
-    still finishes, so use cancel_execution to end that too.
+    """Stop a runner from picking up new cards (idempotent); its in-flight card still finishes. See docs.
 
     Args:
         agent_id: Runner UUID.
@@ -434,8 +422,7 @@ async def restart_agent(
     agent_id: str,
     ctx: Context = None,
 ) -> str:
-    """Ask a live runner to finish its in-flight card and exit for its supervisor
-    to relaunch on fresh config; an offline runner returns 503.
+    """Ask a live runner to finish its card and exit for its supervisor to relaunch; offline runners return 503. See docs.
 
     Args:
         agent_id: Runner UUID.
@@ -509,8 +496,7 @@ async def rotate_agent_key(
     agent_id: str,
     ctx: Context = None,
 ) -> str:
-    """Mint a new API key for a runner; the old key dies immediately and
-    raw_api_key appears only in this result.
+    """Mint a new API key for a runner; the old key dies immediately and raw_api_key appears only here.
 
     Args:
         agent_id: Runner UUID.

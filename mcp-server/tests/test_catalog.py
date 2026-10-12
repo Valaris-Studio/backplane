@@ -242,6 +242,33 @@ def test_no_title_key_in_input_schema_root_or_properties():
     assert not offenders, f"redundant schema titles: {offenders}"
 
 
+def _subschemas(schema: dict):
+    yield schema
+    for branch in schema.get("anyOf", []):
+        yield from _subschemas(branch)
+    if isinstance(schema.get("items"), dict):
+        yield from _subschemas(schema["items"])
+
+
+def test_no_explicit_additional_properties_true():
+    # JSON Schema already allows extra keys when additionalProperties is absent,
+    # so an explicit `true` (every dict param) is wire bytes with no meaning.
+    offenders = sorted(
+        f"{name}.{prop_name}"
+        for name, tool in _registered().items()
+        for prop_name, prop in tool.parameters.get("properties", {}).items()
+        for sub in _subschemas(prop)
+        if sub.get("additionalProperties") is True
+    )
+    assert not offenders, f"explicit additionalProperties: true on {offenders}"
+
+
+def test_dict_params_still_declare_object_type():
+    tool = _registered()["set_board_loop"]
+    branches = tool.parameters["properties"]["slot_values"]["anyOf"]
+    assert {"type": "object"} in branches
+
+
 # ---------- docstring split landed on the wire ----------
 
 
@@ -261,12 +288,18 @@ def test_every_documented_arg_is_the_property_description():
     assert not drift, "\n".join(drift)
 
 
+# Names that say everything a one-line description could ("Workspace slug.",
+# "New display name."); the wire budget pays for meaning, not echoes. A param
+# here still gets a description whenever it carries more than its name.
+SELF_DESCRIBING_PARAMS = frozenset({"workspace_slug", "name", "description", "title", "tags"})
+
+
 def test_every_schema_property_has_a_non_empty_description():
     undocumented = [
         f"{name}.{prop_name}"
         for name, tool in sorted(_registered().items())
         for prop_name, prop in tool.parameters.get("properties", {}).items()
-        if not prop.get("description")
+        if not prop.get("description") and prop_name not in SELF_DESCRIBING_PARAMS
     ]
     assert not undocumented, f"schema properties without a description: {undocumented}"
 

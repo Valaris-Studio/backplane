@@ -19,14 +19,11 @@ async def bulk_create_cards(
     cards: list[dict],
     ctx: Context = None,
 ) -> str:
-    """Create up to 50 cards on a board in one request. An invalid column_id, unknown git_repo_slug or unknown key rejects the whole batch (422).
+    """Create up to 50 cards on a board in one all-or-nothing request (422 on any invalid card). Not idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
-        cards: Each: column_id, title (required); description, card_type
-            (task|issue|feature|bug), priority (none|low|medium|high|urgent),
-            due_date (YYYY-MM-DD), status, labels, git_repo_slug. Nothing else.
+        cards: Each: column_id, title (required); description, card_type, priority, due_date, status, labels, git_repo_slug. Nothing else.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client

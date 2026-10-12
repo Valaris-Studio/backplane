@@ -23,7 +23,6 @@ async def get_completion_policy(workspace_slug: str, board_id: str, ctx: Context
     """Read effective completion policy, inheritance and capabilities.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID/slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -42,7 +41,6 @@ async def get_completion_status(
     """Read current candidate, exact source/merge SHAs and public attempt history.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID/slug.
         card_id: Card UUID.
     """
@@ -69,7 +67,6 @@ async def submit_completion_candidate(
     """Submit execution provenance: a real open card PR, or exact evidence in operator-selected evidence-only mode.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID/slug.
         card_id: Card UUID.
         source_execution_id: This iteration's runner-supplied execution UUID.
@@ -114,7 +111,6 @@ async def request_landing(
     """Request current-candidate queue landing under server policy, review, provenance and forge gates.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID/slug.
         card_id: Card UUID.
     """
@@ -137,7 +133,6 @@ async def retry_completion(
     """Retry a failed phase on the current immutable candidate. The runner produces review/validation results.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID/slug.
         card_id: Card UUID.
     """

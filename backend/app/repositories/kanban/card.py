@@ -14,14 +14,20 @@ from app.models.kanban.column import Column
 from app.repositories.base import BaseRepository
 
 
+# Everything a CardRead serializes: participants plus the column it sits in.
+CARD_READ_LOAD_OPTIONS = (
+    selectinload(Card.participants).selectinload(CardParticipant.user),
+    selectinload(Card.participants).selectinload(CardParticipant.agent),
+    selectinload(Card.column),
+)
+
+
 class CardRepository(BaseRepository[Card]):
     model = Card
 
     async def get_by_id(self, id: uuid.UUID) -> Card | None:
         result = await self.db.execute(
-            select(Card)
-            .where(Card.id == id)
-            .options(selectinload(Card.participants).selectinload(CardParticipant.user), selectinload(Card.participants).selectinload(CardParticipant.agent))
+            select(Card).where(Card.id == id).options(*CARD_READ_LOAD_OPTIONS)
         )
         return result.scalar_one_or_none()
 
@@ -68,10 +74,7 @@ class CardRepository(BaseRepository[Card]):
                 Card.board_id == board_id,
                 id_text.like(f"{needle}%"),
             )
-            .options(
-                selectinload(Card.participants).selectinload(CardParticipant.user),
-                selectinload(Card.participants).selectinload(CardParticipant.agent),
-            )
+            .options(*CARD_READ_LOAD_OPTIONS)
             .order_by(Card.position)
             .limit(limit)
         )
@@ -120,6 +123,8 @@ class CardRepository(BaseRepository[Card]):
         card.board_id = board_id
         card.position = position
         await self.db.flush()
+        # The loaded column is the one the card just left; reload the new one.
+        self.db.expire(card, ["column"])
         return await self.get_by_id(card.id)
 
     async def add_participant(
@@ -366,10 +371,7 @@ class CardRepository(BaseRepository[Card]):
         if ineligible_ids:
             query = query.where(Card.id.notin_(ineligible_ids))
 
-        query = query.options(
-            selectinload(Card.participants).selectinload(CardParticipant.user),
-            selectinload(Card.participants).selectinload(CardParticipant.agent),
-        )
+        query = query.options(*CARD_READ_LOAD_OPTIONS)
         query = query.order_by(Card.position).limit(limit)
 
         result = await self.db.execute(query)

@@ -11,10 +11,13 @@ This module is the single source of truth for the wire-format contract:
 every value the API accepts as `content` is converted here, and the result
 is stored verbatim. The set of supported nodes/marks matches the StarterKit
 + Link + Table extensions configured in `RichTextRenderer.tsx` (tables emit
-the canonical TipTap shape: table → tableRow → tableHeader/tableCell).
+the canonical TipTap shape: table → tableRow → tableHeader/tableCell), plus
+the image and fileAttachment nodes in the markdown form `media_markdown`
+defines — so a note read as markdown can be written back without loss.
 """
 from __future__ import annotations
 
+import copy
 import html as html_module
 import json
 import re
@@ -22,6 +25,13 @@ from typing import Any
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
+
+from app.services.notes.media_markdown import (
+    attachment_node,
+    image_node,
+    parse_attachment_title,
+    strip_unsafe_media,
+)
 
 
 class InvalidContentError(ValueError):
@@ -37,6 +47,7 @@ _HTML_BLOCK_RE = re.compile(
     r"<(h[1-3]|p|ul|ol|li|pre|code|blockquote)[^>]*>(.*?)</\1>",
     re.IGNORECASE | re.DOTALL,
 )
+_HTML_IMG_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 
 
 def _is_html_document(content: str) -> bool:
@@ -49,7 +60,11 @@ def _is_html_document(content: str) -> bool:
     one paragraph of literal source and silently dropped the fragment that
     triggered it: `runner-<name>.yaml`, a generic `<T>`, a shell redirect.
     """
-    return _HTML_BLOCK_RE.search(content) is not None
+    if _HTML_BLOCK_RE.search(content) is not None:
+        return True
+    # An `<img>` only makes a bare-image HTML body when it LEADS; anywhere else
+    # it is a markdown document talking about the tag (same trap as above).
+    return _HTML_IMG_RE.match(content.lstrip()) is not None
 
 
 def normalize_note_content(content: Any) -> str:
@@ -75,7 +90,7 @@ def normalize_note_content(content: Any) -> str:
             raise InvalidContentError(
                 "dict content must be a ProseMirror doc (type=='doc')"
             )
-        return json.dumps(content)
+        return json.dumps(strip_unsafe_media(copy.deepcopy(content)))
 
     if not isinstance(content, str):
         raise InvalidContentError(
@@ -89,7 +104,7 @@ def normalize_note_content(content: Any) -> str:
         except json.JSONDecodeError:
             parsed = None
         if isinstance(parsed, dict) and parsed.get("type") == "doc":
-            return json.dumps(parsed)
+            return json.dumps(strip_unsafe_media(parsed))
 
     if _is_html_document(content):
         return json.dumps(_html_to_doc(content))
@@ -124,21 +139,23 @@ def _consume_blocks(
 
         if t == "heading_open":
             level = int(tok.tag[1])  # h1 → 1
-            inline = tokens[i + 1]
+            runs = _inline_to_runs(tokens[i + 1])
             nodes.append({
                 "type": "heading",
                 "attrs": {"level": min(level, 3)},
-                "content": _inline_to_runs(inline),
+                "content": [run for run in runs if run["type"] != "image"],
             })
+            # A heading cannot hold a block image; keep it right after instead.
+            nodes.extend(run for run in runs if run["type"] == "image")
             i += 3  # heading_open + inline + heading_close
 
         elif t == "paragraph_open":
             inline = tokens[i + 1]
-            runs = _inline_to_runs(inline)
-            if runs:
-                nodes.append({"type": "paragraph", "content": runs})
+            attachment = _attachment_from_inline(inline)
+            if attachment is not None:
+                nodes.append(attachment)
             else:
-                nodes.append({"type": "paragraph"})
+                nodes.extend(_split_out_images(_inline_to_runs(inline)))
             i += 3
 
         elif t == "bullet_list_open":
@@ -215,14 +232,10 @@ def _consume_table(
             j = i + 1
             while j < row_close:
                 if tokens[j].type in ("th_open", "td_open"):
-                    runs = _inline_to_runs(tokens[j + 1])
-                    paragraph: dict[str, Any] = {"type": "paragraph"}
-                    if runs:
-                        paragraph["content"] = runs
                     cells.append({
                         "type": cell_kind,
                         "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
-                        "content": [paragraph],
+                        "content": _split_out_images(_inline_to_runs(tokens[j + 1])),
                     })
                     j += 3  # th/td_open + inline + th/td_close
                 else:
@@ -297,10 +310,74 @@ def _inline_to_runs(inline: Token) -> list[dict[str, Any]]:
             marks.append({"type": "link", "attrs": {"href": href}})
         elif ct == "link_close":
             _pop_mark(marks, "link")
-        # image, html_inline, etc. are intentionally dropped — out of scope
-        # for the StarterKit set.
+        elif ct == "image":
+            # A block node in our schema: `_split_out_images` lifts it out of
+            # the paragraph, so marks (an enclosing link) cannot ride along.
+            image = image_node(
+                child.attrGet("src") or "",
+                _plain_text(child.children),
+                child.attrGet("title"),
+            )
+            if image is not None:
+                runs.append(image)
+        # html_inline etc. are intentionally dropped — out of scope for the
+        # StarterKit set.
 
     return runs
+
+
+def _plain_text(tokens: list[Token] | None) -> str:
+    """markdown-it's `renderInlineAsText`, e.g. an image's alt from its label."""
+    parts: list[str] = []
+    for tok in tokens or []:
+        if tok.type in ("text", "text_special", "code_inline"):
+            parts.append(tok.content)
+        elif tok.type in ("softbreak", "hardbreak"):
+            parts.append("\n")
+        elif tok.type == "image":
+            parts.append(_plain_text(tok.children))
+    return "".join(parts)
+
+
+def _attachment_from_inline(inline: Token) -> dict[str, Any] | None:
+    """A paragraph that is exactly one `[name](src "attachment…")` link."""
+    children = inline.children or []
+    if len(children) < 2 or children[0].type != "link_open" or children[-1].type != "link_close":
+        return None
+    inner = children[1:-1]
+    if any(tok.type in ("link_open", "image") for tok in inner):
+        return None
+    title_attrs = parse_attachment_title(children[0].attrGet("title"))
+    if title_attrs is None:
+        return None
+    return attachment_node(children[0].attrGet("href") or "", _plain_text(inner), title_attrs)
+
+
+def _split_out_images(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Paragraph runs → blocks, lifting each image out as its own block node.
+
+    Without an image this is the paragraph exactly as before; with one, the
+    text on each side becomes its own edge-trimmed paragraph.
+    """
+    if not any(run["type"] == "image" for run in runs):
+        return [{"type": "paragraph", "content": runs} if runs else {"type": "paragraph"}]
+    blocks: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []
+
+    def flush() -> None:
+        trimmed = _trim_edge_whitespace(pending)
+        if trimmed:
+            blocks.append({"type": "paragraph", "content": trimmed})
+        pending.clear()
+
+    for run in runs:
+        if run["type"] == "image":
+            flush()
+            blocks.append(run)
+        else:
+            pending.append(run)
+    flush()
+    return blocks
 
 
 def _text_run(text: str, marks: list[dict[str, Any]]) -> dict[str, Any]:
@@ -335,69 +412,76 @@ def _html_to_doc(html: str) -> dict[str, Any]:
     pos = 0
     for match in _HTML_BLOCK_RE.finditer(html):
         if match.start() > pos:
-            leading = _inline_html_runs(html[pos : match.start()])
+            leading = _inline_html_pieces(html[pos : match.start()])
             if leading:
-                nodes.append({"type": "paragraph", "content": leading})
+                nodes.extend(_split_out_images(leading))
         tag = match.group(1).lower()
         inner = match.group(2)
-        nodes.append(_html_block_node(tag, inner))
+        nodes.extend(_html_block_nodes(tag, inner))
         pos = match.end()
 
-    trailing = _inline_html_runs(html[pos:])
+    trailing = _inline_html_pieces(html[pos:])
     if trailing:
-        nodes.append({"type": "paragraph", "content": trailing})
+        nodes.extend(_split_out_images(trailing))
 
     if not nodes:
         nodes.append({"type": "paragraph"})
     return {"type": "doc", "content": nodes}
 
 
-def _html_block_node(tag: str, inner: str) -> dict[str, Any]:
+_HTML_LONE_ANCHOR_RE = re.compile(r"\s*<a\b([^>]*)>(.*?)</a>\s*", re.IGNORECASE | re.DOTALL)
+
+
+def _html_attachment(inner: str) -> dict[str, Any] | None:
+    """`<a href title="attachment…">name</a>` alone in its block — the HTML
+    twin of the markdown attachment form."""
+    match = _HTML_LONE_ANCHOR_RE.fullmatch(inner)
+    if match is None:
+        return None
+    title_attrs = parse_attachment_title(_attr_from_tag(match.group(1), "title"))
+    if title_attrs is None:
+        return None
+    href = _attr_from_tag(match.group(1), "href") or ""
+    return attachment_node(href, _strip_tags(match.group(2)).strip(), title_attrs)
+
+
+def _html_paragraph_blocks(inner: str) -> list[dict[str, Any]]:
+    attachment = _html_attachment(inner)
+    if attachment is not None:
+        return [attachment]
+    return _split_out_images(_inline_html_pieces(inner))
+
+
+def _html_block_nodes(tag: str, inner: str) -> list[dict[str, Any]]:
     if tag in {"h1", "h2", "h3"}:
-        return {
+        pieces = _inline_html_pieces(inner)
+        heading = {
             "type": "heading",
             "attrs": {"level": int(tag[1])},
-            "content": _inline_html_runs(inner),
+            "content": _trim_edge_whitespace([p for p in pieces if p["type"] != "image"]),
         }
+        # A heading cannot hold a block image; keep it right after instead.
+        return [heading, *(p for p in pieces if p["type"] == "image")]
     if tag == "p":
-        runs = _inline_html_runs(inner)
-        if not runs:
-            return {"type": "paragraph"}
-        return {"type": "paragraph", "content": runs}
+        return _html_paragraph_blocks(inner)
     if tag in {"ul", "ol"}:
-        items = []
-        for li in re.finditer(r"<li[^>]*>(.*?)</li>", inner, re.IGNORECASE | re.DOTALL):
-            runs = _inline_html_runs(li.group(1))
-            items.append({
-                "type": "listItem",
-                "content": [
-                    {"type": "paragraph", "content": runs}
-                    if runs
-                    else {"type": "paragraph"}
-                ],
-            })
-        return {
+        items = [
+            {"type": "listItem", "content": _html_paragraph_blocks(li.group(1))}
+            for li in re.finditer(r"<li[^>]*>(.*?)</li>", inner, re.IGNORECASE | re.DOTALL)
+        ]
+        return [{
             "type": "bulletList" if tag == "ul" else "orderedList",
             "content": items or [{"type": "listItem", "content": [{"type": "paragraph"}]}],
-        }
+        }]
     if tag == "pre" or tag == "code":
         # PM codeBlock content is plain text — marks are not allowed inside it.
-        return {
+        return [{
             "type": "codeBlock",
             "content": [{"type": "text", "text": _strip_tags(inner)}],
-        }
+        }]
     if tag == "blockquote":
-        runs = _inline_html_runs(inner)
-        return {
-            "type": "blockquote",
-            "content": [
-                {"type": "paragraph", "content": runs}
-                if runs
-                else {"type": "paragraph"}
-            ],
-        }
-    runs = _inline_html_runs(inner)
-    return {"type": "paragraph", "content": runs} if runs else {"type": "paragraph"}
+        return [{"type": "blockquote", "content": _html_paragraph_blocks(inner)}]
+    return _html_paragraph_blocks(inner)
 
 
 # Inline tags carrying a StarterKit/Link mark. Everything else is unwrapped:
@@ -415,11 +499,11 @@ _INLINE_MARK_TAGS: dict[str, str] = {
 }
 
 _INLINE_TAG_RE = re.compile(r"<(/?)([a-z][a-z0-9]*)((?:\s[^>]*)?)/?>", re.IGNORECASE)
-_HREF_RE = re.compile(r"""href\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>]+))""", re.IGNORECASE)
 
 
-def _inline_html_runs(fragment: str) -> list[dict[str, Any]]:
-    """Extract PM text runs from an HTML fragment, preserving inline marks.
+def _inline_html_pieces(fragment: str) -> list[dict[str, Any]]:
+    """Extract PM text runs, and `<img>` image nodes, from an HTML fragment,
+    preserving inline marks. `_split_out_images` turns pieces into blocks.
 
     Text is unescaped exactly once here, at run construction — no other branch
     of the HTML path may unescape, or `&amp;amp;` would collapse twice.
@@ -438,6 +522,16 @@ def _inline_html_runs(fragment: str) -> list[dict[str, Any]]:
 
         is_close = tag_match.group(1) == "/"
         tag = tag_match.group(2).lower()
+        if tag == "img" and not is_close:
+            attrs = tag_match.group(3)
+            image = image_node(
+                _attr_from_tag(attrs, "src") or "",
+                _attr_from_tag(attrs, "alt"),
+                _attr_from_tag(attrs, "title"),
+            )
+            if image is not None:
+                runs.append(image)
+            continue
         mark_type = _INLINE_MARK_TAGS.get(tag)
         if mark_type is None:
             continue
@@ -447,20 +541,26 @@ def _inline_html_runs(fragment: str) -> list[dict[str, Any]]:
         elif mark_type == "link":
             marks.append({
                 "type": "link",
-                "attrs": {"href": _href_from_attrs(tag_match.group(3))},
+                "attrs": {"href": _attr_from_tag(tag_match.group(3), "href") or ""},
             })
         else:
             marks.append({"type": mark_type})
 
     emit(fragment[pos:])
+    if any(run["type"] == "image" for run in runs):
+        return runs  # `_split_out_images` trims each side of every image.
     return _trim_edge_whitespace(runs)
 
 
-def _href_from_attrs(attrs: str) -> str:
-    match = _HREF_RE.search(attrs or "")
+def _attr_from_tag(attrs: str, name: str) -> str | None:
+    match = re.search(
+        rf"""(?:^|\s){name}\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>]+))""",
+        attrs or "",
+        re.IGNORECASE,
+    )
     if not match:
-        return ""
-    raw = match.group(2) or match.group(3) or match.group(4) or ""
+        return None
+    raw = next((group for group in match.groups()[1:] if group is not None), "")
     return _unescape(raw)
 
 
@@ -476,15 +576,21 @@ def _trim_edge_whitespace(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     newlines inside every heading and list item.
     """
     trimmed = [dict(run) for run in runs]
-    while trimmed and not trimmed[0]["text"].strip():
+    while trimmed and _is_blank_run(trimmed[0]):
         trimmed.pop(0)
-    if trimmed:
+    if trimmed and "text" in trimmed[0]:
         trimmed[0]["text"] = trimmed[0]["text"].lstrip()
-    while trimmed and not trimmed[-1]["text"].strip():
+    while trimmed and _is_blank_run(trimmed[-1]):
         trimmed.pop()
-    if trimmed:
+    if trimmed and "text" in trimmed[-1]:
         trimmed[-1]["text"] = trimmed[-1]["text"].rstrip()
     return trimmed
+
+
+def _is_blank_run(run: dict[str, Any]) -> bool:
+    if run["type"] == "hardBreak":
+        return True
+    return "text" in run and not run["text"].strip()
 
 
 def _strip_tags(html: str) -> str:

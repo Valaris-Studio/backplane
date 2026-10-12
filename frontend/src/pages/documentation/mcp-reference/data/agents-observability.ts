@@ -427,6 +427,7 @@ export const AGENTS_OBSERVABILITY_TOOL_DOCS: ToolDoc[] = [
       "Rows are heavy — each carries the full input_prompt and tool invocations. Keep limit small unless you need deep history.",
       "status='inflight' is virtual: every started/running row not yet completed, unbounded by limit — the zombie-hunting filter to pair with cancel_execution.",
       "card_id switches to server-side card scope: the card's history ignoring limit — but capped at the newest 200 rows, so a runaway loop card can still truncate. status/role/agent_id filter within that window.",
+      "Before cancel_execution on a row, verify its agent_id and card_id match the scope you meant.",
     ],
     examplePrompt:
       "Show me the last 10 executions in the <workspace> workspace with list_executions and flag anything that looks like a retry loop. Then pull the full pipeline history for card <card-id>.",
@@ -577,6 +578,7 @@ export const AGENTS_OBSERVABILITY_TOOL_DOCS: ToolDoc[] = [
       "enabled_tools is what THIS session can actually call — the registered surface intersected with the allowlist (allowlist null = unrestricted).",
       "allowlist_unknown lists allowlisted names the server doesn't register — a sign of version drift between runner config and deployed server.",
       "Backend health is best-effort: an unreachable API sets backend.reachable=false instead of failing the call.",
+      "Returns version; tools and tool_count (the full live surface, even when this session is filtered); deprecated_aliases (retired names still callable until deprecated_removed_in) and allowlist_deprecated (the granted ones); toolsets (loaded ids, resolved_tool_count = the toolset hand before the allowlist intersection, the default, available ids and a hint to widen); allowlist_outside_toolsets (allowlist entries the loaded toolsets clip); listing_bytes and listing_tokens_estimate (bytes/4) for this session's compact tools/list; and annotated_tools.",
     ],
     examplePrompt:
       "Start by calling get_server_info — confirm the server version, list which tools are enabled in this session, and check the backend is reachable before we do anything else.",
@@ -600,6 +602,7 @@ export const AGENTS_OBSERVABILITY_TOOL_DOCS: ToolDoc[] = [
       "Widen-only and idempotent: a repeated call adds nothing and sends no notification. The change is per-process and never persisted — the next session starts from VALARIS_MCP_TOOLSETS again.",
       "The runner allowlist (VALARIS_MCP_ALLOWLIST) is a ceiling this tool never lifts, so under a runner launch it is a no-op.",
       "client_catalog_status is unverified: list_changed_sent and get_server_info confirm server state only. If tools remain missing, apply restart_env to the MCP server startup configuration, restart the server/connection and start a new agent session. Remote HTTP requires the server operator; preserve VALARIS_MCP_ALLOWLIST.",
+      "Returns loaded (the ids, or [\"all\"] — `all` lifts the toolset layer), added_tools/added_count, enabled_tool_count and listing_bytes of this session's tools/list, list_changed_sent, client_catalog_status (always unverified) and restart_env (the startup environment that preserves the current hand). Names the runner allowlist clips are reported under allowlist_clipped.",
     ],
     examplePrompt:
       "Call enable_toolsets with [\"autonomous-operations\"] so this session can manage runners, confirm the requested native tools are available to this client; if absent, follow restart_env recovery.",

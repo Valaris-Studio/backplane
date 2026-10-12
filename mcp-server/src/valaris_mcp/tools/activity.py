@@ -25,9 +25,8 @@ async def list_activity(
     """Query a workspace's or board's activity log, newest first.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Scope to one board.
-        limit: 1-100, default 50.
+        limit: 1-100.
         entity_type: Activity entity_type; see ENUMS in the server instructions.
         action: Activity action; see ENUMS in the server instructions.
         search: Free-text over summaries.

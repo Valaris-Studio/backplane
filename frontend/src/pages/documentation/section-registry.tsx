@@ -21,6 +21,7 @@ import { CoreConceptsRolesAndPipelines } from "./sections/core-concepts-roles-an
 import { CoreConceptsPrompts } from "./sections/core-concepts-prompts";
 import { CoreConceptsApprovals } from "./sections/core-concepts-approvals";
 import { CoreConceptsLoopMode } from "./sections/core-concepts-loop-mode";
+import { CoreConceptsNotes } from "./sections/core-concepts-notes";
 import { CoreConceptsSkills } from "./sections/core-concepts-skills";
 import { InstallingInstallWithDockerCompose } from "./sections/installing-install-with-docker-compose";
 import { InstallingSecuringASelfHostedDeployment } from "./sections/installing-securing-a-self-hosted-deployment";
@@ -105,6 +106,7 @@ export const SOURCE_SECTION_RENDERERS: Record<
   approvals: CoreConceptsApprovals,
   "loop-mode": CoreConceptsLoopMode,
   skills: CoreConceptsSkills,
+  notes: CoreConceptsNotes,
   "install-with-docker-compose": InstallingInstallWithDockerCompose,
   "securing-a-self-hosted-deployment": InstallingSecuringASelfHostedDeployment,
   "upgrading-backplane": InstallingUpgradingBackplane,

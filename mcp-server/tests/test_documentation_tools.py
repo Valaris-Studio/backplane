@@ -74,5 +74,20 @@ async def test_real_http_client_encodes_query_parameters(ctx):
             "offset": "5",
             "limit": "10",
         }
+
+        # A "See docs." pointer reads one tool entry: the anchor must travel in
+        # the path, not be dropped as a URL fragment.
+        await read_documentation("mcp-tool-catalog#tool-update_note", ctx=ctx)
+        assert requests[1].url.raw_path.startswith(
+            b"/api/documentation/mcp-tool-catalog%23tool-update_note?"
+        )
     finally:
         await client.close()
+
+
+@pytest.mark.anyio
+async def test_list_hint_repeats_the_tool_reference_anchor(ctx, mock_client):
+    # Second point of use for "See docs.": the listing names the slug#anchor form.
+    mock_client.get.return_value = {"version": "v", "sections": []}
+    result = json.loads(await list_documentation(ctx=ctx))
+    assert "mcp-tool-catalog#tool-<name>" in result["_hint"]

@@ -27,18 +27,17 @@ async def test_media_upload_url_local_storage(
     data = resp.json()
 
     assert data["upload_url"].startswith("/api/local-storage/upload/media/")
-    assert data["public_url"].startswith("/api/local-storage/download/media/")
+    # The stored link is the durable, authenticated app path — never a URL
+    # into storage, which would bypass the workspace check or expire.
+    assert data["public_url"].startswith("/api/workspaces/default/media/")
 
-    # Path contains workspace id and filename
     assert str(test_workspace.id) in data["upload_url"]
-    assert "screenshot.png" in data["upload_url"]
-    assert str(test_workspace.id) in data["public_url"]
-    assert "screenshot.png" in data["public_url"]
+    assert data["upload_url"].endswith("/screenshot.png")
+    assert data["public_url"].endswith("/screenshot.png")
 
-    # upload and public share the same gcs_path suffix
-    upload_path = data["upload_url"].removeprefix("/api/local-storage/upload/")
-    public_path = data["public_url"].removeprefix("/api/local-storage/download/")
-    assert upload_path == public_path
+    upload_object_id = data["upload_url"].split("/")[-2]
+    public_object_id = data["public_url"].split("/")[-2]
+    assert upload_object_id == public_object_id
 
 
 @pytest_asyncio.fixture

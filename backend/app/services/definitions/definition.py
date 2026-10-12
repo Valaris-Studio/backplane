@@ -11,6 +11,7 @@ from app.repositories.definitions.definition import DefinitionRepository
 from app.schemas.definitions.definition import DefinitionUpsert
 from app.services.activity import ActivityService
 from app.services.kanban.freeze_guard import assert_board_not_frozen
+from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.utils import shallow_merge_dicts
 
 
@@ -45,6 +46,23 @@ class DefinitionService:
             },
         )
 
+    async def _with_canonical_media_links(
+        self, workspace_id: uuid.UUID, data: DefinitionUpsert
+    ) -> DefinitionUpsert:
+        # Rich text lives in `scope` and in PM-JSON strings nested inside
+        # `content` (decisions[].rationale, an overflow `scope`).
+        scope, content = await MediaLinkCanonicalizer(self.db).definition(
+            workspace_id, data.scope, data.content
+        )
+        if scope is data.scope and content is data.content:
+            return data
+        updates = {}
+        if "scope" in data.model_fields_set:
+            updates["scope"] = scope
+        if "content" in data.model_fields_set:
+            updates["content"] = content
+        return data.model_copy(update=updates)
+
     async def upsert_definition(
         self,
         board_id: uuid.UUID,
@@ -54,6 +72,7 @@ class DefinitionService:
     ):
         await assert_board_not_frozen(self.db, board_id)
         existing = await self.repo.get_by_board(board_id)
+        data = await self._with_canonical_media_links(workspace_id, data)
 
         if existing:
             update_data = data.model_dump(exclude_unset=True)

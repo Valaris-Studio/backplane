@@ -39,6 +39,7 @@ from app.models.kanban.board import Board
 from app.models.kanban.card import Card, CardParticipant
 from app.models.kanban.column import Column
 from app.models.workspace import Workspace, WorkspaceMember
+from app.repositories.kanban.card import CARD_READ_LOAD_OPTIONS
 from app.services.activity import ActivityAction, ActivityEntityType, ActivityService
 from app.services.agents.identity import verify_caller_owns_agent
 from app.services.agents.team import TeamService
@@ -1642,10 +1643,7 @@ class AssignmentService:
         result = await self.db.execute(
             select(Card)
             .where(Card.id == reservation.card_id)
-            .options(
-                selectinload(Card.participants).selectinload(CardParticipant.user),
-                selectinload(Card.participants).selectinload(CardParticipant.agent),
-            )
+            .options(*CARD_READ_LOAD_OPTIONS)
         )
         card = result.scalar_one_or_none()
         if card is None:

@@ -29,7 +29,7 @@ interface ServerSurfaceTool {
   kind: string;
   annotations: ServerSurfaceAnnotations;
   description: string;
-  params: Record<string, string>;
+  params: Record<string, string | null>;
 }
 
 interface ServerSurface {

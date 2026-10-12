@@ -15,6 +15,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 
 import { FileAttachment } from "@/extensions/file-attachment";
 import { Mention } from "@/components/shared/editor/mention-extension";
+import { attachmentMarkdown, imageMarkdown } from "@/lib/media-markdown";
 
 // The extension list the markdown EXPORTER runs on — the vocabulary
 // `@tiptap/markdown` needs to turn a stored ProseMirror doc back into
@@ -22,9 +23,9 @@ import { Mention } from "@/components/shared/editor/mention-extension";
 // lists: those carry node views, suggestion plugins and placeholders that a
 // headless MarkdownManager neither needs nor can construct.
 //
-// Five extensions carry a `renderMarkdown` override: heading, codeBlock and
-// table because upstream's built-in emission diverges from the shared parity
-// corpus (backend/tests/services/notes/fixtures/pm_markdown_corpus.json),
+// Six extensions carry a `renderMarkdown` override: heading, codeBlock, table
+// and image because upstream's built-in emission diverges from the shared
+// parity corpus (backend/tests/services/notes/fixtures/pm_markdown_corpus.json),
 // mention and fileAttachment because upstream renders an unrecognised atom as
 // the empty string. That corpus is the contract the backend serializer must
 // match byte-for-byte.
@@ -129,14 +130,21 @@ const ExportableMention = Mention.extend({
   },
 });
 
-/** Block atom: a link when the upload resolved, otherwise the bare filename. */
+/**
+ * Block atom: an `"attachment; size=…; type=…"`-titled link once the upload
+ * resolved (the form the backend parses back into the node), otherwise the
+ * bare filename.
+ */
 const ExportableFileAttachment = FileAttachment.extend({
   renderMarkdown(node: JSONContent) {
-    const name = (node.attrs?.filename as string) || "attachment";
-    const src = (node.attrs?.src as string) ?? "";
-    return src ? `[${name}](${src})` : name;
+    return attachmentMarkdown(node.attrs ?? {});
   },
 });
+
+/** Image: upstream drops the title and leaves `]`/spaces in alt/src unescaped. */
+const ExportableImage = renderOverride("image", (node) =>
+  imageMarkdown(node.attrs ?? {}),
+);
 
 // Array order is NOT what resolves the overrides — OVERRIDE_PRIORITY is (see
 // above). They are listed first only so the file reads in precedence order.
@@ -144,6 +152,7 @@ export const MARKDOWN_EXPORT_EXTENSIONS = [
   ClampedHeading,
   ExportableCodeBlock,
   CompactTable,
+  ExportableImage,
   StarterKit,
   Image,
   Link,

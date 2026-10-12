@@ -52,6 +52,9 @@ class AppContext:
     # default so contexts built outside the lifespan see every tool.
     hand: HandState = field(default_factory=lambda: HandState(None, None, None))
     default_board: DefaultBoard | None = None
+    # upload_resource receipts: (workspace, board, folder, name, sha256) → resource id,
+    # so a retried upload in this session returns the resource it already made.
+    uploaded_resources: dict[tuple, str] = field(default_factory=dict)
 
 
 _TRACKING_INSTALLED = "_valaris_tracking_installed"

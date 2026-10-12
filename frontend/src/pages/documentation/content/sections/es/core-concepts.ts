@@ -773,4 +773,126 @@ export const ES_CORE_CONCEPTS = {
     "Binary assets referenced as media rather than inlined, and per-file modes so a bundled script can be executable, are both on the roadmap. Until then, the interpreter-invocation convention above is the supported path.":
       "Los recursos binarios referenciados como medios en lugar de incrustados, y los modos por archivo para que un script incluido pueda ser ejecutable, están ambos en la hoja de ruta. Hasta entonces, la convención de invocación mediante intérprete descrita arriba es la vía admitida.",
   },
+  notes: {
+    "A ":
+      "Una ",
+    "note":
+      "nota",
+    " is a titled rich-text document that lives in a workspace or on a board, optionally linked to one card. People write notes in the shared editor; agents write them over MCP. Both edit the same stored document, so this chapter covers what that document can hold and how to change it without losing anything.":
+      " es un documento de texto enriquecido con título que vive en un espacio de trabajo o en un tablero, opcionalmente vinculado a una tarjeta. Las personas escriben notas en el editor compartido; los agentes las escriben por MCP. Ambos editan el mismo documento almacenado, así que este capítulo explica qué puede contener ese documento y cómo cambiarlo sin perder nada.",
+    "What the editor supports":
+      "Qué admite el editor",
+    "The editor and the API share one closed vocabulary: headings (levels 1–3), paragraphs, bold, italic, strikethrough, inline code, links, bullet and numbered lists, block quotes, horizontal rules, tables, code blocks with a language, Mermaid diagrams, mentions, images and file attachments. A Mermaid diagram is an ordinary code block whose language is ":
+      "El editor y la API comparten un vocabulario cerrado: encabezados (niveles 1–3), párrafos, negrita, cursiva, tachado, código en línea, enlaces, listas con viñetas y numeradas, citas en bloque, reglas horizontales, tablas, bloques de código con lenguaje, diagramas Mermaid, menciones, imágenes y archivos adjuntos. Un diagrama Mermaid es un bloque de código normal cuyo lenguaje es ",
+    "; the editor draws it in place.":
+      "; el editor lo dibuja en el mismo lugar.",
+    "Markdown vs ProseMirror":
+      "Markdown frente a ProseMirror",
+    "Every note is stored as ProseMirror JSON, the editor's native format. Writes accept more than that: ":
+      "Cada nota se almacena como JSON de ProseMirror, el formato nativo del editor. Las escrituras aceptan más que eso: ",
+    " may be Markdown, HTML, plain text or ProseMirror JSON, and the server converts it to the stored form on every save. Markdown is the right default for agents — it is compact and readable.":
+      " puede ser Markdown, HTML, texto plano o JSON de ProseMirror, y el servidor lo convierte a la forma almacenada en cada guardado. Markdown es la opción predeterminada adecuada para agentes: es compacto y legible.",
+    "Reads go the other way. ":
+      "Las lecturas van en sentido contrario. ",
+    " returns the raw JSON by default; pass ":
+      " devuelve el JSON crudo de forma predeterminada; pasa ",
+    " to get the same document serialized to Markdown, which costs far fewer tokens. The conversion is a read-time projection — nothing stored changes.":
+      " para obtener el mismo documento serializado a Markdown, que cuesta muchos menos tokens. La conversión es una proyección en tiempo de lectura: no cambia nada de lo almacenado.",
+    "Editing a note over MCP":
+      "Editar una nota por MCP",
+    " takes a ":
+      " recibe un ",
+    " and an optional":
+      " y, opcionalmente,",
+    ", plus ":
+      ", además de ",
+    " for a board note and":
+      " para una nota de tablero y",
+    " to link a card. ":
+      " para vincular una tarjeta. ",
+    " changes only the fields you pass, and its ":
+      " cambia solo los campos que pases, y su ",
+    " decides what":
+      " decide qué hace",
+    " does:":
+      ":",
+    " (the default) — the new content becomes the whole body.":
+      " (el predeterminado): el contenido nuevo pasa a ser todo el cuerpo.",
+    " — the new blocks go after the existing ones. It is not idempotent: a retried call appends a second copy.":
+      ": los bloques nuevos van después de los existentes. No es idempotente: una llamada reintentada añade una segunda copia.",
+    " — rewrites one section, named by":
+      ": reescribe una sección, identificada por",
+    ". The heading itself is kept; the section runs until the next heading at the same or a higher level, so subsections stay inside it. Matching ignores case and surrounding spaces, and a heading that appears twice is refused rather than guessed. Replaying the same call converges, so it is safe to retry.":
+      ". El encabezado se conserva; la sección llega hasta el siguiente encabezado del mismo nivel o de uno superior, así que las subsecciones quedan dentro. La coincidencia ignora mayúsculas y espacios alrededor, y un encabezado que aparece dos veces se rechaza en lugar de adivinarse. Repetir la misma llamada converge, así que es seguro reintentarla.",
+    "Rewrite one section of a tracker note":
+      "Reescribir una sección de una nota de seguimiento",
+    "Large notes: append in chunks":
+      "Notas grandes: añade por partes",
+    "The server sets no size limit on a note; the practical ceiling is how much one tool call can carry. To write a long document, create the note with its first part, then add the rest with":
+      "El servidor no fija un límite de tamaño para una nota; el techo práctico es cuánto puede transportar una llamada a una herramienta. Para escribir un documento largo, crea la nota con su primera parte y añade el resto con",
+    " and ":
+      " y ",
+    ", one section per call. Content is always sent inline — there is no upload-a-file-as-a-note shortcut.":
+      ", una sección por llamada. El contenido siempre se envía en línea: no existe un atajo para subir un archivo como nota.",
+    "Append is not idempotent":
+      "Añadir no es idempotente",
+    "If an append call fails ambiguously, read the note before retrying. Retrying blindly can leave the same chunk in the note twice.":
+      "Si una llamada de añadido falla de forma ambigua, lee la nota antes de reintentar. Reintentar a ciegas puede dejar el mismo fragmento dos veces en la nota.",
+    "Images and attachments":
+      "Imágenes y adjuntos",
+    "A note never stores a short-lived signed link: it would break for every reader within the hour. It stores a stable, authenticated app path instead — ":
+      "Una nota nunca almacena un enlace firmado de corta duración: dejaría de funcionar para todos los lectores en menos de una hora. En su lugar almacena una ruta estable y autenticada de la aplicación: ",
+    " for images pasted in the editor, ":
+      " para imágenes pegadas en el editor, ",
+    "for uploaded files. Each read checks the reader's access before serving the file. A signed storage URL for one of this workspace's files that reaches a save is rewritten to its stable path before it is stored.":
+      "para archivos subidos. Cada lectura comprueba el acceso de quien lee antes de servir el archivo. Una URL firmada de almacenamiento de un archivo de este espacio de trabajo que llega a un guardado se reescribe a su ruta estable antes de almacenarse.",
+    "To add a file from MCP, call ":
+      "Para añadir un archivo desde MCP, llama a ",
+    ". It uploads the bytes and registers the file in one call. Its result carries":
+      ". Sube los bytes y registra el archivo en una sola llamada. Su resultado incluye",
+    ", the stable link to embed, and":
+      ", el enlace estable que debes incrustar, y",
+    ", the Markdown line to paste into a note. For a file that already exists, ":
+      ", la línea de Markdown para pegar en una nota. Para un archivo que ya existe, ",
+    "Upload a screenshot and embed it":
+      "Subir una captura de pantalla e incrustarla",
+    " reads a local file and works only when the server runs over stdio. Over HTTP, send the bytes as":
+      " lee un archivo local y solo funciona cuando el servidor se ejecuta sobre stdio. Con HTTP, envía los bytes como",
+    ". The tool reference lists the size caps and the paths it refuses.":
+      ". La referencia de la herramienta lista los límites de tamaño y las rutas que rechaza.",
+    " returns the same ":
+      " devuelve el mismo ",
+    "Embed the link in Markdown with one of these two forms:":
+      "Incrusta el enlace en Markdown con una de estas dos formas:",
+    "Image and attachment Markdown":
+      "Markdown de imagen y de adjunto",
+    "An image is standard Markdown; the quoted title is optional. An attachment is a link whose title starts with ":
+      "Una imagen es Markdown estándar; el título entre comillas es opcional. Un adjunto es un enlace cuyo título empieza por ",
+    ", optionally followed by ":
+      ", seguido opcionalmente de ",
+    " (bytes) and":
+      " (bytes) y",
+    " (a MIME type), and it must stand alone as its own paragraph. The same link inside a sentence, or with any other title, stays an ordinary link. HTML input follows the same rules:":
+      " (un tipo MIME), y debe ocupar por sí solo su propio párrafo. El mismo enlace dentro de una frase, o con cualquier otro título, sigue siendo un enlace normal. La entrada HTML sigue las mismas reglas:",
+    " becomes an image, and a paragraph holding only an ":
+      " se convierte en una imagen, y un párrafo que contiene solo un ",
+    " with an attachment title becomes an attachment.":
+      " con título de adjunto se convierte en un adjunto.",
+    "Round-trip guarantees":
+      "Garantías de ida y vuelta",
+    "Reading a note as Markdown, editing the text and writing it back keeps the document intact: headings, marks, links, lists, quotes, rules, tables, code blocks and Mermaid diagrams, images with their alt text and title, and attachments with their name, size and type all come back as the same nodes, at the same stable paths.":
+      "Leer una nota como Markdown, editar el texto y volver a escribirla mantiene el documento intacto: encabezados, formatos, enlaces, listas, citas, reglas, tablas, bloques de código y diagramas Mermaid, imágenes con su texto alternativo y su título, y adjuntos con su nombre, tamaño y tipo vuelven como los mismos nodos, en las mismas rutas estables.",
+    "What Markdown cannot carry":
+      "Lo que Markdown no puede transportar",
+    "A mention becomes plain @Name text, a table cell is flattened to one line, and table column alignment is dropped. Headings deeper than level 3 are stored as level 3. An attachment whose upload never finished has no link and comes back as its bare file name. Markdown checklists are not converted yet. When a note holds mentions you need to keep, edit it with ":
+      "Una mención se convierte en texto plano @Nombre, una celda de tabla se aplana a una línea y se pierde la alineación de columnas. Los encabezados de nivel mayor que 3 se almacenan como nivel 3. Un adjunto cuya subida nunca terminó no tiene enlace y vuelve como su simple nombre de archivo. Las listas de verificación de Markdown aún no se convierten. Cuando una nota contiene menciones que necesitas conservar, edítala con ",
+    " around them or write ProseMirror JSON.":
+      " alrededor de ellas o escribe JSON de ProseMirror.",
+    "Edit the smallest piece you can":
+      "Edita la pieza más pequeña posible",
+    "Prefer ":
+      "Prefiere ",
+    " over replacing a whole note. It touches only the section you name, so anything outside it — including what Markdown cannot carry — is left exactly as it was.":
+      " antes que reemplazar una nota entera. Solo toca la sección que nombras, así que todo lo que queda fuera —incluido lo que Markdown no puede transportar— permanece exactamente como estaba.",
+  },
 };

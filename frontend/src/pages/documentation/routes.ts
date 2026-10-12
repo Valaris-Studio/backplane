@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { getDocumentationCopy } from "./content";
+import { NOTES_SECTION_TITLE } from "./content/en";
 
 export const DOC_GROUPS = [
   { id: "introduction", title: "Introduction" },
@@ -45,6 +46,7 @@ export const DOC_SECTIONS = [
   { slug: "approvals", title: "Approvals", group: "core-concepts", order: 60 },
   { slug: "loop-mode", title: "Loop Mode", group: "core-concepts", order: 70 },
   { slug: "skills", title: "Skills (versioned procedural knowledge)", group: "core-concepts", order: 80 },
+  { slug: "notes", title: NOTES_SECTION_TITLE, group: "core-concepts", order: 90 },
 
   // Installing Backplane
   { slug: "install-with-docker-compose", title: "Install with Docker Compose", group: "installing", order: 10 },

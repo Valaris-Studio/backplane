@@ -6,24 +6,66 @@ import json
 import pytest
 
 
-@pytest.mark.anyio
-@pytest.mark.parametrize("mode", ["create", "replace", "append", "section"])
-async def test_note_receipt_names_raw_format_and_editable_read(mock_client, ctx, mode):
+STORED_NOTE = {
+    "id": "n1",
+    "title": "Title",
+    "card_id": None,
+    "kind": "user_note",
+    "pinned": False,
+    "updated_at": "2026-10-05T00:00:00Z",
+    "content": '{"type":"doc","content":[]}',
+}
+
+
+async def _write_note(mock_client, ctx, mode, **flags):
     from valaris_mcp.tools.notes import create_note, update_note
 
-    content = '{"type":"doc","content":[]}'
-    receipt = {"id": "n1", "content": content}
-    mock_client.post.return_value = receipt.copy()
-    mock_client.put.return_value = receipt.copy()
+    mock_client.post.return_value = STORED_NOTE.copy()
+    mock_client.put.return_value = STORED_NOTE.copy()
     if mode == "create":
-        raw = await create_note("ws", "Title", content="body", ctx=ctx)
+        raw = await create_note("ws", "Title", content="body", ctx=ctx, **flags)
     else:
-        kwargs = {"anchor_heading": "Heading"} if mode == "section" else {}
-        raw = await update_note("ws", "n1", content="body", mode=mode, ctx=ctx, **kwargs)
-    result = json.loads(raw)
-    assert result["content"] == content
+        section = {"anchor_heading": "Heading"} if mode == "section" else {}
+        raw = await update_note("ws", "n1", content="body", mode=mode, ctx=ctx, **section, **flags)
+    return json.loads(raw)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("mode", ["create", "replace", "append", "section"])
+async def test_note_receipt_omits_the_body_by_default(mock_client, ctx, mode):
+    result = await _write_note(mock_client, ctx, mode)
+
+    assert "content" not in result
+    assert result["content_chars"] == len(STORED_NOTE["content"])
+    for field in ("id", "title", "card_id", "kind", "pinned", "updated_at"):
+        assert result[field] == STORED_NOTE[field]
+    assert "return_content=True" in result["_hint"]
+    assert 'get_note(format="markdown")' in result["_hint"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("mode", ["create", "replace", "append", "section"])
+async def test_note_receipt_return_content_names_raw_format_and_editable_read(mock_client, ctx, mode):
+    result = await _write_note(mock_client, ctx, mode, return_content=True)
+
+    assert result["content"] == STORED_NOTE["content"]
+    assert result["content_chars"] == len(STORED_NOTE["content"])
     assert result["_content_format"] == "prosemirror"
     assert 'get_note(format="markdown")' in result["_hint"]
+
+
+@pytest.mark.anyio
+async def test_deprecated_note_write_aliases_return_the_summary_receipt(mock_client, ctx):
+    from valaris_mcp.tools.notes import append_note, replace_note_section
+
+    mock_client.post.return_value = STORED_NOTE.copy()
+    for raw in (
+        await append_note("ws", "n1", "body", ctx=ctx),
+        await replace_note_section("ws", "n1", "Heading", "body", ctx=ctx),
+    ):
+        result = json.loads(raw)
+        assert "content" not in result
+        assert result["content_chars"] == len(STORED_NOTE["content"])
 
 
 @pytest.mark.anyio

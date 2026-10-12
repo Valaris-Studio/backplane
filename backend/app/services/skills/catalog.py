@@ -137,7 +137,7 @@ Write these sections, in this order:
 
 _BOARD_HYGIENE = CatalogEntry(
     catalog_id="board-hygiene-for-agents",
-    catalog_version=2,
+    catalog_version=3,
     name="Board Hygiene for Agents",
     description="Keep a kanban board a truthful, current record of the work while acting on it.",
     files=(
@@ -172,6 +172,9 @@ learned is not on the board, it did not happen. Act accordingly.
    chat thread is lost; copy the conclusion onto the card.
 3. When blocked, say so ON THE CARD: what you tried, what you need, who can
    unblock. Then park it — do not sit on a blocked card silently.
+4. Keep the card status a short state label ("in review", "blocked on API
+   key"). The running progress log belongs in a note linked to the card,
+   appended as you go — not in the status field.
 
 ## Card quality
 
@@ -186,6 +189,8 @@ learned is not on the board, it did not happen. Act accordingly.
 - Closing a card without linking the artifact that satisfies it.
 - Creating duplicate cards instead of searching first.
 - Letting a card's title drift from what is actually being done.
+- Writing progress prose into the card status — it fragments the board's
+  status counts; append it to a card-linked note instead.
 """,
         ),
         CatalogFile(

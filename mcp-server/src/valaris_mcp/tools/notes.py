@@ -22,17 +22,25 @@ def _notes_path(client, slug: str, board_id: str | None) -> str:
     return f"{client.ws(slug)}/notes"
 
 
-def _note_receipt(result) -> str:
+def _note_receipt(result, return_content: bool = False) -> str:
+    # A long note's body echoed on every write overflowed clients (237K-char
+    # receipts), so the receipt carries only its size unless asked for.
     if isinstance(result, dict) and "content" in result:
-        result = {
-            **result,
-            "_content_format": "prosemirror",
-            "_hint": (
+        result = {**result, "content_chars": len(result["content"])}
+        if return_content:
+            result["_content_format"] = "prosemirror"
+            result["_hint"] = (
                 'content is ProseMirror JSON, not markdown. Preserve your original markdown '
                 'or use get_note(format="markdown") before editing; prefer update_note '
                 'mode="append" or "section" for partial edits.'
-            ),
-        }
+            )
+        else:
+            del result["content"]
+            result["_hint"] = (
+                'Body omitted (content_chars is its stored size). Read it with '
+                'get_note(format="markdown"), or pass return_content=True to get the '
+                "stored ProseMirror JSON back on a write."
+            )
     return json.dumps(result, indent=2, default=str)
 
 
@@ -56,11 +64,11 @@ async def list_notes(
         workspace_slug: Workspace slug (without board_id, workspace-level notes only).
         board_id: Board UUID if board-scoped.
         card_id: Only notes linked to this card on this board (needs board_id).
-        summary_only: Omit bodies by default; use get_note(format="markdown") to read one.
-        q: Case-insensitive substring search in title and plain-text body, before paging.
+        summary_only: Omit bodies.
+        q: Case-insensitive search in title and body, before paging.
         pinned_only: Only pinned notes.
         kinds: Match any listed note kind (e.g. plan, review_verdict).
-        limit: Page size, 1–100; default 25.
+        limit: Page size, 1–100.
         offset: Zero-based offset; follow next_offset with the same filters.
     """
     if not 1 <= limit <= 100 or offset < 0:
@@ -124,10 +132,9 @@ async def get_note(
     """Read one note; format="markdown" returns readable, token-cheap content.
 
     Args:
-        workspace_slug: Workspace slug.
         note_id: Note UUID or id prefix (resolved within the same scope).
         board_id: Board UUID if board-scoped.
-        format: prosemirror (default, raw JSON) or markdown.
+        format: prosemirror (raw JSON) or markdown.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -152,19 +159,19 @@ async def create_note(
     board_id: str | None = None,
     card_id: str | None = None,
     kind: str = "user_note",
+    return_content: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Create a note in a workspace or board, optionally linked to a card.
+    """Create a note in a workspace or board, optionally linked to a card. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         title: Note title.
-        content: Body as markdown (HTML, plain text or ProseMirror JSON also accepted).
+        content: Markdown (HTML, plain text or ProseMirror JSON accepted).
         pinned: Pin the note to the top.
         board_id: Board UUID if board-scoped.
-        card_id: Card to link; needs board_id and a card on this board (else 422; unknown or cross-workspace card 404).
-        kind: user_note (default) or a structural kind: plan, rework_brief,
-            review_verdict, ...
+        card_id: Card to link; needs board_id and a card on this board.
+        kind: user_note or a structural kind (plan, review_verdict, ...).
+        return_content: Echo the stored body in the receipt.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -174,7 +181,7 @@ async def create_note(
     if card_id:
         body["card_id"] = card_id
     result = await client.post(_notes_path(client, workspace_slug, board_id), body)
-    return _note_receipt(result)
+    return _note_receipt(result, return_content)
 
 
 NOTE_WRITE_MODES = ("replace", "append", "section")
@@ -225,21 +232,21 @@ async def update_note(
     board_id: str | None = None,
     card_id: str | None = None,
     detach_card: bool = False,
+    return_content: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Update a note; only provided fields change. mode decides what content does to the body: "replace" (default) rewrites the whole body; "append" adds blocks at the end (additive — a retry appends twice); "section" rewrites the body under anchor_heading only (idempotent; the heading stays, empty content clears the section, a missing heading is 404 and a duplicate 409). Prefer append/section for logs, trackers and long pinned notes. title/pinned/card_id apply in every mode.
+    """Update a note; only provided fields change. mode: "replace" (default), "append" (not idempotent) or "section" (rewrites the anchor_heading section; idempotent). See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         note_id: Note UUID.
-        title: New title.
-        content: Body as markdown (HTML, plain text or ProseMirror JSON also accepted); required for mode="append".
-        mode: "replace" (whole body), "append" (blocks at the end), or "section" (under anchor_heading).
-        anchor_heading: mode="section" only: heading text without the leading # marks (trimmed, case-insensitive).
+        content: Markdown (HTML, text or ProseMirror JSON accepted); required for mode="append".
+        mode: "replace", "append" or "section".
+        anchor_heading: mode="section" only: heading text without # marks (trimmed, case-insensitive).
         pinned: Pin state.
         board_id: Board UUID if board-scoped.
-        card_id: Card to link (must be on the note's board); omit to keep the current link.
+        card_id: Card to link (on the note's board); omit to keep the link.
         detach_card: Clear the card link; wins over card_id.
+        return_content: Echo the stored body in the receipt.
     """
     if mode not in NOTE_WRITE_MODES:
         return _note_error(f"mode must be one of {', '.join(NOTE_WRITE_MODES)}; got {mode!r}")
@@ -262,7 +269,7 @@ async def update_note(
         result = await _replace_note_section(
             client, workspace_slug, board_id, note_id, anchor_heading, content or ""
         )
-    return _note_receipt(result)
+    return _note_receipt(result, return_content)
 
 
 @deprecated_tool()
@@ -277,7 +284,6 @@ async def append_note(
     """Append blocks to the end of a note. Not idempotent: a retry appends again.
 
     Args:
-        workspace_slug: Workspace slug.
         note_id: Note UUID.
         content: Blocks to append (markdown recommended).
         board_id: Board UUID if board-scoped.
@@ -300,7 +306,6 @@ async def replace_note_section(
     """Rewrite the body under one heading of a note, leaving the rest untouched. Idempotent.
 
     Args:
-        workspace_slug: Workspace slug.
         note_id: Note UUID.
         anchor_heading: Heading text without the leading # marks.
         content: New section body (markdown recommended); empty clears it.
@@ -324,7 +329,6 @@ async def delete_note(
     """Delete a note permanently.
 
     Args:
-        workspace_slug: Workspace slug.
         note_id: Note UUID.
         board_id: Board UUID if board-scoped.
     """

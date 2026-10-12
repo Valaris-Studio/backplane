@@ -435,7 +435,7 @@ def test_prompt_init_project_mandates_acceptance_card():
 
 
 def test_prompt_init_project_uses_ui_validation_body_marker_not_label():
-    """P5 companion: UI-touching cards get the body marker; the
+    """P5 sibling: UI-touching cards get the body marker; the
     needs-ui-validation label is applied at review time, never pre-seeded
     (a production-incident wedge)."""
     from valaris_mcp.prompts import init_project
@@ -455,7 +455,7 @@ def test_prompt_plan_work_mandates_acceptance_card_and_ui_marker():
 
 
 def test_prompt_decompose_card_chains_children_and_ui_marker():
-    """P4/P5 companion: children created by decomposition must re-block the
+    """P4/P5 sibling: children created by decomposition must re-block the
     board's acceptance card and carry the UI marker convention."""
     from valaris_mcp.prompts import decompose_card
 

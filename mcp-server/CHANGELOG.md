@@ -4,7 +4,103 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [0.9.0] - 2026-10-02
+## [0.9.2] - 2026-10-07
+
+### Added
+
+- `upload_resource` uploads a file and registers it as a resource in one call:
+  the server asks for an upload URL, PUTs the bytes and creates the resource,
+  so an agent needs no shell and never handles a signed URL. Pass `path` (a
+  local file, stdio transport only, up to 25 MiB) or `content_base64` (up to
+  5 MiB; a `data:` URL is accepted), plus `filename`, and optionally
+  `content_type`, `board_id`, `parent_id` and `description`. The result is the
+  resource with `content_url` and `embed_markdown`, the image or attachment
+  line to paste into a note. `path` must resolve, symlinks followed, inside
+  the working directory or `VALARIS_MCP_UPLOAD_ROOTS`. Directories, devices,
+  pipes, hard-linked files and secret-looking paths are refused with no
+  override; the denylist (`.env*`, `.envrc`, `.ssh`, `.aws`, `.git`, `.codex`,
+  `.claude`, Backplane's app-data directories and any directory a
+  `BACKPLANE_*_HOME`/`_DIR` or `VALARIS_*_HOME`/`_DIR` variable names, private
+  keys, `credentials.json`,
+  service-account keys, `*.tfvars`, `.mcp.json` and similar) matches
+  regardless of letter case or Unicode form. The opened file must be the one
+  that was checked. A content type the bytes contradict is refused. Repeating
+  the same bytes, name and scope in one session returns the resource already
+  made (`already_uploaded`). Signed URLs stay out of results, errors and
+  every log record (signature redacted). It is in the default toolset; its
+  reference tells agents to upload only files the user asked for.
+
+### Changed
+
+- `tools/list` is smaller: 95,919 B for the full live surface (was 109,995 B),
+  so new tools no longer cost existing guidance. Tool and parameter
+  descriptions now state the contract: what the tool does, its inputs and key
+  constraints. Usage gotchas, return-field lists and examples moved to each
+  tool's entry in the in-app MCP reference, in English, Spanish and
+  Portuguese. A description ending in "See docs." has more there; read it with
+  `read_documentation(slug="mcp-tool-catalog#tool-<name>")`. No tool, parameter
+  or alias was renamed or removed.
+- `workspace_slug`, and `name`, `description`, `title` or `tags` parameters
+  whose description only repeated the name, carry no description on the wire.
+  Explicit `"additionalProperties": true` is dropped from dict parameters; it
+  is JSON Schema's default, so accepted input is unchanged.
+- `get_project_context` has a 32,000-character budget for the whole reply.
+  Over it, sections degrade in order (per-column status counts collapse to
+  `_other`, then notes, activity, definition content, column detail, git
+  repos and the column count, and last any long text or list is clipped)
+  until the reply fits. Dropped repos and columns are counted in
+  `_git_repos_truncated` and `_columns_truncated`. `_size_capped` lists the steps applied and `_hint` names the
+  tool with the full data. Replies under the budget are unchanged. Platforms
+  that include the status-count cap send at most 8 statuses per column plus
+  `_other`, so most boards never reach the budget.
+- `get_download_url` also returns `content_url`, the stable
+  `/api/workspaces/{slug}/resources/{id}/content` path to embed in notes and
+  links, and `expires_in`; `download_url` still expires, so its `_hint` says
+  to fetch with it now and never store it. `create_resource` with `gcs_path`
+  returns the same `content_url`, and the file's type and size now come from
+  the stored object. Registering before the upload answers 422
+  `object_not_uploaded`, with a `_hint` to PUT the file first and retry.
+  Neither tool's result is recorded in invocation summaries.
+
+### Fixed
+
+- `update_note.anchor_heading` again says matching is trimmed as well as
+  case-insensitive; 0.9.1 dropped that to fit the old byte budget.
+
+### Upgrade notes
+
+- `read_documentation` reads one subsection when the slug carries an anchor
+  (`<slug>#<anchor>`). This needs a platform that includes the anchor
+  support; an older one answers 404 for such a slug, and the whole section
+  (`mcp-tool-catalog`) still reads as before.
+- `content_url` needs a platform with durable media links. An older one
+  returns no `content_url` from `get_download_url` (the tool adds none),
+  serves no `/content` route for the one `create_resource` returns, and
+  accepts `create_resource` before the upload.
+
+## [0.9.1] - 2026-10-05
+
+### Changed
+
+- `create_note` and `update_note` receipts (every mode, and the deprecated
+  `append_note`/`replace_note_section` aliases) no longer echo the note body.
+  They keep every other field and add `content_chars`, the stored body's
+  size, so a long note no longer floods the reply. Pass
+  `return_content=True` to get the stored ProseMirror JSON back as before.
+
+### Fixed
+
+- String parameters keep JSON-looking text as text. A `str | None` param such
+  as `update_note.content` or `update_card.description` was JSON-decoded
+  before validation, so ProseMirror JSON (or `"null"`, `"true"`, a JSON list)
+  was rejected with "Input should be a valid string". All 155 optional string
+  params are fixed in one place; list and dict params still accept JSON text.
+- Card responses carry `column_name` and `column_type` on every path (create,
+  get, update, move, bulk, claim, participants, next assignment), not only
+  from `search_cards`. The fix is in the backend; an older backend still
+  returns null outside search.
+
+## [0.9.0] - 2026-10-04
 
 ### Changed
 
@@ -71,7 +167,7 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
   slug, instead of falling back to a shared `workspace` slug that could hand
   back an unrelated existing workspace.
 
-## [0.8.0] - 2026-09-13
+## [0.8.0] - 2026-09-15
 
 ### Changed
 

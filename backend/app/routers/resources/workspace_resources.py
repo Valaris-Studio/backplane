@@ -4,6 +4,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -18,7 +19,9 @@ from app.schemas.resources.resource import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from app.services.gcs import GCSService
+from app.services.gcs import get_gcs_service
+from app.routers.media import stored_file_response
+from app.services.media.service import MediaService
 from app.services.resources.resource import ResourceService
 
 router = APIRouter(
@@ -76,8 +79,7 @@ async def get_upload_url(
             upload_url=f"/api/local-storage/upload/{gcs_path}",
             gcs_path=gcs_path,
         )
-    gcs = GCSService(settings.GCS_BUCKET, settings.GCS_SA_EMAIL)
-    upload_url = gcs.generate_upload_url(gcs_path, data.content_type)
+    upload_url = get_gcs_service().generate_upload_url(gcs_path, data.content_type)
     if not upload_url:
         raise StorageUnavailableError("GCS credentials unavailable")
     return UploadUrlResponse(upload_url=upload_url, gcs_path=gcs_path)
@@ -99,17 +101,28 @@ async def get_download_url(
     ctx: WorkspaceContext = Depends(get_workspace),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    service = ResourceService(db)
-    resource = await service.get_resource_for_signing(resource_id, ctx.workspace.id)
-    if not settings.GCS_BUCKET:
-        return DownloadUrlResponse(
-            download_url=f"/api/local-storage/download/{resource.gcs_path}"
-        )
-    gcs = GCSService(settings.GCS_BUCKET, settings.GCS_SA_EMAIL)
-    download_url = gcs.generate_download_url(resource.gcs_path)
-    if not download_url:
-        raise StorageUnavailableError("GCS credentials unavailable")
-    return DownloadUrlResponse(download_url=download_url)
+    resource = await ResourceService(db).get_resource_for_signing(resource_id, ctx.workspace.id)
+    link = MediaService(db).resource_download_link(ctx.workspace, resource)
+    return DownloadUrlResponse(
+        download_url=link.download_url,
+        content_url=link.content_url,
+        expires_in=link.expires_in,
+    )
+
+
+@router.get(
+    "/{resource_id}/content",
+    response_class=Response,
+    responses={302: {"description": "Redirect to a short-lived signed URL"}},
+)
+async def get_workspace_resource_content(
+    # str, not UUID: a malformed id must get the same 404 as a missing file.
+    resource_id: str,
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    target = await MediaService(db).resource_content(ctx.workspace, resource_id)
+    return stored_file_response(target)
 
 
 @router.put("/{resource_id}", response_model=ResourceRead)

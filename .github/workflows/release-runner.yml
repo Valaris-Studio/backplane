@@ -12,9 +12,11 @@ permissions:
 
 jobs:
   qualify:
+    if: github.repository == 'Valaris-Studio/backplane'
     needs: validate
     uses: ./.github/workflows/ci.yml
   validate:
+    if: github.repository == 'Valaris-Studio/backplane'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +26,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/platform-release.py check-ref --component runner
+      - name: Require a dated CHANGELOG.md entry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py check-changelog --tag "$RELEASE_TAG"
   goreleaser:
     name: goreleaser — binaries + ghcr image
     runs-on: ubuntu-latest
@@ -52,6 +58,10 @@ jobs:
           python-version: '3.12'
       - name: Recheck public release ref after approval
         run: python scripts/platform-release.py check-ref --component runner
+      - name: Render release notes from CHANGELOG.md
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py release-notes --tag "$RELEASE_TAG" --output /tmp/runner-release-notes.md
 
       - uses: actions/setup-go@v5
         with:
@@ -70,7 +80,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes /tmp/runner-release-notes.md
           workdir: runner
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

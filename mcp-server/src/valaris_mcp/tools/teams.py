@@ -21,7 +21,6 @@ async def list_teams(
     """List a workspace's teams with members and board assignments.
 
     Args:
-        workspace_slug: Workspace slug.
         include_inactive: Include inactive teams.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -45,7 +44,6 @@ async def get_team(
     """Get one team with its members and their roles.
 
     Args:
-        workspace_slug: Workspace slug.
         team_id: Team UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -72,7 +70,6 @@ async def create_team(
     """Create a team of runners in a workspace.
 
     Args:
-        workspace_slug: Workspace slug.
         name: Team name.
         description: What it does.
         board_id: Board UUID to scope the team to.
@@ -100,10 +97,7 @@ async def update_team(
     """Update a team; only passed fields change.
 
     Args:
-        workspace_slug: Workspace slug.
         team_id: Team UUID.
-        name: New name.
-        description: New description.
         board_id: New board scope.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -123,7 +117,6 @@ async def deactivate_team(
     """Deactivate (soft-delete) a team.
 
     Args:
-        workspace_slug: Workspace slug.
         team_id: Team UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -142,11 +135,9 @@ async def add_team_member(
     role: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Add a runner to a team with roles; idempotent, re-adding updates the roles.
-    orchestrator/reviewer/documentator are one runner per team; custom allows many.
+    """Add a runner to a team with roles; idempotent, re-adding replaces the roles. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         team_id: Team UUID.
         agent_id: Runner UUID.
         roles: One or more of orchestrator|reviewer|documentator|custom.
@@ -172,7 +163,6 @@ async def remove_team_member(
     """Remove a runner from a team.
 
     Args:
-        workspace_slug: Workspace slug.
         team_id: Team UUID.
         agent_id: Runner UUID.
     """

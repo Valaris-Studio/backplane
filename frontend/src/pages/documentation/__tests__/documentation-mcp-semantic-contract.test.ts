@@ -201,12 +201,12 @@ const SPANISH_AUDITED_SEMANTIC_TRANSLATION_CONTRACTS: readonly SpanishSafetyCrit
     {
       slug: "mcp-tool-catalog",
       source:
-        "The backend does not validate the list: nonexistent ids are silently skipped, omitted columns keep their old positions, and ids are never checked against this board — a partial or mixed-up list yields an unpredictable order. Always send exactly this board's full column id list.",
+        "Ids that are not columns of this board (unknown or foreign) are rejected with 422 before anything moves. Omitted columns keep their old positions, so a partial list yields an unpredictable order — always send exactly this board's full column id list.",
       clauses: {
-        "nonexistent ids are silently skipped": /omite silenciosamente.+ids inexistentes/iu,
+        "ids outside this board are rejected": /ids.+no son columnas de este tablero.+rechazan con 422/iu,
+        "nothing moves on rejection": /antes de mover nada/iu,
         "omitted columns retain old positions": /columnas omitidas.+posiciones/iu,
-        "ids are not board checked": /ids.+nunca.+(?:comprueban|verifican).+tablero/iu,
-        "partial or mixed lists are unpredictable": /lista parcial.+mezclada.+orden impredecible/iu,
+        "partial lists are unpredictable": /lista parcial.+orden impredecible/iu,
         "exact full list for this board is required": /exactamente.+lista completa.+este tablero/iu,
       },
     },

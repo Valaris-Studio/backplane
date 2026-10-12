@@ -122,3 +122,16 @@ class ResourceRepository(BaseRepository[Resource]):
             )
         )
         return result.scalar_one()
+
+    async def ids_by_gcs_path(
+        self, workspace_id: uuid.UUID, gcs_paths: set[str]
+    ) -> dict[str, uuid.UUID]:
+        if not gcs_paths:
+            return {}
+        result = await self.db.execute(
+            select(Resource.gcs_path, Resource.id).where(
+                Resource.workspace_id == workspace_id,
+                Resource.gcs_path.in_(gcs_paths),
+            )
+        )
+        return {gcs_path: resource_id for gcs_path, resource_id in result.all()}

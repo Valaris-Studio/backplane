@@ -139,10 +139,10 @@ async def test_workspace_download_url_without_file_returns_canonical_400(
 async def test_workspace_download_url_without_gcs_credentials_returns_canonical_501(
     client: AsyncClient, test_workspace: Workspace, monkeypatch
 ):
+    # No gcs_path: a supplied one must name an uploaded object (422 otherwise),
+    # and the generated key is all this signing failure needs.
     resource = await _create_resource(
-        client,
-        f"/api/workspaces/{test_workspace.slug}/resources",
-        gcs_path=f"{test_workspace.id}/{uuid.uuid4()}/spec.pdf",
+        client, f"/api/workspaces/{test_workspace.slug}/resources"
     )
     monkeypatch.setattr(settings, "GCS_BUCKET", "some-bucket")
     monkeypatch.setattr(
@@ -185,9 +185,7 @@ async def test_board_download_url_without_gcs_credentials_returns_canonical_501(
     client: AsyncClient, test_workspace: Workspace, test_board: Board, monkeypatch
 ):
     base = f"/api/workspaces/{test_workspace.slug}/boards/{test_board.id}/resources"
-    resource = await _create_resource(
-        client, base, gcs_path=f"{test_workspace.id}/{uuid.uuid4()}/spec.pdf"
-    )
+    resource = await _create_resource(client, base)
     monkeypatch.setattr(settings, "GCS_BUCKET", "some-bucket")
     monkeypatch.setattr(
         "app.services.gcs.GCSService.generate_download_url", lambda *a, **k: None
@@ -195,6 +193,24 @@ async def test_board_download_url_without_gcs_credentials_returns_canonical_501(
 
     resp = await client.get(f"{base}/{resource['id']}/download-url")
     assert_canonical(resp, status=501, error_code="storage_unavailable")
+
+
+async def test_media_upload_url_with_unreachable_storage_returns_canonical_503(
+    client: AsyncClient, test_workspace: Workspace, monkeypatch
+):
+    """Transient storage failure is 503 with its own code: `storage_unavailable`
+    already means the permanent 501 above, and one code must not name two
+    statuses for clients that branch on `error_code`."""
+    monkeypatch.setattr(settings, "GCS_BUCKET", "some-bucket")
+    monkeypatch.setattr(
+        "app.services.gcs.GCSService.generate_upload_url", lambda *a, **k: None
+    )
+
+    resp = await client.post(
+        f"/api/workspaces/{test_workspace.slug}/media/upload-url",
+        json={"filename": "shot.png", "content_type": "image/png"},
+    )
+    assert_canonical(resp, status=503, error_code="storage_backend_unavailable")
 
 
 # --- 422/400: bundle import speaks one shape --------------------------------

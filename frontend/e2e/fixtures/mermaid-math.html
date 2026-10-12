@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Mermaid math compatibility</title></head>
+<body><main aria-label="Math diagram"></main><script type="module">
+import { renderMermaid } from "/src/lib/mermaid-render.ts";
+const source = String.raw`flowchart LR
+  A["$$\frac{1}{2} + x^2$$"] --> B["Result"]`;
+const target = document.querySelector("main");
+try { target.innerHTML = await renderMermaid({ id: "math", source, theme: new URLSearchParams(location.search).get("theme") || "light" }); }
+catch (error) { target.textContent = String(error); }
+</script></body></html>
