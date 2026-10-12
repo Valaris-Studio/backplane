@@ -25,7 +25,6 @@ async def request_approval(
     """Request human approval for a high-impact action, then poll get_approval_status.
 
     Args:
-        workspace_slug: Workspace slug.
         category: deletion|bulk_change|deployment|schema_change|permission_change|external_action.
         action_description: What will happen, for humans.
         action_payload: JSON of the action to run if approved.
@@ -59,7 +58,6 @@ async def list_approvals(
     """List a workspace's approval requests.
 
     Args:
-        workspace_slug: Workspace slug.
         status: pending|approved|rejected|expired|auto_approved.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -86,10 +84,9 @@ async def get_approval_status(
     approval_id: str,
     ctx: Context = None,
 ) -> str:
-    """Check an approval request's status (pending|approved|rejected|expired|auto_approved).
+    """Check an approval request's status. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         approval_id: Approval UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -119,7 +116,6 @@ async def decide_approval(
     """Approve or reject a pending approval request.
 
     Args:
-        workspace_slug: Workspace slug.
         approval_id: Approval UUID.
         decision: approved|rejected.
         reason: Optional reason.

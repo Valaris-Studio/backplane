@@ -178,6 +178,7 @@ const VALARIS_MCP_NAMES = [
   "update_webhook",
   "update_workspace_config",
   "update_workspace_member",
+  "upload_resource",
   "validate_board_dependencies",
   "list_documentation",
   "read_documentation",

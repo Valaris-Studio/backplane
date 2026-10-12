@@ -156,6 +156,7 @@ class BoardRepository(BaseRepository[Board]):
             .options(
                 selectinload(Board.columns).selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.user),
                 selectinload(Board.columns).selectinload(Column.cards).selectinload(Card.participants).selectinload(CardParticipant.agent),
+                selectinload(Board.columns).selectinload(Column.cards).selectinload(Card.column),
             )
         )
         return result.scalar_one_or_none()

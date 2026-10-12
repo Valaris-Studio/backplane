@@ -163,8 +163,8 @@ class CardRead(UTCModel):
     id: uuid.UUID
     column_id: uuid.UUID
     # Derived column labels so a card payload is self-describing: a caller can
-    # tell WHERE a card sits without a second board lookup. Populated by
-    # `attach_column_labels` (one batched SELECT per response). Default None
+    # tell WHERE a card sits without a second board lookup. Read from the
+    # eager-loaded Card.column (repositories selectinload it). Default None
     # keeps every existing CardRead construction site valid.
     column_name: str | None = None
     column_type: ColumnType | None = None

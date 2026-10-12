@@ -1757,7 +1757,11 @@
     "attachFile": "Attach File",
     "uploading": "Uploading...",
     "fileTooLarge": "File is too large. Maximum size is 50 MB.",
-    "imageUploadError": "Image upload failed",
+    "uploadFailedTitle": "Couldn't upload {{name}}",
+    "uploadStorageUnavailable": "File storage is temporarily unavailable. Nothing was added — try again in a moment.",
+    "uploadRejected": "The server didn't accept this file, so nothing was added.",
+    "uploadFailed": "The upload didn't finish, so nothing was added. Check your connection and try again.",
+    "uploadRetry": "Retry",
     "mermaid": "Diagram",
     "mermaidEdit": "Edit diagram",
     "mermaidError": "Diagram error",
@@ -2873,6 +2877,9 @@
       },
       "update_workspace_member": {
         "summary": "Change an existing workspace member's role."
+      },
+      "upload_resource": {
+        "summary": "Upload a file as a resource in one call."
       },
       "validate_board_dependencies": {
         "summary": "Validate board dependencies for cycles, conflicts, and orphans."

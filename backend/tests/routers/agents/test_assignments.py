@@ -227,6 +227,32 @@ async def test_next_assignment_bundles_integration_branch_when_set(
 
 
 @pytest.mark.asyncio
+async def test_next_assignment_card_names_its_column(
+    agent_client: AsyncClient,
+    test_workspace: Workspace,
+    test_board: Board,
+    test_user: User,
+    test_agent: Agent,
+    db_session: AsyncSession,
+):
+    await _seed_default_pipeline(db_session, test_workspace)
+    cols = await _make_typed_columns(db_session, test_board)
+    await _make_repo(db_session, test_board, test_user)
+    await _add_team_role(db_session, test_workspace, test_agent, test_user, "implementer")
+    await _make_card(db_session, test_board, cols["active"], test_user, title="real work")
+
+    resp = await agent_client.post(
+        URL_TPL.format(slug=test_workspace.slug, agent_id=test_agent.id),
+        json={},
+    )
+
+    assert resp.status_code == 200
+    card = resp.json()["card"]
+    assert card["column_name"] == "In Progress"
+    assert card["column_type"] == "active"
+
+
+@pytest.mark.asyncio
 async def test_next_assignment_returns_204_when_no_work(
     agent_client: AsyncClient,
     test_workspace: Workspace,

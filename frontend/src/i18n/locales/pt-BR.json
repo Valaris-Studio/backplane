@@ -1787,7 +1787,11 @@
     "attachFile": "Anexar arquivo",
     "uploading": "Enviando...",
     "fileTooLarge": "O arquivo é muito grande. O tamanho máximo é 50 MB.",
-    "imageUploadError": "Falha ao enviar a imagem",
+    "uploadFailedTitle": "Não foi possível enviar {{name}}",
+    "uploadStorageUnavailable": "O armazenamento de arquivos está temporariamente indisponível. Nada foi adicionado; tente novamente em instantes.",
+    "uploadRejected": "O servidor não aceitou este arquivo, então nada foi adicionado.",
+    "uploadFailed": "O envio não terminou, então nada foi adicionado. Verifique sua conexão e tente novamente.",
+    "uploadRetry": "Tentar novamente",
     "mermaid": "Diagrama",
     "mermaidEdit": "Editar diagrama",
     "mermaidError": "Erro no diagrama",
@@ -2905,6 +2909,9 @@
       },
       "update_workspace_member": {
         "summary": "Altera a função de um membro existente do espaço de trabalho."
+      },
+      "upload_resource": {
+        "summary": "Enviar um arquivo como recurso em uma única chamada."
       },
       "validate_board_dependencies": {
         "summary": "Validar as dependências do quadro para detectar ciclos, conflitos e itens órfãos."

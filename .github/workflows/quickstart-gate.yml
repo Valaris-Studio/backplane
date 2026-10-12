@@ -23,8 +23,12 @@ on:
 permissions:
   contents: read
 
+# Every job is guarded to the public repo: Actions must never run on the private
+# source repo. A guarded-off job reports "skipped" (not absent), so the public
+# repo's required-check names are unchanged.
 jobs:
   quickstart-gate:
+    if: github.repository == 'Valaris-Studio/backplane'
     name: Fresh-clone Quickstart
     runs-on: ubuntu-latest
     timeout-minutes: 25

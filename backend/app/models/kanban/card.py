@@ -5,7 +5,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Enum, Float, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, Float, ForeignKey, Integer, JSON, String, Text, func, inspect
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -177,3 +177,20 @@ class Card(Base, UUIDMixin, TimestampMixin):
         foreign_keys=[parent_card_id],
         lazy="raise",
     )
+
+    # CardRead's column labels come from the eager-loaded column. Card.column is
+    # lazy="raise", so an unloaded one reads as None instead of raising.
+    def _loaded_column(self) -> "Column | None":  # noqa: F821
+        if "column" in inspect(self).unloaded:
+            return None
+        return self.column
+
+    @property
+    def column_name(self) -> str | None:
+        column = self._loaded_column()
+        return column.name if column is not None else None
+
+    @property
+    def column_type(self) -> "ColumnType | None":  # noqa: F821
+        column = self._loaded_column()
+        return column.column_type if column is not None else None

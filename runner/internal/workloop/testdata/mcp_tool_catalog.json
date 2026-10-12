@@ -153,6 +153,7 @@
   "update_webhook",
   "update_workspace_config",
   "update_workspace_member",
+  "upload_resource",
   "validate_board_dependencies",
   "whoami"
 ]

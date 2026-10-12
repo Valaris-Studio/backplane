@@ -61,3 +61,38 @@ async def test_missing_artifact_fails_explicitly_without_bundled_fallback(
     response = await client.get("/api/documentation")
     assert response.status_code == 503
     assert "internal path" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_slug_with_anchor_reads_only_that_subsection(client):
+    # Wire tool descriptions point here ("See docs: mcp-tool-catalog#tool-x"),
+    # so one tool's reference must be readable without paging the whole catalog.
+    response = await client.get(
+        "/api/documentation/mcp-tool-catalog%23tool-update_note",
+        params={"locale": "pt-BR"},
+    )
+    assert response.status_code == 200
+    read = response.json()
+    assert read["slug"] == "mcp-tool-catalog"
+    assert read["anchor"] == "tool-update_note"
+    assert read["markdown"].startswith('<a id="tool-update_note"></a>')
+    assert "## update_note" in read["markdown"]
+    assert '<a id="' not in read["markdown"][1:]
+    assert read["total_characters"] == len(read["markdown"])
+    assert read["next_offset"] is None
+
+    page = (
+        await client.get(
+            "/api/documentation/mcp-tool-catalog%23tool-update_note",
+            params={"locale": "pt-BR", "offset": 10, "limit": 20},
+        )
+    ).json()
+    assert page["markdown"] == read["markdown"][10:30]
+    assert page["next_offset"] == 30
+
+
+@pytest.mark.asyncio
+async def test_unknown_anchor_is_not_found(client):
+    response = await client.get("/api/documentation/mcp-tool-catalog%23tool-nope")
+    assert response.status_code == 404
+    assert "anchor" in response.text.lower()

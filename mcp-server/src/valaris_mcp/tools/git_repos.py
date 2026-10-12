@@ -25,7 +25,6 @@ async def list_git_repos(
     """List the git repos linked to a board.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -51,17 +50,13 @@ async def create_git_repo(
     """Link a git repo to a board.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
-        name: Display name.
         url: Repository URL.
         provider: github|gitlab|bitbucket|gitea|other.
         default_branch: Default branch name.
         description: Optional description.
-        require_branch_protection: Runner arms branch protection at first clone
-            (default True); False for human-owned repos.
-        slug: Per-card git_repo_slug selector on multi-repo boards; derived from
-            name when omitted.
+        require_branch_protection: Arm branch protection at first clone.
+        slug: Per-card git_repo_slug selector; derived from name.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -100,18 +95,14 @@ async def update_git_repo(
     """Update a linked git repo; only passed fields change.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         repo_id: Git repo UUID.
-        name: New display name.
         url: New URL.
         provider: New provider.
         default_branch: New default branch.
-        integration_branch: Staging branch that git.base_ref="integration_branch"
-            stages fork from; empty keeps default_branch.
-        description: New description.
+        integration_branch: Staging branch for stages with git.base_ref="integration_branch".
         require_branch_protection: Toggle the policy.
-        slug: New board-unique slug; changes which cards' git_repo_slug resolve here.
+        slug: New board-unique slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -145,7 +136,6 @@ async def delete_git_repo(
     """Unlink a git repo from a board.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         repo_id: Git repo UUID.
     """

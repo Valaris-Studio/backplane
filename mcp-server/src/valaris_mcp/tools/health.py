@@ -14,10 +14,9 @@ from valaris_mcp.server import AppContext, mcp
 @mcp.tool()
 @handle_api_errors
 async def get_board_health(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Get a board's computed health: score (0-100), stale/overdue/unassigned cards, priority and column distribution, velocity. Use for triage and standup.
+    """Get a board's computed health: 0-100 score, stale/overdue/unassigned cards, distributions and velocity.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context

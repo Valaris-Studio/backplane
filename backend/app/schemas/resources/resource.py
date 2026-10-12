@@ -94,4 +94,9 @@ class UploadUrlResponse(UTCModel):
 
 
 class DownloadUrlResponse(UTCModel):
+    # Short-lived: fetch with it now, never store it.
     download_url: str
+    # Durable, authenticated app path: the link to embed in notes.
+    content_url: str | None = None
+    # Seconds until download_url expires; None when it does not expire.
+    expires_in: int | None = None

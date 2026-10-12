@@ -14,6 +14,8 @@ from app.models.approvals.approval import ApprovalCategory, ApprovalStatus
 from app.repositories.approvals.approval import ApprovalRepository
 from app.schemas.approvals.approval import ApprovalCreate, ApprovalDecide
 from app.services.approvals.risk import AUTO_APPROVE_THRESHOLD, compute_risk_score
+from app.services.approvals.rich_text import sanitise_action_payload, sanitise_rich_text
+from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,17 @@ class ApprovalService:
         self.repo = ApprovalRepository(db)
 
     async def create_approval(self, workspace_id: uuid.UUID, data: ApprovalCreate):
+        # Rich text rendered in the decide dialog: same media-src allowlist as
+        # notes/cards, applied before the row, the event and the notification.
+        description = await MediaLinkCanonicalizer(self.db).rich_text(
+            workspace_id, data.action_description
+        )
+        data = data.model_copy(
+            update={
+                "action_description": sanitise_rich_text(description),
+                "action_payload": sanitise_action_payload(data.action_payload),
+            }
+        )
         risk_score = compute_risk_score(data.category, data.action_payload)
         status = (
             ApprovalStatus.auto_approved
@@ -109,6 +122,14 @@ class ApprovalService:
 
         if approval.status != ApprovalStatus.pending:
             raise ConflictError(f"Approval already {approval.status.value}")
+
+        data = data.model_copy(
+            update={
+                "reason": sanitise_rich_text(
+                    await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, data.reason)
+                )
+            }
+        )
 
         handler = self._DECISION_HANDLERS.get(approval.category)
         if handler is not None:

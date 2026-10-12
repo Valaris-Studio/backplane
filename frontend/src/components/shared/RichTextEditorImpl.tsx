@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { toast } from "sonner";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { MediaImage } from "@/extensions/media-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
@@ -39,8 +39,20 @@ import { htmlWinsClipboard, cleanPastedHtml } from "@/components/shared/editor/p
 import { useMentionPicker } from "@/components/shared/editor/use-mention-picker";
 import { cn } from "@/lib/utils";
 import { parseContent, looksLikeMarkdown } from "@/lib/editor-utils";
+import {
+  classifyUploadFailure,
+  isRetryableUploadFailure,
+  type UploadFailureKind,
+} from "@/lib/media-upload";
 import type { EditorView } from "@tiptap/pm/view";
 import type { EditorState } from "@tiptap/pm/state";
+
+const UPLOAD_FAILURE_COPY: Record<UploadFailureKind, string> = {
+  tooLarge: "editor.fileTooLarge",
+  storageUnavailable: "editor.uploadStorageUnavailable",
+  rejected: "editor.uploadRejected",
+  failed: "editor.uploadFailed",
+};
 
 export interface RichTextEditorProps {
   content: string;
@@ -118,7 +130,7 @@ export function RichTextEditor({
         codeBlock: false,
       }),
       MermaidCodeBlock,
-      Image.configure({ inline: false }),
+      MediaImage.configure({ inline: false }),
       Placeholder.configure({
         placeholder: placeholder ?? t("editor.placeholder"),
       }),
@@ -214,17 +226,30 @@ export function RichTextEditor({
     }
   }, [editor, content]);
 
+  const reportUploadFailure = useCallback(
+    (file: File, error: unknown, retry: () => void) => {
+      const kind = classifyUploadFailure(error);
+      toast.error(t("editor.uploadFailedTitle", { name: file.name }), {
+        description: t(UPLOAD_FAILURE_COPY[kind]),
+        action: isRetryableUploadFailure(kind)
+          ? { label: t("editor.uploadRetry"), onClick: retry }
+          : undefined,
+      });
+    },
+    [t],
+  );
+
   const handleImageFile = useCallback(
     async (file: File) => {
       if (!editor || !workspaceSlug) return;
       try {
-        const url = await uploadImage(file);
-        editor.chain().focus().setImage({ src: url, alt: file.name }).run();
-      } catch {
-        toast.error(t("editor.imageUploadError"));
+        const src = await uploadImage(file);
+        editor.chain().focus().setImage({ src, alt: file.name }).run();
+      } catch (error) {
+        reportUploadFailure(file, error, () => void handleImageFile(file));
       }
     },
-    [editor, uploadImage, workspaceSlug, t],
+    [editor, uploadImage, workspaceSlug, reportUploadFailure],
   );
 
   const handleAttachmentFile = useCallback(
@@ -260,8 +285,7 @@ export function RichTextEditor({
             editor.view.dispatch(tr);
           }
         }
-      } catch (err) {
-        // Remove placeholder on failure
+      } catch (error) {
         if (placeholderPos !== null) {
           const { tr } = editor.state;
           const node = tr.doc.nodeAt(placeholderPos);
@@ -270,12 +294,10 @@ export function RichTextEditor({
             editor.view.dispatch(tr);
           }
         }
-        if (err instanceof Error && err.message === "FILE_TOO_LARGE") {
-          alert(t("editor.fileTooLarge"));
-        }
+        reportUploadFailure(file, error, () => void handleAttachmentFile(file));
       }
     },
-    [editor, uploadFile, workspaceSlug, t],
+    [editor, uploadFile, workspaceSlug, reportUploadFailure],
   );
 
   function handleImageButton() {

@@ -59,7 +59,8 @@ export interface ServerSurfaceTool {
   kind: ToolKind;
   annotations: ServerSurfaceAnnotations;
   description: string;
-  params: Record<string, string>;
+  // null: the param ships with no wire description (its name says it all).
+  params: Record<string, string | null>;
 }
 
 // One selectable hand: a group (id slugified from its title) or a category.

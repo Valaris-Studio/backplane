@@ -328,7 +328,7 @@ export const FLOW_CONTROL_TOOL_DOCS: ToolDoc[] = [
       },
     ],
     gotchas: [
-      "satisfied mirrors the exact condition the scheduler gates pickup on: every prerequisite in a done-type column.",
+      "satisfied mirrors the exact condition the scheduler gates pickup on: every prerequisite meets its effective completion policy (accepted or Done release; legacy boards use the done-type column).",
       "blocking lists only the unfinished prerequisites, each with title, status, and column type — the finish-first list.",
       "card_id accepts a short id prefix (≥4 chars); the returned card_id is always the resolved full UUID.",
     ],

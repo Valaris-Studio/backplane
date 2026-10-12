@@ -415,6 +415,9 @@ export function ReferenceEnvironmentVariables() {
       </div>
 
       <h2 id="mcp">MCP server</h2>
+      <ImportantNote title="Protect the HTTP endpoint">
+        The HTTP transport has no authentication of its own. Anyone who can reach it can invoke tools with the authority of the server's VALARIS_API_KEY. Run it behind an authenticating reverse proxy or on a trusted private network. MCP_HOST=0.0.0.0 binds all interfaces; it does not restrict access.
+      </ImportantNote>
       <p>
         Read from <code>mcp-server/src/valaris_mcp/config.py</code>. Set
         these in the MCP server environment. Claude hosts use the{" "}

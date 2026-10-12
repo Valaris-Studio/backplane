@@ -28,10 +28,8 @@ async def create_column(
     """Create a column at the end of a board.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
-        name: Display name.
-        column_type: backlog|active|review|done|blocked; drives runner discovery and movement.
+        column_type: backlog|active|review|done|blocked; untyped columns are human-only.
         color: Hex color for the header.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -60,13 +58,10 @@ async def update_column(
     """Update column fields; only provided fields change.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         column_id: Column UUID.
-        name: New display name.
         color: New hex color.
-        column_type: backlog|active|review|done|blocked, or "null" to clear the
-            type and make the column human-only (runners skip it).
+        column_type: backlog|active|review|done|blocked, or "null" to clear it (human-only column).
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -96,7 +91,6 @@ async def delete_column(
     """Delete a column and all its cards permanently.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         column_id: Column UUID.
     """
@@ -115,10 +109,9 @@ async def reorder_columns(
     column_ids: list[str],
     ctx: Context = None,
 ) -> str:
-    """Reorder a board's columns. Send every column UUID on the board in the new left-to-right order; foreign ids are rejected and omitted columns keep their positions.
+    """Reorder a board's columns: send every column UUID on the board, left to right. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID.
         column_ids: All column UUIDs on the board, in order.
     """

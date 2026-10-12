@@ -23,12 +23,9 @@ async def list_skills(
     include_archived: bool = False,
     ctx: Context = None,
 ) -> str:
-    """List workspace skills, or a board's effective skill set with board_id.
-    Metadata only (incl. each skill's declared toolsets and, for a board, the
-    toolsets its loop grant does not cover); get_skill returns the files.
+    """List workspace skills, or a board's effective set (board_id): metadata and declared toolsets, no files. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug: return its effective set.
         include_archived: Include archived skills (workspace listing only).
     """
@@ -66,11 +63,9 @@ async def get_skill(
     file_path: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Fetch a skill version's files verbatim (with its declared toolsets).
-    Long files are truncated; re-fetch one whole with file_path.
+    """Fetch a skill version's files verbatim and its declared toolsets; file_path returns one long file whole. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         slug: Skill slug.
         version: Omit for the latest published; pass explicitly for a draft.
         file_path: Return this one file in full.
@@ -153,11 +148,9 @@ async def propose_skill(
     board_id: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Propose a new skill or version as a draft pending human approval;
-    nothing is served until approved. Idempotent: returns the pending proposal.
+    """Propose a skill or version as a draft pending human approval; nothing is served until approved. Idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         slug: Skill slug to create or version.
         files: [{"path", "content"}], SKILL.md plus support files, verbatim.
         name: Omit to use SKILL.md frontmatter.
@@ -196,12 +189,9 @@ async def set_skill_binding(
     clear_pin: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Upsert a skill binding on a board: enable/disable, optionally pin a
-    version. Omitted fields are unchanged (tri-state); new bindings default
-    to enabled, unpinned.
+    """Upsert a board's skill binding: enable/disable, optionally pin a version; omitted fields are unchanged. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         skill_slug: Workspace skill slug.
         enabled: Active on the board.
@@ -263,11 +253,9 @@ async def list_skill_bindings_raw(
     board_id: str,
     ctx: Context = None,
 ) -> str:
-    """Raw view of a board's skill binding rows, disabled ones included;
-    list_skills(board_id) is the effective set callers actually get.
+    """Raw view of a board's skill binding rows, disabled ones included; list_skills(board_id) is the effective set. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -285,7 +273,6 @@ async def list_skill_bindings(
     """List a board's raw skill binding rows.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -301,11 +288,9 @@ async def remove_skill_binding(
     skill_slug: str,
     ctx: Context = None,
 ) -> str:
-    """Delete a board's skill binding row, pin included; disable via
-    set_skill_binding to keep it. Idempotent.
+    """Delete a board's skill binding row, pin included; idempotent. Disable via set_skill_binding to keep it. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         skill_slug: Bound skill slug.
     """
@@ -336,12 +321,7 @@ async def list_skill_catalog(
     workspace_slug: str,
     ctx: Context = None,
 ) -> str:
-    """List the built-in skill catalog: curated bundles (each declaring the
-    toolsets it plays in) not yet in the workspace library.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """List built-in catalog skill bundles, with their declared toolsets, not yet in the workspace library."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get(f"{client.ws(workspace_slug)}/skill-catalog")
@@ -369,11 +349,9 @@ async def activate_catalog_skill(
     catalog_id: str,
     ctx: Context = None,
 ) -> str:
-    """Copy a catalog skill into the workspace library as published v1. Human
-    sessions only (runner keys 403). Idempotent.
+    """Copy a catalog skill into the workspace library as published v1. Human sessions only. Idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         catalog_id: Catalog entry id, from list_skill_catalog.
     """
     app: AppContext = ctx.request_context.lifespan_context

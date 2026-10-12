@@ -3,18 +3,54 @@
 
 from __future__ import annotations
 
+import logging
 from contextvars import ContextVar
 
 import httpx
 
 from valaris_mcp.config import AGENT_EMAIL, API_BASE_URL, API_KEY, IAP_AUDIENCE
+from valaris_mcp.tracking import _without_url_signatures as without_url_signatures
 
 
 current_invocation_id: ContextVar[str | None] = ContextVar("current_invocation_id", default=None)
 
+# A 25 MiB upload over a slow uplink outlasts the 30 s API timeout.
+_STORAGE_PUT_TIMEOUT = httpx.Timeout(30.0, write=300.0)
+
+
+def _install_signed_url_log_redaction() -> None:
+    """httpx (and any other library) logs request URLs, and MCP clients persist the
+    server's stderr: a signed upload URL would land in a log file with its credential.
+
+    A record factory, not a logger or handler filter: it covers every logger,
+    including ones created later, and every handler, including ones installed later.
+    """
+    base_factory = logging.getLogRecordFactory()
+    if getattr(base_factory, "_redacts_signed_urls", False):
+        return
+
+    def redacting_factory(*args, **kwargs) -> logging.LogRecord:
+        record = base_factory(*args, **kwargs)
+        try:
+            message = record.getMessage()
+        except Exception:
+            return record  # leave a malformed record to logging's own error path
+        redacted = without_url_signatures(message)
+        if redacted != message:
+            record.msg, record.args = redacted, None
+        return record
+
+    redacting_factory._redacts_signed_urls = True
+    logging.setLogRecordFactory(redacting_factory)
+
+
+_install_signed_url_log_redaction()
+
 
 class ValarisClient:
     """Async HTTP client wrapping the Valaris REST API."""
+
+    _storage_transport: httpx.AsyncBaseTransport | None = None
 
     def __init__(self) -> None:
         headers = {}
@@ -112,6 +148,25 @@ class ValarisClient:
         when the status code itself carries semantics the caller needs.
         """
         return await self._request(method, path, **kwargs)
+
+    async def put_bytes(self, upload_url: str, content: bytes, content_type: str) -> None:
+        """PUT raw bytes to an upload URL from get_upload_url.
+
+        A root-relative `/api/...` URL (local storage) is this API and gets its
+        auth; an absolute http(s) URL is a signed storage URL that carries its
+        own credential, so it never sees this client's headers.
+        """
+        headers = {"Content-Type": content_type}
+        if upload_url.startswith("/api/"):
+            await self._request("PUT", upload_url[len("/api") :], content=content, headers=headers)
+            return
+        if not upload_url.lower().startswith(("https://", "http://")):
+            raise ValueError("upload URL is neither an /api/ path nor an http(s) URL")
+        async with httpx.AsyncClient(
+            timeout=_STORAGE_PUT_TIMEOUT, follow_redirects=False, transport=self._storage_transport
+        ) as storage:
+            resp = await storage.put(upload_url, content=content, headers=headers)
+            resp.raise_for_status()
 
     # -- workspace paths --
 

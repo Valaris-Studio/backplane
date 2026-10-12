@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import tarfile
 
@@ -143,3 +144,172 @@ def test_runner_history_fetch_excludes_other_component_tags(release, tmp_path):
     assert checkout_git("tag", "--list").splitlines() == ["v0.8.3", "v0.8.4"]
     assert checkout_git("rev-parse", "HEAD") == git("rev-parse", "HEAD")
     assert checkout_git("rev-parse", "origin/main") == git("rev-parse", "HEAD")
+
+
+CHANGELOG = """# Changelog
+
+<a id="unreleased"></a>
+
+## Unreleased
+
+### Runner 0.8.6
+
+`runner` `planned`
+
+#### Changed
+
+- Pending.
+
+---
+
+<a id="platform-v0.1.2-preview.2"></a>
+
+## Platform 0.1.2-preview.2 — 2026-09-21
+
+`platform` `preview` · Qualified with runner 0.8.5
+
+> Skills keep an auditable history.
+
+#### Added
+
+- Skill history, see [Self-hosting](README.md#self-hosting) and [runner](#v0.8.5).
+
+[Release](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.2-preview.2)
+
+<a id="platform-v0.1.2-preview.1"></a>
+
+> **`platform-v0.1.2-preview.1` was tagged but never published.**
+
+---
+
+<a id="v0.8.5"></a>
+
+## Runner 0.8.5 — 2026-09-21
+
+`runner` `experimental`
+
+#### Fixed
+
+- Recovery.
+
+---
+
+<a id="platform-v0.1.1-preview.1"></a>
+
+## Platform 0.1.1-preview.1 — TODO(publish-date)
+
+`platform` `preview`
+
+#### Fixed
+
+- Uploads.
+"""
+
+
+@pytest.fixture
+def changelog_repo(release):
+    module, repo, git = release
+    (repo / "CHANGELOG.md").write_text(CHANGELOG)
+    (repo / "docs/releases").mkdir(parents=True)
+    (repo / "docs/releases/footer-platform.md").write_text("Install {version} from [the archive](../../README.md#self-hosting) at `{tag}`.\n")
+    (repo / "docs/releases/footer-runner.md").write_text("Verify runner {version} with SHA256SUMS.\n")
+    return module, repo
+
+
+def test_changelog_entries_are_keyed_by_tag_with_unpublished_tags_kept_apart(changelog_repo):
+    module, repo = changelog_repo
+    changelog = module.parse_changelog((repo / "CHANGELOG.md").read_text())
+    assert list(changelog.entries) == ["platform-v0.1.2-preview.2", "v0.8.5", "platform-v0.1.1-preview.1"]
+    entry = changelog.entries["platform-v0.1.2-preview.2"]
+    assert (entry.component, entry.version, entry.date) == ("platform", "0.1.2-preview.2", "2026-09-21")
+    assert changelog.unpublished_tags == {"platform-v0.1.2-preview.1"}
+    assert changelog.unreleased == {"runner": "0.8.6"}
+    # The cancelled-tag note belongs to no release body.
+    assert "never published" not in entry.body
+
+
+@pytest.mark.parametrize("tag", ["platform-v0.1.2-preview.2", "v0.8.5"])
+def test_check_changelog_accepts_a_dated_entry(changelog_repo, tag):
+    module, repo = changelog_repo
+    module.check_changelog(repo, tag)
+
+
+@pytest.mark.parametrize("tag,reason", [
+    ("platform-v0.1.3-preview.1", "no CHANGELOG.md entry"),
+    ("platform-v0.1.2-preview.1", "no CHANGELOG.md entry"),
+    ("platform-v0.1.1-preview.1", "publish date"),
+    ("v0.8.6", "no CHANGELOG.md entry"),
+])
+def test_check_changelog_refuses_a_release_without_a_dated_entry(changelog_repo, tag, reason):
+    module, repo = changelog_repo
+    with pytest.raises(module.ReleaseError, match=reason):
+        module.check_changelog(repo, tag)
+
+
+def test_check_changelog_refuses_a_heading_that_disagrees_with_its_anchor(changelog_repo):
+    module, repo = changelog_repo
+    text = CHANGELOG.replace("## Runner 0.8.5 — 2026-09-21", "## Runner 0.8.4 — 2026-09-21")
+    (repo / "CHANGELOG.md").write_text(text)
+    with pytest.raises(module.ReleaseError, match="v0.8.5"):
+        module.check_changelog(repo, "v0.8.5")
+
+
+def test_mcp_release_also_needs_the_package_changelog(changelog_repo):
+    module, repo = changelog_repo
+    (repo / "CHANGELOG.md").write_text(CHANGELOG.replace(
+        "---\n\n<a id=\"v0.8.5\">",
+        "---\n\n<a id=\"mcp-server-v0.9.0\"></a>\n\n## MCP server 0.9.0 — 2026-10-04\n\n`mcp-server`\n\n#### Changed\n\n- Queue.\n\n---\n\n<a id=\"v0.8.5\">"))
+    (repo / "mcp-server/CHANGELOG.md").write_text("# Changelog\n\n## [0.8.0] - 2026-09-15\n")
+    with pytest.raises(module.ReleaseError, match="mcp-server/CHANGELOG.md"):
+        module.check_changelog(repo, "mcp-server-v0.9.0")
+    (repo / "mcp-server/CHANGELOG.md").write_text("# Changelog\n\n## [0.9.0] - 2026-10-04\n")
+    module.check_changelog(repo, "mcp-server-v0.9.0")
+
+
+def test_release_notes_render_the_entry_with_tag_pinned_links_and_the_component_footer(changelog_repo):
+    module, repo = changelog_repo
+    notes = module.release_notes(repo, "platform-v0.1.2-preview.2")
+    blob = "https://github.com/Valaris-Studio/backplane/blob/platform-v0.1.2-preview.2"
+    assert notes.startswith("# Backplane Platform 0.1.2-preview.2\n\n> Skills keep an auditable history.")
+    assert "`platform` `preview`" not in notes
+    assert "### Added" in notes and "#### Added" not in notes
+    assert f"[Self-hosting]({blob}/README.md#self-hosting)" in notes
+    assert f"[runner]({blob}/CHANGELOG.md#v0.8.5)" in notes
+    assert f"Install 0.1.2-preview.2 from [the archive]({blob}/README.md#self-hosting) at `platform-v0.1.2-preview.2`." in notes
+    assert f"[Full changelog]({blob}/CHANGELOG.md#platform-v0.1.2-preview.2)" in notes
+    assert "never published" not in notes
+    assert not re.search(r"\]\((?!https://|#)", notes), "every link must be absolute"
+    runner = module.release_notes(repo, "v0.8.5")
+    assert runner.startswith("# Backplane Runner 0.8.5\n") and "Verify runner 0.8.5 with SHA256SUMS." in runner
+
+
+def test_release_notes_cli_writes_a_fresh_file_only(changelog_repo, tmp_path):
+    module, repo = changelog_repo
+    output = tmp_path / "notes.md"
+    module.write_release_notes(repo, "v0.8.5", output)
+    assert output.read_text() == module.release_notes(repo, "v0.8.5")
+    with pytest.raises(module.ReleaseError, match="exists"):
+        module.write_release_notes(repo, "v0.8.5", output)
+
+
+@pytest.mark.parametrize("filename,job", [
+    ("release-platform.yml", "validate"),
+    ("release-runner.yml", "validate"),
+    ("publish-mcp-server.yml", "test"),
+])
+def test_every_release_workflow_refuses_a_tag_without_a_changelog_entry(filename, job):
+    workflow = yaml.load((ROOT / ".github/workflows" / filename).read_text(), Loader=yaml.BaseLoader)
+    runs = [step.get("run", "") for step in workflow["jobs"][job]["steps"]]
+    assert any("platform-release.py check-changelog" in run for run in runs)
+
+
+@pytest.mark.parametrize("filename,job", [
+    ("release-platform.yml", "publish"),
+    ("release-runner.yml", "goreleaser"),
+])
+def test_published_release_notes_are_rendered_from_the_changelog(filename, job):
+    text = (ROOT / ".github/workflows" / filename).read_text()
+    workflow = yaml.load(text, Loader=yaml.BaseLoader)
+    steps = workflow["jobs"][job]["steps"]
+    assert any("platform-release.py release-notes" in step.get("run", "") for step in steps)
+    assert "platform-release-notes.md" not in text

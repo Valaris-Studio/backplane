@@ -1751,6 +1751,174 @@ async def test_get_project_context_no_truncation_no_markers(mock_client, ctx):
     assert "_hint" not in result
 
 
+def _bloated_board_context(columns: int, distinct_statuses_per_column: int) -> dict:
+    # An older backend sends one status_distribution key per distinct free-text
+    # card.status (up to 255 chars); a real board reached 66K chars this way.
+    return {
+        "board": {
+            "id": "b1",
+            "name": "Busy",
+            "columns": [
+                {
+                    "id": f"c{c}",
+                    "name": f"Column {c}",
+                    "card_count": distinct_statuses_per_column,
+                    "priority_distribution": {"none": distinct_statuses_per_column},
+                    "status_distribution": {
+                        f"{c}-{i} progress log " + "z" * 200: 1
+                        for i in range(distinct_statuses_per_column)
+                    },
+                }
+                for c in range(columns)
+            ],
+        },
+        "definition": None,
+        "notes": [],
+        "git_repos": [],
+        "recent_activity": [],
+    }
+
+
+@pytest.mark.anyio
+async def test_get_project_context_total_size_backstop_collapses_status_counts(
+    mock_client, ctx
+):
+    from valaris_mcp.tools.context import MAX_PROJECT_CONTEXT_CHARS, get_project_context
+
+    mock_client.get.return_value = _bloated_board_context(
+        columns=6, distinct_statuses_per_column=164
+    )
+    rendered = await get_project_context("ws", "b1", ctx=ctx)
+    result = json.loads(rendered)
+
+    assert len(rendered) <= MAX_PROJECT_CONTEXT_CHARS
+    for column in result["board"]["columns"]:
+        assert column["status_distribution"] == {"_other": 164}
+        assert column["card_count"] == 164
+    assert "status_counts" in result["_size_capped"]
+    assert "list_cards" in result["_hint"]
+
+
+@pytest.mark.anyio
+async def test_get_project_context_total_size_backstop_bounds_every_section(
+    mock_client, ctx
+):
+    # No single section may push the briefing past the budget: bloat every one.
+    from valaris_mcp.tools.context import MAX_PROJECT_CONTEXT_CHARS, get_project_context
+
+    payload = _bloated_board_context(columns=6, distinct_statuses_per_column=164)
+    payload["notes"] = [
+        {"id": str(i), "title": "t" * 500, "pinned": False} for i in range(25)
+    ]
+    payload["recent_activity"] = [
+        {"id": str(i), "action": "moved", "summary": "s" * 1000} for i in range(20)
+    ]
+    payload["definition"] = {
+        "scope": "ok",
+        "content": {f"field_{i}": "d" * 3000 for i in range(4)},
+    }
+    mock_client.get.return_value = payload
+    rendered = await get_project_context("ws", "b1", ctx=ctx)
+    result = json.loads(rendered)
+
+    assert len(rendered) <= MAX_PROJECT_CONTEXT_CHARS
+    assert result["board"]["columns"]
+    assert result["_size_capped"]
+
+
+@pytest.mark.anyio
+async def test_get_project_context_backstop_caps_many_git_repos(mock_client, ctx):
+    from valaris_mcp.tools.context import MAX_PROJECT_CONTEXT_CHARS, get_project_context
+
+    payload = _bloated_board_context(columns=1, distinct_statuses_per_column=1)
+    payload["git_repos"] = [
+        {"id": str(i), "name": f"repo-{i}", "url": "https://git.example/" + "r" * 300,
+         "provider": "github", "default_branch": "main"}
+        for i in range(500)
+    ]
+    mock_client.get.return_value = payload
+    rendered = await get_project_context("ws", "b1", ctx=ctx)
+    result = json.loads(rendered)
+
+    assert len(rendered) <= MAX_PROJECT_CONTEXT_CHARS
+    kept = len(result["git_repos"])
+    assert kept > 0
+    assert result["_git_repos_truncated"] == 500 - kept
+    assert "git_repos" in result["_size_capped"]
+    assert "list_git_repos" in result["_hint"]
+
+
+@pytest.mark.anyio
+async def test_get_project_context_backstop_caps_many_columns(mock_client, ctx):
+    from valaris_mcp.tools.context import MAX_PROJECT_CONTEXT_CHARS, get_project_context
+
+    payload = _bloated_board_context(columns=2000, distinct_statuses_per_column=1)
+    mock_client.get.return_value = payload
+    rendered = await get_project_context("ws", "b1", ctx=ctx)
+    result = json.loads(rendered)
+
+    assert len(rendered) <= MAX_PROJECT_CONTEXT_CHARS
+    columns = result["board"]["columns"]
+    assert columns[0]["id"] == "c0"
+    assert result["_columns_truncated"] == 2000 - len(columns)
+    assert "columns" in result["_size_capped"]
+    assert "get_board" in result["_hint"]
+
+
+@pytest.mark.anyio
+async def test_get_project_context_backstop_bounds_oversized_leaves(mock_client, ctx):
+    # Even with every list capped, single huge strings (board description,
+    # tags, column names) must not break the budget.
+    from valaris_mcp.tools.context import MAX_PROJECT_CONTEXT_CHARS, get_project_context
+
+    payload = _bloated_board_context(columns=1000, distinct_statuses_per_column=1)
+    board = payload["board"]
+    board["description"] = "d" * 100_000
+    board["tags"] = ["t" * 500 for _ in range(500)]
+    for column in board["columns"]:
+        column["name"] = "n" * 5_000
+    payload["git_repos"] = [
+        {"id": str(i), "name": "g" * 5_000, "url": "u" * 5_000} for i in range(50)
+    ]
+    mock_client.get.return_value = payload
+    rendered = await get_project_context("ws", "b1", ctx=ctx)
+    result = json.loads(rendered)
+
+    assert len(rendered) <= MAX_PROJECT_CONTEXT_CHARS
+    assert result["_size_capped"][-1] == "leaves"
+
+
+@pytest.mark.anyio
+async def test_get_project_context_backstop_order_is_deterministic(mock_client, ctx):
+    from valaris_mcp.tools.context import get_project_context
+
+    payload = _bloated_board_context(columns=2000, distinct_statuses_per_column=1)
+    payload["git_repos"] = [{"id": str(i), "url": "u" * 300} for i in range(500)]
+    mock_client.get.return_value = payload
+    first = await get_project_context("ws", "b1", ctx=ctx)
+    mock_client.get.return_value = _bloated_board_context(
+        columns=2000, distinct_statuses_per_column=1
+    ) | {"git_repos": [{"id": str(i), "url": "u" * 300} for i in range(500)]}
+    second = await get_project_context("ws", "b1", ctx=ctx)
+
+    assert first == second
+    steps = json.loads(first)["_size_capped"]
+    assert steps.index("git_repos") < steps.index("columns")
+
+
+@pytest.mark.anyio
+async def test_get_project_context_under_budget_keeps_status_counts(mock_client, ctx):
+    from valaris_mcp.tools.context import get_project_context
+
+    payload = _bloated_board_context(columns=1, distinct_statuses_per_column=9)
+    mock_client.get.return_value = payload
+    result = json.loads(await get_project_context("ws", "b1", ctx=ctx))
+
+    assert len(result["board"]["columns"][0]["status_distribution"]) == 9
+    assert "_size_capped" not in result
+    assert "_hint" not in result
+
+
 # -- Search -------------------------------------------------------------------
 
 
@@ -3993,3 +4161,11 @@ def test_set_board_loop_docstring_documents_the_template_levers():
     doc = set_board_loop.__doc__ or ""
     assert "template_ref" in doc
     assert "detach_template" in doc
+
+
+@pytest.mark.anyio
+async def test_get_board_loop_description_names_the_version_field():
+    from valaris_mcp.server import mcp
+
+    tool = next(t for t in await mcp.list_tools() if t.name == "get_board_loop")
+    assert "version" in tool.description

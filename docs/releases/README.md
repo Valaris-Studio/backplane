@@ -22,6 +22,19 @@ sha256sum --check SHA256SUMS
 
 On macOS, use `shasum -a 256 -c SHA256SUMS`. Packaging excludes untracked files and does not create a tag, publish a release, or claim that tests passed. Keep qualification results for the exact commit separately.
 
+## Changelog and release notes
+
+[`CHANGELOG.md`](../../CHANGELOG.md) is the one record of public changes for all three distributions. Each release has an entry whose anchor is its tag (`#platform-v0.1.3-preview.1`, `#v0.8.5`, `#mcp-server-v0.9.1`), and the MCP server keeps its detailed per-tool history in [`mcp-server/CHANGELOG.md`](../../mcp-server/CHANGELOG.md). Release workflows refuse a tag without a dated entry and render the GitHub release body from that entry plus the component footer in this directory, with links pinned to the tag:
+
+```sh
+python3 scripts/platform-release.py check-changelog --tag v0.8.5
+python3 scripts/platform-release.py release-notes --tag v0.8.5 --output /tmp/notes.md
+```
+
+A tagged release still awaiting publication carries `TODO(publish-date)` instead of its date; `check-changelog` refuses it until the date is filled in. A runner or MCP release is dated when its downloads or PyPI package go live, which can precede its public tag; the entry may come before the tag, but a public component tag never lacks an entry (release preparation refuses that).
+
+## Tags
+
 Release tags must identify commits already included in public `main`. Platform tag workflows run CI and the fresh-clone Quickstart before packaging. A permitted publication creates a draft GitHub release for review; maintainers publish that draft separately.
 
 Publishing requires the repository variable `PUBLIC_RELEASES_ENABLED=true` and a configured environment: `platform-release`, `runner-release`, or `pypi`. Before enabling publication, maintainers must configure required reviewers, restrict each environment to its component's tags, protect release tags from replacement/deletion, and align PyPI's trusted publisher with the `pypi` environment. Merely naming an environment in YAML does not configure its protections. See [GitHub's environment setup](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) and [PyPI trusted publishing setup](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).

@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.repository == 'Valaris-Studio/backplane'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +24,23 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/platform-release.py check-ref --component platform
+      - name: Require a dated CHANGELOG.md entry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py check-changelog --tag "$RELEASE_TAG"
 
   qualify:
+    if: github.repository == 'Valaris-Studio/backplane'
     needs: validate
     uses: ./.github/workflows/ci.yml
 
   install:
+    if: github.repository == 'Valaris-Studio/backplane'
     needs: validate
     uses: ./.github/workflows/quickstart-gate.yml
 
   package:
+    if: github.repository == 'Valaris-Studio/backplane'
     needs: [qualify, install]
     runs-on: ubuntu-latest
     steps:
@@ -69,6 +77,10 @@ jobs:
         with:
           name: platform-release
           path: /tmp/platform-release
+      - name: Render release notes from CHANGELOG.md
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py release-notes --tag "$RELEASE_TAG" --output /tmp/release-notes.md
       - name: Verify and create draft release
         working-directory: /tmp/platform-release
         env:
@@ -82,5 +94,5 @@ jobs:
           prerelease=()
           if [[ "${RELEASE_TAG#platform-v}" == *-* ]]; then prerelease=(--prerelease); fi
           gh release create "$RELEASE_TAG" --verify-tag --draft "${prerelease[@]}" \
-            --title "Backplane $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/releases/platform-release-notes.md" \
+            --title "Backplane $RELEASE_TAG" --notes-file /tmp/release-notes.md \
             ./*.tar.gz ./release.json ./SHA256SUMS

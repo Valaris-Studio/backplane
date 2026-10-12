@@ -37,6 +37,7 @@ from app.services.notes.content_serializer import prosemirror_to_markdown
 from app.services.notes.content_text import extract_plain_text
 from app.services.kanban.freeze_guard import assert_board_not_frozen
 from app.services.kanban.labels import stamp_label
+from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.services.kanban.snapshots import snapshot_card
 from app.services.mentions.notify import notify_new_mentions
 from app.services.reviews.stuck_loop import record_review_iteration
@@ -181,12 +182,13 @@ class NoteService:
             if board_workspace != workspace_id:
                 raise ResourceNotFoundError("Board not found")
         await assert_board_not_frozen(self.db, board_id)
+        content = await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, data.content)
         create_kwargs = dict(
             workspace_id=workspace_id,
             board_id=board_id,
             title=data.title,
-            content=data.content,
-            content_text=extract_plain_text(data.content),
+            content=content,
+            content_text=extract_plain_text(content),
             pinned=data.pinned,
             kind=data.kind,
             failure_class=data.failure_class,
@@ -444,6 +446,9 @@ class NoteService:
         # Only when `content` was actually sent — an unset content field means
         # "leave the body alone", which must not blank the searchable text.
         if "content" in update_fields:
+            update_fields["content"] = await MediaLinkCanonicalizer(self.db).rich_text(
+                workspace_id, update_fields["content"]
+            )
             update_fields["content_text"] = extract_plain_text(update_fields["content"])
         updated = await self.note_repo.update(note, **update_fields)
         if actor_id and workspace_id:
@@ -509,7 +514,9 @@ class NoteService:
             **existing,
             "content": (existing.get("content") or []) + (appended.get("content") or []),
         }
-        merged_content = json.dumps(merged)
+        merged_content = await MediaLinkCanonicalizer(self.db).rich_text(
+            workspace_id, json.dumps(merged)
+        )
         updated = await self.note_repo.update(
             note,
             content=merged_content,
@@ -581,7 +588,9 @@ class NoteService:
             **existing,
             "content": blocks[: anchor_index + 1] + replacement + blocks[section_end:],
         }
-        merged_content = json.dumps(merged)
+        merged_content = await MediaLinkCanonicalizer(self.db).rich_text(
+            workspace_id, json.dumps(merged)
+        )
         updated = await self.note_repo.update(
             note,
             content=merged_content,

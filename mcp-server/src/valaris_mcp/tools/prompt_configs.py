@@ -21,7 +21,6 @@ async def list_prompt_configs(
     """List prompt configs, optionally filtered by team role.
 
     Args:
-        workspace_slug: Workspace slug.
         team_role: Filter, e.g. orchestrator|reviewer.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -53,7 +52,6 @@ async def get_prompt_config(
     """Get one prompt config.
 
     Args:
-        workspace_slug: Workspace slug.
         config_id: Prompt config UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -78,12 +76,9 @@ async def create_prompt_config(
     team_id: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Create a prompt config: a stage prompt override for matching runners,
-    applied on their next config refresh.
+    """Create a stage prompt override for matching runners, applied on their next config refresh. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
-        name: Display name.
         slug: Unique slug.
         stage: e.g. implement|review|plan.
         content: Prompt template text.
@@ -133,9 +128,7 @@ async def update_prompt_config(
     """Update a prompt config; omitted fields are unchanged.
 
     Args:
-        workspace_slug: Workspace slug.
         config_id: Prompt config UUID.
-        name: New name.
         slug: New slug.
         stage: New stage.
         content: New prompt text.
@@ -175,7 +168,6 @@ async def delete_prompt_config(
     """Delete a prompt config; affected runners fall back to defaults.
 
     Args:
-        workspace_slug: Workspace slug.
         config_id: Prompt config UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context

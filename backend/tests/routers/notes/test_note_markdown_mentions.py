@@ -81,4 +81,4 @@ async def test_get_note_markdown_keeps_file_attachment(
 ):
     note_id = await _create_rich_note(client)
     markdown = await _read_markdown(client, note_id)
-    assert "[spec.pdf](https://f/spec.pdf)" in markdown
+    assert '[spec.pdf](https://f/spec.pdf "attachment")' in markdown

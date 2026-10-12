@@ -27,11 +27,9 @@ async def list_merge_queue(
     merged_within_hours: int | None = None,
     ctx: Context = None,
 ) -> str:
-    """List a workspace's in-flight merge-queue entries (queued, merging, conflict,
-    failed, blocked_pending_consolidation); merged ones only with merged_within_hours.
+    """List a workspace's in-flight merge-queue entries; merged ones only with merged_within_hours. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         merged_within_hours: Also include entries merged within 1..720 hours.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -52,7 +50,6 @@ async def get_merge_queue_entry(
     """Fetch one merge-queue entry.
 
     Args:
-        workspace_slug: Workspace slug.
         entry_id: Entry UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -66,11 +63,9 @@ async def get_merge_queue_entry(
 async def enqueue_for_merge(
     workspace_slug: str, card_id: str, ctx: Context = None
 ) -> str:
-    """Re-queue a card's existing merge-queue entry after conflict consolidation;
-    idempotent, 404 if the card has no entry.
+    """Re-queue a card's existing merge-queue entry after conflict consolidation; idempotent, 404 without an entry. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         card_id: Original (parent) card UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -95,22 +90,14 @@ async def enqueue_pr_for_merge(
     integration_branch: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Enqueue a card's green, self-reviewed PR for the server-side merge queue;
-    never run `gh pr merge` yourself.
-
-    The executor rebases and lands it once CI is green and the reconciler moves
-    the card to Done. Runner calls need the board loop's
-    loop_landing="merge_queue" (else error_code loop_landing_not_enabled).
-    Idempotent.
+    """Enqueue a card's green, self-reviewed PR for the server-side merge queue; never run `gh pr merge` yourself. Idempotent. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         card_id: Card UUID.
         git_repo_id: Board git repo UUID.
         pr_url: PR URL.
         pr_branch: PR head branch.
-        integration_branch: Target branch; defaults to the repo's integration,
-            then default, branch.
+        integration_branch: Target branch (default: the repo's integration, then default branch).
     """
     app: AppContext = ctx.request_context.lifespan_context
     payload = {
@@ -136,11 +123,9 @@ async def enqueue_pr_for_merge(
 async def cancel_merge_queue_entry(
     workspace_slug: str, entry_id: str, ctx: Context = None
 ) -> str:
-    """Cancel a wedged (conflict/failed) merge-queue entry for human triage
-    (admin/owner only); the card is eligible for next_assignment again.
+    """Delete a wedged merge-queue entry for human triage (admin/owner). See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         entry_id: Entry UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context

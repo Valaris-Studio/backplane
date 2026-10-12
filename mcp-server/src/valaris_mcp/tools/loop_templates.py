@@ -49,12 +49,9 @@ async def list_loop_templates(
     include_archived: bool = False,
     ctx: Context = None,
 ) -> str:
-    """List loop templates: system first, then workspace. Summaries only;
-    get_loop_template carries the prompts, slots and tool grants. meta.runner_vars
-    is the runner's Go-template variable vocabulary (never hardcode it).
+    """List loop template summaries, system first; meta.runner_vars is the runner's template variable vocabulary. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         q: Free-text filter over name and slug.
         sort: name|updated_at|boards_using.
         include_archived: Also list archived workspace templates.
@@ -139,17 +136,16 @@ async def get_loop_template(
     version: int | None = None,
     ctx: Context = None,
 ) -> str:
-    """Read a template: full=profile/prompts/slots/rails/tools; profile=identity and board/execution/spend/outcome history (archived included); preview=read-only render with board autofill/rails; fit=board checks (ok|missing|warn), evidence, fix_id for apply_loop_template_fixes, and autofill; lint=repo facts to move into slots (hints only, draft). Rehearse published text before binding. Avoid full prompt previews inside running loops.
+    """Read one loop template; view picks full, profile (track record), preview (render), fit (board pre-flight) or lint (repo facts). See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: System slug or template UUID.
-        view: full (default)|profile|preview|fit|lint.
+        view: full|profile|preview|fit|lint.
         draft: True=draft, false=published. Default: false for full, true for rehearsal.
         include_archived: full: also resolve archived templates.
         board_id: Board UUID/slug; required for fit, optional for preview.
-        slot_values: fit/preview: proposed slots; missing values use autofill, then defaults.
-        include_prompts: preview: false omits large prompt bodies, keeping findings/slots/rails/tools.
+        slot_values: fit/preview: proposed slot values.
+        include_prompts: preview: false omits the prompt bodies.
         loop_config: fit/preview: unsaved loop rails.
         version: fit/preview: exact published version; requires draft=false.
     """
@@ -183,7 +179,6 @@ async def get_loop_template_profile(workspace_slug: str, ref: str, ctx: Context 
     """Read a template's identity plus track record.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: System slug or template UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -201,14 +196,10 @@ async def create_loop_template(
     profile: dict | None = None,
     ctx: Context = None,
 ) -> str:
-    """Create a workspace loop template as an unpublished draft. Not
-    idempotent: a repeated slug is 409. Author large prompts in the UI or
-    REST; MCP has garbled multi-KB strings.
+    """Create a workspace loop template as an unpublished draft. Not idempotent: a repeated slug is 409. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         slug: URL-safe, unique in the workspace.
-        name: Display name.
         content: {system_prompt, loop_prompt, slots, tools, rails_defaults, ...}.
         profile: {emoji, tagline, tags}.
     """
@@ -235,17 +226,13 @@ async def update_loop_template(
     expected_updated_at: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Autosave a workspace template's DRAFT. Omitted fields are unchanged;
-    `content` and `profile` replace the whole object (no deep merge). System
-    templates are immutable: duplicate first.
+    """Autosave a workspace template's DRAFT. Omitted fields are unchanged; content and profile replace the whole object. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: Workspace template UUID or slug.
         content: Full replacement body.
         profile: Full replacement {emoji, tagline, tags}.
-        name: New display name.
-        expected_updated_at: Optimistic lock: `draft_updated_at` last read; 409 on conflict.
+        expected_updated_at: draft_updated_at last read; 409 on conflict.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -277,11 +264,9 @@ async def publish_loop_template(
     note: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Validate the draft, snapshot a new version and publish it; bound boards
-    show drift until re-rendered. Invalid draft: 422 with per-field findings.
+    """Validate the draft and publish it as a new version; bound boards show drift until re-rendered. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: Workspace template UUID or slug.
         expected_version: Optimistic lock.
         note: Changelog line (<= 500 chars).
@@ -310,11 +295,9 @@ async def duplicate_loop_template(
     new_slug: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Fork a system or workspace template into a new workspace draft; how a
-    system template gets customized.
+    """Fork a system or workspace template into a new workspace draft. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: System slug or template UUID.
         new_slug: Slug for the copy; omit to derive one.
     """
@@ -330,11 +313,9 @@ async def duplicate_loop_template(
 async def archive_loop_template(
     workspace_slug: str, ref: str, archived: bool = True, ctx: Context = None
 ) -> str:
-    """Soft-archive a workspace template (archived=False restores). Archived
-    templates keep serving bound boards; there is no hard delete.
+    """Soft-archive a workspace template (archived=False restores); bound boards keep running it. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: Workspace template UUID or slug.
         archived: False to restore.
     """
@@ -348,10 +329,9 @@ async def archive_loop_template(
 @mcp.tool()
 @handle_api_errors
 async def list_loop_template_versions(workspace_slug: str, ref: str, ctx: Context = None) -> str:
-    """List a template's published versions, newest first: version, timestamp, note.
+    """List a template's published versions (version, timestamp, note), newest first.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: System slug or template UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -368,7 +348,6 @@ async def restore_loop_template_version(
     """Stage a published version as the current draft. Does not republish.
 
     Args:
-        workspace_slug: Workspace slug.
         ref: Workspace template UUID or slug.
         version: Published version number to stage.
     """
@@ -400,14 +379,11 @@ async def get_board_loop_binding_raw(
     include_diff: bool = False,
     ctx: Context = None,
 ) -> str:
-    """Raw view of a board's template binding: template, version, rendered
-    slot values, drift — the authoring state behind get_board_loop, which is
-    the effective loop config. 404 `not_bound` when the board's prompts are raw.
+    """Raw view of a board's template binding (template, version, rendered slots, drift) behind get_board_loop; 404 `not_bound` for raw prompts. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
-        include_diff: Also fetch the prompt diff and slot delta vs. the current version (skipped when `diff_available` is false).
+        include_diff: Also fetch the prompt diff and slot delta vs. the current version.
     """
     app: AppContext = ctx.request_context.lifespan_context
     result = await _board_loop_binding(app.client, workspace_slug, board_id, include_diff)
@@ -425,7 +401,6 @@ async def get_board_loop_binding(
     """Read a board's template binding (raw view).
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         include_diff: Also fetch the prompt diff and slot delta.
     """
@@ -445,7 +420,6 @@ async def check_loop_template_fit(
     """Board pre-flight for a template.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         template_ref: System slug or template UUID.
     """
@@ -463,12 +437,9 @@ async def apply_loop_template_fixes(
     fix_ids: list[str],
     ctx: Context = None,
 ) -> str:
-    """Apply named fixes from a fit report, then return the fresh report.
-    Idempotent per fix (`skipped_already_satisfied`); unknown fix ids are 422
-    before anything applies; a frozen board 409s.
+    """Apply named fixes from a fit report and return the fresh report. Idempotent per fix. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         board_id: Board UUID or slug.
         template_ref: System slug or template UUID.
         fix_ids: `fix_id` values from check_loop_template_fit.
@@ -495,7 +466,6 @@ async def preview_loop_template(
     """Render a template's prompts without binding (dry run).
 
     Args:
-        workspace_slug: Workspace slug.
         template_ref: System slug or template UUID.
         slot_values: Slot name -> value.
         board_id: Board to render for.
@@ -516,7 +486,6 @@ async def lint_loop_template(
     """Report repo-specific facts in a template.
 
     Args:
-        workspace_slug: Workspace slug.
         template_ref: System slug or template UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -531,9 +500,7 @@ async def export_loop_template(
     template_ref: str,
     ctx: Context = None,
 ) -> str:
-    """Export a template as a portable `loop_template` envelope for
-    import_loop_template. System templates export too. `data.leak_findings`
-    carries lint hints as warnings; export always succeeds.
+    """Export a template (system ones too) as an envelope for import_loop_template; always succeeds. See docs.
 
     Args:
         workspace_slug: Source workspace slug.
@@ -563,11 +530,7 @@ async def import_loop_template(
     dry_run: bool = True,
     ctx: Context = None,
 ) -> str:
-    """Import a `loop_template` envelope as an unpublished DRAFT. Dry-run by
-    default: returns {action, findings, diff_summary, leak_findings}, writes
-    nothing; dry_run=false adds `template_id`. A matching slug overwrites
-    that draft (`action` updated|created). Over ~64 KB, POST
-    /loop-templates/import directly.
+    """Import a `loop_template` envelope as an unpublished DRAFT; a matching slug overwrites it. Dry-run by default. See docs.
 
     Args:
         workspace_slug: Target workspace slug.

@@ -15,6 +15,8 @@ import uuid
 
 from httpx import AsyncClient
 
+from app.config import settings
+
 from app.models.kanban.board import Board
 from app.models.workspace import Workspace
 
@@ -84,11 +86,14 @@ async def test_create_resource_rejects_traversal_in_gcs_path(
 
 
 async def test_create_resource_accepts_own_workspace_gcs_path(
-    client: AsyncClient, test_workspace: Workspace
+    client: AsyncClient, test_workspace: Workspace, tmp_path, monkeypatch
 ):
     # Exactly the shape /upload-url mints — must keep working, and must be
     # stored unchanged so the signed download resolves to the uploaded object.
+    monkeypatch.setattr(settings, "LOCAL_STORAGE_DIR", str(tmp_path))
     own_path = f"{test_workspace.id}/{uuid.uuid4()}/file.pdf"
+    uploaded = await client.put(f"/api/local-storage/upload/{own_path}", content=b"%PDF")
+    assert uploaded.status_code == 200
 
     response = await client.post(
         BASE_URL,

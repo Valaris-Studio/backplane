@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   test:
+    if: github.repository == 'Valaris-Studio/backplane'
     name: Gate — pytest
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -24,6 +25,10 @@ jobs:
           python-version: "3.12"
       - name: Validate public release ref
         run: python scripts/platform-release.py check-ref --component mcp
+      - name: Require a dated CHANGELOG.md entry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/platform-release.py check-changelog --tag "$RELEASE_TAG"
       - uses: astral-sh/setup-uv@v6
       # Same policy as ci.yml: the gate tests the locked resolution.
       - name: Install (frozen lock)
@@ -46,6 +51,7 @@ jobs:
           uvx pip-audit --strict --no-deps -r /tmp/mcp-lock-darwin-x86_64.txt --ignore-vuln PYSEC-2026-3552 --ignore-vuln PYSEC-2026-3553 --ignore-vuln PYSEC-2026-3554
 
   build:
+    if: github.repository == 'Valaris-Studio/backplane'
     name: Build wheel + sdist
     needs: test
     runs-on: ubuntu-latest

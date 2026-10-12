@@ -22,6 +22,7 @@ export const PIPELINE_CONFIG_TOOL_DOCS: ToolDoc[] = [
     gotchas: [
       "The response includes a `version` field — pass it as `expected_version` on update_workspace_config for conflict-safe edits.",
       "`pipeline_config` is never null in the response: an unconfigured workspace gets the platform-default multi-role pipeline (the read even seeds it onto a stored record whose pipeline is null).",
+      "Returns pipeline_config, max_rework_attempts, card_cooldown_hours, the commit and PR templates, model_pricing, cost_circuit_breaker, role_labels and version, which bumps on every update.",
     ],
     examplePrompt:
       "Using the Backplane MCP, fetch the workspace config for <workspace> with get_workspace_config and summarize the pipeline stages, their roles, and the cost circuit breaker settings.",
@@ -100,6 +101,8 @@ export const PIPELINE_CONFIG_TOOL_DOCS: ToolDoc[] = [
       "Pass `expected_version` from the last read to get a 409 instead of silently clobbering a concurrent edit.",
       "The backend validates `pipeline_config` and returns its structured 422 error list on malformed stages; the call requires workspace admin/owner role.",
       "Pipeline stages drive the backend scheduler behind next_assignment — changing a role's discover/claim rules changes which cards runners are offered.",
+      "Pass {} to clear a dict field.",
+      "Each stage's llm.context_sources[] entry is {\"kind\", \"filter\"?, \"as\"?}, with kind one of card_notes, board_definition, pinned_notes, sibling_cards, board_snapshot or review_history.",
     ],
     danger:
       "Passing pipeline_config overwrites the workspace's ENTIRE stored pipeline in place — no history is kept beyond a version counter, and every runner's discover/claim behavior changes on its next poll. Read-modify-write: fetch with get_workspace_config, mutate locally, send back with expected_version (or export_pipeline_bundle first as a backup).",

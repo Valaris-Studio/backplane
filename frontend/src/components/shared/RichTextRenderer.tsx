@@ -3,7 +3,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { MediaImage } from "@/extensions/media-image";
 import Link from "@tiptap/extension-link";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import { FileAttachment } from "@/extensions/file-attachment";
@@ -29,7 +29,7 @@ export function RichTextRenderer({ content, className }: RichTextRendererProps) 
         codeBlock: false,
       }),
       MermaidCodeBlock,
-      Image.configure({ inline: false }),
+      MediaImage.configure({ inline: false }),
       Link.configure({ openOnClick: true }),
       FileAttachment,
       Table,

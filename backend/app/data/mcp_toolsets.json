@@ -78,11 +78,12 @@
       "update_definition",
       "update_note",
       "update_resource",
+      "upload_resource",
       "validate_board_dependencies",
       "whoami"
     ]
   },
-  "tool_count": 142,
+  "tool_count": 143,
   "toolsets": [
     {
       "group": "Start here",
@@ -167,7 +168,8 @@
         "list_resources",
         "update_definition",
         "update_note",
-        "update_resource"
+        "update_resource",
+        "upload_resource"
       ]
     },
     {
@@ -436,7 +438,8 @@
         "get_resource",
         "get_upload_url",
         "list_resources",
-        "update_resource"
+        "update_resource",
+        "upload_resource"
       ]
     },
     {

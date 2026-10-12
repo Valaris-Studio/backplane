@@ -27,8 +27,7 @@ def _slugify(name: str) -> str:
 @mcp.tool()
 @handle_api_errors
 async def list_workspaces(ctx: Context) -> str:
-    """List workspaces the caller can access; use the slug for workspace-scoped tools.
-    """
+    """List workspaces you can access; their slugs scope the other tools."""
     app: AppContext = ctx.request_context.lifespan_context
     workspaces = await app.client.get("/workspaces")
     result = {"total": len(workspaces), "workspaces": workspaces}
@@ -40,11 +39,7 @@ async def list_workspaces(ctx: Context) -> str:
 @mcp.tool()
 @handle_api_errors
 async def get_workspace(workspace_slug: str, ctx: Context) -> str:
-    """Get a workspace's metadata (no member roster; see list_workspace_members).
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Get a workspace's metadata (no member roster; see list_workspace_members)."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get(f"{client.ws(workspace_slug)}")
@@ -59,11 +54,10 @@ async def list_workspace_members(
     limit: int | None = None,
     ctx: Context = None,
 ) -> str:
-    """List workspace members (user_id, email, name, role); resolves people to user_id before adding card participants.
+    """List workspace members (user_id, email, name, role) to resolve people to user_id.
 
     Args:
-        workspace_slug: Workspace slug.
-        query: Case-insensitive name/email search (capped autocomplete match).
+        query: Case-insensitive name/email search (capped).
         limit: Max members returned.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -90,8 +84,7 @@ async def list_workspace_members(
 @mcp.tool()
 @handle_api_errors
 async def whoami(ctx: Context = None) -> str:
-    """Identify the authenticated user behind this session (id, email, name).
-    """
+    """Identify the authenticated user behind this session (id, email, name)."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get("/me")
@@ -101,11 +94,7 @@ async def whoami(ctx: Context = None) -> str:
 @mcp.tool()
 @handle_api_errors
 async def get_workspace_summary(workspace_slug: str, ctx: Context) -> str:
-    """Get workspace aggregate stats: board/card/note/channel counts, recent activity, per-board board_stats (card_count, overdue_count, cards by column_type incl. untyped) and a 30-day activity_trend of {day, count} with zero-filled quiet days.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Get workspace aggregate stats: counts, recent activity, per-board board_stats and a 30-day activity_trend. See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     result = await client.get(f"{client.ws(workspace_slug)}/summary")
@@ -119,10 +108,9 @@ async def create_workspace(
     slug: str = "",
     ctx: Context = None,
 ) -> str:
-    """Create a workspace; the creator becomes owner. If the slug already exists and you are a member, nothing is created: the existing workspace comes back under `existing` plus an `error` string (a no-op, not a failure). Non-members get a 409 with no metadata.
+    """Create a workspace you own. A slug you already belong to comes back under `existing` (a no-op). See docs.
 
     Args:
-        name: Display name.
         slug: URL slug; derived from name if omitted.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -174,12 +162,11 @@ async def add_workspace_member(
     role: str = "member",
     ctx: Context = None,
 ) -> str:
-    """Add a user to a workspace, auto-provisioning them if needed. Idempotent: an existing member is returned unchanged and role is ignored; use update_workspace_member to change a role.
+    """Add a user by email (auto-provisioned). Idempotent: for an existing member role is ignored (change it with update_workspace_member). See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         user_email: Email of the user to add.
-        role: owner|admin|member|viewer (default member).
+        role: owner|admin|member|viewer.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -201,7 +188,6 @@ async def remove_workspace_member(
     """Remove a member from a workspace.
 
     Args:
-        workspace_slug: Workspace slug.
         user_id: User UUID.
     """
     app: AppContext = ctx.request_context.lifespan_context
@@ -218,10 +204,9 @@ async def update_workspace_member(
     role: str,
     ctx: Context = None,
 ) -> str:
-    """Change a workspace member's role. Same role is a no-op; granting or demoting owner needs an acting owner and a human caller (runner keys get 403 human_required).
+    """Change a member's role; the same role is a no-op. Owner grants and demotions need an acting owner and a human caller. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
         user_id: Member's user UUID.
         role: owner|admin|member|viewer.
     """
@@ -236,11 +221,7 @@ async def update_workspace_member(
 @mcp.tool()
 @handle_api_errors
 async def delete_workspace(workspace_slug: str, ctx: Context = None) -> str:
-    """PERMANENTLY delete a workspace and everything in it (boards, columns, cards, definitions, git-repo bindings, notes, resources, channels, memberships). No undo; confirm the slug with list_workspaces first. Needs admin/owner; an already-deleted workspace reports so instead of erroring.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """PERMANENTLY delete a workspace and everything in it (admin/owner). Confirm the slug with list_workspaces first. See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     try:

@@ -18,9 +18,10 @@ import inspect
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Iterable, Literal
+from types import UnionType
+from typing import Any, Iterable, Literal, Union, get_args, get_origin
 
-from mcp.server.fastmcp.utilities.func_metadata import func_metadata
+from mcp.server.fastmcp.utilities.func_metadata import FuncMetadata, func_metadata
 from mcp.types import ToolAnnotations
 
 from valaris_mcp.config import DefaultBoard
@@ -311,6 +312,7 @@ TOOL_META: dict[str, ToolMeta] = {
         "workspace-config", "write", destructive=True, idempotent=True
     ),
     "update_workspace_member": ToolMeta("workspaces", "write", idempotent=True),
+    "upload_resource": ToolMeta("resources", "write"),  # a retry in-session returns the earlier upload
     "validate_board_dependencies": ToolMeta("card-dependencies", "read"),
     "whoami": ToolMeta("server-info", "read", title="Who am I"),
 }
@@ -420,6 +422,31 @@ def _check_coverage(registered: dict[str, Any], meta: dict[str, ToolMeta]) -> No
         )
 
 
+def _admits_str(annotation: Any) -> bool:
+    if get_origin(annotation) in (Union, UnionType):
+        return str in get_args(annotation)
+    return annotation is str
+
+
+class StringPreservingFuncMetadata(FuncMetadata):
+    """FastMCP argument handling that never JSON-decodes a string-typed param.
+
+    FastMCP's pre_parse_json decodes JSON text for every param not annotated
+    exactly `str` (a client workaround for lists sent as strings), so a
+    `str | None` param handed ProseMirror JSON, a JSON card description or
+    "null" received a dict/list/None and failed validation. List and dict
+    params keep that decoding.
+    """
+
+    def pre_parse_json(self, data: dict[str, Any]) -> dict[str, Any]:
+        pre_parsed = super().pre_parse_json(data)
+        for name, field in self.arg_model.model_fields.items():
+            for key in (name, field.alias):
+                if key in data and isinstance(data[key], str) and _admits_str(field.annotation):
+                    pre_parsed[key] = data[key]
+        return pre_parsed
+
+
 def finalize_tool_surface(server: Any) -> None:
     """Apply TOOL_META to every registered tool and slim the wire payload.
 
@@ -434,10 +461,13 @@ def finalize_tool_surface(server: Any) -> None:
         tool.annotations = tool_annotations(name, meta)
 
         # Structured output off: call results stay plain text, no outputSchema.
-        tool.fn_metadata = func_metadata(
+        metadata = func_metadata(
             tool.fn,
             skip_names=[tool.context_kwarg] if tool.context_kwarg else [],
             structured_output=False,
+        )
+        tool.fn_metadata = StringPreservingFuncMetadata(
+            **{field: getattr(metadata, field) for field in FuncMetadata.model_fields}
         )
         tool.__dict__.pop("output_schema", None)  # cached_property
 
@@ -468,6 +498,18 @@ def finalize_tool_surface(server: Any) -> None:
             # fn_metadata.arg_model, not this schema.
             if "default" in prop and prop["default"] is None:
                 del prop["default"]
+            _drop_open_object_markers(prop)
+
+
+def _drop_open_object_markers(schema: dict[str, Any]) -> None:
+    # `dict[str, Any]` emits "additionalProperties": true, which is already
+    # JSON Schema's meaning when the key is absent: pure wire bytes.
+    if schema.get("additionalProperties") is True:
+        del schema["additionalProperties"]
+    for branch in schema.get("anyOf", []):
+        _drop_open_object_markers(branch)
+    if isinstance(schema.get("items"), dict):
+        _drop_open_object_markers(schema["items"])
 
 
 def install_board_defaults(server: Any, default_board: DefaultBoard | None) -> None:

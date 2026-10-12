@@ -29,3 +29,34 @@ def test_frontend_release_gate_handles_the_zero_before_sha_on_new_tags():
     expression = test_step["env"]["I18N_COPY_BASE_SHA"]
     assert "github.event.before != '" + "0" * 40 + "'" in expression
     assert "|| 'HEAD^'" in expression
+
+
+PUBLIC_REPOSITORY_GUARD = "github.repository == 'Valaris-Studio/backplane'"
+WORKFLOW_FILES = sorted([*WORKFLOWS.glob("*.yml"), *WORKFLOWS.glob("*.yaml")])
+
+
+def _is_public_repository_guarded(condition: str) -> bool:
+    # A top-level `||` could make the guard vacuous, so extra conditions may
+    # only be AND-ed onto it.
+    if condition == PUBLIC_REPOSITORY_GUARD:
+        return True
+    extra = condition.removeprefix(PUBLIC_REPOSITORY_GUARD + " && ")
+    return extra != condition and "||" not in extra
+
+
+def test_workflow_inventory_is_not_empty():
+    assert len(WORKFLOW_FILES) >= 5
+
+
+@pytest.mark.parametrize("workflow_file", WORKFLOW_FILES, ids=lambda path: path.name)
+def test_every_job_runs_only_in_the_public_repository(workflow_file):
+    # Owner rule: Actions never run on the private source repo. A job-level
+    # `if:` (not a removed job) keeps the public repo's required-check names:
+    # a skipped job reports a passing conclusion, an absent one stays pending.
+    workflow = yaml.load(workflow_file.read_text(), Loader=yaml.BaseLoader)
+    unguarded = [
+        job_id
+        for job_id, job in workflow["jobs"].items()
+        if not _is_public_repository_guarded(job.get("if", "").strip())
+    ]
+    assert not unguarded, f"{workflow_file.name}: jobs without the public-repository guard: {unguarded}"

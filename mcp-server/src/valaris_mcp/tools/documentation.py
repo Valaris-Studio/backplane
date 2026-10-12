@@ -17,7 +17,7 @@ from valaris_mcp.server import AppContext, mcp
 async def list_documentation(
     locale: str = "en", offset: int = 0, limit: int = 20, ctx: Context = None
 ) -> str:
-    """List product documentation from the connected platform, with its version and translation status.
+    """List the connected platform's product documentation sections, version and translation status.
 
     Args:
         locale: Registered documentation locale (en, es, pt-BR).
@@ -27,7 +27,8 @@ async def list_documentation(
     app: AppContext = ctx.request_context.lifespan_context
     result = await app.client.get("/documentation", locale=locale, offset=offset, limit=limit)
     result["_hint"] = (
-        "Use read_documentation with a section slug and this version. Follow next_offset for more sections."
+        "Use read_documentation with a section slug and this version. Follow next_offset for more sections. "
+        "A tool description ending in \"See docs.\" has its entry at slug \"mcp-tool-catalog#tool-<name>\"."
     )
     return json.dumps(result, indent=2, default=str)
 
@@ -42,10 +43,10 @@ async def read_documentation(
     limit: int = 12000,
     ctx: Context = None,
 ) -> str:
-    """Read bounded Markdown from the connected platform's canonical product documentation.
+    """Read bounded Markdown from the connected platform's product documentation.
 
     Args:
-        slug: Section slug returned by list_documentation.
+        slug: Section slug from list_documentation; "<slug>#<anchor>" reads one subsection. A tool's "See docs." means "mcp-tool-catalog#tool-<name>".
         locale: Registered documentation locale (en, es, pt-BR).
         version: Version from list_documentation; mismatches fail explicitly.
         offset: Character offset for continuing a section.

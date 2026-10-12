@@ -104,7 +104,7 @@ export const CARDS_WORK_TOOL_DOCS: ToolDoc[] = [
         name: "status",
         required: false,
         description:
-          "Free-form status string. Max 255 characters — a short state label, not prose.",
+          "Free-form status string. Max 255 characters — a short state label, not prose. Progress logs go in a card note (create_note with card_id).",
       },
       { name: "labels", required: false, description: "List of label strings." },
       {
@@ -168,7 +168,7 @@ export const CARDS_WORK_TOOL_DOCS: ToolDoc[] = [
         name: "status",
         required: false,
         description:
-          "New status string. Max 255 characters — a short state label, not prose.",
+          "New status string. Max 255 characters — a short state label, not prose. Progress logs go in a card note (create_note with card_id).",
       },
       {
         name: "labels",
@@ -203,6 +203,7 @@ export const CARDS_WORK_TOOL_DOCS: ToolDoc[] = [
       "labels REPLACES the whole list; to add one label, send the existing labels plus the new one.",
       "pr_url and branch_name are update-only — create_card has no equivalent, because the backend's create schema does not accept them.",
       "An unrecognised field name is rejected with a 422 naming it, not silently ignored — a misspelling fails loudly instead of costing you the write.",
+      "Clearing is idempotent: repeating a clear is safe.",
     ],
     examplePrompt:
       "Using the Backplane MCP, find the card about <topic> on the <board> board in <workspace> and update its priority to urgent, adding the label <label> without dropping existing labels.",
@@ -510,6 +511,7 @@ export const CARDS_WORK_TOOL_DOCS: ToolDoc[] = [
       "Idempotent while your reservation is active: repeated calls return the same card. The reservation auto-expires, so a crashed runner cannot starve the board.",
       "409 means the runner already has an in-flight execution on a different card (response carries active_card_id and execution_id) — finish or cancel that first.",
       "A paused runner gets no_work rather than an error; 423 means the workspace cost circuit breaker tripped — no cards are handed out until it clears.",
+      "Role filters, untyped-column exclusion and role preconditions are all applied server-side. 403 means the runner's owner is not a member of the workspace; 404 means the runner is unknown.",
     ],
     examplePrompt:
       "Using the Backplane MCP, call next_assignment for runner <agent-id> in the <workspace> workspace. If a card is reserved, start an execution with the returned stage_action; if no_work, tell me and stop.",

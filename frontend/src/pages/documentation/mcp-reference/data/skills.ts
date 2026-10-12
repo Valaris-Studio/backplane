@@ -35,6 +35,7 @@ export const SKILLS_TOOL_DOCS: ToolDoc[] = [
     ],
     gotchas: [
       "Listings never inline file contents — install a skill by calling get_skill and writing each returned file verbatim into your local skills dir.",
+      "With board_id, each skill also reports the toolsets the board's loop grant does not cover.",
     ],
     examplePrompt:
       "Using the Backplane MCP, list the skills available on the <board> board in <workspace>.",

@@ -38,6 +38,7 @@ from app.services.github_client import (  # noqa: F401 — patched by tests
 from app.services.kanban.freeze_guard import assert_board_not_frozen
 from app.services.kanban.labels import stamp_label
 from app.services.kanban.pr_extract import extract_pr_url
+from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.services.notes.content_serializer import prosemirror_to_markdown
 from app.services.kanban.snapshots import snapshot_card
 from app.services.mentions.notify import notify_new_mentions
@@ -234,32 +235,6 @@ async def attach_agent_presence(
         card.agent_presence = presence
         card.active_execution_id = active_exec
         card.last_agent_activity_at = latest
-
-
-async def attach_column_labels(
-    db: AsyncSession,
-    cards: Iterable[Card],
-) -> None:
-    """Annotate each Card with `column_name` and `column_type`.
-
-    One batched SELECT over the distinct `column_id`s covers N cards, so a
-    search response becomes self-describing — the caller learns WHERE a card
-    sits without a follow-up board fetch — at constant query cost.
-    """
-    card_list = [c for c in cards if c is not None]
-    if not card_list:
-        return
-
-    column_ids = {c.column_id for c in card_list}
-    result = await db.execute(
-        select(Column.id, Column.name, Column.column_type).where(Column.id.in_(column_ids))
-    )
-    labels_by_column = {cid: (name, ctype) for cid, name, ctype in result.all()}
-
-    for card in card_list:
-        name, ctype = labels_by_column.get(card.column_id, (None, None))
-        card.column_name = name
-        card.column_type = ctype
 
 
 async def attach_dependency_counts(
@@ -512,7 +487,6 @@ class CardService:
             ineligible_ids=ineligible_ids,
             limit=limit,
         )
-        await attach_column_labels(self.db, cards)
         await attach_pending_approvals(self.db, cards, workspace_id=workspace_id)
         await attach_agent_presence(self.db, cards)
         await attach_dependency_counts(self.db, cards)
@@ -561,11 +535,14 @@ class CardService:
             )
 
         max_pos = await self.card_repo.get_max_position(data.column_id)
+        description = await MediaLinkCanonicalizer(self.db).rich_text(
+            board.workspace_id, data.description
+        )
         card = await self.card_repo.create(
             board_id=board_id,
             column_id=data.column_id,
             title=data.title,
-            description=data.description,
+            description=description,
             card_type=data.card_type,
             priority=data.priority,
             created_by=user_id,
@@ -601,7 +578,7 @@ class CardService:
                 entity_id=card.id,
                 card_id=card.id,
                 before_content="",
-                after_content=data.description,
+                after_content=description,
             )
             if rejected_repo_slug:
                 await activity.record(
@@ -669,12 +646,18 @@ class CardService:
         column_ids = {c.column_id for c in cards_data}
         max_positions = await self.card_repo.get_max_positions(column_ids)
 
+        canonicalizer = MediaLinkCanonicalizer(self.db)
+        board_workspace_id = (await self.board_repo.get_by_id(board_id)).workspace_id
         created_cards = []
         for card_data in cards_data:
             max_positions[card_data.column_id] += 1024.0
+            fields = card_data.model_dump()
+            fields["description"] = await canonicalizer.rich_text(
+                board_workspace_id, fields.get("description")
+            )
             card = await self.card_repo.create(
                 board_id=board_id,
-                **card_data.model_dump(),
+                **fields,
                 created_by=user_id,
                 position=max_positions[card_data.column_id],
             )
@@ -810,6 +793,10 @@ class CardService:
         # and clearing is spelled "" (see CardUpdate).
         if updates.get("description") is None:
             updates.pop("description", None)
+        else:
+            updates["description"] = await MediaLinkCanonicalizer(self.db).rich_text(
+                board.workspace_id, updates["description"]
+            )
         changed_fields = list(updates.keys())
         contract_fields = {"pr_url", "git_repo_slug", "completion_mode", "branch_name", "title", "description"}
         if any(key in contract_fields and getattr(card, key) != value for key, value in updates.items()):

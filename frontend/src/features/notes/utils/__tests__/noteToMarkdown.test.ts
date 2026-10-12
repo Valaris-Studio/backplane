@@ -171,7 +171,7 @@ describe("noteToMarkdown", () => {
     );
     expect(md).toContain("![diagram](https://img/x.png)");
     expect(md).toContain("@Ana ping");
-    expect(md).toContain("[spec.pdf](https://f/spec.pdf)");
+    expect(md).toContain('[spec.pdf](https://f/spec.pdf "attachment")');
   });
 
   it("falls back to stripped text for HTML content", () => {

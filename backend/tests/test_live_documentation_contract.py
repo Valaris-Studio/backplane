@@ -7,6 +7,8 @@ import ast
 import json
 import re
 
+import pytest
+
 from pathlib import Path
 
 
@@ -255,3 +257,17 @@ def test_product_introduction_describes_git_separation_without_a_sandbox_promise
         assert "separate Git branch" in catalog
         assert "sandboxed branch" not in catalog
         assert translation in catalog
+
+
+@pytest.mark.parametrize("path", [
+    "mcp-server/README.md",
+    "frontend/src/pages/documentation/sections/reference-environment-variables.tsx",
+])
+def test_mcp_http_warning_discloses_shared_credential_authority(path):
+    text = re.sub(r"\s+", " ", _read(path))
+    assert "HTTP transport has no authentication of its own" in text
+    assert "Anyone who can reach it" in text
+    assert "VALARIS_API_KEY" in text
+    assert "authenticating reverse proxy" in text
+    assert "trusted private network" in text
+    assert "0.0.0.0" in text

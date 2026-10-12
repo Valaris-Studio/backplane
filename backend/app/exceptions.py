@@ -86,6 +86,13 @@ class ServiceUnavailableError(ValarisError):
     error_code = "service_unavailable"
 
 
+class StorageBackendUnavailableError(ServiceUnavailableError):
+    # Transient (retry later), unlike StorageUnavailableError's permanent 501:
+    # a separate code so one error_code never names two statuses.
+    detail = "Object storage is temporarily unavailable"
+    error_code = "storage_backend_unavailable"
+
+
 class ValidationError(ValarisError):
     status_code = 422
     detail = "Validation error"

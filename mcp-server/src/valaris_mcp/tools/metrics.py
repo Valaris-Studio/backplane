@@ -29,11 +29,10 @@ async def _cost(client, workspace_slug: str) -> dict:
 @mcp.tool()
 @handle_api_errors
 async def get_workspace_metrics(workspace_slug: str, view: str = "all", ctx: Context = None) -> str:
-    """Workspace-wide delivery and spend figures in one read. velocity: cards completed over 7d/30d/90d; quality: reversion_rate (done cards that came back) and agent_efficiency_score — falling velocity with rising reversion means rework, not slowdown. cost: per-runner tokens/executions over 7d/30d and per-card total_cost_usd/tokens/execution_count — a card whose execution_count keeps climbing outside done is a money-loop. Do not re-derive totals. Per-board velocity is get_board_health; per-runner spend is get_agent_budget_status.
+    """Workspace-wide velocity, quality and per-runner/per-card spend in one read. See docs.
 
     Args:
-        workspace_slug: Workspace slug.
-        view: "all" (default), "velocity" (velocity + quality only) or "cost" (spend only).
+        view: "all", "velocity" (with quality) or "cost".
     """
     if view not in METRICS_VIEWS:
         return json.dumps(
@@ -53,11 +52,7 @@ async def get_workspace_metrics(workspace_slug: str, view: str = "all", ctx: Con
 @deprecated_tool()
 @handle_api_errors
 async def get_workspace_cost(workspace_slug: str, ctx: Context = None) -> str:
-    """Runner token spend and per-card cost for a workspace.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Runner token spend and per-card cost for a workspace."""
     app: AppContext = ctx.request_context.lifespan_context
     return json.dumps(await _cost(app.client, workspace_slug), indent=2, default=str)
 
@@ -65,10 +60,6 @@ async def get_workspace_cost(workspace_slug: str, ctx: Context = None) -> str:
 @deprecated_tool()
 @handle_api_errors
 async def get_workspace_velocity(workspace_slug: str, ctx: Context = None) -> str:
-    """Workspace throughput and quality figures.
-
-    Args:
-        workspace_slug: Workspace slug.
-    """
+    """Workspace throughput and quality figures."""
     app: AppContext = ctx.request_context.lifespan_context
     return json.dumps(await _velocity_and_quality(app.client, workspace_slug), indent=2, default=str)

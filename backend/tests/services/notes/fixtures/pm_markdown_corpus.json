@@ -709,7 +709,7 @@
         }
       ]
     },
-    "expected_markdown": "[spec.pdf](https://f/spec.pdf)"
+    "expected_markdown": "[spec.pdf](https://f/spec.pdf \"attachment\")"
   },
   {
     "name": "file-attachment-without-src",
@@ -725,6 +725,58 @@
       ]
     },
     "expected_markdown": "notes.txt"
+  },
+  {
+    "name": "image-with-title",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "image",
+          "attrs": {
+            "src": "/api/workspaces/acme/media/33333333-3333-4333-8333-333333333333/shot.png",
+            "alt": "Login [v2]",
+            "title": "Step \"1\""
+          }
+        }
+      ]
+    },
+    "expected_markdown": "![Login \\[v2\\]](/api/workspaces/acme/media/33333333-3333-4333-8333-333333333333/shot.png \"Step \\\"1\\\"\")"
+  },
+  {
+    "name": "image-src-with-space",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "image",
+          "attrs": {
+            "src": "https://img/a b.png",
+            "alt": "x"
+          }
+        }
+      ]
+    },
+    "expected_markdown": "![x](<https://img/a b.png>)"
+  },
+  {
+    "name": "file-attachment-with-size-and-type",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "fileAttachment",
+          "attrs": {
+            "filename": "notes_*v2*.pdf",
+            "src": "/api/workspaces/acme/resources/44444444-4444-4444-8444-444444444444/content",
+            "fileSize": 2048,
+            "mimeType": "application/pdf",
+            "uploading": false
+          }
+        }
+      ]
+    },
+    "expected_markdown": "[notes\\_\\*v2\\*.pdf](/api/workspaces/acme/resources/44444444-4444-4444-8444-444444444444/content \"attachment; size=2048; type=application/pdf\")"
   },
   {
     "name": "empty-paragraph-skipped",
@@ -971,6 +1023,6 @@
         }
       ]
     },
-    "expected_markdown": "## Kitchen sink\n\nPing @Ana about **the plan**\n\n- alpha\n- beta\n\n| Col | Val |\n| --- | --- |\n| x | y |\n\n![chart](https://img/chart.png)\n\n[spec.pdf](https://files/spec.pdf)\n\n> quoted\n\n---\n\n```js\nconst a = 1;\n```"
+    "expected_markdown": "## Kitchen sink\n\nPing @Ana about **the plan**\n\n- alpha\n- beta\n\n| Col | Val |\n| --- | --- |\n| x | y |\n\n![chart](https://img/chart.png)\n\n[spec.pdf](https://files/spec.pdf \"attachment\")\n\n> quoted\n\n---\n\n```js\nconst a = 1;\n```"
   }
 ]

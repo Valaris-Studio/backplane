@@ -9417,6 +9417,54 @@
         "x-surface": "public"
       }
     },
+    "/api/workspaces/{slug}/resources/{resource_id}/content": {
+      "get": {
+        "tags": [
+          "workspace-resources"
+        ],
+        "summary": "Get Workspace Resource Content",
+        "operationId": "get_workspace_resource_content_api_workspaces__slug__resources__resource_id__content_get",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect to a short-lived signed URL"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
     "/api/workspaces/{slug}/skills": {
       "get": {
         "tags": [
@@ -10518,6 +10566,63 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "internal"
+      }
+    },
+    "/api/workspaces/{slug}/media/{object_id}/{filename}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get Media Content",
+        "operationId": "get_media_content_api_workspaces__slug__media__object_id___filename__get",
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect to a short-lived signed URL"
           },
           "422": {
             "description": "Validation Error",
@@ -18424,6 +18529,7 @@
           },
           "action_description": {
             "type": "string",
+            "maxLength": 16384,
             "title": "Action Description"
           },
           "action_payload": {
@@ -18473,7 +18579,8 @@
           "reason": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 16384
               },
               {
                 "type": "null"
@@ -22891,6 +22998,28 @@
           "download_url": {
             "type": "string",
             "title": "Download Url"
+          },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          },
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
           }
         },
         "type": "object",

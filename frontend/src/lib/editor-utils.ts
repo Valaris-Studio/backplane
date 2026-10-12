@@ -3,7 +3,7 @@
 
 import { generateJSON } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { MediaImage } from "@/extensions/media-image";
 import Link from "@tiptap/extension-link";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import MarkdownIt from "markdown-it";
@@ -17,7 +17,7 @@ export { extractPlainText } from "./text-utils";
 
 const EXTENSIONS = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
-  Image.configure({ inline: false }),
+  MediaImage.configure({ inline: false }),
   Link.configure({ openOnClick: true }),
   FileAttachment,
   Table,

@@ -19,8 +19,9 @@ set exactly (StarterKit + Link + our mention/image/file-attachment nodes):
   Nodes: doc, paragraph, heading(1-3), bulletList, orderedList(attrs.start),
          listItem, codeBlock(attrs.language), blockquote, horizontalRule,
          hardBreak, text, table, tableRow, tableHeader, tableCell,
-         mention(@label), image(![alt](src) — block in our schema, also
-         serializable inline), fileAttachment([filename](src)).
+         mention(@label), image(![alt](src "title") — block in our schema,
+         also serializable inline), fileAttachment([filename](src
+         "attachment; size=…; type=…")) — see `media_markdown`.
   Marks: bold(**), italic(*), strike(~~), code(`), link([text](href)).
 
 Anything that isn't a valid PM doc (legacy HTML or plain text stored before the
@@ -31,6 +32,8 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+
+from app.services.notes.media_markdown import attachment_markdown, image_markdown
 
 
 def prosemirror_to_markdown(content: str | dict) -> str:
@@ -135,10 +138,7 @@ def _serialize_block(node: dict[str, Any]) -> str:
         return _serialize_table(node)
 
     if node_type == "fileAttachment":
-        attrs = node.get("attrs") or {}
-        name = attrs.get("filename") or "attachment"
-        src = attrs.get("src") or ""
-        return f"[{name}]({src})" if src else name
+        return attachment_markdown(node.get("attrs") or {})
 
     if node_type == "image":
         return _serialize_inline_node(node)
@@ -312,8 +312,7 @@ def _serialize_inline_node(node: dict[str, Any]) -> str:
     if node_type == "mention":
         return f"@{(node.get('attrs') or {}).get('label') or ''}"
     if node_type == "image":
-        attrs = node.get("attrs") or {}
-        return f"![{attrs.get('alt') or ''}]({attrs.get('src') or ''})"
+        return image_markdown(node.get("attrs") or {})
 
     value = node.get("text", "")
     marks = sorted(

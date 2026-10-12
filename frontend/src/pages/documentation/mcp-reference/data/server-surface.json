@@ -78,6 +78,7 @@
       "update_definition",
       "update_note",
       "update_resource",
+      "upload_resource",
       "validate_board_dependencies",
       "whoami"
     ]
@@ -140,8 +141,8 @@
       "replacement": "update_note(mode='section')"
     }
   },
-  "listing_bytes": 109962,
-  "tool_count": 142,
+  "listing_bytes": 95919,
+  "tool_count": 143,
   "tools": {
     "activate_catalog_skill": {
       "annotations": {
@@ -150,11 +151,11 @@
         "readOnlyHint": false
       },
       "category": "skills",
-      "description": "Copy a catalog skill into the workspace library as published v1. Human\nsessions only (runner keys 403). Idempotent.",
+      "description": "Copy a catalog skill into the workspace library as published v1. Human sessions only. Idempotent. See docs.",
       "kind": "write",
       "params": {
         "catalog_id": "Catalog entry id, from list_skill_catalog.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Activate catalog skill"
     },
@@ -165,13 +166,13 @@
         "readOnlyHint": false
       },
       "category": "card-dependencies",
-      "description": "Declare that card_id depends on depends_on_card_id, gating scheduler pickup until the prerequisite satisfies its effective completion policy. Idempotent: re-adding returns the existing edge (200); cycles and self-deps are 422.",
+      "description": "Make card_id depend on depends_on_card_id; the scheduler holds it until the prerequisite completes. Idempotent. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Dependent card UUID or id prefix.",
         "depends_on_card_id": "Prerequisite card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Add card dependency"
     },
@@ -182,15 +183,15 @@
         "readOnlyHint": false
       },
       "category": "cards",
-      "description": "Add a participant to a card. Idempotent: an existing row keeps its pipeline_role unless it was NULL, which is backfilled.",
+      "description": "Add a participant to a card. Idempotent; a NULL pipeline_role on an existing row is backfilled. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "pipeline_role": "Stage role for role-aware filters (planner, implementer, reviewer, ... or custom; max 64 chars).",
+        "pipeline_role": "Stage role (planner, implementer, reviewer, ... or custom; max 64 chars).",
         "role": "hero (responsible)|viewer|stakeholder|helper.",
         "user_id": "User UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Add card participant"
     },
@@ -201,14 +202,14 @@
         "readOnlyHint": false
       },
       "category": "teams",
-      "description": "Add a runner to a team with roles; idempotent, re-adding updates the roles.\norchestrator/reviewer/documentator are one runner per team; custom allows many.",
+      "description": "Add a runner to a team with roles; idempotent, re-adding replaces the roles. See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID.",
         "role": "Single role (legacy; prefer roles).",
         "roles": "One or more of orchestrator|reviewer|documentator|custom.",
         "team_id": "Team UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Add team member"
     },
@@ -219,12 +220,12 @@
         "readOnlyHint": false
       },
       "category": "workspaces",
-      "description": "Add a user to a workspace, auto-provisioning them if needed. Idempotent: an existing member is returned unchanged and role is ignored; use update_workspace_member to change a role.",
+      "description": "Add a user by email (auto-provisioned). Idempotent: for an existing member role is ignored (change it with update_workspace_member). See docs.",
       "kind": "write",
       "params": {
-        "role": "owner|admin|member|viewer (default member).",
+        "role": "owner|admin|member|viewer.",
         "user_email": "Email of the user to add.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Add workspace member"
     },
@@ -235,13 +236,13 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Apply named fixes from a fit report, then return the fresh report.\nIdempotent per fix (`skipped_already_satisfied`); unknown fix ids are 422\nbefore anything applies; a frozen board 409s.",
+      "description": "Apply named fixes from a fit report and return the fresh report. Idempotent per fix. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
         "fix_ids": "`fix_id` values from check_loop_template_fit.",
         "template_ref": "System slug or template UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Apply loop template fixes"
     },
@@ -252,12 +253,12 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Soft-archive a workspace template (archived=False restores). Archived\ntemplates keep serving bound boards; there is no hard delete.",
+      "description": "Soft-archive a workspace template (archived=False restores); bound boards keep running it. See docs.",
       "kind": "write",
       "params": {
         "archived": "False to restore.",
         "ref": "Workspace template UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Archive loop template"
     },
@@ -268,12 +269,12 @@
         "readOnlyHint": false
       },
       "category": "bulk",
-      "description": "Create up to 50 cards on a board in one request. An invalid column_id, unknown git_repo_slug or unknown key rejects the whole batch (422).",
+      "description": "Create up to 50 cards on a board in one all-or-nothing request (422 on any invalid card). Not idempotent. See docs.",
       "kind": "composite",
       "params": {
         "board_id": "Board UUID.",
-        "cards": "Each: column_id, title (required); description, card_type (task|issue|feature|bug), priority (none|low|medium|high|urgent), due_date (YYYY-MM-DD), status, labels, git_repo_slug. Nothing else.",
-        "workspace_slug": "Workspace slug."
+        "cards": "Each: column_id, title (required); description, card_type, priority, due_date, status, labels, git_repo_slug. Nothing else.",
+        "workspace_slug": null
       },
       "title": "Bulk create cards"
     },
@@ -284,13 +285,13 @@
         "readOnlyHint": false
       },
       "category": "card-dependencies",
-      "description": "Atomically replace a card's whole depends-on set in one call; use it to declare a DAG from the planner stage. The set is validated for cycles and tenancy before anything changes; on rejection existing edges stay.",
+      "description": "Atomically replace a card's whole depends-on set; cycles reject the call and leave the existing edges. See docs.",
       "kind": "composite",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "depends_on_card_ids": "Complete prerequisite list (UUIDs or id prefixes); empty clears the set.",
-        "workspace_slug": "Workspace slug."
+        "depends_on_card_ids": "Full prerequisite list (UUIDs or id prefixes); [] clears it.",
+        "workspace_slug": null
       },
       "title": "Bulk set card dependencies"
     },
@@ -301,13 +302,13 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Force a stuck 'running' execution to a terminal status, clearing the\nagent_busy 409 guard that stalls the pipeline.",
+      "description": "Force a stuck execution to a terminal status, clearing the agent_busy 409 guard. See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID.",
-        "execution_id": "Execution UUID (list_executions status='inflight' finds zombies).",
+        "execution_id": "Execution UUID.",
         "reason": "Recorded as output_summary.",
-        "status": "aborted (default)|completed|failed; non-terminal values are rejected."
+        "status": "aborted|completed|failed."
       },
       "title": "Cancel execution"
     },
@@ -318,11 +319,11 @@
         "readOnlyHint": false
       },
       "category": "merge-queue",
-      "description": "Cancel a wedged (conflict/failed) merge-queue entry for human triage\n(admin/owner only); the card is eligible for next_assignment again.",
+      "description": "Delete a wedged merge-queue entry for human triage (admin/owner). See docs.",
       "kind": "write",
       "params": {
         "entry_id": "Entry UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Cancel merge queue entry"
     },
@@ -342,7 +343,7 @@
         "budget_usd": "Spending cap in USD.",
         "description": "What it does.",
         "max_requests_per_minute": "Rate limit.",
-        "name": "Display name."
+        "name": null
       },
       "title": "Create agent"
     },
@@ -353,7 +354,7 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Create a board, optionally with its structured definition in the same call.\n\nIdempotent only when slug is given (an existing board with that slug is returned); without slug every call mints a new board. Definition fields upsert either way.",
+      "description": "Create a board, optionally with its definition. Idempotent only with slug. See docs.",
       "kind": "write",
       "params": {
         "coding_standards": "Free text.",
@@ -364,16 +365,16 @@
         "description": "Board purpose.",
         "exclusions": "Out-of-scope items.",
         "milestones": "[{\"title\", \"date\", \"type\"?}].",
-        "name": "Display name.",
+        "name": null,
         "objectives": "[{\"text\", \"priority\"?}].",
         "references": "[{\"url\", \"label\"?}].",
         "scope": "Definition scope/summary.",
-        "skip_default_columns": "Skip the default typed columns (To Do/In Progress/Blocked/Done).",
+        "skip_default_columns": "Skip the default typed columns.",
         "slug": "URL slug; the idempotency key.",
         "stakeholders": "[{\"name\", \"role\"?, \"member_id\"?, \"channel_id\"?}].",
-        "tags": "Tags.",
+        "tags": null,
         "tech_stack": "[\"python\", \"react\", ...].",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create board"
     },
@@ -392,12 +393,12 @@
         "column_id": "Target column UUID.",
         "description": "Card description.",
         "due_date": "YYYY-MM-DD.",
-        "git_repo_slug": "Target repo slug on multi-repo boards; omit for the primary repo.",
+        "git_repo_slug": "Repo slug on multi-repo boards; omit for the primary.",
         "labels": "Label strings.",
         "priority": "none|low|medium|high|urgent.",
         "status": "Short state label. Max 255 characters.",
         "title": "Max 500 characters.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create card"
     },
@@ -413,10 +414,10 @@
       "params": {
         "channel_type": "email|slack|whatsapp|phone|website|other.",
         "contact_value": "Address or identifier (email, phone number, URL).",
-        "description": "Description.",
+        "description": null,
         "metadata_json": "Extra metadata dict.",
-        "name": "Display name.",
-        "workspace_slug": "Workspace slug."
+        "name": null,
+        "workspace_slug": null
       },
       "title": "Create channel"
     },
@@ -432,9 +433,9 @@
       "params": {
         "board_id": "Board UUID.",
         "color": "Hex color for the header.",
-        "column_type": "backlog|active|review|done|blocked; drives runner discovery and movement.",
-        "name": "Display name.",
-        "workspace_slug": "Workspace slug."
+        "column_type": "backlog|active|review|done|blocked; untyped columns are human-only.",
+        "name": null,
+        "workspace_slug": null
       },
       "title": "Create column"
     },
@@ -451,12 +452,12 @@
         "board_id": "Board UUID.",
         "default_branch": "Default branch name.",
         "description": "Optional description.",
-        "name": "Display name.",
+        "name": null,
         "provider": "github|gitlab|bitbucket|gitea|other.",
-        "require_branch_protection": "Runner arms branch protection at first clone (default True); False for human-owned repos.",
-        "slug": "Per-card git_repo_slug selector on multi-repo boards; derived from name when omitted.",
+        "require_branch_protection": "Arm branch protection at first clone.",
+        "slug": "Per-card git_repo_slug selector; derived from name.",
         "url": "Repository URL.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create git repo"
     },
@@ -467,14 +468,14 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Create a workspace loop template as an unpublished draft. Not\nidempotent: a repeated slug is 409. Author large prompts in the UI or\nREST; MCP has garbled multi-KB strings.",
+      "description": "Create a workspace loop template as an unpublished draft. Not idempotent: a repeated slug is 409. See docs.",
       "kind": "write",
       "params": {
         "content": "{system_prompt, loop_prompt, slots, tools, rails_defaults, ...}.",
-        "name": "Display name.",
+        "name": null,
         "profile": "{emoji, tagline, tags}.",
         "slug": "URL-safe, unique in the workspace.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create loop template"
     },
@@ -485,16 +486,17 @@
         "readOnlyHint": false
       },
       "category": "notes",
-      "description": "Create a note in a workspace or board, optionally linked to a card.",
+      "description": "Create a note in a workspace or board, optionally linked to a card. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID if board-scoped.",
-        "card_id": "Card to link; needs board_id and a card on this board (else 422; unknown or cross-workspace card 404).",
-        "content": "Body as markdown (HTML, plain text or ProseMirror JSON also accepted).",
-        "kind": "user_note (default) or a structural kind: plan, rework_brief, review_verdict, ...",
+        "card_id": "Card to link; needs board_id and a card on this board.",
+        "content": "Markdown (HTML, plain text or ProseMirror JSON accepted).",
+        "kind": "user_note or a structural kind (plan, review_verdict, ...).",
         "pinned": "Pin the note to the top.",
+        "return_content": "Echo the stored body in the receipt.",
         "title": "Note title.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create note"
     },
@@ -505,17 +507,17 @@
         "readOnlyHint": false
       },
       "category": "prompt-configs",
-      "description": "Create a prompt config: a stage prompt override for matching runners,\napplied on their next config refresh.",
+      "description": "Create a stage prompt override for matching runners, applied on their next config refresh. See docs.",
       "kind": "write",
       "params": {
         "agent_type": "coding|manager|reviewer|secretary|improver.",
         "content": "Prompt template text.",
-        "name": "Display name.",
+        "name": null,
         "slug": "Unique slug.",
         "stage": "e.g. implement|review|plan.",
         "team_id": "Team UUID scope.",
         "team_role": "e.g. orchestrator|reviewer.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create prompt config"
     },
@@ -526,17 +528,17 @@
         "readOnlyHint": false
       },
       "category": "resources",
-      "description": "Create a file or folder resource. For uploads: get_upload_url, PUT the file, then pass its gcs_path here.",
+      "description": "Create a file or folder resource; for uploads PUT first, then pass gcs_path (type and size come from the stored object). See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID if board-scoped.",
-        "description": "Description.",
+        "description": null,
         "gcs_path": "Storage path from get_upload_url (uploaded files).",
         "metadata": "Metadata dict.",
         "name": "Resource name.",
         "parent_id": "Parent folder UUID.",
         "resource_type": "file|folder.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create resource"
     },
@@ -553,7 +555,7 @@
         "board_id": "Board UUID to scope the team to.",
         "description": "What it does.",
         "name": "Team name.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create team"
     },
@@ -570,7 +572,7 @@
         "events": "Event names; see ENUMS in the server instructions.",
         "secret": "HMAC signing secret.",
         "url": "Delivery URL (https-only outside development).",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Create webhook"
     },
@@ -581,10 +583,10 @@
         "readOnlyHint": false
       },
       "category": "workspaces",
-      "description": "Create a workspace; the creator becomes owner. If the slug already exists and you are a member, nothing is created: the existing workspace comes back under `existing` plus an `error` string (a no-op, not a failure). Non-members get a 409 with no metadata.",
+      "description": "Create a workspace you own. A slug you already belong to comes back under `existing` (a no-op). See docs.",
       "kind": "write",
       "params": {
-        "name": "Display name.",
+        "name": null,
         "slug": "URL slug; derived from name if omitted."
       },
       "title": "Create workspace"
@@ -600,7 +602,7 @@
       "kind": "write",
       "params": {
         "team_id": "Team UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Deactivate team"
     },
@@ -617,7 +619,7 @@
         "approval_id": "Approval UUID.",
         "decision": "approved|rejected.",
         "reason": "Optional reason.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Decide approval"
     },
@@ -628,11 +630,11 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Permanently delete a board and everything scoped to it. IRREVERSIBLE — confirm the board_id first.\n\nCascades to columns, cards, notes, definition, git-repo bindings, resources; activity/execution history is kept but unlinked.",
+      "description": "Permanently delete a board and everything scoped to it; IRREVERSIBLE, confirm the board_id first. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete board"
     },
@@ -648,7 +650,7 @@
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete card"
     },
@@ -663,7 +665,7 @@
       "kind": "write",
       "params": {
         "channel_id": "Channel UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete channel"
     },
@@ -679,7 +681,7 @@
       "params": {
         "board_id": "Board UUID.",
         "column_id": "Column UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete column"
     },
@@ -695,7 +697,7 @@
       "params": {
         "board_id": "Board UUID.",
         "repo_id": "Git repo UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete git repo"
     },
@@ -711,7 +713,7 @@
       "params": {
         "board_id": "Board UUID if board-scoped.",
         "note_id": "Note UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete note"
     },
@@ -726,7 +728,7 @@
       "kind": "write",
       "params": {
         "config_id": "Prompt config UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete prompt config"
     },
@@ -742,7 +744,7 @@
       "params": {
         "board_id": "Board UUID if board-scoped.",
         "resource_id": "Resource UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete resource"
     },
@@ -753,10 +755,10 @@
         "readOnlyHint": false
       },
       "category": "workspaces",
-      "description": "PERMANENTLY delete a workspace and everything in it (boards, columns, cards, definitions, git-repo bindings, notes, resources, channels, memberships). No undo; confirm the slug with list_workspaces first. Needs admin/owner; an already-deleted workspace reports so instead of erroring.",
+      "description": "PERMANENTLY delete a workspace and everything in it (admin/owner). Confirm the slug with list_workspaces first. See docs.",
       "kind": "write",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Delete workspace"
     },
@@ -767,12 +769,12 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Fork a system or workspace template into a new workspace draft; how a\nsystem template gets customized.",
+      "description": "Fork a system or workspace template into a new workspace draft. See docs.",
       "kind": "write",
       "params": {
         "new_slug": "Slug for the copy; omit to derive one.",
         "ref": "System slug or template UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Duplicate loop template"
     },
@@ -783,10 +785,10 @@
         "readOnlyHint": false
       },
       "category": "server-info",
-      "description": "Widen THIS session's server tool hand and request client refresh; notification delivery does not prove the client catalog updated.\n\nWiden-only and idempotent: ids already loaded add nothing and send no\nnotification; `all` lifts the toolset layer. A runner allowlist is a\nceiling this never lifts — names it clips are reported under\nallowlist_clipped. Returns loaded (ids, or [\"all\"]), added_tools/\nadded_count, enabled_tool_count and listing_bytes of this session's\ntools/list, list_changed_sent, client_catalog_status (always unverified),\nand restart_env (server startup environment preserving the current hand).",
+      "description": "Widen THIS session's toolsets (widen-only; never past a runner allowlist) and request a client refresh, which stays unverified. See docs.",
       "kind": "write",
       "params": {
-        "toolset_ids": "Toolset ids to add: all, default, or any group or category id listed under get_server_info.toolsets.available."
+        "toolset_ids": "all, default, or group/category ids from get_server_info.toolsets.available."
       },
       "title": "Enable toolsets"
     },
@@ -797,11 +799,11 @@
         "readOnlyHint": false
       },
       "category": "merge-queue",
-      "description": "Re-queue a card's existing merge-queue entry after conflict consolidation;\nidempotent, 404 if the card has no entry.",
+      "description": "Re-queue a card's existing merge-queue entry after conflict consolidation; idempotent, 404 without an entry. See docs.",
       "kind": "write",
       "params": {
         "card_id": "Original (parent) card UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Enqueue for merge"
     },
@@ -812,15 +814,15 @@
         "readOnlyHint": false
       },
       "category": "merge-queue",
-      "description": "Enqueue a card's green, self-reviewed PR for the server-side merge queue;\nnever run `gh pr merge` yourself.\n\nThe executor rebases and lands it once CI is green and the reconciler moves\nthe card to Done. Runner calls need the board loop's\nloop_landing=\"merge_queue\" (else error_code loop_landing_not_enabled).\nIdempotent.",
+      "description": "Enqueue a card's green, self-reviewed PR for the server-side merge queue; never run `gh pr merge` yourself. Idempotent. See docs.",
       "kind": "write",
       "params": {
         "card_id": "Card UUID.",
         "git_repo_id": "Board git repo UUID.",
-        "integration_branch": "Target branch; defaults to the repo's integration, then default, branch.",
+        "integration_branch": "Target branch (default: the repo's integration, then default branch).",
         "pr_branch": "PR head branch.",
         "pr_url": "PR URL.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Enqueue pr for merge"
     },
@@ -831,7 +833,7 @@
         "readOnlyHint": true
       },
       "category": "loop-templates",
-      "description": "Export a template as a portable `loop_template` envelope for\nimport_loop_template. System templates export too. `data.leak_findings`\ncarries lint hints as warnings; export always succeeds.",
+      "description": "Export a template (system ones too) as an envelope for import_loop_template; always succeeds. See docs.",
       "kind": "composite",
       "params": {
         "template_ref": "System slug or template UUID.",
@@ -846,7 +848,7 @@
         "readOnlyHint": true
       },
       "category": "workspace-config",
-      "description": "Export a portable bundle (pipeline_config, derived setup_contract, workspace-scoped prompt_configs) for import_pipeline_bundle on another workspace. Platform-default prompts are excluded; they re-seed on the target.",
+      "description": "Export a portable pipeline bundle (pipeline_config, setup_contract, workspace prompt configs) for import_pipeline_bundle. See docs.",
       "kind": "composite",
       "params": {
         "workspace_slug": "Source workspace slug."
@@ -860,11 +862,11 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Freeze a board: every mutation returns 409 board_frozen and the scheduler stops handing out its cards until unfreeze_board.\n\nReads and telemetry (execution logging, approvals) stay open. Workspace admin/owner. Idempotent.",
+      "description": "Freeze a board (admin/owner; idempotent): mutations get 409 board_frozen and pickup stops until unfreeze_board. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Freeze board"
     },
@@ -903,7 +905,7 @@
         "readOnlyHint": true
       },
       "category": "agents-executions",
-      "description": "Get the runner identity linked to this API key (agent_id, allowed_workspaces,\nallowed_actions); falls back to the user identity when no runner is linked.",
+      "description": "Get the runner identity (agent_id, allowed workspaces/actions) linked to this API key, or the user identity when none is linked.",
       "kind": "read",
       "params": {},
       "title": "Get agent config"
@@ -915,11 +917,11 @@
         "readOnlyHint": true
       },
       "category": "approvals",
-      "description": "Check an approval request's status (pending|approved|rejected|expired|auto_approved).",
+      "description": "Check an approval request's status. See docs.",
       "kind": "read",
       "params": {
         "approval_id": "Approval UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get approval status"
     },
@@ -930,13 +932,13 @@
         "readOnlyHint": true
       },
       "category": "boards",
-      "description": "Get a board with its columns and their cards. On large boards pass summary_only or titles_only; summary_only wins when both are set.",
+      "description": "Get a board with its columns and cards; on large boards pass summary_only (wins) or titles_only. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "summary_only": "Per-column card counts + priority/status breakdowns, no cards.",
-        "titles_only": "Slim each card to id/title/status/priority/labels.",
-        "workspace_slug": "Workspace slug."
+        "summary_only": "Per-column counts and breakdowns only.",
+        "titles_only": "Slim cards to id/title/status/priority/labels.",
+        "workspace_slug": null
       },
       "title": "Get board"
     },
@@ -947,11 +949,11 @@
         "readOnlyHint": true
       },
       "category": "health",
-      "description": "Get a board's computed health: score (0-100), stale/overdue/unassigned cards, priority and column distribution, velocity. Use for triage and standup.",
+      "description": "Get a board's computed health: 0-100 score, stale/overdue/unassigned cards, distributions and velocity.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get board health"
     },
@@ -962,11 +964,11 @@
         "readOnlyHint": true
       },
       "category": "boards",
-      "description": "Read loop config: state, prompts, provider/model, tools, caps, disabled_reason, version and template (null for raw prompts). Unconfigured=404.",
+      "description": "Read a board's effective loop config, incl. version, disabled_reason and template (null for raw prompts); 404 until configured. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get board loop"
     },
@@ -977,12 +979,12 @@
         "readOnlyHint": true
       },
       "category": "loop-templates",
-      "description": "Raw view of a board's template binding: template, version, rendered\nslot values, drift — the authoring state behind get_board_loop, which is\nthe effective loop config. 404 `not_bound` when the board's prompts are raw.",
+      "description": "Raw view of a board's template binding (template, version, rendered slots, drift) behind get_board_loop; 404 `not_bound` for raw prompts. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID or slug.",
-        "include_diff": "Also fetch the prompt diff and slot delta vs. the current version (skipped when `diff_available` is false).",
-        "workspace_slug": "Workspace slug."
+        "include_diff": "Also fetch the prompt diff and slot delta vs. the current version.",
+        "workspace_slug": null
       },
       "title": "Get board loop binding raw"
     },
@@ -998,7 +1000,7 @@
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get card"
     },
@@ -1009,12 +1011,12 @@
         "readOnlyHint": true
       },
       "category": "card-dependencies",
-      "description": "Report whether a card is unblocked: satisfied (every prerequisite meets its effective completion policy), total_prerequisites, blocking (undone prerequisites with title/status/column_type) and blocks_count.",
+      "description": "Report whether a card is unblocked (every prerequisite meets its completion policy) and what still blocks it. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get card dependency status"
     },
@@ -1025,12 +1027,12 @@
         "readOnlyHint": true
       },
       "category": "card-dependencies",
-      "description": "Fetch the latest review verdict on a card (decision and reasoning) before reworking it. 404 when the card has no verdict yet.",
+      "description": "Fetch a card's latest review verdict (decision, reasoning); 404 when it has none.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get card verdict"
     },
@@ -1045,7 +1047,7 @@
       "kind": "read",
       "params": {
         "board_id": "Board UUID/slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get completion policy"
     },
@@ -1061,7 +1063,7 @@
       "params": {
         "board_id": "Board UUID/slug.",
         "card_id": "Card UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get completion status"
     },
@@ -1076,7 +1078,7 @@
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get definition"
     },
@@ -1087,12 +1089,12 @@
         "readOnlyHint": true
       },
       "category": "resources",
-      "description": "Get a signed download URL (valid 1 hour) for a resource's file; errors if it has no file.",
+      "description": "Get a short-lived download_url to fetch now and the stable content_url to embed in notes. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID if board-scoped.",
         "resource_id": "Resource UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get download url"
     },
@@ -1103,19 +1105,19 @@
         "readOnlyHint": true
       },
       "category": "loop-templates",
-      "description": "Read a template: full=profile/prompts/slots/rails/tools; profile=identity and board/execution/spend/outcome history (archived included); preview=read-only render with board autofill/rails; fit=board checks (ok|missing|warn), evidence, fix_id for apply_loop_template_fixes, and autofill; lint=repo facts to move into slots (hints only, draft). Rehearse published text before binding. Avoid full prompt previews inside running loops.",
+      "description": "Read one loop template; view picks full, profile (track record), preview (render), fit (board pre-flight) or lint (repo facts). See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID/slug; required for fit, optional for preview.",
         "draft": "True=draft, false=published. Default: false for full, true for rehearsal.",
         "include_archived": "full: also resolve archived templates.",
-        "include_prompts": "preview: false omits large prompt bodies, keeping findings/slots/rails/tools.",
+        "include_prompts": "preview: false omits the prompt bodies.",
         "loop_config": "fit/preview: unsaved loop rails.",
         "ref": "System slug or template UUID.",
-        "slot_values": "fit/preview: proposed slots; missing values use autofill, then defaults.",
+        "slot_values": "fit/preview: proposed slot values.",
         "version": "fit/preview: exact published version; requires draft=false.",
-        "view": "full (default)|profile|preview|fit|lint.",
-        "workspace_slug": "Workspace slug."
+        "view": "full|profile|preview|fit|lint.",
+        "workspace_slug": null
       },
       "title": "Get loop template"
     },
@@ -1130,7 +1132,7 @@
       "kind": "read",
       "params": {
         "entry_id": "Entry UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get merge queue entry"
     },
@@ -1145,9 +1147,9 @@
       "kind": "read",
       "params": {
         "board_id": "Board UUID if board-scoped.",
-        "format": "prosemirror (default, raw JSON) or markdown.",
+        "format": "prosemirror (raw JSON) or markdown.",
         "note_id": "Note UUID or id prefix (resolved within the same scope).",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get note"
     },
@@ -1158,10 +1160,10 @@
         "readOnlyHint": true
       },
       "category": "workspace-config",
-      "description": "List the sensors runners in this workspace have registered — what pipeline_config.stages[*].sensors[*].name is validated against. Deduped union; the first runner to report a name wins.",
+      "description": "List runner-registered sensors: the names pipeline_config.stages[*].sensors[*].name is validated against. See docs.",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get pipeline sensors"
     },
@@ -1172,11 +1174,11 @@
         "readOnlyHint": true
       },
       "category": "context",
-      "description": "Get a full board briefing in one call: board summary, definition, notes, git repos, recent activity. The recommended first call for any board workflow.\n\nBoard section is per-column counts only. Notes, definition, and activity are capped; a trimmed section carries a _..._truncated marker and a _hint naming the tool with the full data.",
+      "description": "Full board briefing in one call (counts, definition, notes, repos, activity); the recommended first call. See docs.",
       "kind": "composite",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get project context"
     },
@@ -1191,7 +1193,7 @@
       "kind": "read",
       "params": {
         "config_id": "Prompt config UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get prompt config"
     },
@@ -1207,7 +1209,7 @@
       "params": {
         "board_id": "Board UUID if board-scoped.",
         "resource_id": "Resource UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get resource"
     },
@@ -1218,7 +1220,7 @@
         "readOnlyHint": true
       },
       "category": "server-info",
-      "description": "Report this server's version, full tool surface, and the hand enabled in\nTHIS session; call it when a tool seems missing (version, toolset or\nallowlist drift).\n\nReturns version, tools/tool_count (full live surface even when filtered;\ndeprecated_aliases lists retired names still callable until\ndeprecated_removed_in, allowlist_deprecated the granted ones),\nallowlist, toolsets (loaded ids; resolved_tool_count = the toolset hand\nBEFORE the allowlist intersection; default, available ids, hint to widen),\nenabled_tools (registered ∩ toolsets ∩ allowlist; allowlist entries this\nserver lacks under allowlist_unknown, entries clipped by the loaded\ntoolsets under allowlist_outside_toolsets), listing_bytes/\nlisting_tokens_estimate (compact size of this session's tools/list;\ntokens ≈ bytes/4), annotated_tools, backend reachability (GET /api/health).",
+      "description": "Report the server version, full tool surface and THIS session's enabled hand; call it when a tool seems missing. See docs.",
       "kind": "read",
       "params": {},
       "title": "Get server info"
@@ -1230,13 +1232,13 @@
         "readOnlyHint": true
       },
       "category": "skills",
-      "description": "Fetch a skill version's files verbatim (with its declared toolsets).\nLong files are truncated; re-fetch one whole with file_path.",
+      "description": "Fetch a skill version's files verbatim and its declared toolsets; file_path returns one long file whole. See docs.",
       "kind": "read",
       "params": {
         "file_path": "Return this one file in full.",
         "slug": "Skill slug.",
         "version": "Omit for the latest published; pass explicitly for a draft.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get skill"
     },
@@ -1251,7 +1253,7 @@
       "kind": "read",
       "params": {
         "team_id": "Team UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get team"
     },
@@ -1268,7 +1270,7 @@
         "board_id": "Board UUID if board-scoped.",
         "content_type": "MIME type.",
         "filename": "File name.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get upload url"
     },
@@ -1279,11 +1281,11 @@
         "readOnlyHint": true
       },
       "category": "webhooks",
-      "description": "Read one webhook's URL, events, active state, and delivery health;\nnot-found under another workspace's slug.",
+      "description": "Read one webhook's URL, events, active state and delivery health. See docs.",
       "kind": "read",
       "params": {
         "webhook_id": "Webhook UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get webhook"
     },
@@ -1297,7 +1299,7 @@
       "description": "Get a workspace's metadata (no member roster; see list_workspace_members).",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get workspace"
     },
@@ -1308,10 +1310,10 @@
         "readOnlyHint": true
       },
       "category": "workspace-config",
-      "description": "Read the workspace config: pipeline_config, max_rework_attempts, card_cooldown_hours, commit/PR templates, model_pricing, cost_circuit_breaker, role_labels, version (bumps on every update).",
+      "description": "Read the workspace config and its version (send it back as expected_version on update). See docs.",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get workspace config"
     },
@@ -1322,11 +1324,11 @@
         "readOnlyHint": true
       },
       "category": "agents-executions",
-      "description": "Workspace-wide delivery and spend figures in one read. velocity: cards completed over 7d/30d/90d; quality: reversion_rate (done cards that came back) and agent_efficiency_score — falling velocity with rising reversion means rework, not slowdown. cost: per-runner tokens/executions over 7d/30d and per-card total_cost_usd/tokens/execution_count — a card whose execution_count keeps climbing outside done is a money-loop. Do not re-derive totals. Per-board velocity is get_board_health; per-runner spend is get_agent_budget_status.",
+      "description": "Workspace-wide velocity, quality and per-runner/per-card spend in one read. See docs.",
       "kind": "read",
       "params": {
-        "view": "\"all\" (default), \"velocity\" (velocity + quality only) or \"cost\" (spend only).",
-        "workspace_slug": "Workspace slug."
+        "view": "\"all\", \"velocity\" (with quality) or \"cost\".",
+        "workspace_slug": null
       },
       "title": "Get workspace metrics"
     },
@@ -1337,10 +1339,10 @@
         "readOnlyHint": true
       },
       "category": "workspaces",
-      "description": "Get workspace aggregate stats: board/card/note/channel counts, recent activity, per-board board_stats (card_count, overdue_count, cards by column_type incl. untyped) and a 30-day activity_trend of {day, count} with zero-filled quiet days.",
+      "description": "Get workspace aggregate stats: counts, recent activity, per-board board_stats and a 30-day activity_trend. See docs.",
       "kind": "composite",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Get workspace summary"
     },
@@ -1351,7 +1353,7 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Import a `loop_template` envelope as an unpublished DRAFT. Dry-run by\ndefault: returns {action, findings, diff_summary, leak_findings}, writes\nnothing; dry_run=false adds `template_id`. A matching slug overwrites\nthat draft (`action` updated|created). Over ~64 KB, POST\n/loop-templates/import directly.",
+      "description": "Import a `loop_template` envelope as an unpublished DRAFT; a matching slug overwrites it. Dry-run by default. See docs.",
       "kind": "composite",
       "params": {
         "bundle": "Envelope from export_loop_template.",
@@ -1367,11 +1369,11 @@
         "readOnlyHint": false
       },
       "category": "workspace-config",
-      "description": "Import a pipeline bundle into a workspace. DRY-RUN BY DEFAULT: inspect the preview, then re-call with dry_run=false. Requires admin/owner.\n\nChecks: envelope (400), pipeline validation (422), expected_pipeline_version vs the target (409). Apply is atomic; re-import is idempotent.",
+      "description": "Import a pipeline bundle (admin/owner). DRY-RUN BY DEFAULT: re-call with dry_run=false to apply atomically. See docs.",
       "kind": "composite",
       "params": {
         "bundle": "The envelope from export_pipeline_bundle.",
-        "dry_run": "Preview only (default). false applies.",
+        "dry_run": "Preview only; false applies.",
         "workspace_slug": "Target workspace slug."
       },
       "title": "Import pipeline bundle"
@@ -1389,9 +1391,9 @@
         "action": "Activity action; see ENUMS in the server instructions.",
         "board_id": "Scope to one board.",
         "entity_type": "Activity entity_type; see ENUMS in the server instructions.",
-        "limit": "1-100, default 50.",
+        "limit": "1-100.",
         "search": "Free-text over summaries.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List activity"
     },
@@ -1420,7 +1422,7 @@
       "kind": "read",
       "params": {
         "status": "pending|approved|rejected|expired|auto_approved.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List approvals"
     },
@@ -1434,7 +1436,7 @@
       "description": "List the boards in a workspace.",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List boards"
     },
@@ -1445,12 +1447,12 @@
         "readOnlyHint": true
       },
       "category": "card-dependencies",
-      "description": "List a card's dependency edges both ways: depends_on (prerequisites) and blocks (dependents).",
+      "description": "List a card's edges both ways: depends_on (prerequisites) and blocks (dependents).",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List card dependencies"
     },
@@ -1465,7 +1467,7 @@
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List cards"
     },
@@ -1479,7 +1481,7 @@
       "description": "List a workspace's contact channels.",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List channels"
     },
@@ -1490,7 +1492,7 @@
         "readOnlyHint": true
       },
       "category": "context",
-      "description": "List product documentation from the connected platform, with its version and translation status.",
+      "description": "List the connected platform's product documentation sections, version and translation status.",
       "kind": "read",
       "params": {
         "limit": "Maximum sections, from 1 to 100.",
@@ -1506,15 +1508,15 @@
         "readOnlyHint": true
       },
       "category": "agents-executions",
-      "description": "List runner execution history for a workspace, newest first. Rows are\nheavy (full input_prompt); keep limit small. Before cancel_execution on a\nrow, verify its agent_id/card_id match the scope you meant.",
+      "description": "List a workspace's runner executions, newest first. Rows are heavy; keep limit small. See docs.",
       "kind": "read",
       "params": {
         "agent_id": "Only this runner.",
-        "card_id": "That card's history, ignoring limit, capped at the newest 200 rows.",
-        "limit": "Default 20, caps at 200.",
+        "card_id": "That card's history; ignores limit, newest 200 rows.",
+        "limit": "Caps at 200.",
         "role": "Pipeline role.",
-        "status": "started|running|completed|failed|aborted|skipped, or 'inflight' = all active rows workspace-wide, ignoring limit.",
-        "workspace_slug": "Workspace slug."
+        "status": "started|running|completed|failed|aborted|skipped, or inflight (every active row; ignores limit).",
+        "workspace_slug": null
       },
       "title": "List executions"
     },
@@ -1529,7 +1531,7 @@
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List git repos"
     },
@@ -1540,11 +1542,11 @@
         "readOnlyHint": true
       },
       "category": "loop-templates",
-      "description": "List a template's published versions, newest first: version, timestamp, note.",
+      "description": "List a template's published versions (version, timestamp, note), newest first.",
       "kind": "read",
       "params": {
         "ref": "System slug or template UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List loop template versions"
     },
@@ -1555,13 +1557,13 @@
         "readOnlyHint": true
       },
       "category": "loop-templates",
-      "description": "List loop templates: system first, then workspace. Summaries only;\nget_loop_template carries the prompts, slots and tool grants. meta.runner_vars\nis the runner's Go-template variable vocabulary (never hardcode it).",
+      "description": "List loop template summaries, system first; meta.runner_vars is the runner's template variable vocabulary. See docs.",
       "kind": "read",
       "params": {
         "include_archived": "Also list archived workspace templates.",
         "q": "Free-text filter over name and slug.",
         "sort": "name|updated_at|boards_using.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List loop templates"
     },
@@ -1572,11 +1574,11 @@
         "readOnlyHint": true
       },
       "category": "merge-queue",
-      "description": "List a workspace's in-flight merge-queue entries (queued, merging, conflict,\nfailed, blocked_pending_consolidation); merged ones only with merged_within_hours.",
+      "description": "List a workspace's in-flight merge-queue entries; merged ones only with merged_within_hours. See docs.",
       "kind": "read",
       "params": {
         "merged_within_hours": "Also include entries merged within 1..720 hours.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List merge queue"
     },
@@ -1593,11 +1595,11 @@
         "board_id": "Board UUID if board-scoped.",
         "card_id": "Only notes linked to this card on this board (needs board_id).",
         "kinds": "Match any listed note kind (e.g. plan, review_verdict).",
-        "limit": "Page size, 1–100; default 25.",
+        "limit": "Page size, 1–100.",
         "offset": "Zero-based offset; follow next_offset with the same filters.",
         "pinned_only": "Only pinned notes.",
-        "q": "Case-insensitive substring search in title and plain-text body, before paging.",
-        "summary_only": "Omit bodies by default; use get_note(format=\"markdown\") to read one.",
+        "q": "Case-insensitive search in title and body, before paging.",
+        "summary_only": "Omit bodies.",
         "workspace_slug": "Workspace slug (without board_id, workspace-level notes only)."
       },
       "title": "List notes"
@@ -1613,7 +1615,7 @@
       "kind": "read",
       "params": {
         "team_role": "Filter, e.g. orchestrator|reviewer.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List prompt configs"
     },
@@ -1632,7 +1634,7 @@
         "resource_type": "file|folder.",
         "search": "Name search.",
         "tag": "Tag filter.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List resources"
     },
@@ -1643,11 +1645,11 @@
         "readOnlyHint": true
       },
       "category": "skills",
-      "description": "Raw view of a board's skill binding rows, disabled ones included;\nlist_skills(board_id) is the effective set callers actually get.",
+      "description": "Raw view of a board's skill binding rows, disabled ones included; list_skills(board_id) is the effective set. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List skill bindings raw"
     },
@@ -1658,10 +1660,10 @@
         "readOnlyHint": true
       },
       "category": "skills",
-      "description": "List the built-in skill catalog: curated bundles (each declaring the\ntoolsets it plays in) not yet in the workspace library.",
+      "description": "List built-in catalog skill bundles, with their declared toolsets, not yet in the workspace library.",
       "kind": "read",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List skill catalog"
     },
@@ -1672,12 +1674,12 @@
         "readOnlyHint": true
       },
       "category": "skills",
-      "description": "List workspace skills, or a board's effective skill set with board_id.\nMetadata only (incl. each skill's declared toolsets and, for a board, the\ntoolsets its loop grant does not cover); get_skill returns the files.",
+      "description": "List workspace skills, or a board's effective set (board_id): metadata and declared toolsets, no files. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID or slug: return its effective set.",
         "include_archived": "Include archived skills (workspace listing only).",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List skills"
     },
@@ -1692,7 +1694,7 @@
       "kind": "read",
       "params": {
         "include_inactive": "Include inactive teams.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List teams"
     },
@@ -1707,7 +1709,7 @@
       "kind": "read",
       "params": {
         "is_active": "true = active only, false = inactive only.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "List webhooks"
     },
@@ -1718,12 +1720,12 @@
         "readOnlyHint": true
       },
       "category": "workspaces",
-      "description": "List workspace members (user_id, email, name, role); resolves people to user_id before adding card participants.",
+      "description": "List workspace members (user_id, email, name, role) to resolve people to user_id.",
       "kind": "read",
       "params": {
         "limit": "Max members returned.",
-        "query": "Case-insensitive name/email search (capped autocomplete match).",
-        "workspace_slug": "Workspace slug."
+        "query": "Case-insensitive name/email search (capped).",
+        "workspace_slug": null
       },
       "title": "List workspace members"
     },
@@ -1734,7 +1736,7 @@
         "readOnlyHint": true
       },
       "category": "workspaces",
-      "description": "List workspaces the caller can access; use the slug for workspace-scoped tools.",
+      "description": "List workspaces you can access; their slugs scope the other tools.",
       "kind": "read",
       "params": {},
       "title": "List workspaces"
@@ -1758,7 +1760,7 @@
         "parent_execution_id": "Execution UUID this retries.",
         "role": "Pipeline role, e.g. 'implementer'.",
         "session_id": "Coding-agent session id.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Log execution start"
     },
@@ -1769,7 +1771,7 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Record an execution's status, result, or error at completion, failure, or a checkpoint.",
+      "description": "Record an execution's status, result or error at completion, failure or a checkpoint. See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID.",
@@ -1795,14 +1797,14 @@
         "readOnlyHint": false
       },
       "category": "cards",
-      "description": "Move a card to another column and/or position. Omit position to append to the end of the target column.",
+      "description": "Move a card to another column and/or position; omitted position appends. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
         "column_id": "Target column UUID.",
         "position": "Fractional index (midpoint between neighbours); omitted appends.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Move card"
     },
@@ -1813,13 +1815,13 @@
         "readOnlyHint": false
       },
       "category": "assignments",
-      "description": "Atomically reserve the next eligible card for a pipeline runner; role filters, untyped-column exclusion and role preconditions are applied server-side.\n\nReturns card, board, column, repo, effective role, stage_action and a reservation (id + expires_at; auto-expires so a crashed runner cannot starve the board), or {\"status\": \"no_work\"} (sleep, retry). Idempotent while reserved; 409 = in-flight execution on another card (403 owner not a member, 404 unknown runner).",
+      "description": "Atomically reserve the next eligible card for a pipeline runner (role filters applied server-side); returns the card bundle or {\"status\": \"no_work\"}. See docs.",
       "kind": "composite",
       "params": {
         "agent_id": "Runner UUID.",
         "board_id": "Restrict the scan to one board UUID.",
-        "role_override": "A role the runner holds in its team, instead of its primary.",
-        "workspace_slug": "Workspace slug."
+        "role_override": "A team role to take instead of the primary.",
+        "workspace_slug": null
       },
       "title": "Next assignment"
     },
@@ -1830,7 +1832,7 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Stop a runner from picking up new cards (idempotent); its in-flight card\nstill finishes, so use cancel_execution to end that too.",
+      "description": "Stop a runner from picking up new cards (idempotent); its in-flight card still finishes. See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID."
@@ -1844,7 +1846,7 @@
         "readOnlyHint": false
       },
       "category": "skills",
-      "description": "Propose a new skill or version as a draft pending human approval;\nnothing is served until approved. Idempotent: returns the pending proposal.",
+      "description": "Propose a skill or version as a draft pending human approval; nothing is served until approved. Idempotent. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Originating board.",
@@ -1852,7 +1854,7 @@
         "files": "[{\"path\", \"content\"}], SKILL.md plus support files, verbatim.",
         "name": "Omit to use SKILL.md frontmatter.",
         "slug": "Skill slug to create or version.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Propose skill"
     },
@@ -1863,13 +1865,13 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Validate the draft, snapshot a new version and publish it; bound boards\nshow drift until re-rendered. Invalid draft: 422 with per-field findings.",
+      "description": "Validate the draft and publish it as a new version; bound boards show drift until re-rendered. See docs.",
       "kind": "write",
       "params": {
         "expected_version": "Optimistic lock.",
         "note": "Changelog line (<= 500 chars).",
         "ref": "Workspace template UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Publish loop template"
     },
@@ -1880,13 +1882,13 @@
         "readOnlyHint": true
       },
       "category": "context",
-      "description": "Read bounded Markdown from the connected platform's canonical product documentation.",
+      "description": "Read bounded Markdown from the connected platform's product documentation.",
       "kind": "read",
       "params": {
         "limit": "Maximum characters, from 1 to 30000.",
         "locale": "Registered documentation locale (en, es, pt-BR).",
         "offset": "Character offset for continuing a section.",
-        "slug": "Section slug returned by list_documentation.",
+        "slug": "Section slug from list_documentation; \"<slug>#<anchor>\" reads one subsection. A tool's \"See docs.\" means \"mcp-tool-catalog#tool-<name>\".",
         "version": "Version from list_documentation; mismatches fail explicitly."
       },
       "title": "Read product documentation"
@@ -1898,13 +1900,13 @@
         "readOnlyHint": false
       },
       "category": "card-dependencies",
-      "description": "Remove a depends-on edge. Idempotent: a missing edge is a no-op success.",
+      "description": "Remove a depends-on edge; idempotent.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Dependent card UUID or id prefix.",
         "depends_on_card_id": "Prerequisite card UUID or id prefix.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Remove card dependency"
     },
@@ -1915,14 +1917,14 @@
         "readOnlyHint": false
       },
       "category": "cards",
-      "description": "Remove participants from a card: one person by user_id, or every holder of a pipeline_role (e.g. drop the stale implementer before rework; idempotent — a no-op when nobody holds it). Exactly one selector.",
+      "description": "Remove one participant by user_id, or every holder of a pipeline_role (pass exactly one). Idempotent. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
-        "pipeline_role": "Stage role to clear — planner, implementer, reviewer, rework_mediator or custom; instead of user_id.",
+        "pipeline_role": "Stage role whose holders are all removed (planner, implementer, ... or custom); instead of user_id.",
         "user_id": "Participant's user UUID (one person).",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Remove card participant"
     },
@@ -1933,12 +1935,12 @@
         "readOnlyHint": false
       },
       "category": "skills",
-      "description": "Delete a board's skill binding row, pin included; disable via\nset_skill_binding to keep it. Idempotent.",
+      "description": "Delete a board's skill binding row, pin included; idempotent. Disable via set_skill_binding to keep it. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
         "skill_slug": "Bound skill slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Remove skill binding"
     },
@@ -1954,7 +1956,7 @@
       "params": {
         "agent_id": "Runner UUID.",
         "team_id": "Team UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Remove team member"
     },
@@ -1969,7 +1971,7 @@
       "kind": "write",
       "params": {
         "user_id": "User UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Remove workspace member"
     },
@@ -1980,12 +1982,12 @@
         "readOnlyHint": false
       },
       "category": "columns",
-      "description": "Reorder a board's columns. Send every column UUID on the board in the new left-to-right order; foreign ids are rejected and omitted columns keep their positions.",
+      "description": "Reorder a board's columns: send every column UUID on the board, left to right. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "column_ids": "All column UUIDs on the board, in order.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Reorder columns"
     },
@@ -2004,7 +2006,7 @@
         "agent_id": "Requesting runner UUID.",
         "board_id": "Board UUID if board-scoped.",
         "category": "deletion|bulk_change|deployment|schema_change|permission_change|external_action.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Request approval"
     },
@@ -2020,7 +2022,7 @@
       "params": {
         "board_id": "Board UUID/slug.",
         "card_id": "Card UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Request landing"
     },
@@ -2031,7 +2033,7 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Ask a live runner to finish its in-flight card and exit for its supervisor\nto relaunch on fresh config; an offline runner returns 503.",
+      "description": "Ask a live runner to finish its card and exit for its supervisor to relaunch; offline runners return 503. See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID."
@@ -2050,7 +2052,7 @@
       "params": {
         "ref": "Workspace template UUID or slug.",
         "version": "Published version number to stage.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Restore loop template version"
     },
@@ -2075,10 +2077,10 @@
         "readOnlyHint": false
       },
       "category": "workspace-config",
-      "description": "Clear a tripped cost circuit breaker so runners can pick up work again — use when next_assignment returns 423 for every runner.\n\nAn acknowledgement, not a mute: the next spend over the threshold re-trips it. Threshold/action are unchanged (update_workspace_config). Admin/owner only. Returns {status: \"resumed\", workspace_id}.",
+      "description": "Clear a tripped cost circuit breaker (admin/owner); it re-trips on the next spend over the threshold. See docs.",
       "kind": "write",
       "params": {
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Resume cost breaker"
     },
@@ -2094,7 +2096,7 @@
       "params": {
         "board_id": "Board UUID/slug.",
         "card_id": "Card UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Retry completion"
     },
@@ -2105,7 +2107,7 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Mint a new API key for a runner; the old key dies immediately and\nraw_api_key appears only in this result.",
+      "description": "Mint a new API key for a runner; the old key dies immediately and raw_api_key appears only here.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID."
@@ -2119,7 +2121,7 @@
         "readOnlyHint": true
       },
       "category": "search",
-      "description": "Search and filter cards on a board by text, priority, type, status, label, assignee, column, column type, or overdue.\n\nUse summary_only=True to browse or triage (full cards carry descriptions and participants and overflow on busy boards), then get_card for the one you need. Both modes include column_name and column_type.",
+      "description": "Search a board's cards by text and filters. Browse with summary_only=True (full cards can overflow), then get_card. See docs.",
       "kind": "read",
       "params": {
         "assignee_id": "Participant user/runner UUID.",
@@ -2129,15 +2131,15 @@
         "column_type": "backlog|active|review|done|blocked.",
         "exclude_column_type": "Exclude columns of this type.",
         "has_assignee": "True = has a hero, False = unassigned.",
-        "include_untyped": "Include untyped (human-only) columns; default True. Pass False when picking work to execute.",
+        "include_untyped": "Include untyped (human-only) columns; default True. Pass False when picking work.",
         "label": "Cards carrying this label.",
-        "limit": "1-100, default 50.",
+        "limit": "1-100.",
         "overdue": "True for cards past their due date.",
         "priority": "none|low|medium|high|urgent.",
         "q": "Text to match in titles and descriptions.",
         "status": "Status string.",
-        "summary_only": "Drop description/participants/derived fields.",
-        "workspace_slug": "Workspace slug."
+        "summary_only": "Drop description/participants/derived fields; column_name/column_type stay.",
+        "workspace_slug": null
       },
       "title": "Search cards"
     },
@@ -2148,18 +2150,18 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Edit loop config/state. Omitted fields persist; edits apply next iteration. Enable is idempotent, requiring nonempty loop_prompt. Config saves before state. When running in loop mode: call this with enabled=false and a concise reason when the objective is complete or you are blocked.",
+      "description": "Edit a board's loop config and/or state; omitted fields persist. When running in loop mode: call this with enabled=false and a concise reason when the objective is complete or you are blocked. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
         "budget_usd": "Cumulative budget since enable (>0).",
         "completion_query": "{label, exclude_column_type:\"done\"}; zero matches stops; {} clears.",
-        "detach_template": "Remove binding, retain rendered text; overrides template_ref.",
+        "detach_template": "Drop the binding, keep the rendered text.",
         "enabled": "True=start/resume, false=stop; omitted=config only.",
         "expected_version": "Last-read loop version; stale=409.",
         "iteration_delay_seconds": "Iteration cooldown (>=0).",
         "iteration_timeout_seconds": "Session timeout (>=1).",
-        "loop_landing": "Legacy human|self_merge|merge_queue. Human self_merge saves auto-relax the Done merge gate.",
+        "loop_landing": "Legacy human|self_merge|merge_queue.",
         "loop_prompt": "Iteration prompt.",
         "max_blocked_on_human": "Consecutive blocked_on_human stop threshold; 0=park only.",
         "max_consecutive_failures": "Failure breaker (>=1).",
@@ -2167,17 +2169,17 @@
         "merge_gate": "forge_ci (require green CI before queue merge)|none.",
         "model": "Tier (premium/mid/low) or model ID.",
         "provider": "Coding agent (empty=runner default).",
-        "reason": "Stop reason; saved only on enabled-to-disabled transition.",
+        "reason": "Stop reason (kept on disable).",
         "relax_done_merge_gate": "False declines self_merge auto-relax for this save.",
         "skills_proposal_enabled": "Allow runner propose_skill; default true.",
-        "slot_values": "Full replacement {SLOT_NAME:value}; alone re-renders the binding.",
+        "slot_values": "Full replacement {SLOT_NAME:value}.",
         "starvation_policy": "park (sleep when idle)|always_run.",
         "system_prompt": "Session system prompt.",
-        "template_ref": "System slug/workspace UUID to bind; owns prompts/tools (raw edits:422 alongside bind,409 later).",
+        "template_ref": "System slug or workspace UUID to bind.",
         "template_source": "system (default)|workspace.",
         "template_version": "Published version; omitted=newest.",
         "tools": "Replacement mcp__valaris__* allowlist; []=full surface.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Set board loop"
     },
@@ -2188,7 +2190,7 @@
         "readOnlyHint": false
       },
       "category": "skills",
-      "description": "Upsert a skill binding on a board: enable/disable, optionally pin a\nversion. Omitted fields are unchanged (tri-state); new bindings default\nto enabled, unpinned.",
+      "description": "Upsert a board's skill binding: enable/disable, optionally pin a version; omitted fields are unchanged. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
@@ -2196,7 +2198,7 @@
         "enabled": "Active on the board.",
         "pinned_version": "Version to pin.",
         "skill_slug": "Workspace skill slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Set skill binding"
     },
@@ -2216,7 +2218,7 @@
         "checks": "Checks: [{id, source_sha, exit_code, output}].",
         "source_execution_id": "This iteration's runner-supplied execution UUID.",
         "source_sha": "Evidence source commit SHA (full).",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Submit completion candidate"
     },
@@ -2227,11 +2229,11 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Unfreeze a frozen board, reopening mutations and scheduling.\n\nWorkspace owner only (admins can freeze but not unfreeze). Idempotent.",
+      "description": "Unfreeze a board, reopening mutations and pickup. Workspace owner only; idempotent. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Unfreeze board"
     },
@@ -2242,18 +2244,18 @@
         "readOnlyHint": false
       },
       "category": "agents-executions",
-      "description": "Update a runner's profile or constraints; only passed fields change. is_active=false is the reversible retirement; hard_delete=true erases the runner instead (API key, executions, approvals, team memberships — unrecoverable; 409 while a card is in flight) and accepts no other field.",
+      "description": "Update a runner's profile or constraints; only passed fields change. hard_delete=true erases it (alone). See docs.",
       "kind": "write",
       "params": {
         "agent_id": "Runner UUID.",
         "allowed_actions": "New action allowlist.",
         "allowed_workspaces": "Replacement allowlist; non-empty.",
         "budget_usd": "New spending cap.",
-        "description": "New description.",
-        "hard_delete": "True permanently erases the runner (unrecoverable); alone, with no other field.",
+        "description": null,
+        "hard_delete": "True erases the runner (unrecoverable); alone.",
         "is_active": "False disables (reversible).",
         "max_requests_per_minute": "New rate limit.",
-        "name": "New display name."
+        "name": null
       },
       "title": "Update agent"
     },
@@ -2264,15 +2266,15 @@
         "readOnlyHint": false
       },
       "category": "boards",
-      "description": "Update a board's name, description, tags, or done-merge-gate override. Omitted fields are unchanged.\n\nHuman keys only (runners get 403). done_merge_gate needs workspace admin/owner.",
+      "description": "Update a board's name, description, tags or done_merge_gate; omitted fields are unchanged. Human keys only. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
-        "description": "New description.",
-        "done_merge_gate": "inherit|enforced|off. Gates RUNNER moves into done on a merged PR with an approving verdict (humans never gated; no linked repo = exempt); inherit follows the workspace flag.",
-        "name": "New display name.",
+        "description": null,
+        "done_merge_gate": "inherit|enforced|off (admin/owner): gates runner moves into done.",
+        "name": null,
         "tags": "Replaces the tag list.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update board"
     },
@@ -2283,23 +2285,23 @@
         "readOnlyHint": false
       },
       "category": "cards",
-      "description": "Update card fields; omitted or null values keep existing values.\n\nTo clear nullable values, pass clear_fields=[\"due_date\"] (or another\nsupported field). Do not also set a non-null value for a cleared field.\nClear a description with description=\"\"; clear labels with labels=[] or\nclear_fields=[\"labels\"] (JSON null). Repeating a clear is safe.",
+      "description": "Update card fields; omitted or null values keep existing values. Clear via clear_fields, description=\"\" or labels=[]. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
         "branch_name": "Branch the work landed on.",
         "card_id": "Card UUID or id prefix.",
         "card_type": "task|issue|feature|bug.",
-        "clear_fields": "Nullable fields to set to null: due_date, status, labels, pr_url, branch_name, git_repo_slug. Omit to preserve existing values.",
-        "description": "New description.",
+        "clear_fields": "Nullable fields to null: due_date, status, labels, pr_url, branch_name, git_repo_slug.",
+        "description": null,
         "due_date": "YYYY-MM-DD.",
         "git_repo_slug": "Target repo slug on multi-repo boards.",
         "labels": "Replaces the whole label list.",
-        "pr_url": "PR the card shipped as; prefer it over a link in the description.",
+        "pr_url": "PR the card shipped as.",
         "priority": "none|low|medium|high|urgent.",
         "status": "Short state label. Max 255 characters.",
         "title": "Max 500 characters.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update card"
     },
@@ -2316,10 +2318,10 @@
         "channel_id": "Channel UUID.",
         "channel_type": "email|slack|whatsapp|phone|website|other.",
         "contact_value": "New address or identifier.",
-        "description": "New description.",
+        "description": null,
         "metadata_json": "Shallow-merged per key; set a key to null to remove it.",
-        "name": "New display name.",
-        "workspace_slug": "Workspace slug."
+        "name": null,
+        "workspace_slug": null
       },
       "title": "Update channel"
     },
@@ -2336,9 +2338,9 @@
         "board_id": "Board UUID.",
         "color": "New hex color.",
         "column_id": "Column UUID.",
-        "column_type": "backlog|active|review|done|blocked, or \"null\" to clear the type and make the column human-only (runners skip it).",
-        "name": "New display name.",
-        "workspace_slug": "Workspace slug."
+        "column_type": "backlog|active|review|done|blocked, or \"null\" to clear it (human-only column).",
+        "name": null,
+        "workspace_slug": null
       },
       "title": "Update column"
     },
@@ -2349,7 +2351,7 @@
         "readOnlyHint": false
       },
       "category": "definitions",
-      "description": "Upsert a board's definition. Shallow merge: only given keys are replaced.\nExplicit params win over the same key in `content`.",
+      "description": "Upsert a board's definition; shallow merge, and explicit params win over the same key in `content`. See docs.",
       "kind": "write",
       "params": {
         "board_id": "Board UUID.",
@@ -2365,7 +2367,7 @@
         "scope": "Summary paragraph.",
         "stakeholders": "[{\"name\", \"role\"?, \"member_id\"?, \"channel_id\"?}].",
         "tech_stack": "[\"python\", \"react\", ...].",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update definition"
     },
@@ -2381,15 +2383,15 @@
       "params": {
         "board_id": "Board UUID.",
         "default_branch": "New default branch.",
-        "description": "New description.",
-        "integration_branch": "Staging branch that git.base_ref=\"integration_branch\" stages fork from; empty keeps default_branch.",
-        "name": "New display name.",
+        "description": null,
+        "integration_branch": "Staging branch for stages with git.base_ref=\"integration_branch\".",
+        "name": null,
         "provider": "New provider.",
         "repo_id": "Git repo UUID.",
         "require_branch_protection": "Toggle the policy.",
-        "slug": "New board-unique slug; changes which cards' git_repo_slug resolve here.",
+        "slug": "New board-unique slug.",
         "url": "New URL.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update git repo"
     },
@@ -2400,15 +2402,15 @@
         "readOnlyHint": false
       },
       "category": "loop-templates",
-      "description": "Autosave a workspace template's DRAFT. Omitted fields are unchanged;\n`content` and `profile` replace the whole object (no deep merge). System\ntemplates are immutable: duplicate first.",
+      "description": "Autosave a workspace template's DRAFT. Omitted fields are unchanged; content and profile replace the whole object. See docs.",
       "kind": "write",
       "params": {
         "content": "Full replacement body.",
-        "expected_updated_at": "Optimistic lock: `draft_updated_at` last read; 409 on conflict.",
-        "name": "New display name.",
+        "expected_updated_at": "draft_updated_at last read; 409 on conflict.",
+        "name": null,
         "profile": "Full replacement {emoji, tagline, tags}.",
         "ref": "Workspace template UUID or slug.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update loop template"
     },
@@ -2419,19 +2421,20 @@
         "readOnlyHint": false
       },
       "category": "notes",
-      "description": "Update a note; only provided fields change. mode decides what content does to the body: \"replace\" (default) rewrites the whole body; \"append\" adds blocks at the end (additive — a retry appends twice); \"section\" rewrites the body under anchor_heading only (idempotent; the heading stays, empty content clears the section, a missing heading is 404 and a duplicate 409). Prefer append/section for logs, trackers and long pinned notes. title/pinned/card_id apply in every mode.",
+      "description": "Update a note; only provided fields change. mode: \"replace\" (default), \"append\" (not idempotent) or \"section\" (rewrites the anchor_heading section; idempotent). See docs.",
       "kind": "write",
       "params": {
-        "anchor_heading": "mode=\"section\" only: heading text without the leading # marks (trimmed, case-insensitive).",
+        "anchor_heading": "mode=\"section\" only: heading text without # marks (trimmed, case-insensitive).",
         "board_id": "Board UUID if board-scoped.",
-        "card_id": "Card to link (must be on the note's board); omit to keep the current link.",
-        "content": "Body as markdown (HTML, plain text or ProseMirror JSON also accepted); required for mode=\"append\".",
+        "card_id": "Card to link (on the note's board); omit to keep the link.",
+        "content": "Markdown (HTML, text or ProseMirror JSON accepted); required for mode=\"append\".",
         "detach_card": "Clear the card link; wins over card_id.",
-        "mode": "\"replace\" (whole body), \"append\" (blocks at the end), or \"section\" (under anchor_heading).",
+        "mode": "\"replace\", \"append\" or \"section\".",
         "note_id": "Note UUID.",
         "pinned": "Pin state.",
-        "title": "New title.",
-        "workspace_slug": "Workspace slug."
+        "return_content": "Echo the stored body in the receipt.",
+        "title": null,
+        "workspace_slug": null
       },
       "title": "Update note"
     },
@@ -2448,12 +2451,12 @@
         "agent_type": "coding|manager|reviewer|secretary|improver.",
         "config_id": "Prompt config UUID.",
         "content": "New prompt text.",
-        "name": "New name.",
+        "name": null,
         "slug": "New slug.",
         "stage": "New stage.",
         "team_id": "New team UUID.",
         "team_role": "New team role filter.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update prompt config"
     },
@@ -2468,12 +2471,12 @@
       "kind": "write",
       "params": {
         "board_id": "Board UUID if board-scoped.",
-        "description": "New description.",
-        "metadata": "Shallow-merged per key; only `tags` survives validation, and a tags array replaces the whole list.",
-        "name": "New name.",
+        "description": null,
+        "metadata": "Shallow-merged; only tags survive, replacing the whole list.",
+        "name": null,
         "parent_id": "New parent folder UUID (moves it).",
         "resource_id": "Resource UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update resource"
     },
@@ -2488,10 +2491,10 @@
       "kind": "write",
       "params": {
         "board_id": "New board scope.",
-        "description": "New description.",
-        "name": "New name.",
+        "description": null,
+        "name": null,
         "team_id": "Team UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update team"
     },
@@ -2502,16 +2505,16 @@
         "readOnlyHint": false
       },
       "category": "webhooks",
-      "description": "Update a webhook; only passed fields change. is_active=false pauses deliveries reversibly; delete=true removes the registration for good (deliveries stop at once; an already-deleted webhook reports so) and accepts no other field.",
+      "description": "Update a webhook; only passed fields change. delete=true removes it permanently (alone). See docs.",
       "kind": "write",
       "params": {
-        "delete": "True permanently removes the webhook (no undo); alone, with no other field. Prefer is_active=false to pause.",
+        "delete": "True removes it permanently; alone. Pause with is_active=false instead.",
         "events": "REPLACES the whole subscription list.",
         "is_active": "false pauses deliveries, true resumes.",
-        "secret": "New HMAC secret; update the receiver too.",
+        "secret": "New HMAC secret.",
         "url": "New delivery URL.",
         "webhook_id": "Webhook UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update webhook"
     },
@@ -2522,7 +2525,7 @@
         "readOnlyHint": false
       },
       "category": "workspace-config",
-      "description": "PATCH the workspace config; omitted fields stay unchanged. Requires admin/owner.\n\nNot pre-validated: a malformed payload returns the backend validator's 422 error list as message. Pass {} to clear a dict field. Stage edits: read with get_workspace_config, mutate, send back the whole pipeline_config.",
+      "description": "PATCH the workspace config (admin/owner); omitted fields stay unchanged and pipeline_config is replaced whole. See docs.",
       "kind": "write",
       "params": {
         "card_cooldown_hours": "Wait before re-offering a released card.",
@@ -2531,10 +2534,10 @@
         "expected_version": "409 when the stored version differs.",
         "max_rework_attempts": "Per-card rework cap.",
         "model_pricing": "Per-model $/token overrides, merged over defaults.",
-        "pipeline_config": "{\"stages\": [{role, discover, claim, git, llm, on_success}], \"scheduling\"?}; llm.context_sources[] = {\"kind\", \"filter\"?, \"as\"?} with kind card_notes|board_definition|pinned_notes|sibling_cards|board_snapshot|review_history.",
+        "pipeline_config": "{\"stages\": [{role, discover, claim, git, llm, on_success}], \"scheduling\"?}.",
         "pr_description_template": "PR description template.",
         "role_labels": "Per-role display labels, e.g. {\"implementer\": \"Coder\"}.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update workspace config"
     },
@@ -2545,14 +2548,35 @@
         "readOnlyHint": false
       },
       "category": "workspaces",
-      "description": "Change a workspace member's role. Same role is a no-op; granting or demoting owner needs an acting owner and a human caller (runner keys get 403 human_required).",
+      "description": "Change a member's role; the same role is a no-op. Owner grants and demotions need an acting owner and a human caller. See docs.",
       "kind": "write",
       "params": {
         "role": "owner|admin|member|viewer.",
         "user_id": "Member's user UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Update workspace member"
+    },
+    "upload_resource": {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "readOnlyHint": false
+      },
+      "category": "resources",
+      "description": "Upload a file the user asked for as a resource; returns content_url and embed_markdown for notes. See docs.",
+      "kind": "write",
+      "params": {
+        "board_id": "Board UUID if board-scoped.",
+        "content_base64": "Base64 bytes; 5 MiB cap.",
+        "content_type": "MIME type; default sniffed.",
+        "description": null,
+        "filename": "Required with content_base64.",
+        "parent_id": "Folder UUID.",
+        "path": "Local file; stdio only, 25 MiB cap.",
+        "workspace_slug": null
+      },
+      "title": "Upload resource"
     },
     "validate_board_dependencies": {
       "annotations": {
@@ -2561,11 +2585,11 @@
         "readOnlyHint": true
       },
       "category": "card-dependencies",
-      "description": "Check a board's whole dependency graph for faults. Read-only. ok=True when clean; otherwise cycles (mutually dependent cards, never eligible), conflicts (done cards with undone prerequisites) and orphans (edges pointing off-board), each with a summary.",
+      "description": "Check a board's dependency graph (read-only) for cycles, conflicts and orphans; ok=True when clean. See docs.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
-        "workspace_slug": "Workspace slug."
+        "workspace_slug": null
       },
       "title": "Validate board dependencies"
     },
@@ -2666,7 +2690,8 @@
         "list_resources",
         "update_definition",
         "update_note",
-        "update_resource"
+        "update_resource",
+        "upload_resource"
       ]
     },
     {
@@ -2935,7 +2960,8 @@
         "get_resource",
         "get_upload_url",
         "list_resources",
-        "update_resource"
+        "update_resource",
+        "upload_resource"
       ]
     },
     {

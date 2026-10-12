@@ -48,6 +48,7 @@ from app.services.kanban.loop_binding import (
     slim_ref,
 )
 from app.services.kanban.snapshots import snapshot_column
+from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.utils import slugify
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,9 @@ class BoardService:
             workspace_id=workspace_id,
             name=data.name,
             slug=slug,
-            description=data.description,
+            description=await MediaLinkCanonicalizer(self.db).rich_text(
+                workspace_id, data.description
+            ),
             tags=data.tags,
             created_by=user_id,
         )
@@ -251,10 +254,13 @@ class BoardService:
                     f"Board slug '{data.slug}' already exists in this workspace"
                 )
         before_state = _snapshot_board(board)
-        changed_fields = list(data.model_dump(exclude_unset=True).keys())
-        updated = await self.board_repo.update(
-            board, **data.model_dump(exclude_unset=True)
-        )
+        update_fields = data.model_dump(exclude_unset=True)
+        changed_fields = list(update_fields.keys())
+        if "description" in update_fields:
+            update_fields["description"] = await MediaLinkCanonicalizer(self.db).rich_text(
+                workspace_id, update_fields["description"]
+            )
+        updated = await self.board_repo.update(board, **update_fields)
         if actor_id:
             activity = ActivityService(self.db)
             await activity.record(

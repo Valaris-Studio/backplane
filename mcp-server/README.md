@@ -66,6 +66,7 @@ Claude Code's project `.mcp.json` or `claude_desktop_config.json`):
 | `VALARIS_API_KEY` | yes | Platform API key (`vlr_…`). Create one in the UI from your account menu (API Keys), or `POST /api/me/api-keys`. |
 | `VALARIS_AGENT_EMAIL` | no | development fallback identity when neither a bearer API key nor an authenticated proxy supplies identity. It is ignored when `VALARIS_API_KEY` is used. |
 | `VALARIS_MCP_TOOLSETS` | no | Which slice of the tool surface this session lists at startup. Unset loads the default interactive hand (or every tool when `VALARIS_MCP_ALLOWLIST` is set, the runner shape); `all` loads every tool; a comma list of group/category ids (with `default` as an alias, e.g. `default,autonomous-operations`) composes a custom hand. An unknown id fails startup. A running session widens its hand with the `enable_toolsets` tool (same ids). |
+| `VALARIS_MCP_UPLOAD_ROOTS` | no | Directories (`os.pathsep`-separated) that `upload_resource(path=…)` may read from, replacing the default: the server's working directory. The filesystem root never counts, and secret-looking paths are refused regardless. |
 
 ### Upgrading from 0.5.0
 
@@ -133,9 +134,13 @@ VALARIS_MCP_TOOLSETS=default,autonomous-operations
 ```
 
 The operator applies these values at the actual MCP service startup, retaining
-the existing API/authentication configuration. Protect the endpoint behind
-authenticated access or a trusted private network. `MCP_HOST=0.0.0.0` is a bind
-address, not access control. Use your deployment's service restart mechanism.
+the existing API/authentication configuration. Use your deployment's service
+restart mechanism.
+
+> **The HTTP transport has no authentication of its own.** Anyone who can reach it
+> can invoke tools with the authority of the server's `VALARIS_API_KEY`. Run it
+> behind an authenticating reverse proxy or on a trusted private network.
+> `MCP_HOST=0.0.0.0` binds all interfaces; it does not restrict access.
 
 1. For **local stdio**, apply the exact returned `restart_env` to the MCP
    server launch configuration and retain stdio transport. For **remote HTTP**,
@@ -225,9 +230,14 @@ No configuration changes. What behaves differently:
   shows the counts under `invocation_tracking`.
 - `create_agent`, `rotate_agent_key`, `get_download_url` and `get_upload_url`
   outcomes keep no result summary, and signed-URL query values are redacted
-  from every summary.
+  from every summary. `upload_resource` keeps its signed upload URL out of
+  its result and error messages, so its summary stays.
 - The deprecated aliases from 0.7.0 still work; their removal is
   postponed to 0.10.0. Migrate to the canonical tools before that release.
+- From 0.9.2, tool descriptions carry the contract only. A description ending
+  in "See docs." has gotchas and examples in the tool's reference entry:
+  `read_documentation(slug="mcp-tool-catalog#tool-<name>")`. Anchored slugs
+  need a platform with anchored documentation reads; older ones answer 404.
 
 ### Upgrading from 0.7.3
 
@@ -341,6 +351,10 @@ Mutation receipts may contain raw ProseMirror JSON. `_content_format` or
 make the receipt editable markdown. Before replacing content, call
 `get_note(format="markdown")` or `get_card`, or retain the original markdown
 used to create it. This does not add a format selector to mutation tools.
+
+Note write receipts (`create_note`, `update_note` in every mode) omit the body
+by default and report its stored size as `content_chars`; pass
+`return_content=True` to get the stored ProseMirror JSON back.
 
 `bulk_create_cards` preserves each card's `git_repo_slug` and other supported
 create fields. An unknown slug or a repository not attached to the target

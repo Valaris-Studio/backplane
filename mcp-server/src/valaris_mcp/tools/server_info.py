@@ -88,21 +88,7 @@ def _allowlist_is_the_hand(hand: HandState) -> bool:
 @mcp.tool()
 @handle_api_errors
 async def get_server_info(ctx: Context = None) -> str:
-    """Report this server's version, full tool surface, and the hand enabled in
-    THIS session; call it when a tool seems missing (version, toolset or
-    allowlist drift).
-
-    Returns version, tools/tool_count (full live surface even when filtered;
-    deprecated_aliases lists retired names still callable until
-    deprecated_removed_in, allowlist_deprecated the granted ones),
-    allowlist, toolsets (loaded ids; resolved_tool_count = the toolset hand
-    BEFORE the allowlist intersection; default, available ids, hint to widen),
-    enabled_tools (registered ∩ toolsets ∩ allowlist; allowlist entries this
-    server lacks under allowlist_unknown, entries clipped by the loaded
-    toolsets under allowlist_outside_toolsets), listing_bytes/
-    listing_tokens_estimate (compact size of this session's tools/list;
-    tokens ≈ bytes/4), annotated_tools, backend reachability (GET /api/health).
-    """
+    """Report the server version, full tool surface and THIS session's enabled hand; call it when a tool seems missing. See docs."""
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
     hand = app.hand
@@ -174,18 +160,10 @@ async def get_server_info(ctx: Context = None) -> str:
 @mcp.tool()
 @handle_api_errors
 async def enable_toolsets(toolset_ids: list[str], ctx: Context = None) -> str:
-    """Widen THIS session's server tool hand and request client refresh; notification delivery does not prove the client catalog updated.
-
-    Widen-only and idempotent: ids already loaded add nothing and send no
-    notification; `all` lifts the toolset layer. A runner allowlist is a
-    ceiling this never lifts — names it clips are reported under
-    allowlist_clipped. Returns loaded (ids, or ["all"]), added_tools/
-    added_count, enabled_tool_count and listing_bytes of this session's
-    tools/list, list_changed_sent, client_catalog_status (always unverified),
-    and restart_env (server startup environment preserving the current hand).
+    """Widen THIS session's toolsets (widen-only; never past a runner allowlist) and request a client refresh, which stays unverified. See docs.
 
     Args:
-        toolset_ids: Toolset ids to add: all, default, or any group or category id listed under get_server_info.toolsets.available.
+        toolset_ids: all, default, or group/category ids from get_server_info.toolsets.available.
     """
     app: AppContext = ctx.request_context.lifespan_context
     hand = app.hand
