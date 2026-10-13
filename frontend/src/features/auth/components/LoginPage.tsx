@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { isApiError } from "@/lib/api-error";
 import { useAuthModes } from "../api/use-auth-modes";
 import { useLogin } from "../api/use-login";
+import { markReturnedFromSignIn, takeReturnPath } from "../redirect-to-login";
 
 // The OIDC callback redirects here with `?code=` on every failure. Codes are
 // opaque by design (the backend never echoes tokens or upstream bodies), so
@@ -36,7 +37,13 @@ export function LoginPage() {
     // screen's minimum, and the server answers uniformly anyway.
     login.mutate(
       { email: email.trim(), password },
-      { onSuccess: () => navigate("/", { replace: true }) },
+      {
+        onSuccess: () => {
+          const returnPath = takeReturnPath();
+          if (returnPath) markReturnedFromSignIn(returnPath);
+          navigate(returnPath ?? "/", { replace: true });
+        },
+      },
     );
   };
 

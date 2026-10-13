@@ -90,8 +90,8 @@ export function TimelineFlagBar({
             data-testid="flag-search-input"
             value={query.text}
             onChange={(e) => onQueryChange({ ...query, text: e.target.value })}
-            placeholder={t("timeline.flags.searchPlaceholder")}
-            aria-label={t("timeline.flags.searchLabel")}
+            placeholder={t("timeline.history.localSearch")}
+            aria-label={t("timeline.history.localSearch")}
             className="h-8 w-full min-w-0 rounded-md border border-input/85 bg-[color:var(--color-surface-1)] pl-7 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring/45"
           />
         </div>

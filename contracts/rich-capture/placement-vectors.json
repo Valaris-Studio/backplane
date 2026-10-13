@@ -1,0 +1,236 @@
+{
+  "about": "Shared placement vectors. `raw` is what an agent wrote; `device_placed` is what the companion's placement (companion/internal/privacy/place.go: text mode for free text, value mode for a whole-path value) must produce with `roots` and `homes`. RC-03 asserts Go produces `device_placed`; the backend gate asserts the server backstop place_text(device_placed, roots) leaves it unchanged. Vectors with `expected_fix_in` are known gaps: today neither side places `raw` (`current_device_placed` records Go's output); the named cards must make Go produce `device_placed` (RC-03) and make the server check flag `raw` (RC-02), and the backend gate holds the RC-02 half as a strict xfail. macOS home spellings are JSON-escaped (\\u002f) so the public-export home-path scan never matches the fixture text.",
+  "vectors": [
+    {
+      "name": "root path in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "see /home/me/code/app/src/main.go:12 for the panic",
+      "device_placed": "see src/main.go:12 for the panic"
+    },
+    {
+      "name": "file URL in the root",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "open file:///home/me/code/app/README.md now",
+      "device_placed": "open file://README.md now"
+    },
+    {
+      "name": "device home in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "config lives in /home/me/.config/tool.toml",
+      "device_placed": "config lives in ~/.config/tool.toml"
+    },
+    {
+      "name": "another Linux home in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "copied from /home/alice/notes/plan.md yesterday",
+      "device_placed": "copied from ~alice/notes/plan.md yesterday"
+    },
+    {
+      "name": "macOS home in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "copied from \u002fUsers/alice/notes/plan.md yesterday",
+      "device_placed": "copied from ~alice/notes/plan.md yesterday"
+    },
+    {
+      "name": "Windows home in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "built in C:\\Users\\alice\\proj\\out.exe",
+      "device_placed": "built in ~alice\\proj\\out.exe"
+    },
+    {
+      "name": "URL-encoded home",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "GET /open?path=%2fhome%2falice%2fnotes",
+      "device_placed": "GET /open?path=~alice%2fnotes"
+    },
+    {
+      "name": "WSL home in prose",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "mounted at /mnt/c\u002fUsers/alice/proj/x",
+      "device_placed": "mounted at ~alice/proj/x"
+    },
+    {
+      "name": "web route stays",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "GET \u002fusers/42/items returned 404",
+      "device_placed": "GET \u002fusers/42/items returned 404"
+    },
+    {
+      "name": "word stays",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "see /home/about for details",
+      "device_placed": "see /home/about for details"
+    },
+    {
+      "name": "other home as a whole value",
+      "mode": "value",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "/home/alice",
+      "device_placed": "~alice"
+    },
+    {
+      "name": "the root as a whole value",
+      "mode": "value",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "/home/me/code/app",
+      "device_placed": "."
+    },
+    {
+      "name": "Windows extended path in the root",
+      "mode": "value",
+      "roots": [
+        "C:\\work\\app"
+      ],
+      "homes": [
+        "C:\\Users\\me"
+      ],
+      "raw": "\\\\?\\C:\\work\\app\\src\\a.txt",
+      "device_placed": "src\\a.txt"
+    },
+    {
+      "name": "root user home as a whole value",
+      "mode": "value",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "/root/.bashrc",
+      "device_placed": "~root/.bashrc"
+    },
+    {
+      "name": "Windows root written with forward slashes",
+      "mode": "text",
+      "roots": [
+        "C:\\work\\app"
+      ],
+      "homes": [
+        "C:\\Users\\me"
+      ],
+      "raw": "compiled C:/work/app/src/b.c ok",
+      "device_placed": "compiled src/b.c ok",
+      "current_device_placed": "compiled C:/work/app/src/b.c ok",
+      "expected_fix_in": [
+        "RC-03",
+        "RC-02"
+      ]
+    },
+    {
+      "name": "macOS root in another case",
+      "mode": "text",
+      "roots": [
+        "\u002fUsers/me/Code/App"
+      ],
+      "homes": [
+        "\u002fUsers/me"
+      ],
+      "raw": "see \u002fusers/me/code/app/a.txt",
+      "device_placed": "see a.txt",
+      "current_device_placed": "see \u002fusers/me/code/app/a.txt",
+      "expected_fix_in": [
+        "RC-03",
+        "RC-02"
+      ]
+    },
+    {
+      "name": "JSON-escaped root inside plain text",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "log {\"file\":\"\\/home\\/me\\/code\\/app\\/a.go\"}",
+      "device_placed": "log {\"file\":\"a.go\"}",
+      "current_device_placed": "log {\"file\":\"\\/home\\/me\\/code\\/app\\/a.go\"}",
+      "expected_fix_in": [
+        "RC-03",
+        "RC-02"
+      ]
+    },
+    {
+      "name": "Linux root in another case stays",
+      "mode": "text",
+      "roots": [
+        "/home/me/code/app"
+      ],
+      "homes": [
+        "/home/me"
+      ],
+      "raw": "see /HOME/me/code/app/a.txt",
+      "device_placed": "see /HOME/me/code/app/a.txt"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+ "litellm": {
+  "commit": "e106dbd8ba9b22317cac4d7d3fb6036777a70cd7",
+  "committed_at": "2026-09-25T05:59:32Z",
+  "file": "litellm_prices.json",
+  "license": "MIT",
+  "providers": [
+   "anthropic",
+   "cerebras",
+   "deepseek",
+   "fireworks_ai",
+   "gemini",
+   "github_copilot",
+   "groq",
+   "minimax",
+   "mistral",
+   "moonshot",
+   "openai",
+   "openrouter",
+   "together_ai",
+   "xai",
+   "zai"
+  ],
+  "sha256": "f69626546f0f4c24a9cc97d32897b77f5945dc7a9fa5ed273af16de1ee711917",
+  "source": "https://github.com/BerriAI/litellm/blob/e106dbd8ba9b22317cac4d7d3fb6036777a70cd7/model_prices_and_context_window.json"
+ },
+ "models_dev": {
+  "fetched_at": "2026-09-25",
+  "file": "models_dev_prices.json",
+  "license": "MIT",
+  "providers": [
+   "amazon-bedrock",
+   "anthropic",
+   "cerebras",
+   "deepseek",
+   "fireworks-ai",
+   "github-copilot",
+   "google",
+   "google-vertex",
+   "groq",
+   "minimax",
+   "mistral",
+   "moonshotai",
+   "openai",
+   "openrouter",
+   "togetherai",
+   "xai",
+   "zai"
+  ],
+  "sha256": "021de852c2c5d111ceb59ce058c80c196e92060d9a95f8a1479153a78ebf00ae",
+  "source": "https://models.dev/api.json"
+ },
+ "version": "litellm-e106dbd8ba9b.models-dev-021de852c2c5"
+}

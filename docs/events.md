@@ -134,13 +134,14 @@ Note: `approval.updated` uses `decided_by` (a user UUID), not `actor_id`. `actio
 
 ### execution.*
 
-Emitted by `ExecutionService`. All surface in the UI (`useAgentMetrics`, `useExecutions`, `useImprovementStatus` subscribe to `execution.*`).
+Emitted by `ExecutionService` (and `ExecutionContextService` for context receipts). All surface in the UI (`useAgentMetrics`, `useExecutions`, `useImprovementStatus` subscribe to `execution.*`).
 
 | Event | Source | Payload |
 |---|---|---|
 | `execution.started` | `ExecutionService.start_execution` (`agents/execution.py:88`). | `{execution_id, agent_id, action, input_summary, board_id, card_id}` |
 | `execution.completed` | `ExecutionService.update_execution` when `status` is terminal (completed/failed/aborted/skipped) (`agents/execution.py:191`). | `{execution_id, status, cost_usd, tokens_used, output_summary, error_message, board_id, card_id, agent_id}` |
 | `execution.warning` | `ExecutionService.record_warning` (`agents/execution.py:317`). In-flight, typed warning surface — **not** a completion signal; the underlying retry continues. Consumers switch on `kind`. | `{execution_id, agent_id, card_id, kind, message}` |
+| `execution.context_receipt_created` | `ExecutionContextService.prepare` (`agents/execution_context.py`) when a new invocation context receipt is retained. Queued until the preparing transaction commits; never sent for an exact idempotent replay. Carries no prompt, manifest or note content. | `{execution_id, workspace_id, receipt_id, ordinal}` |
 
 `input_summary`, `output_summary`, `error_message`, and `message` are unbounded free-text fields — the real thin-payload overflow candidates (see below).
 
@@ -202,7 +203,7 @@ Emitted by `MergeQueueService._publish` (`backend/app/services/merge_queue.py`) 
 
 ### notification.created
 
-Emitted by the in-app notification channel via a deferred, after-commit publish (`backend/app/services/notifications/live_push.py:99`). Staged inside the generation savepoint (`stage_push`), promoted past it (`promote_staged`), and flushed to the bus only after the outer transaction commits (`_flush_pending_pushes`, an `after_commit` listener) — so a rolled-back notification never produces a phantom badge.
+Emitted by the in-app notification channel via a deferred, after-commit publish (`backend/app/services/notifications/live_push.py`). Staged inside the generation savepoint (`stage_push`), promoted on a clean generation (`promote_staged`), and published only after the outer transaction commits (`backend/app/services/committed_events.py`). A push is dropped with any transaction or caller savepoint that rolls back around it, so a rolled-back notification never produces a phantom badge.
 
 Payload (`backend/app/services/notifications/channels.py:49-64`): `{notification_id, recipient_user_id, category, workspace_id, unread_delta, link}`.
 

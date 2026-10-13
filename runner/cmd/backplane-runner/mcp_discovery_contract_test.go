@@ -59,7 +59,7 @@ func TestMCPStaticValidationAllowsRecipesAndRejectsUnsafeStructureWithoutSecrets
 		valid bool
 	}{
 		{`{"mcpServers":{"valaris":{"command":"/opt/custom/mcp","args":["--mode","custom"],"env":{"TOKEN":"private-sentinel"}}}}`, true},
-		{`{"mcpServers":{"valaris":{"command":"uvx","args":["--from","backplane-mcp==0.8.0","valaris-mcp"]}}}`, true},
+		{`{"mcpServers":{"valaris":{"command":"uvx","args":["--from","backplane-mcp==0.9.1","valaris-mcp"]}}}`, true},
 		{`private-sentinel`, false},
 		{`{"mcpServers":{"valaris":{"command":"server","args":[{"private-sentinel":true}]}}}`, false},
 		{`{"mcpServers":{"valaris":{"command":"server","env":{"TOKEN":{"private-sentinel":true}}}}}`, false},

@@ -12,18 +12,30 @@ from app.core import events
 from app.core.auth import current_agent_id
 from app.core.event_bus import event_bus
 from app.core.workspace import enforce_agent_scope
-from app.exceptions import ResourceNotFoundError, ValidationError
+from app.exceptions import ConflictError, ResourceNotFoundError, ValidationError
 from app.models.agents.agent import Agent
-from app.models.agents.execution import ExecutionStatus
+from app.models.agents.execution import AgentExecution, ExecutionStatus
+from app.models.agents.reservation import AgentReservation
 from app.models.workspace import Workspace
 from app.utils import utcnow
+from app.repositories.agents.agent import AgentRepository
+from app.repositories.agents.context_receipt import (
+    ExecutionContextBindingRepository,
+    ExecutionContextReceiptRepository,
+)
 from app.repositories.agents.execution import ExecutionRepository
 from app.repositories.agents.reservation import AgentReservationRepository
 from app.repositories.config_template import BoardLoopTemplateBindingRepository
 from app.repositories.kanban.board import BoardRepository
 from app.repositories.kanban.card import CardRepository
-from app.services.agents.identity import verify_caller_owns_agent
+from app.services.agents.context_dispatch import ContextDispatchPolicyService
+from app.services.agents.context_manifest import canonical_json, sha256_text
+from app.services.agents.identity import (
+    verify_agent_may_work_in_workspace,
+    verify_caller_owns_agent,
+)
 from app.services.loop_template_stamp import STAMP_PREFIX, binding_template_key
+from app.schemas.agents.context import ContextBindingRead
 from app.schemas.agents.execution import (
     CardRef,
     ExecutionCreate,
@@ -60,6 +72,21 @@ def _guard_skills_manifest(execution, update_data: dict) -> None:
         update_data.pop("skills")
 
 
+class _HoldAlreadyPromoted(Exception):
+    """A concurrent start committed a binding for the same hold first."""
+
+
+def _start_request_sha256(data: ExecutionCreate) -> str:
+    # The exact fields the caller sent: identical retries replay, any other
+    # payload that reuses the same hold is a conflicting second start.
+    return sha256_text(canonical_json(data.model_dump(mode="json", exclude_unset=True)))
+
+
+def _reservation_not_found() -> ResourceNotFoundError:
+    # One opaque answer for unknown, foreign and mismatched holds alike.
+    return ResourceNotFoundError("Reservation not found", error_code="reservation_not_found")
+
+
 def _matches_search(execution, term: str) -> bool:
     """Mirror of the SQL search: case-insensitive across BOTH summaries,
     because the iteration number lives in input_summary and the outcome prose
@@ -79,6 +106,7 @@ class ExecutionService:
         self.card_repo = CardRepository(db)
         self.board_repo = BoardRepository(db)
         self.binding_repo = BoardLoopTemplateBindingRepository(db)
+        self.context_binding_repo = ExecutionContextBindingRepository(db)
 
     async def _resolve_workspace(self, slug: str) -> uuid.UUID:
         # The slug arrives in the request body, not the path, so no route
@@ -151,13 +179,13 @@ class ExecutionService:
                 error_params={"prompt_slug": data.prompt_slug},
             )
 
-    async def start_execution(
+    async def _authorize_start(
         self,
         agent_id: uuid.UUID,
         data: ExecutionCreate,
-        user_id: uuid.UUID | None = None,
-    ):
-        await self._get_agent(agent_id, user_id)
+        user_id: uuid.UUID | None,
+    ) -> tuple[Agent, uuid.UUID]:
+        agent = await self._get_agent(agent_id, user_id)
         self._reject_reserved_prompt_slug(data)
         workspace_id = await self._resolve_workspace(data.workspace_slug)
         if data.board_id is not None:
@@ -165,7 +193,11 @@ class ExecutionService:
             # cross-tenant call must neither observe a foreign binding nor
             # leave a row behind.
             await self._verify_board_tenancy(data.board_id, workspace_id)
+        return agent, workspace_id
 
+    async def _create_execution(
+        self, agent_id: uuid.UUID, workspace_id: uuid.UUID, data: ExecutionCreate
+    ) -> AgentExecution:
         # Bind the reserved card at START so `agent_presence='active'` is
         # authoritative the moment work begins. The runner never sets
         # cards_affected (only the LLM sometimes does, via log_execution_update),
@@ -181,7 +213,7 @@ class ExecutionService:
         stamp = await self._loop_template_stamp(data)
         prompt_slug = stamp if data.action == "loop_iteration" else data.prompt_slug
 
-        execution = await self.repo.create(
+        return await self.repo.create(
             agent_id=agent_id,
             workspace_id=workspace_id,
             board_id=data.board_id,
@@ -199,22 +231,191 @@ class ExecutionService:
             skills=data.skills,
         )
 
+    async def _publish_started(
+        self, execution: AgentExecution, data: ExecutionCreate
+    ) -> None:
         try:
             await event_bus.publish(
                 event_type=events.EXECUTION_STARTED,
                 payload={
                     "execution_id": str(execution.id),
-                    "agent_id": str(agent_id),
+                    "agent_id": str(execution.agent_id),
                     "action": data.action,
                     "input_summary": data.input_summary,
                     "board_id": str(data.board_id) if data.board_id else None,
                     "card_id": str(data.card_id) if data.card_id else None,
                 },
-                workspace_id=workspace_id,
+                workspace_id=execution.workspace_id,
             )
         except Exception:
             logger.exception("Failed to publish EXECUTION_STARTED event")
 
+    async def start_execution(
+        self,
+        agent_id: uuid.UUID,
+        data: ExecutionCreate,
+        user_id: uuid.UUID | None = None,
+        *,
+        context_dispatch_header: str | None = None,
+    ):
+        _, workspace_id = await self._authorize_start(agent_id, data, user_id)
+        if data.card_id is not None:
+            await ContextDispatchPolicyService(self.db).refuse_unbound_card_start(
+                workspace_id,
+                data.workspace_slug,
+                agent_id,
+                user_id,
+                header=context_dispatch_header,
+                version=data.context_dispatch_version,
+            )
+        execution = await self._create_execution(agent_id, workspace_id, data)
+        await self._publish_started(execution, data)
+        return await self._attach_card_refs_one(execution)
+
+    async def start_bound_execution(
+        self,
+        agent_id: uuid.UUID,
+        data: ExecutionCreate,
+        user_id: uuid.UUID | None = None,
+        *,
+        context_dispatch_header: str | None = None,
+    ) -> tuple[AgentExecution, bool]:
+        """Start an execution by promoting the exact scheduler hold it names.
+
+        Returns (execution, created). The hold authorizes this ONE promotion;
+        afterwards the immutable binding identifies the work, so an exact
+        retry replays even after the hold expired or was swept. Every call,
+        replays included, re-checks current authority first.
+        """
+        agent, workspace_id = await self._authorize_start(agent_id, data, user_id)
+        await verify_agent_may_work_in_workspace(
+            self.db,
+            agent,
+            workspace_slug=data.workspace_slug,
+            workspace_id=workspace_id,
+            caller_id=user_id,
+        )
+        fingerprint = _start_request_sha256(data)
+
+        existing = await self.context_binding_repo.get_by_reservation(data.reservation_id)
+        if existing is None:
+            policy = ContextDispatchPolicyService(self.db)
+            # First lock of the promotion (policy -> hold -> workspace): a
+            # policy activation committing meanwhile is seen below.
+            await policy.lock_shared(workspace_id)
+            hold = await self.reservation_repo.get_for_update(data.reservation_id)
+            # The lock wait has no bound: authority revoked meanwhile still
+            # denies, and a promotion committed meanwhile is replayed even if
+            # its winner let the hold expire or deleted it before committing.
+            current_agent = await AgentRepository(self.db).get_current(agent_id)
+            if current_agent is None:
+                raise ResourceNotFoundError("Agent not found")
+            await verify_agent_may_work_in_workspace(
+                self.db,
+                current_agent,
+                workspace_slug=data.workspace_slug,
+                workspace_id=workspace_id,
+                caller_id=user_id,
+            )
+            existing = await self.context_binding_repo.get_by_reservation(
+                data.reservation_id
+            )
+            if existing is None:
+                self._verify_promotable_hold(hold, agent_id, workspace_id, data)
+                # Current policy, read after the hold lock and serialized
+                # against floor-raising config writes. A replay below keeps
+                # its original stamp instead: a floor never downgrades.
+                stamp = await policy.stamp_for_start(
+                    workspace_id,
+                    agent_id,
+                    header=context_dispatch_header,
+                    version=data.context_dispatch_version,
+                    policy_revision=data.context_dispatch_policy_revision,
+                )
+        if existing is None:
+            try:
+                async with self.db.begin_nested():
+                    execution = await self._create_execution(agent_id, workspace_id, data)
+                    claimed = await self.context_binding_repo.claim(
+                        execution_id=execution.id,
+                        reservation_id=hold.id,
+                        agent_id=hold.agent_id,
+                        workspace_id=hold.workspace_id,
+                        board_id=hold.board_id,
+                        card_id=hold.card_id,
+                        role=hold.role,
+                        start_request_sha256=fingerprint,
+                        context_dispatch_version=stamp.version if stamp else None,
+                        context_dispatch_mode=stamp.mode if stamp else None,
+                        context_dispatch_policy_revision=(
+                            stamp.policy_revision if stamp else None
+                        ),
+                    )
+                    if claimed is None:
+                        raise _HoldAlreadyPromoted
+            except _HoldAlreadyPromoted:
+                existing = await self.context_binding_repo.get_by_reservation(
+                    data.reservation_id
+                )
+            else:
+                await self._publish_started(execution, data)
+                return await self._attach_card_refs_one(execution), True
+        replayed = await self._replay_bound_start(
+            existing, agent_id, workspace_id, data, fingerprint
+        )
+        return replayed, False
+
+    @staticmethod
+    def _verify_promotable_hold(
+        hold: AgentReservation | None,
+        agent_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        data: ExecutionCreate,
+    ) -> None:
+        if (
+            hold is None
+            or hold.agent_id != agent_id
+            or hold.workspace_id != workspace_id
+            or hold.board_id != data.board_id
+            or hold.card_id != data.card_id
+            or hold.role != data.role
+        ):
+            raise _reservation_not_found()
+        if hold.expires_at <= utcnow():
+            raise ConflictError(
+                "The assignment hold expired before this execution started; "
+                "request a new assignment",
+                error_code="reservation_expired",
+            )
+
+    async def _replay_bound_start(
+        self,
+        binding,
+        agent_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        data: ExecutionCreate,
+        fingerprint: str,
+    ) -> AgentExecution:
+        # Same identity test as an unpromoted hold, so a mismatched tuple gets
+        # the same opaque 404 whether or not a concurrent start won first.
+        if (
+            binding is None
+            or binding.agent_id != agent_id
+            or binding.workspace_id != workspace_id
+            or binding.board_id != data.board_id
+            or binding.card_id != data.card_id
+            or binding.role != data.role
+        ):
+            raise _reservation_not_found()
+        if binding.start_request_sha256 != fingerprint:
+            raise ConflictError(
+                "This assignment hold already started an execution with a "
+                "different request",
+                error_code="execution_start_conflict",
+            )
+        execution = await self.repo.get_by_id(binding.execution_id)
+        if execution is None:
+            raise _reservation_not_found()
         return await self._attach_card_refs_one(execution)
 
     async def update_execution(
@@ -386,7 +587,8 @@ class ExecutionService:
         return parsed
 
     async def _attach_card_refs(self, executions: list) -> list:
-        """Set the transient `cards_affected_detail` on each execution.
+        """Set the transient `cards_affected_detail` (and `context_binding`) on
+        each execution.
 
         Collects the UNION of every cards_affected UUID across the whole batch
         and resolves it in ONE query (no N+1), then per execution keeps only the
@@ -401,6 +603,9 @@ class ExecutionService:
             all_ids.update(parsed)
 
         resolved = await self.card_repo.get_refs_by_ids(all_ids)
+        bindings = await self.context_binding_repo.by_execution_ids(
+            {execution.id for execution in executions}
+        )
 
         for execution in executions:
             execution.cards_affected_detail = [
@@ -412,6 +617,10 @@ class ExecutionService:
                 for cid in parsed_by_execution[execution.id]
                 if cid in resolved
             ]
+            binding = bindings.get(execution.id)
+            execution.context_binding = (
+                ContextBindingRead.model_validate(binding) if binding else None
+            )
         return executions
 
     async def _attach_card_refs_one(self, execution):
@@ -490,6 +699,9 @@ class ExecutionService:
         execution = await self.repo.get_by_id(execution_id)
         if execution is None or execution.workspace_id != workspace_id:
             return None
+        execution.context_receipt_count = await ExecutionContextReceiptRepository(
+            self.db
+        ).count(execution.id)
         return await self._attach_card_refs_one(execution)
 
     async def list_workspace_executions_page(

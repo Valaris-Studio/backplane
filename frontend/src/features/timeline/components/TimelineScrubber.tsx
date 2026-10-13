@@ -34,10 +34,6 @@ const MAX_FLAG_DOTS = 120;
 // Cap day-boundary hairlines the same way — multi-month logs would otherwise
 // turn the track to mud.
 const MAX_DAY_MARKERS = 30;
-// The tick/fill layers are inset-x-1 (4px each side) inside the track; the
-// hover math must subtract this so pointer x maps to the same coordinate
-// space the ticks are painted in.
-const TRACK_INSET_PX = 4;
 
 // The four card-step accents the legend teaches — derived from the SAME source
 // describeEvent assigns per kind (the tokens the ticks and StepPanel paint),
@@ -69,14 +65,14 @@ export function TimelineScrubber({
     () => providedActorAccents ?? buildActorAccents(events.map(eventActorKey)),
     [providedActorAccents, events],
   );
-  const containerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [trackWidth, setTrackWidth] = useState(640);
   useLayoutEffect(() => {
-    const element = containerRef.current;
+    const element = trackRef.current;
     if (!element) return;
     const measure = () => {
       const width = element.getBoundingClientRect().width;
-      if (width > 0) setTrackWidth(width - TRACK_INSET_PX * 2);
+      if (width > 0) setTrackWidth(width);
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
@@ -175,12 +171,11 @@ export function TimelineScrubber({
   const handlePointerMove = (e: React.PointerEvent<HTMLInputElement>) => {
     // Touch has no hover state — a finger would just hide the bubble it spawns.
     if (e.pointerType === "touch" || events.length === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const trackWidth = rect.width - TRACK_INSET_PX * 2;
-    if (trackWidth <= 0) return;
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
     const ratio = Math.min(
       1,
-      Math.max(0, (e.clientX - rect.left - TRACK_INSET_PX) / trackWidth),
+      Math.max(0, (e.clientX - rect.left) / rect.width),
     );
     const index = Math.round(ratio * last);
     // Same index → same object, so mousemove storms don't re-render.
@@ -223,11 +218,11 @@ export function TimelineScrubber({
   const flagDots = flags?.filter((_, i) => i % flagStride === 0) ?? [];
 
   return (
-    <div ref={containerRef} className="space-y-1.5">
-      <div className="relative h-6">
+    <div className="space-y-1.5">
+      <div className="relative mx-3 h-6">
         {/* The "filled" portion of the track up to the playhead — reads as a
             video progress bar (how much of the story has played). */}
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted">
+        <div ref={trackRef} className="pointer-events-none absolute inset-x-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted">
           <div
             data-testid="scrubber-progress-fill"
             className="h-full rounded-full bg-primary/40 transition-[width] duration-300 ease-out motion-reduce:transition-none"
@@ -236,7 +231,7 @@ export function TimelineScrubber({
         </div>
         {/* Day-boundary hairlines — slightly taller than the event ticks and
             rendered first so they sit BEHIND them. */}
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 h-5 -translate-y-1/2">
+        <div className="pointer-events-none absolute inset-x-2 top-1/2 h-5 -translate-y-1/2">
           {dayBoundaryIndices.map((index) => (
             <span
               key={`day-${index}`}
@@ -247,7 +242,7 @@ export function TimelineScrubber({
           ))}
         </div>
         {/* Event tick marks behind the range track. */}
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 h-4 -translate-y-1/2">
+        <div className="pointer-events-none absolute inset-x-2 top-1/2 h-4 -translate-y-1/2">
           {ticks.map(({ event, index }) => {
             const isCurrent = index === current;
             return (
@@ -280,7 +275,7 @@ export function TimelineScrubber({
             clickable; each dot seeks straight to its event and feeds the same
             hover bubble the track uses. */}
         {flagDots.length > 0 && (
-          <div className="pointer-events-none absolute inset-x-1 -top-0.5 z-[2] h-2.5">
+          <div className="pointer-events-none absolute inset-x-2 -top-0.5 z-[2] h-2.5">
             {flagDots.map((index) => (
               <motion.button
                 key={index}
@@ -317,6 +312,8 @@ export function TimelineScrubber({
             ))}
           </div>
         )}
+        {/* The size-4 thumb radius matches inset-x-2 so native seeking and every
+            painted lane share the same endpoints at any density. */}
         <input
           type="range"
           min={0}
@@ -329,12 +326,12 @@ export function TimelineScrubber({
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHover(null)}
           aria-label={t("timeline.scrubber.label")}
-          className="relative z-[1] h-6 w-full cursor-pointer appearance-none bg-transparent accent-[color:var(--color-primary)]"
+          className="relative z-[1] h-6 w-full cursor-pointer appearance-none bg-transparent accent-[color:var(--color-primary)] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-primary"
         />
-        {/* Hover preview bubble — the ticks' coordinate space (inset-x-1),
+        {/* Hover preview bubble — the ticks' coordinate space (inset-x-2),
             floated above the track, never trapping the cursor. */}
         {hoverEvent && hover && (
-          <div className="pointer-events-none absolute inset-x-1 bottom-full z-10 mb-1.5">
+          <div className="pointer-events-none absolute inset-x-2 bottom-full z-10 mb-1.5">
             <motion.div
               ref={hoverBubbleRef}
               data-testid="scrubber-hover-preview"
@@ -372,9 +369,9 @@ export function TimelineScrubber({
         )}
       </div>
       {contextGroups.length > 0 && (
-        <div className="relative h-5" role="group" aria-label={t("timeline.scrubber.contextLane")}>
-          <div aria-hidden className="absolute inset-x-1 top-1/2 h-px bg-border/70" />
-          <div className="absolute inset-x-1 inset-y-0">
+        <div className="relative mx-3 h-9" role="group" aria-label={t("timeline.scrubber.contextLane")}>
+          <div aria-hidden className="absolute inset-x-2 top-1/2 h-px bg-border/70" />
+          <div className="absolute inset-x-2 inset-y-0">
             {contextGroups.map(({ indices, position }) => {
               const index = indices.find((candidate) => candidate > current) ?? indices[0]!;
               const event = events[index]!;
@@ -392,7 +389,7 @@ export function TimelineScrubber({
                   onClick={() => onSeek(index)}
                   onPointerEnter={() => previewAt(index, position)} onPointerLeave={() => setHover(null)}
                   onFocus={() => previewAt(index, position)} onBlur={() => setHover(null)}
-                  className={cn("absolute top-0 flex size-6 -translate-x-1/2 items-center justify-center rounded bg-background transition-colors hover:bg-muted focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", indices.includes(current) && "ring-1 ring-current")}
+                  className={cn("absolute top-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded bg-background transition-colors hover:bg-muted focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", indices.includes(current) && "ring-1 ring-current")}
                   style={{ left: last > 0 ? `${(position / last) * 100}%` : "0%", color: tickAccents[index] }}>
                   <Icon aria-hidden className="size-3" />
                   {grouped && <span aria-hidden className="absolute -right-1 -top-1 rounded bg-background px-0.5 text-[8px] font-medium tabular-nums">{indices.length}</span>}

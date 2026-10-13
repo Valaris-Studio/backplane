@@ -54,6 +54,7 @@ func TestCodexCLI_Capabilities(t *testing.T) {
 		// same nested-shell limitation as Claude's --disallowedTools).
 		EnforcesShellDeny:  true,
 		ShellDenyMechanism: "execpolicy-rules",
+		PromptChannels:     PromptChannels{Version: 1, FreshInput: true, ResumeInput: true},
 	}
 	if got != want {
 		t.Errorf("Capabilities() = %+v, want %+v", got, want)

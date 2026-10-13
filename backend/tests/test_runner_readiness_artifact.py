@@ -588,7 +588,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             }
             # Populate one isolated resolver cache with both versions. The
             # generated recipe must still launch the qualified pin, not 0.7.3.
-            for mcp_version in ("0.7.3", "0.8.0"):
+            for mcp_version in ("0.7.3", "0.9.1"):
                 warm = await asyncio.create_subprocess_exec(
                     uvx,
                     "--from",
@@ -742,7 +742,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                         generated.append(server_config)
             assert generated, "first-use wizard did not generate a uvx config"
             assert all(
-                "backplane-mcp==0.8.0" in item.get("args", []) for item in generated
+                "backplane-mcp==0.9.1" in item.get("args", []) for item in generated
             )
             assert {auth for _, auth in forge_http.requests} == {
                 f"Bearer {WORKSPACE_TOKEN}"
@@ -800,7 +800,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             # The terminal report wraps long absolute paths. The exact saved path
             # is asserted above; a successful probe plus the untouched conflicting
             # config marker proves this invocation used that explicit selection.
-            assert "0.8.0" in doctor_output
+            assert "0.9.1" in doctor_output
             assert not wrong_marker.exists()
             selected_mcp.unlink()
             missing_code, missing_output = await saved_profile_doctor()
@@ -819,7 +819,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                         "result": "passed",
                         "artifact_sha256": digest,
                         "source_sha": sha,
-                        "published_mcp": "0.8.0",
+                        "published_mcp": "0.9.1",
                         "model_service_calls": 0,
                     }
                 ),

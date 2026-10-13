@@ -62,11 +62,14 @@ class NoteRepository(BaseRepository[Note]):
         )
         return list(result.scalars().all())
 
-    async def list_by_card(self, card_id: uuid.UUID, workspace_id: uuid.UUID) -> list[Note]:
+    async def list_by_card(
+        self, card_id: uuid.UUID, workspace_id: uuid.UUID, *, limit: int | None = None
+    ) -> list[Note]:
         result = await self.db.execute(
             select(Note)
             .where(Note.card_id == card_id, Note.workspace_id == workspace_id)
             .order_by(Note.pinned.desc(), Note.created_at.desc(), Note.id.asc())
+            .limit(limit)
         )
         return list(result.scalars().all())
 
@@ -94,7 +97,12 @@ class NoteRepository(BaseRepository[Note]):
         return {row[0]: row[1] for row in result.all()}
 
     async def list_card_notes_by_kind(
-        self, card_id: uuid.UUID, workspace_id: uuid.UUID, kind: str
+        self,
+        card_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        kind: str,
+        *,
+        limit: int | None = None,
     ) -> list[Note]:
         result = await self.db.execute(
             select(Note)
@@ -103,7 +111,8 @@ class NoteRepository(BaseRepository[Note]):
                 Note.workspace_id == workspace_id,
                 Note.kind == kind,
             )
-            .order_by(Note.created_at.desc())
+            .order_by(Note.created_at.desc(), Note.id.asc())
+            .limit(limit)
         )
         return list(result.scalars().all())
 

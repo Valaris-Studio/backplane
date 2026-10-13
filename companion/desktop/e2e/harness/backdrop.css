@@ -1,0 +1,9 @@
+/* Harness only: a stand-in for the desktop the translucent popover sits on. */
+:root {
+  background: oklch(0.9 0.03 150);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: oklch(0.24 0.03 152);
+  }
+}

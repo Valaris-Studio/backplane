@@ -43,9 +43,10 @@ class InAppChannel(NotificationChannel):
         # txn's begin_nested savepoint, so a synchronous push would (a) race the
         # outer commit's visibility and (b) become a phantom badge increment if
         # that savepoint later rolls back. Instead we STAGE the contract-shaped
-        # push intent on the session; the generator promotes it past the
-        # savepoint and an after_commit listener flushes it to the bus only once
-        # the outer transaction has durably committed (see live_push.py).
+        # push intent on the session; the generator promotes it into
+        # committed_events, which publishes it only once the outer transaction
+        # has durably committed and drops it with any rolled-back savepoint
+        # around it (see live_push.py).
         stage_push(
             db,
             workspace_id=notification.workspace_id,

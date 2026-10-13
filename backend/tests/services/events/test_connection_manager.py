@@ -8,6 +8,8 @@ import pytest
 from fastapi import WebSocket
 
 from app.core.event_bus import EventBus
+from app.models.workspace import WorkspaceRole
+from app.services.events.authority import DeliveryAuthority
 from app.services.events.connection_manager import ConnectionManager
 
 
@@ -23,9 +25,15 @@ def bus():
     return EventBus()
 
 
+async def _current_member(principal):
+    # Existing-test adaptation: these principals have no database rows, so the
+    # delivery-time authority read is injected at its service boundary.
+    return DeliveryAuthority(role=WorkspaceRole.member)
+
+
 @pytest.fixture
 def manager(bus):
-    return ConnectionManager(bus)
+    return ConnectionManager(bus, authority=_current_member)
 
 
 async def test_connect_registers_connection(manager):
@@ -85,8 +93,22 @@ async def test_update_subscriptions_replaces_old(manager, bus):
     assert len(bus._subscribers) == 1
 
     await manager.update_subscriptions(conn, ["approval.*", "execution.*"])
-    assert len(bus._subscribers) == 2
+    # One registration per socket (replaced, not added to), however many
+    # patterns: an event is matched, authorized and sent at most once.
+    assert len(bus._subscribers) == 1
     assert conn.patterns == ["approval.*", "execution.*"]
+
+
+async def test_overlapping_patterns_deliver_an_event_once(manager, bus):
+    ws = make_mock_ws()
+    workspace_id = uuid.uuid4()
+    conn = await manager.connect(ws, workspace_id, uuid.uuid4())
+
+    await manager.update_subscriptions(conn, ["card.*", "*", "card.created"])
+    await bus.publish("card.created", {"title": "Once"}, workspace_id)
+    await conn._outbox.join()
+
+    ws.send_json.assert_awaited_once()
 
 
 async def test_deliver_sends_json(manager, bus):
@@ -97,6 +119,8 @@ async def test_deliver_sends_json(manager, bus):
     await manager.update_subscriptions(conn, ["card.*"])
 
     await bus.publish("card.created", {"title": "Test Card"}, workspace_id)
+    # Delivery runs on the socket's sender, off the publisher's await path.
+    await conn._outbox.join()
 
     ws.send_json.assert_awaited_once()
     sent_data = ws.send_json.call_args[0][0]
@@ -115,6 +139,7 @@ async def test_deliver_error_triggers_disconnect(manager, bus):
     await manager.update_subscriptions(conn, ["card.*"])
 
     await bus.publish("card.created", {"title": "Test"}, workspace_id)
+    await conn._outbox.join()
 
     assert manager.active_count == 0
 
@@ -169,6 +194,8 @@ async def test_api_key_first_used_delivered_only_to_owning_user(manager, bus):
         {"api_key_id": str(uuid.uuid4()), "user_id": str(owner_id), "key_name": "CLI"},
         workspace_id,
     )
+    await owner_conn._outbox.join()
+    await bystander_conn._outbox.join()
 
     owner_ws.send_json.assert_awaited_once()
     assert owner_ws.send_json.call_args[0][0]["event"] == "api_key.first_used"
@@ -183,6 +210,7 @@ async def test_api_key_first_used_without_user_id_is_not_delivered(manager, bus)
     await manager.update_subscriptions(conn, ["api_key.*"])
 
     await bus.publish("api_key.first_used", {"api_key_id": str(uuid.uuid4())}, workspace_id)
+    await conn._outbox.join()
 
     ws.send_json.assert_not_awaited()
 

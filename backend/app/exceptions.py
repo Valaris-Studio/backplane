@@ -56,6 +56,12 @@ class BoardFrozenError(ConflictError):
     error_code = "board_frozen"
 
 
+class GoneError(ValarisError):
+    status_code = 410
+    detail = "Gone"
+    error_code = "gone"
+
+
 class BadRequestError(ValarisError):
     status_code = 400
     detail = "Bad request"
@@ -97,3 +103,9 @@ class ValidationError(ValarisError):
     status_code = 422
     detail = "Validation error"
     error_code = "validation_error"
+
+
+class DeviceAuthenticationError(ValarisError):
+    status_code = 401
+    detail = "Invalid or revoked device token"
+    error_code = "invalid_device_token"

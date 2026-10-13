@@ -19,7 +19,6 @@ async def test_artifact_fixture_websocket_auth_uses_same_disposable_database(
 ):
     from app import database
     from app.routers import events
-    from app.services import api_key
 
     raw = await _make_agent_with_key(
         db_session, test_user, allowed_workspaces=["default"]
@@ -27,12 +26,7 @@ async def test_artifact_fixture_websocket_auth_uses_same_disposable_database(
     agent = await db_session.scalar(select(Agent).where(Agent.name == "scoped-agent"))
     await db_session.commit()
     with sealed_database(monkeypatch, db_engine) as factory:
-        assert (
-            database.async_session
-            is events.async_session
-            is api_key.async_session
-            is factory
-        )
+        assert database.async_session is events.async_session is factory
         assert factory.kw["bind"] is db_engine
         user, agent_id = await events._authenticate_ws(
             SimpleNamespace(headers={"authorization": "Bearer " + raw}, query_params={})

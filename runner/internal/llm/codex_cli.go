@@ -66,6 +66,9 @@ func (c *CodexCLI) Capabilities() Capabilities {
 		// same nested-shell limitation as Claude's --disallowedTools.
 		EnforcesShellDeny:  true,
 		ShellDenyMechanism: "execpolicy-rules",
+		// The prompt is the last argument of exec and exec resume; codex exec
+		// has no system-prompt channel, so a system prompt is not delivered.
+		PromptChannels: PromptChannels{Version: 1, FreshInput: true, ResumeInput: true},
 	}
 }
 
@@ -77,6 +80,9 @@ func (c *CodexCLI) UnenforceableDeny(deny []string) []string {
 }
 
 func (c *CodexCLI) Execute(ctx context.Context, prompt string, opts Options) (*Result, error) {
+	if err := CheckPromptChannels(c.Capabilities().PromptChannels, opts.ResumeSessionID != "", opts); err != nil {
+		return nil, err
+	}
 	// Codex structured output is file-based: --output-schema takes a JSON Schema
 	// FILE (unlike Claude's inline --json-schema). Materialize opts.OutputSchema
 	// to a temp file so Codex actually ENFORCES the shape, rather than relying on
@@ -302,8 +308,8 @@ func (c *CodexCLI) buildArgs(prompt string, opts Options) []string {
 		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
 	}
 
-	args = append(args, prompt)
-	return args
+	// After --, a prompt beginning with - is never parsed as an option.
+	return append(args, "--", prompt)
 }
 
 // writeSchemaFile materializes a JSON Schema string to a temp file for

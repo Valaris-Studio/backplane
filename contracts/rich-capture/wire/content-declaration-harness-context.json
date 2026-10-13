@@ -1,0 +1,31 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "system",
+    "channel": "instruction",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "b1c2d3e4-f5a6-4b7c-9d8e-0f1a2b3c4d5e",
+      "order": 26
+    },
+    "occurred_at": "2026-10-08T14:01:02Z",
+    "observed_at": "2026-10-08T14:01:03Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "9756b887b577ed724caccd6018e1e75953e74464b00dc398586c6078f9ab708c",
+    "coverage": "withheld_by_policy",
+    "coverage_reason": "harness_context",
+    "delivery": "none",
+    "original_byte_count": 55785
+  }
+}

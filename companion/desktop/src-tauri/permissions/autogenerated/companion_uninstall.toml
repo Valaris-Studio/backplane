@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-companion-uninstall"
+description = "Enables the companion_uninstall command without any pre-configured scope."
+commands.allow = ["companion_uninstall"]
+
+[[permission]]
+identifier = "deny-companion-uninstall"
+description = "Denies the companion_uninstall command without any pre-configured scope."
+commands.deny = ["companion_uninstall"]

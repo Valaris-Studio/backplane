@@ -155,6 +155,10 @@ func (s *loopModeServer) handle(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 
 	switch {
+	// A backend from before context dispatch negotiation: the route's bare 404.
+	case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/context-dispatch-contract"):
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Not Found"}`))
 	case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/loop/history"):
 		s.historyCalls++
 		if s.history404 {

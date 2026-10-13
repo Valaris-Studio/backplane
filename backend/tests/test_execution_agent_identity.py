@@ -296,6 +296,36 @@ async def test_owner_user_without_agent_key_keeps_created_by_access(
     assert resp.status_code == 201, resp.text
 
 
+async def test_start_execution_installation_key_keeps_created_by_access(
+    installation_key_client: AsyncClient, siblings, workspace: Workspace
+):
+    _agent_a, _key_a, agent_b, _key_b = siblings
+    resp = await installation_key_client.post(
+        f"/api/agents/{agent_b.id}/executions",
+        json={
+            "workspace_slug": workspace.slug,
+            "action": "manual",
+            "input_summary": "owner-triggered",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+
+
+async def test_start_execution_plain_user_key_keeps_created_by_access(
+    plain_key_client: AsyncClient, siblings, workspace: Workspace
+):
+    _agent_a, _key_a, agent_b, _key_b = siblings
+    resp = await plain_key_client.post(
+        f"/api/agents/{agent_b.id}/executions",
+        json={
+            "workspace_slug": workspace.slug,
+            "action": "manual",
+            "input_summary": "owner-triggered",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+
+
 async def test_foreign_user_still_denied(
     client: AsyncClient, db_session: AsyncSession, workspace: Workspace
 ):

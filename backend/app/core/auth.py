@@ -18,6 +18,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.client_ip import client_ip_from_headers
+from app.core.iap_claims_cache import (
+    cached_claims,
+    clear_verified_iap_claims_cache,  # noqa: F401 — re-exported for tests
+    iap_jwt_is_plausible,
+    remember_claims,
+    token_digest,
+)
 from app.database import get_db
 from app.exceptions import ForbiddenError
 from app.models.user import User
@@ -33,6 +41,9 @@ IAP_JWT_HEADER = "X-Goog-IAP-JWT-Assertion"
 IAP_JWT_FALLBACK_HEADER = "X-IAP-JWT-Assertion"
 
 PROXY_SECRET_HEADER = "X-Backplane-Proxy-Secret"
+# (token digest, claims) on request.state, so auth reuses the rate limiter's
+# verification of the same request instead of repeating it.
+VERIFIED_IAP_CLAIMS_STATE = "verified_iap_claims"
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +68,15 @@ def proxy_secret_valid(get_header: Callable[[str, str], str]) -> bool:
         PROXY_SECRET_HEADER.lower(), ""
     )
     return hmac.compare_digest(presented, secret)
+
+
+def companion_bearer_present(authorization: str) -> bool:
+    parts = authorization.split(None, 1)
+    return (
+        len(parts) == 2
+        and parts[0].casefold() == "bearer"
+        and parts[1].startswith("bpc_")
+    )
 
 
 def normalize_email(email: str) -> str:
@@ -88,10 +108,27 @@ current_authentication_method: ContextVar[str | None] = ContextVar(
     "current_authentication_method", default=None
 )
 
+# Set when the API key is the one a companion installation minted for the
+# agents it launches.
+current_api_key_installation_id: ContextVar[uuid.UUID | None] = ContextVar(
+    "current_api_key_installation_id", default=None
+)
+
 # Set when the API key is linked to a registered agent.
 current_agent_id: ContextVar[uuid.UUID | None] = ContextVar(
     "current_agent_id", default=None
 )
+
+
+def may_manage_credentials() -> bool:
+    """Minting, revoking or pairing credentials is for a person's own login.
+    A companion installation's key otherwise carries its person's full reach,
+    but it sits in every agent session the person runs, so a credential minted
+    through it would outlive revoking the device."""
+    return (
+        current_agent_id.get() is None
+        and current_api_key_installation_id.get() is None
+    )
 
 # Shared across requests. CacheControl wraps the session so verify_token's
 # cert fetch honors the cache headers IAP_CERTS_URL sends instead of hitting
@@ -114,13 +151,13 @@ def extract_iap_jwt(get_header: Callable[[str, str], str]) -> str:
 
 
 def forwarded_for_is_trusted(get_header: Callable[[str, str], str]) -> bool:
-    """True when a hop we control is guaranteed to have rewritten X-Forwarded-For.
+    """True when a hop we control is guaranteed to have appended to X-Forwarded-For.
 
     XFF is client-settable, so trusting it unconditionally would let anyone
     forge the IP in our audit log. It is only trustworthy when the request
-    provably came through our own edge: IAP (Google's LB appends the real
-    client as the first hop and strips client-supplied copies), or trusted-proxy
-    mode where the hop also proved TRUSTED_PROXY_SECRET. With no verifier — or a
+    provably came through our own edge: IAP (Cloud Run sits behind Google's
+    front end, which always appends the peer it saw), or trusted-proxy mode
+    where the hop also proved TRUSTED_PROXY_SECRET. With no verifier — or a
     trusted-proxy handshake we cannot check — we fall back to the peer address,
     which is at worst useless rather than actively misleading.
     """
@@ -133,19 +170,21 @@ def forwarded_for_is_trusted(get_header: Callable[[str, str], str]) -> bool:
 
 
 def resolve_client_ip(request: Request) -> str:
-    """The originating client IP for audit logs, XFF-aware but spoofing-aware.
+    """The originating client IP for rate-limit buckets and audit logs.
 
-    Takes the FIRST X-Forwarded-For hop (the original client; later entries are
-    intermediate proxies) — but only when `forwarded_for_is_trusted`.
+    Never the leftmost X-Forwarded-For entry (the caller writes that): the
+    rightmost hop that isn't one of FORWARDED_TRUSTED_PROXIES — see
+    app/core/client_ip.py. An edge proxy that proves EDGE_PROXY_SECRET supplies
+    the chain it observed, before the backend's own front end appended its
+    egress address. Works for WebSockets too (same headers/client shape).
     """
-    peer = request.client.host if request.client else "unknown"
-    if not forwarded_for_is_trusted(request.headers.get):
-        return peer
-    forwarded = request.headers.get("X-Forwarded-For", "") or request.headers.get(
-        "x-forwarded-for", ""
+    client = getattr(request, "client", None)
+    peer = client.host if client else "unknown"
+    return client_ip_from_headers(
+        request.headers,
+        peer,
+        forwarded_for_trusted=forwarded_for_is_trusted(request.headers.get),
     )
-    first_hop = forwarded.split(",")[0].strip()
-    return first_hop or peer
 
 
 def session_user_id(get_cookie: Callable[[str], str | None]) -> uuid.UUID | None:
@@ -197,6 +236,41 @@ async def _verify_iap_jwt(jwt_token: str, *, audience: str, certs_url: str) -> d
     return await anyio.to_thread.run_sync(verify)
 
 
+async def verified_iap_email(request: Request) -> str | None:
+    """The normalized email of a valid IAP JWT on this request, else None.
+
+    For callers that must not fail the request (the rate limiter): any
+    verification error just means "not proven", never a rejection.
+    """
+    jwt_token = extract_iap_jwt(request.headers.get)
+    try:
+        if not jwt_token or not iap_jwt_is_plausible(jwt_token, settings.IAP_AUDIENCE):
+            return None
+        claims = await _verify_iap_jwt_once(request, jwt_token)
+    except Exception:
+        return None
+    email = claims.get("email", "")
+    return normalize_email(email) if email else None
+
+
+async def _verify_iap_jwt_once(request: Request, jwt_token: str) -> dict:
+    """Verify at most once per request (the rate limiter and auth both ask) and
+    once per token lifetime across requests."""
+    audience = settings.IAP_AUDIENCE
+    digest = token_digest(jwt_token, audience)
+    stashed = getattr(request.state, VERIFIED_IAP_CLAIMS_STATE, None)
+    if stashed is not None and stashed[0] == digest:
+        return stashed[1]
+    claims = cached_claims(jwt_token, audience)
+    if claims is None:
+        claims = await _verify_iap_jwt(
+            jwt_token, audience=audience, certs_url=IAP_CERTS_URL
+        )
+        remember_claims(jwt_token, audience, claims)
+    setattr(request.state, VERIFIED_IAP_CLAIMS_STATE, (digest, claims))
+    return claims
+
+
 async def _extract_email_from_iap_jwt(request: Request) -> str:
     jwt_token = extract_iap_jwt(request.headers.get)
     if not jwt_token:
@@ -209,9 +283,7 @@ async def _extract_email_from_iap_jwt(request: Request) -> str:
         raise ForbiddenError("Missing IAP JWT token")
 
     try:
-        claims = await _verify_iap_jwt(
-            jwt_token, audience=settings.IAP_AUDIENCE, certs_url=IAP_CERTS_URL
-        )
+        claims = await _verify_iap_jwt_once(request, jwt_token)
     except Exception:
         log_auth_rejected(
             "invalid_iap_jwt",
@@ -253,10 +325,13 @@ async def get_current_user(
     current_agent_id.set(None)
     current_api_key_id.set(None)
     current_api_key_name.set(None)
+    current_api_key_installation_id.set(None)
     current_authentication_method.set(None)
 
     # API key auth: Bearer vlr_... tokens (prefix distinguishes from IAP OIDC JWTs)
     auth_header = request.headers.get("Authorization", "")
+    if companion_bearer_present(auth_header):
+        raise ForbiddenError()
     if auth_header.startswith("Bearer vlr_"):
         from app.services.api_key import ApiKeyService
 
@@ -268,7 +343,12 @@ async def get_current_user(
         # Throttled and self-isolating (see ApiKeyService.touch); runs before the
         # agent checks below so a deactivated agent's rejected request still
         # records that the key reached us.
-        await service.touch(api_key)
+        stamp = await service.touch(api_key)
+        if stamp is not None:
+            # Nothing else is pending before business work, so committing the
+            # stamp here keeps it through a later failure on this one connection.
+            await db.commit()
+            await service.announce(stamp)
         result = await db.execute(select(User).where(User.id == api_key.user_id))
         user = result.scalar_one_or_none()
         if not user:
@@ -291,6 +371,7 @@ async def get_current_user(
 
         current_api_key_id.set(api_key.id)
         current_api_key_name.set(api_key.name)
+        current_api_key_installation_id.set(api_key.installation_id)
         current_authentication_method.set("api_key")
         return user
 
@@ -397,9 +478,8 @@ def forbid_agent_callers(_: User = Depends(get_current_user)) -> None:
 
     An agent key resolves to its creating user, and the agent-admin routes
     authorize on `created_by_id` — which is that same user. So an agent could
-    widen its own `allowed_workspaces`, reactivate itself, rotate its key, or
-    mint a fresh key carrying no agent identity at all. Each defeats workspace
-    scoping outright, and the minted key outlives revoking the agent.
+    widen its own `allowed_workspaces`, reactivate itself, or rewrite the
+    surfaces that constrain it. Each defeats workspace scoping outright.
 
     Registered per-route rather than checked in each service: the routes this
     applies to are a deliberate, closed list, and stating it at the route keeps
@@ -410,6 +490,19 @@ def forbid_agent_callers(_: User = Depends(get_current_user)) -> None:
     route-level dependencies resolve before signature parameters, so without
     this the check would run before auth had identified the caller and would
     wave every agent through.
+
+    A companion installation's key passes: it acts for the person running the
+    session, not for a registered Agent.
     """
     if current_agent_id.get() is not None:
         raise ForbiddenError("Agent keys cannot perform agent administration")
+
+
+def forbid_credential_management(_: User = Depends(get_current_user)) -> None:
+    """Refuse agent and companion installation keys on routes that mint, rotate,
+    list or revoke credentials (API keys, agent keys, companion devices and
+    their pairing). A credential minted through a key outlives revoking that
+    key's agent or device. Depends on get_current_user for the reason given on
+    forbid_agent_callers."""
+    if not may_manage_credentials():
+        raise ForbiddenError("Agent and companion keys cannot manage credentials")

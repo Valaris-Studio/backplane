@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-diagnostics"
+description = "Enables the save_diagnostics command without any pre-configured scope."
+commands.allow = ["save_diagnostics"]
+
+[[permission]]
+identifier = "deny-save-diagnostics"
+description = "Denies the save_diagnostics command without any pre-configured scope."
+commands.deny = ["save_diagnostics"]

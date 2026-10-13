@@ -54,6 +54,8 @@ async def enforce_agent_scope(
     ambient lookup. One definition, because three copies of a security predicate
     drift and the divergence is invisible until someone exploits it.
     """
+    # Registered Agents only, on purpose: an installation key has no allowlist
+    # and carries exactly its owner's membership reach (D3).
     if agent_id is None:
         return
 

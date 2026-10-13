@@ -246,7 +246,7 @@ describe("ExecutionDetailPage", () => {
     expect(promptRegion).toHaveClass("whitespace-pre-wrap");
   });
 
-  it("shows empty-state message in the Prompt tab when input_prompt is null", async () => {
+  it("states that no prompt was retained, without guessing its age, when input_prompt is null", async () => {
     setupHandlers();
     renderPage();
 
@@ -256,7 +256,7 @@ describe("ExecutionDetailPage", () => {
 
     expect(
       await screen.findByText(
-        "Prompt not captured — this execution predates prompt logging.",
+        "No prompt was retained for this execution.",
       ),
     ).toBeInTheDocument();
   });

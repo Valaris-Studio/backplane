@@ -17,7 +17,8 @@ no leading `# {title}` is emitted here.
 The node/mark vocabulary is a CLOSED set that mirrors the editor's supported
 set exactly (StarterKit + Link + our mention/image/file-attachment nodes):
   Nodes: doc, paragraph, heading(1-3), bulletList, orderedList(attrs.start),
-         listItem, codeBlock(attrs.language), blockquote, horizontalRule,
+         listItem, taskList, taskItem(`- [ ]`/`- [x]`, attrs.checked),
+         codeBlock(attrs.language), blockquote, horizontalRule,
          hardBreak, text, table, tableRow, tableHeader, tableCell,
          mention(@label), image(![alt](src "title") — block in our schema,
          also serializable inline), fileAttachment([filename](src
@@ -83,11 +84,49 @@ def project_pm_to_text(text: str) -> str:
 
 
 def _doc_to_markdown(doc: dict[str, Any]) -> str:
+    doc = _with_lf_line_endings(doc)
     blocks = [_serialize_block(node) for node in doc.get("content", [])]
     return "\n\n".join(b for b in blocks if b)
 
 
+_CR_LINE_ENDING = re.compile(r"\r\n?")
+
+
+def _with_lf_line_endings(value: Any) -> Any:
+    # CommonMark reads CR and CRLF as line endings, but the quote/list prefixers
+    # split on LF only: a bare CR anywhere in the doc — text, attrs, mark attrs —
+    # would start an unprefixed line that escapes its container.
+    if isinstance(value, str):
+        return _CR_LINE_ENDING.sub("\n", value)
+    if isinstance(value, list):
+        return [_with_lf_line_endings(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _with_lf_line_endings(item) for key, item in value.items()}
+    return value
+
+
 # --- Block-level ------------------------------------------------------------
+
+_MIN_FENCE_LENGTH = 3
+_BACKTICK_RUN = re.compile(r"`+")
+# A backtick in a backtick fence's info string invalidates the fence, and a
+# line break ends it early — either lets a language attr forge markdown.
+_FENCE_INFO_BREAKOUT = re.compile(r"[`\x00-\x1f\x7f]")
+
+
+def _code_fence_for(code: str) -> str:
+    """A backtick fence no line of `code` can close: longer than its longest run."""
+    longest_run = max((len(run) for run in _BACKTICK_RUN.findall(code)), default=0)
+    return "`" * max(_MIN_FENCE_LENGTH, longest_run + 1)
+
+
+def _safe_fence_info(language: object) -> str:
+    if not isinstance(language, str):
+        return ""
+    language = language.strip(" ")
+    if _FENCE_INFO_BREAKOUT.search(language):
+        return ""
+    return language
 
 
 def _serialize_block(node: dict[str, Any]) -> str:
@@ -105,6 +144,9 @@ def _serialize_block(node: dict[str, Any]) -> str:
             _serialize_list_item(li, "- ") for li in node.get("content", [])
         )
 
+    if node_type == "taskList":
+        return "\n".join(_serialize_task_item(item) for item in node.get("content", []))
+
     if node_type == "orderedList":
         start = int((node.get("attrs") or {}).get("start", 1))
         return "\n".join(
@@ -116,20 +158,22 @@ def _serialize_block(node: dict[str, Any]) -> str:
         inner = "\n\n".join(
             _serialize_block(child) for child in node.get("content", [])
         )
-        # Prefix every line (including blank continuation lines) with '> '.
+        # Prefix every line with '> '; only an empty line gets a bare '>'. Other
+        # lines pass through untouched — a quoted code line keeps its whitespace.
         return "\n".join(
-            f"> {line}".rstrip() for line in inner.split("\n")
+            f"> {line}" if line else ">" for line in inner.split("\n")
         )
 
     if node_type == "codeBlock":
-        lang = (node.get("attrs") or {}).get("language") or ""
+        lang = _safe_fence_info((node.get("attrs") or {}).get("language"))
         code = "".join(c.get("text", "") for c in node.get("content", []))
         # markdown-it's fence content carries a single trailing newline; strip
         # ONE so we don't emit a blank line before the closing fence (which
         # would re-normalize to code text with a doubled trailing '\n').
         if code.endswith("\n"):
             code = code[:-1]
-        return f"```{lang}\n{code}\n```"
+        fence = _code_fence_for(code)
+        return f"{fence}{lang}\n{code}\n{fence}"
 
     if node_type == "horizontalRule":
         return "---"
@@ -147,7 +191,7 @@ def _serialize_block(node: dict[str, Any]) -> str:
     return _serialize_inline(node.get("content")) or node.get("text", "")
 
 
-_NESTED_LIST_TYPES = ("bulletList", "orderedList")
+_NESTED_LIST_TYPES = ("bulletList", "orderedList", "taskList")
 
 
 def _join_list_item_blocks(children: list[dict[str, Any]]) -> str:
@@ -181,6 +225,22 @@ def _serialize_list_item(item: dict[str, Any], marker: str) -> str:
         f"{marker}{line}" if i == 0 else f"{indent}{line}"
         for i, line in enumerate(lines)
     )
+
+
+# Continuation lines indent to the `- ` bullet, not past the box: four or more
+# spaces beyond it would turn a nested list into paragraph text on re-parse.
+_TASK_ITEM_INDENT = "  "
+
+
+def _serialize_task_item(item: dict[str, Any]) -> str:
+    checked = (item.get("attrs") or {}).get("checked") is True
+    box = "- [x]" if checked else "- [ ]"
+    # Not stripped: an empty leading paragraph must keep its (empty) first line,
+    # or a nested list would be hoisted onto the box's own line.
+    first, *rest = _join_list_item_blocks(item.get("content", [])).split("\n")
+    lines = [f"{box} {first}" if first else box]
+    lines.extend(f"{_TASK_ITEM_INDENT}{line}" for line in rest)
+    return "\n".join(lines)
 
 
 def _serialize_table(node: dict[str, Any]) -> str:

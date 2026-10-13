@@ -47,6 +47,24 @@ function withoutEmptyParagraphs(node: JSONContent): JSONContent {
   };
 }
 
+/**
+ * Rewrite CR and CRLF to LF in every string of the doc — text, attrs and mark
+ * attrs — before serializing. CommonMark reads a bare CR as a line ending, but
+ * the blockquote/list prefixers split on LF only, so a CR line would escape
+ * its quote or list item. The stored doc is untouched: this runs on the parsed
+ * copy. Backend twin: content_serializer._with_lf_line_endings.
+ */
+function withLfLineEndings<T>(value: T): T {
+  if (typeof value === "string") return value.replace(/\r\n?/g, "\n") as T;
+  if (Array.isArray(value)) return value.map(withLfLineEndings) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, withLfLineEndings(item)]),
+    ) as T;
+  }
+  return value;
+}
+
 function stripHtmlTags(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -62,7 +80,7 @@ function bodyToMarkdown(content: string): string {
   try {
     const parsed = JSON.parse(content) as JSONContent;
     if (parsed?.type === "doc") {
-      return markdownManager.serialize(withoutEmptyParagraphs(parsed));
+      return markdownManager.serialize(withLfLineEndings(withoutEmptyParagraphs(parsed)));
     }
   } catch {
     /* not JSON — fall through */

@@ -119,12 +119,19 @@ const IDENTICAL_BY_DESIGN_VALUES = new Set([
   "Pull request",
   "Round robin",
   "{{bytes}} bytes", // byte is also the Spanish unit name
+  "{{value}} KB", // unit symbols are language-neutral
+  "{{value}} MB",
+  "{{value}} tokens", // "Tokens" is kept in English above
+  "{{count}} prompt", // "Prompt" is kept in English above
+  "{{count}} prompts",
+  "Companion {{version}}", // product name plus a version number
 
   // Cognates — the Spanish word is spelled identically.
   "Alias",
   "Alias (as)",
   "Editor",
   "Emoji",
+  "Error",
   "Inspector",
   "No",
   "Personal",

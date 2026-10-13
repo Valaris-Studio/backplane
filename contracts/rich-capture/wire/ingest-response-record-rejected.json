@@ -1,0 +1,20 @@
+{
+  "model": "RichIngestResult",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "status": 200
+  },
+  "body": {
+    "acknowledged": [],
+    "rejected": [
+      {
+        "capture_id": "4a1b2c3d4e5f60718293a4b5c6d7e8f9",
+        "reason": "paused"
+      }
+    ],
+    "dropped": [],
+    "history_deleted": [],
+    "contents": []
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "model": "RichIngestResult",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "status": 200
+  },
+  "body": {
+    "acknowledged": [
+      "5b2c3d4e5f60718293a4b5c6d7e8f90a"
+    ],
+    "rejected": [],
+    "dropped": [
+      {
+        "capture_id": "5b2c3d4e5f60718293a4b5c6d7e8f90a",
+        "reason": "session_deleted"
+      }
+    ],
+    "history_deleted": [
+      {
+        "mapping_id": "3d6a1f4e-2b7c-4e8d-9f01-23456789abcd",
+        "harness": "claude_code",
+        "native_session_id": "sess-1",
+        "deleted_through": "2026-10-08T14:30:00Z",
+        "reason": "owner"
+      }
+    ],
+    "contents": [
+      {
+        "capture_id": "5b2c3d4e5f60718293a4b5c6d7e8f90a",
+        "content_key": "c41aa34e627a20884622298fde5e70f9087cc852ea7a4cb26900f023ec70e614",
+        "outcome": "dropped"
+      }
+    ]
+  }
+}

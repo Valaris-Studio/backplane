@@ -55,22 +55,11 @@ async def auth_client(db_session: AsyncSession, test_user: User) -> AsyncClient:
         yield ac
 
 
-@pytest_asyncio.fixture
-async def touch_session_factory(_api_key_touch_uses_test_engine):
-    """The test-engine session factory the API-key touch is pinned to.
-
-    The patching itself is global (see the autouse fixture in conftest.py —
-    every API-key-authenticated test needs it, not just these). This exposes the
-    same factory so tests can open their own sessions against that engine.
-    """
-    return _api_key_touch_uses_test_engine
-
-
 async def _stored_last_used_at(db_session: AsyncSession, key_id: uuid.UUID):
     """Re-read last_used_at, bypassing the identity map.
 
-    The touch committed on a DIFFERENT session, so `db_session`'s cached
-    ApiKey instance still holds the pre-touch value.
+    The stamp is a bulk UPDATE, so `db_session`'s cached ApiKey instance still
+    holds the pre-touch value.
     """
     result = await db_session.execute(
         select(ApiKey.last_used_at).where(ApiKey.id == key_id)
@@ -250,7 +239,6 @@ async def test_api_key_first_use_stamps_last_used_at(
     auth_client: AsyncClient,
     db_session: AsyncSession,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
     api_key, raw_key = api_key_record
     assert api_key.last_used_at is None
@@ -268,7 +256,6 @@ async def test_api_key_first_use_publishes_event_once(
     api_key_record: tuple[ApiKey, str],
     test_user: User,
     test_workspace: Workspace,
-    touch_session_factory,
 ):
     """The never-used -> used transition fires exactly once, ever."""
     api_key, raw_key = api_key_record
@@ -304,7 +291,6 @@ async def test_api_key_second_use_within_throttle_does_not_rewrite(
     auth_client: AsyncClient,
     db_session: AsyncSession,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
     api_key, raw_key = api_key_record
     headers = {"Authorization": f"Bearer {raw_key}"}
@@ -319,49 +305,36 @@ async def test_api_key_second_use_within_throttle_does_not_rewrite(
 
 
 @pytest.mark.anyio
-async def test_api_key_throttled_request_opens_no_session(
+async def test_api_key_throttled_request_writes_nothing(
     db_session: AsyncSession,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
-    monkeypatch,
 ):
-    """Inside the throttle window the touch must not even open a session.
+    """Inside the throttle window the touch issues no statement at all.
 
-    The in-memory check is the whole point of the throttle: the repository's
-    `older_than` guard keeps the stored VALUE correct either way, so only
-    counting sessions catches a regression that spends a pooled connection
-    (pool_size=3) on every authenticated request.
-
-    Driven through the service with a session PER call rather than through
-    `auth_client`, which shares one session across requests — the second
-    verify_key would otherwise return the identity-mapped instance still
-    holding the pre-touch NULL, and the throttle would have nothing to read.
+    The repository's `older_than` guard keeps the stored VALUE correct either
+    way, so only counting statements catches a regression that spends a write
+    on every authenticated request.
     """
-    api_key, raw_key = api_key_record
-    await db_session.commit()
+    from sqlalchemy import event
 
     from app.services.api_key import ApiKeyService
 
-    async with touch_session_factory() as session:
-        first = await ApiKeyService(session).verify_key(raw_key)
-        await ApiKeyService(session).touch(first)
+    api_key, _ = api_key_record
+    api_key.last_used_at = datetime.now(timezone.utc)
+    await db_session.flush()
 
-    import app.services.api_key as api_key_module
+    statements = []
 
-    opened = 0
+    def record(_conn, _cursor, statement, *_args):
+        statements.append(statement)
 
-    def counting_factory(*args, **kwargs):
-        nonlocal opened
-        opened += 1
-        return touch_session_factory(*args, **kwargs)
-
-    async with touch_session_factory() as session:
-        second = await ApiKeyService(session).verify_key(raw_key)
-        assert second.last_used_at is not None
-        monkeypatch.setattr(api_key_module, "async_session", counting_factory)
-        await ApiKeyService(session).touch(second)
-
-    assert opened == 0
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        assert await ApiKeyService(db_session).touch(api_key) is None
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert statements == []
 
 
 @pytest.mark.anyio
@@ -369,7 +342,6 @@ async def test_api_key_touch_refreshes_once_past_throttle_window(
     auth_client: AsyncClient,
     db_session: AsyncSession,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
     """A stamp older than the throttle window is refreshed — without an event."""
     api_key, raw_key = api_key_record
@@ -398,13 +370,9 @@ async def test_api_key_stamped_even_when_request_fails_after_auth(
     auth_client: AsyncClient,
     db_session: AsyncSession,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
-    """The dedicated touch session survives get_db's rollback on a failed request.
-
-    Stamping on the request-scoped session would vanish here — get_db rolls the
-    whole transaction back whenever the request raises.
-    """
+    """The stamp is committed during auth, so get_db's rollback of a failed
+    request cannot take it back."""
     api_key, raw_key = api_key_record
 
     resp = await auth_client.get(
@@ -420,7 +388,6 @@ async def test_api_key_stamped_even_when_request_fails_after_auth(
 async def test_list_api_keys_reports_never_used_as_null(
     auth_client: AsyncClient,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
     _, raw_key = api_key_record
 
@@ -444,11 +411,9 @@ async def test_list_api_keys_serializes_a_used_key(
     """A stamped key surfaces its timestamp through ApiKeyRead.
 
     The stamp is seeded directly rather than driven through a prior request:
-    `auth_client` shares ONE session across requests (production gives each its
-    own), so the touch's commit on its dedicated session stays invisible to the
-    identity-mapped ApiKey this session already loaded. Durability of that write
-    is pinned by the _stored_last_used_at tests above; this one pins schema
-    serialization.
+    the stamp is a bulk UPDATE, invisible to the identity-mapped ApiKey this
+    session already loaded. Durability of that write is pinned by the
+    _stored_last_used_at tests above; this one pins schema serialization.
     """
     api_key, raw_key = api_key_record
     api_key.last_used_at = datetime(2026, 8, 4, 12, 30, tzinfo=timezone.utc)
@@ -474,14 +439,13 @@ async def test_create_api_key_response_reports_never_used(client: AsyncClient):
 async def test_api_key_touch_failure_never_breaks_auth(
     auth_client: AsyncClient,
     api_key_record: tuple[ApiKey, str],
-    touch_session_factory,
 ):
     _, raw_key = api_key_record
     import app.services.api_key as api_key_module
 
     with patch.object(
-        api_key_module.ApiKeyService,
-        "_apply_touch",
+        api_key_module.ApiKeyRepository,
+        "stamp_last_used",
         side_effect=RuntimeError("db is on fire"),
     ):
         resp = await auth_client.get(
@@ -489,3 +453,61 @@ async def test_api_key_touch_failure_never_breaks_auth(
         )
     assert resp.status_code == 200
 
+
+
+@pytest.mark.anyio
+async def test_api_key_touch_never_checks_out_a_second_pooled_connection(
+    tmp_path, test_user: User, db_session: AsyncSession
+):
+    """A stale-key request must stamp on the connection it already holds.
+
+    Pool of ONE, zero overflow: a touch that opened its own session would wait
+    on the connection the request is holding and time out, so the stamp only
+    lands if it is written (and committed) on the request's own session.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import AsyncAdaptedQueuePool
+
+    from app.models.base import Base
+    from app.services.api_key import ApiKeyService
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///" + str(tmp_path / "pool.db"),
+        poolclass=AsyncAdaptedQueuePool,
+        pool_size=1,
+        max_overflow=0,
+        pool_timeout=0.5,
+    )
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    raw_key = "vlr_bounded-pool-key-0000000000000000000"
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with factory.begin() as seed:
+            seed.add(User(id=test_user.id, email="pool@valaris.dev", name="Pool"))
+            await seed.flush()
+            seed.add(
+                ApiKey(
+                    user_id=test_user.id,
+                    name="Bounded",
+                    key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
+                    key_prefix=raw_key[:8],
+                    last_used_at=datetime.now(timezone.utc) - timedelta(hours=6),
+                )
+            )
+
+        async with factory() as request_session:
+            service = ApiKeyService(request_session)
+            api_key = await service.verify_key(raw_key)
+            await service.touch(api_key)
+            await request_session.commit()
+
+        async with factory() as reader:
+            stamped = await reader.scalar(
+                select(ApiKey.last_used_at).where(ApiKey.id == api_key.id)
+            )
+        assert datetime.now(timezone.utc).replace(tzinfo=None) - stamped.replace(
+            tzinfo=None
+        ) < timedelta(minutes=1)
+    finally:
+        await engine.dispose()

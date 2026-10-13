@@ -1,0 +1,296 @@
+{
+  "id": "8f0e8a54-5d4b-4c55-9d0e-00000000a003",
+  "execution_id": "8f0e8a54-5d4b-4c55-9d0e-0000000000e1",
+  "ordinal": 3,
+  "client_request_id": "request-3",
+  "context_revision": "617e91cf61bb67c897a840c7416fa011e3a02d91358bdde62a33d1b576f7a4d3",
+  "prompt_sha256": "8900dc91699a2acb676d3190bb6653d40d492c84d335e671ce7c90ff3b7d41f1",
+  "prompt_bytes": 169,
+  "system_prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "system_prompt_bytes": 0,
+  "provider": "operator-provider",
+  "model": "operator-model",
+  "status": "prepared",
+  "use_verification": "not_verified",
+  "created_at": "2026-10-13T12:03:00+00:00",
+  "dispatch_summary": {
+    "protocol_version": 1,
+    "dispatch_revision": "0b42e2586b33f00222220d1d512cf48c79ca60018d70eb56ca186c2c5aefbef1",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "review",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "required_blocks_exact",
+    "injected_bytes": {
+      "input": 103,
+      "system": 0,
+      "total": 103
+    }
+  },
+  "context_manifest": {
+    "schema_version": 2,
+    "renderer_version": "context-v2",
+    "sources": [
+      {
+        "source_index": 0,
+        "kind": "card_notes",
+        "alias": "HandoffNotes",
+        "filter": {},
+        "coverage": "record_traced",
+        "rendered_sha256": "0813fe69a5c48b84d8f58694e95ca7bd3157ef3d53bb8ebf82295944a9348c87",
+        "rendered_bytes": 66,
+        "records": [
+          {
+            "record_index": 0,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000101",
+            "title": "Retained handoff — café 🧭",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "a6d1d4ea8e5a4fa08e8438c91ab01e2055faf19e5134fddd3a61efc0c133aa46",
+            "rendered_sha256": "cd9cd864976a5923484048be5f1bd83a26aa8677d62007bf6735b69fabdbca60",
+            "rendered_bytes": 33
+          },
+          {
+            "record_index": 1,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000102",
+            "title": "Second handoff",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "c64a4543ce76fcbcade5797b53bedc08e6d81e9e031a72380c03a07cb788efce",
+            "rendered_sha256": "c98c65bd45f9548d94d411e1f995e331d923d882f9eaa0eda871cde049253eb7",
+            "rendered_bytes": 16
+          }
+        ],
+        "admission": {
+          "required": true,
+          "outcome": "complete",
+          "candidate_limit": 50,
+          "candidate_count": 2,
+          "has_more_candidates": false,
+          "admitted_count": 2,
+          "excluded_count": 0,
+          "max_rendered_bytes": 24576
+        }
+      },
+      {
+        "source_index": 1,
+        "kind": "card_notes",
+        "alias": "ReviewerNotes",
+        "filter": {
+          "kind": "review_note",
+          "limit": 3
+        },
+        "coverage": "record_traced",
+        "rendered_sha256": "7ca14a5066b1646305782993d45fee8d01faaa0b76ca827c934072b921309c24",
+        "rendered_bytes": 37,
+        "records": [
+          {
+            "record_index": 0,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000103",
+            "title": "Kept reviewer note",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "6069e0c9472018d99d1f4796c9340d02ccbba33506452d6e0ab5808f87330856",
+            "rendered_sha256": "de24f37012aedc173df1c36f66ac4a4459d22c0351690375334f516d18fbf22d",
+            "rendered_bytes": 20
+          }
+        ],
+        "admission": {
+          "required": false,
+          "outcome": "partial",
+          "candidate_limit": 3,
+          "candidate_count": 3,
+          "has_more_candidates": true,
+          "admitted_count": 1,
+          "excluded_count": 2,
+          "max_rendered_bytes": 24576
+        }
+      },
+      {
+        "source_index": 2,
+        "kind": "pinned_notes",
+        "alias": "PinnedGuides",
+        "filter": {},
+        "coverage": "source_only",
+        "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rendered_bytes": 0,
+        "records": [],
+        "admission": {
+          "required": false,
+          "outcome": "excluded",
+          "candidate_limit": 50,
+          "candidate_count": 2,
+          "has_more_candidates": false,
+          "admitted_count": 0,
+          "excluded_count": 2,
+          "max_rendered_bytes": 24576
+        }
+      },
+      {
+        "source_index": 3,
+        "kind": "pipeline_expectations",
+        "alias": "StagePolicy",
+        "filter": {},
+        "coverage": "source_only",
+        "rendered_sha256": "21650ee5c9689aa1eb89b39035b03f8988568352adb132d97c0dfd7550785257",
+        "rendered_bytes": 40,
+        "records": [],
+        "admission": {
+          "required": false,
+          "outcome": "complete",
+          "candidate_limit": null,
+          "candidate_count": 1,
+          "has_more_candidates": false,
+          "admitted_count": 1,
+          "excluded_count": 0,
+          "max_rendered_bytes": 24576
+        }
+      }
+    ],
+    "budget": {
+      "policy": {
+        "version": 1,
+        "max_note_body_bytes": 16384,
+        "max_note_fetch_bytes": 65536,
+        "max_optional_note_bytes": 4096,
+        "max_managed_context_bytes": 24576,
+        "max_invocation_bytes": 131072
+      },
+      "policy_sha256": "72993b6cb83904d39a8c73bd0651aa6251288ede5dbc2c7bcbdc54cc5bbf5d77",
+      "raw_note_bytes_fetched": 9120,
+      "managed_context_bytes": 143,
+      "raw_note_fetch_coverage": "complete",
+      "non_note_fetch_coverage": "not_bounded"
+    },
+    "diagnostics": {
+      "entries": [
+        {
+          "source_index": 1,
+          "candidate_index": 1,
+          "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000104",
+          "title": "Long reviewer transcript",
+          "kind": "review_note",
+          "raw_body_bytes": 6100,
+          "rendered_bytes": 5990,
+          "revision_sha256": "f26df72f284b3a7324ebd95bd742f3a790f4127d2013a6d9a5dc3839a3d0c70a",
+          "reason": "record_too_large"
+        },
+        {
+          "source_index": 1,
+          "candidate_index": 2,
+          "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000105",
+          "title": "Older reviewer note",
+          "kind": "review_note",
+          "raw_body_bytes": 900,
+          "rendered_bytes": null,
+          "revision_sha256": null,
+          "reason": "fetch_budget"
+        },
+        {
+          "source_index": 2,
+          "candidate_index": 0,
+          "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000106",
+          "title": "Pinned architecture guide",
+          "kind": "user_note",
+          "raw_body_bytes": 40000,
+          "rendered_bytes": null,
+          "revision_sha256": null,
+          "reason": "raw_body_limit"
+        }
+      ],
+      "excluded_count": 4,
+      "reason_counts": {
+        "record_too_large": 1,
+        "fetch_budget": 1,
+        "raw_body_limit": 1,
+        "total_budget": 1
+      },
+      "truncated": true
+    }
+  },
+  "input_prompt": "You are reviewing card 47.\r\n## HandoffNotes\n- Retained handoff — café 🧭\n- Second handoff\n\n## ReviewerNotes\n- Kept reviewer note\n\nPolicy (summarised): review only.\n",
+  "system_prompt": "",
+  "dispatch": {
+    "protocol_version": 1,
+    "dispatch_revision": "0b42e2586b33f00222220d1d512cf48c79ca60018d70eb56ca186c2c5aefbef1",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "review",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "required_blocks_exact",
+    "injected_bytes": {
+      "input": 103,
+      "system": 0,
+      "total": 103
+    },
+    "adapter": "operator-adapter",
+    "resolution_kind": "tier",
+    "resume_session_id": null,
+    "channel_contract": {
+      "version": 1,
+      "input": "verbatim",
+      "system": "empty",
+      "resume": false
+    },
+    "required_source_indices": [
+      0
+    ],
+    "source_inclusions": [
+      {
+        "source_index": 0,
+        "alias": "HandoffNotes",
+        "required": true,
+        "outcome": "exact",
+        "spans": [
+          {
+            "channel": "input",
+            "start": 28,
+            "end": 94
+          }
+        ],
+        "contribution_bytes": 66
+      },
+      {
+        "source_index": 1,
+        "alias": "ReviewerNotes",
+        "required": false,
+        "outcome": "exact",
+        "spans": [
+          {
+            "channel": "input",
+            "start": 96,
+            "end": 133
+          }
+        ],
+        "contribution_bytes": 37
+      },
+      {
+        "source_index": 2,
+        "alias": "PinnedGuides",
+        "required": false,
+        "outcome": "empty",
+        "spans": [],
+        "contribution_bytes": 0
+      },
+      {
+        "source_index": 3,
+        "alias": "StagePolicy",
+        "required": false,
+        "outcome": "exact_block_not_observed",
+        "spans": [],
+        "contribution_bytes": null
+      }
+    ]
+  }
+}

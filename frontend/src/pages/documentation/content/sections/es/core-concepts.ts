@@ -782,8 +782,8 @@ export const ES_CORE_CONCEPTS = {
       " es un documento de texto enriquecido con título que vive en un espacio de trabajo o en un tablero, opcionalmente vinculado a una tarjeta. Las personas escriben notas en el editor compartido; los agentes las escriben por MCP. Ambos editan el mismo documento almacenado, así que este capítulo explica qué puede contener ese documento y cómo cambiarlo sin perder nada.",
     "What the editor supports":
       "Qué admite el editor",
-    "The editor and the API share one closed vocabulary: headings (levels 1–3), paragraphs, bold, italic, strikethrough, inline code, links, bullet and numbered lists, block quotes, horizontal rules, tables, code blocks with a language, Mermaid diagrams, mentions, images and file attachments. A Mermaid diagram is an ordinary code block whose language is ":
-      "El editor y la API comparten un vocabulario cerrado: encabezados (niveles 1–3), párrafos, negrita, cursiva, tachado, código en línea, enlaces, listas con viñetas y numeradas, citas en bloque, reglas horizontales, tablas, bloques de código con lenguaje, diagramas Mermaid, menciones, imágenes y archivos adjuntos. Un diagrama Mermaid es un bloque de código normal cuyo lenguaje es ",
+    "The editor and the API share one closed vocabulary: headings (levels 1–3), paragraphs, bold, italic, strikethrough, inline code, links, bullet and numbered lists, checklists, block quotes, horizontal rules, tables, code blocks with a language, Mermaid diagrams, mentions, images and file attachments. A Mermaid diagram is an ordinary code block whose language is ":
+      "El editor y la API comparten un vocabulario cerrado: encabezados (niveles 1–3), párrafos, negrita, cursiva, tachado, código en línea, enlaces, listas con viñetas y numeradas, listas de tareas, citas en bloque, reglas horizontales, tablas, bloques de código con lenguaje, diagramas Mermaid, menciones, imágenes y archivos adjuntos. Un diagrama Mermaid es un bloque de código normal cuyo lenguaje es ",
     "; the editor draws it in place.":
       "; el editor lo dibuja en el mismo lugar.",
     "Markdown vs ProseMirror":
@@ -880,12 +880,12 @@ export const ES_CORE_CONCEPTS = {
       " con título de adjunto se convierte en un adjunto.",
     "Round-trip guarantees":
       "Garantías de ida y vuelta",
-    "Reading a note as Markdown, editing the text and writing it back keeps the document intact: headings, marks, links, lists, quotes, rules, tables, code blocks and Mermaid diagrams, images with their alt text and title, and attachments with their name, size and type all come back as the same nodes, at the same stable paths.":
-      "Leer una nota como Markdown, editar el texto y volver a escribirla mantiene el documento intacto: encabezados, formatos, enlaces, listas, citas, reglas, tablas, bloques de código y diagramas Mermaid, imágenes con su texto alternativo y su título, y adjuntos con su nombre, tamaño y tipo vuelven como los mismos nodos, en las mismas rutas estables.",
+    "Reading a note as Markdown, editing the text and writing it back keeps the document intact: headings, marks, links, lists, checklists with their ticks, quotes, rules, tables, code blocks and Mermaid diagrams, images with their alt text and title, and attachments with their name, size and type all come back as the same nodes, at the same stable paths.":
+      "Leer una nota como Markdown, editar el texto y volver a escribirla mantiene el documento intacto: encabezados, formatos, enlaces, listas, listas de tareas con sus marcas, citas, reglas, tablas, bloques de código y diagramas Mermaid, imágenes con su texto alternativo y su título, y adjuntos con su nombre, tamaño y tipo vuelven como los mismos nodos, en las mismas rutas estables.",
     "What Markdown cannot carry":
       "Lo que Markdown no puede transportar",
-    "A mention becomes plain @Name text, a table cell is flattened to one line, and table column alignment is dropped. Headings deeper than level 3 are stored as level 3. An attachment whose upload never finished has no link and comes back as its bare file name. Markdown checklists are not converted yet. When a note holds mentions you need to keep, edit it with ":
-      "Una mención se convierte en texto plano @Nombre, una celda de tabla se aplana a una línea y se pierde la alineación de columnas. Los encabezados de nivel mayor que 3 se almacenan como nivel 3. Un adjunto cuya subida nunca terminó no tiene enlace y vuelve como su simple nombre de archivo. Las listas de verificación de Markdown aún no se convierten. Cuando una nota contiene menciones que necesitas conservar, edítala con ",
+    "A mention becomes plain @Name text, a table cell is flattened to one line, and table column alignment is dropped. Headings deeper than level 3 are stored as level 3. An attachment whose upload never finished has no link and comes back as its bare file name. When a note holds mentions you need to keep, edit it with ":
+      "Una mención se convierte en texto plano @Nombre, una celda de tabla se aplana a una línea y se pierde la alineación de columnas. Los encabezados de nivel mayor que 3 se almacenan como nivel 3. Un adjunto cuya subida nunca terminó no tiene enlace y vuelve como su simple nombre de archivo. Cuando una nota contiene menciones que necesitas conservar, edítala con ",
     " around them or write ProseMirror JSON.":
       " alrededor de ellas o escribe JSON de ProseMirror.",
     "Edit the smallest piece you can":
@@ -894,5 +894,39 @@ export const ES_CORE_CONCEPTS = {
       "Prefiere ",
     " over replacing a whole note. It touches only the section you name, so anything outside it — including what Markdown cannot carry — is left exactly as it was.":
       " antes que reemplazar una nota entera. Solo toca la sección que nombras, así que todo lo que queda fuera —incluido lo que Markdown no puede transportar— permanece exactamente como estaba.",
+    "Checklists":
+      "Listas de tareas",
+    "A checklist is a list whose items each carry a box. In the editor, press the Checklist button in the toolbar, or start a line with":
+      "Una lista de tareas es una lista en la que cada elemento lleva una casilla. En el editor, pulsa el botón Lista de tareas de la barra de herramientas o empieza una línea con",
+    " and a space. Tab nests an item under the one above it and Shift+Tab lifts it back out. Click a box to tick it, or press Ctrl+Enter (⌘+Enter on a Mac) to tick the item under the cursor.":
+      " y un espacio. Tab anida un elemento bajo el anterior y Mayús+Tab lo vuelve a sacar. Haz clic en una casilla para marcarla, o pulsa Ctrl+Enter (⌘+Enter en Mac) para marcar el elemento donde está el cursor.",
+    "Over MCP, write a checklist as Markdown task items in":
+      "Por MCP, escribe una lista de tareas como elementos de tarea de Markdown en",
+    " or ":
+      " o ",
+    ". Reading the note with ":
+      ". Al leer la nota con ",
+    " returns the same form, so an agent ticks an item by changing ":
+      " se obtiene la misma forma, así que un agente marca un elemento cambiando ",
+    " to":
+      " por",
+    " and writing the note back.":
+      " y volviendo a escribir la nota.",
+    "A checklist in Markdown":
+      "Una lista de tareas en Markdown",
+    "Every item of the list must start with ":
+      "Todos los elementos de la lista deben empezar con ",
+    " or":
+      " o",
+    "; a list that mixes task items with plain items stays an ordinary bullet list. Indent a nested item by two spaces. To start a plain list item with a literal bracket, escape it as":
+      "; una lista que mezcla elementos de tarea con elementos normales sigue siendo una lista con viñetas normal. Sangra un elemento anidado con dos espacios. Para empezar un elemento de lista normal con un corchete literal, escápalo como",
+    ". HTML input works too: TipTap's":
+      ". También se acepta HTML: la lista de TipTap",
+    ", or any list whose every item starts with an":
+      ", o cualquier lista cuyos elementos empiecen todos por un",
+    "Boxes are ticked while editing":
+      "Las casillas se marcan al editar",
+    "Wherever a note or a card description is shown read-only, its boxes show the saved state but cannot be changed. Open the editor to tick an item, so the change is saved, and attributed, like any other edit.":
+      "Allí donde una nota o la descripción de una tarjeta se muestra en solo lectura, sus casillas muestran el estado guardado pero no se pueden cambiar. Abre el editor para marcar un elemento: así el cambio se guarda, y se atribuye, como cualquier otra edición.",
   },
 };

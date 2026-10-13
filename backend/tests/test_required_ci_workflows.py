@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import shlex
 from fnmatch import fnmatchcase
 from pathlib import Path
 
@@ -8,6 +9,15 @@ import pytest
 import yaml
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+
+
+def test_companion_packaging_gate_includes_module_identity_contract():
+    script = (WORKFLOWS.parents[1] / "scripts" / "companion-source-gate.sh").read_text()
+    packaging = script.split("check_packaging() (", 1)[1].split("\n)", 1)[0]
+    command = next(line for line in packaging.replace("\\\n", "").splitlines() if "-m unittest" in line)
+    arguments = shlex.split(command, comments=True)
+    modules = arguments[arguments.index("unittest") + 1 :]
+    assert modules.count("test_module_identity") == 1
 
 
 @pytest.mark.parametrize("filename", ["ci.yml", "quickstart-gate.yml"])

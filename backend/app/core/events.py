@@ -56,6 +56,10 @@ EXECUTION_COMPLETED = "execution.completed"
 # kind, message}; consumers switch on `kind`. See app/services/agents/
 # execution.py::ExecutionService.record_warning.
 EXECUTION_WARNING = "execution.warning"
+# One newly retained invocation context receipt, published only after the
+# preparing transaction commits and never for an exact replay. Carries
+# {execution_id, workspace_id, receipt_id, ordinal}.
+EXECUTION_CONTEXT_RECEIPT_CREATED = "execution.context_receipt_created"
 AGENT_STATUS_CHANGED = "agent.status_changed"
 AGENT_POLL_REQUESTED = "agent.poll_requested"
 AGENT_HEARTBEAT_RECEIVED = "agent.heartbeat_received"

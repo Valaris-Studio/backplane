@@ -11,9 +11,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 license_for() {
-  # LICENSES.md: runner/ is MIT, everything else defaults to AGPL-3.0-or-later
+  # LICENSES.md: runner/ and companion/ are MIT, everything else defaults to AGPL-3.0-or-later
   case "$1" in
     runner/*) echo "MIT" ;;
+    companion/*) echo "MIT" ;;
     *)        echo "AGPL-3.0-or-later" ;;
   esac
 }
@@ -23,8 +24,8 @@ is_generated() {
 }
 
 list_source_files() {
-  find backend frontend mcp-server runner scripts infra -type f \
-    \( -name '*.py' -o -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.sh' \) \
+  find backend frontend mcp-server runner companion scripts infra -type f \
+    \( -name '*.py' -o -name '*.go' -o -name '*.rs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.sh' \) \
     -not -path '*/node_modules/*' \
     -not -path '*/.venv/*' \
     -not -path '*/venv/*' \

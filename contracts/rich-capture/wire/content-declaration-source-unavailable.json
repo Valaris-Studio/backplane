@@ -1,0 +1,31 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "user",
+    "channel": "attachment",
+    "source": {
+      "kind": "codex_rollout",
+      "parser": "companion-codex-rollout/1",
+      "schema_version": "codex-rollout/0.161",
+      "native_ref": "01a11e74-c2f3-70a2-9353-38d7dcca1633",
+      "order": 9
+    },
+    "occurred_at": "2026-10-09T02:18:50.999Z",
+    "observed_at": "2026-10-09T02:18:52Z",
+    "media_type": "image/jpeg",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "910682c9ae47ab0a8836d0dfa3f95e8f02dc81e541ef0e46531f07cdca6c84b6",
+    "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983",
+    "coverage": "source_unavailable",
+    "coverage_reason": "file_missing",
+    "delivery": "none"
+  }
+}

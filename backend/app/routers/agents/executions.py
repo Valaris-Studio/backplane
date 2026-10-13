@@ -3,12 +3,13 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
 from app.database import get_db
 from app.models.user import User
+from app.schemas.agents.context import CONTEXT_DISPATCH_HEADER
 from app.schemas.agents.execution import (
     ExecutionCreate,
     ExecutionListRead,
@@ -24,15 +25,47 @@ from app.services.agents.tool_invocation import ToolInvocationService
 router = APIRouter(prefix="/api/agents/{agent_id}/executions", tags=["agent-executions"])
 
 
-@router.post("", response_model=ExecutionRead, status_code=201)
+@router.post(
+    "", response_model=ExecutionRead, status_code=201,
+    responses={
+        200: {"model": ExecutionRead},
+        409: {
+            "description": (
+                "Hold conflicts, or context-dispatch refusal: "
+                "context_dispatch_version_required, context_dispatch_version_unsupported, "
+                "context_dispatch_policy_changed, context_budget_invalid (bounded findings)."
+            )
+        },
+    },
+)
 async def start_execution(
     agent_id: uuid.UUID,
     data: ExecutionCreate,
+    response: Response,
+    context_dispatch_header: str | None = Header(None, alias=CONTEXT_DISPATCH_HEADER),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    """With `reservation_id`, promotes that exact assignment hold into the
+    execution's context binding; an identical retry returns the same
+    execution with 200. A required-floor agent must echo its negotiated
+    `context_dispatch_version` and `context_dispatch_policy_revision`; the
+    binding then keeps that floor for good."""
     service = ExecutionService(db)
-    return await service.start_execution(agent_id, data, user_id=user.id)
+    if data.reservation_id is None:
+        return await service.start_execution(
+            agent_id, data, user_id=user.id, context_dispatch_header=context_dispatch_header
+        )
+    execution, created = await service.start_bound_execution(
+        agent_id, data, user_id=user.id, context_dispatch_header=context_dispatch_header
+    )
+    if not created:
+        response.status_code = 200
+    if execution.context_binding and execution.context_binding.context_dispatch:
+        response.headers[CONTEXT_DISPATCH_HEADER] = str(
+            execution.context_binding.context_dispatch.version
+        )
+    return execution
 
 
 @router.patch("/{execution_id}", response_model=ExecutionRead)

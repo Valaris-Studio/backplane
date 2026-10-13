@@ -3,7 +3,7 @@
 
 import uuid
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.models.agents.reservation import AgentReservation
 from app.repositories.base import BaseRepository
@@ -34,3 +34,13 @@ class AgentReservationRepository(BaseRepository[AgentReservation]):
         )
         await self.db.flush()
         return result.rowcount or 0
+
+    async def get_for_update(self, reservation_id: uuid.UUID) -> AgentReservation | None:
+        """Locks the hold for the promoting transaction; a concurrent promotion
+        of the same hold waits here on PostgreSQL."""
+        return await self.db.scalar(
+            select(AgentReservation)
+            .where(AgentReservation.id == reservation_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )

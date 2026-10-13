@@ -317,6 +317,146 @@ export interface Execution {
   // omits the key on older rows).
   ship_warnings?: string[] | null;
   tool_invocations: ToolInvocation[];
+  // Context receipts (A1). Both are additive: an older server omits the count,
+  // which means "history not supported" — never "zero receipts".
+  context_receipt_count?: number;
+  context_binding?: ContextBinding | null;
+}
+
+// The authorized assignment identity an execution was started under. A binding
+// proves the start was authorized, not that any prompt was ever prepared.
+export interface ContextBinding {
+  reservation_id: string;
+  agent_id: string;
+  workspace_id: string;
+  board_id: string;
+  card_id: string;
+  role: string;
+  created_at: string;
+}
+
+// One selected note occurrence. title/kind are the values retained at
+// preparation; a later rename or deletion of the note does not change them.
+export interface ContextRecord {
+  record_index: number;
+  note_id: string;
+  title: string;
+  kind: string;
+  workspace_id: string;
+  board_id: string | null;
+  card_id: string | null;
+  updated_at: string;
+  revision_sha256: string;
+  rendered_sha256: string;
+  rendered_bytes: number;
+}
+
+export interface ContextSource {
+  source_index: number;
+  kind: string;
+  alias: string;
+  filter: Record<string, unknown>;
+  // `source_only` sources carry no record provenance, so an empty `records`
+  // there does not mean nothing was selected.
+  coverage: "record_traced" | "source_only";
+  rendered_sha256: string;
+  rendered_bytes: number;
+  records: ContextRecord[];
+  // Schema 2 only; omitted (not null) on schema-1 manifests.
+  admission?: ContextAdmission;
+}
+
+// `outcome` stays a plain string: a value this UI does not know is shown
+// verbatim, never mapped onto a known meaning.
+export interface ContextAdmission {
+  required: boolean;
+  outcome: string;
+  candidate_limit: number | null;
+  candidate_count: number;
+  // The candidate window was full: notes past `candidate_limit` were neither
+  // fetched nor counted, so `candidate_count` is a lower bound.
+  has_more_candidates: boolean;
+  admitted_count: number;
+  excluded_count: number;
+  max_rendered_bytes: number;
+}
+
+export interface ContextExclusion {
+  source_index: number;
+  candidate_index: number | null;
+  note_id: string | null;
+  title: string | null;
+  kind: string;
+  raw_body_bytes: number | null;
+  rendered_bytes: number | null;
+  revision_sha256: string | null;
+  reason: string;
+}
+
+// `entries` is a bounded list; `excluded_count` is the authoritative total.
+export interface ContextDiagnostics {
+  entries: ContextExclusion[];
+  excluded_count: number;
+  reason_counts: Record<string, number>;
+  truncated: boolean;
+}
+
+export interface ContextManifest {
+  schema_version: number;
+  renderer_version: string;
+  sources: ContextSource[];
+  diagnostics?: ContextDiagnostics;
+}
+
+// `contribution_bytes` is null when the source's exact block was not observed:
+// its share of the prompt is unknown, which is not the same as zero.
+export interface ContextSourceInclusion {
+  source_index: number;
+  alias: string;
+  required: boolean;
+  outcome: string;
+  spans: { channel: string; start: number; end: number }[];
+  contribution_bytes: number | null;
+}
+
+// Proves what the prepared prompt contained, not that a provider received or
+// used it; receipt `use_verification` stays authoritative for that.
+export interface ContextDispatch {
+  inclusion_verification: string;
+  required_source_indices: number[];
+  source_inclusions: ContextSourceInclusion[];
+}
+
+// History row: no prompt bodies and no manifest. `status`/`use_verification`
+// are plain strings because A1 only ever reports prepared/not_verified and the
+// UI must not invent meaning for values it does not know yet.
+export interface ContextReceiptSummary {
+  id: string;
+  execution_id: string;
+  ordinal: number;
+  client_request_id: string;
+  context_revision: string;
+  prompt_sha256: string;
+  prompt_bytes: number;
+  system_prompt_sha256: string;
+  system_prompt_bytes: number;
+  provider: string;
+  model: string;
+  status: string;
+  use_verification: string;
+  created_at: string;
+}
+
+export interface ContextReceipt extends ContextReceiptSummary {
+  context_manifest: ContextManifest;
+  input_prompt: string;
+  system_prompt: string;
+  dispatch?: ContextDispatch | null;
+}
+
+export interface ContextReceiptPage {
+  items: ContextReceiptSummary[];
+  total: number;
 }
 
 export interface DailyMetric {
@@ -448,6 +588,33 @@ export async function fetchExecution(
 export async function fetchSkippedExecutionCardIds(slug: string): Promise<string[]> {
   const { data } = await api.get<string[]>(
     `/workspaces/${slug}/executions/skipped-card-ids`,
+  );
+  return data;
+}
+
+export async function fetchExecutionContextReceipts(
+  slug: string,
+  executionId: string,
+  params: { limit: number; offset: number },
+): Promise<ContextReceiptPage> {
+  const response = await api.get<ContextReceiptSummary[]>(
+    `/workspaces/${slug}/executions/${executionId}/context-receipts`,
+    { params },
+  );
+  const parsed = Number(response.headers["x-total-count"]);
+  return {
+    items: response.data,
+    total: Number.isFinite(parsed) ? parsed : response.data.length,
+  };
+}
+
+export async function fetchExecutionContextReceipt(
+  slug: string,
+  executionId: string,
+  receiptId: string,
+): Promise<ContextReceipt> {
+  const { data } = await api.get<ContextReceipt>(
+    `/workspaces/${slug}/executions/${executionId}/context-receipts/${receiptId}`,
   );
   return data;
 }

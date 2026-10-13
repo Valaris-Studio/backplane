@@ -1,19 +1,24 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatDateTime, formatNumber } from "@/lib/format";
 import { AlertTriangle, Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
-import { useTimeline } from "../api/use-timeline";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { ApiError } from "@/lib/api-error";
+import { timelineKeys } from "@/lib/query-keys";
+import { useTimelineHistory } from "../api/use-timeline-history";
+import { TimelineHistoryOverview } from "./TimelineHistoryOverview";
 import { usePlayback } from "../hooks/use-playback";
 import { useSpotlight } from "../hooks/use-spotlight";
 import { useViewMode } from "../hooks/use-view-mode";
 import { buildActorAccents, eventActorKey } from "../utils/actor-colors";
-import { reconstructState } from "../utils/replay-engine";
-import { buildDisplayColumns } from "../utils/display-columns";
+import { reconstructWindowState } from "../utils/window-replay";
 import { computeCardAnalytics } from "../utils/analytics";
 import { describeEvent } from "../utils/event-descriptor";
 import { buildAgentRoleIndex, resolveStepActor } from "../utils/step-role";
@@ -34,7 +39,7 @@ import { StepPanel } from "./StepPanel";
 import { BoardEdgePulse } from "./BoardEdgePulse";
 import { ViewToggle } from "./ViewToggle";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
-import type { ColumnSnapshot, TimelineEvent } from "../types";
+import type { ColumnSnapshot, HistoryAnchor, HistoryLiveHead, HistorySelector, HistoryWindow, TimelineEvent } from "../types";
 
 interface Props {
   slug: string;
@@ -44,8 +49,8 @@ interface Props {
 // Build a column_id -> name map from EVERY column snapshot in the log so
 // captions and dwell labels resolve names even for columns absent from the
 // current frame (e.g. deleted, or not yet created at this index).
-function buildColumnNames(events: TimelineEvent[], baselineColumns: ColumnSnapshot[]): Record<string, string> {
-  const names: Record<string, string> = Object.fromEntries(baselineColumns.map((column) => [column.id, column.name]));
+function buildColumnNames(events: TimelineEvent[], anchorColumns: ColumnSnapshot[]): Record<string, string> {
+  const names: Record<string, string> = Object.fromEntries(anchorColumns.map((column) => [column.id, column.name]));
   for (const event of events) {
     if (event.entity_type !== "column") continue;
     const snapshot = (event.after_state ?? event.before_state) as ColumnSnapshot | null;
@@ -56,78 +61,131 @@ function buildColumnNames(events: TimelineEvent[], baselineColumns: ColumnSnapsh
   return names;
 }
 
-const EMPTY_EVENTS: TimelineEvent[] = [];
+const EMPTY_EVENTS: HistoryWindow["events"] = [];
+const UNKNOWN_ANCHOR: HistoryAnchor = { through_seq: null, state: { columns: [], cards: [] }, coverage: { quality: "partial", unknown_origin: true, missing_structural_snapshots: "0", reasons: ["unknown_origin"] } };
 
 export function TimelineSimulator({ slug, boardId }: Props) {
   const { t } = useTranslation();
   const reducedMotion = useReducedMotion();
-  const { data, isLoading, isError, refetch } = useTimeline(slug, boardId);
-
-  // Keep the loading skeleton in the board region so transport stays available.
-  const events = data?.events ?? EMPTY_EVENTS;
-  const generatedAt = data?.generated_at ?? "";
-  // v1.1: the current-state baseline seeds the engine so legacy boards render
-  // real titles/columns instead of synthetic Untitled cards (absent on old
-  // backends → undefined → engine behaves as v1).
-  const baseline = data?.baseline ?? undefined;
-  const playback = usePlayback(events.length);
+  const history = useTimelineHistory(slug, boardId);
+  const readyWindow = history.status === "ready" && history.window?.status === "ready" ? history.window : undefined;
+  const events = readyWindow?.events ?? EMPTY_EVENTS;
+  const anchor = readyWindow?.anchor ?? UNKNOWN_ANCHOR;
+  const anchorState = anchor.state;
+  const [observing, setObserving] = useState(false);
+  const observedQuery = useQuery({
+    queryKey: [...timelineKeys.history(slug, boardId), history.generation?.id, "live-head"],
+    queryFn: async ({ signal }) => (await api.get<HistoryLiveHead>(`/workspaces/${slug}/boards/${boardId}/timeline/generations/${history.generation?.id}/live-head`, { signal })).data,
+    enabled: observing && Boolean(history.generation), retry: false, staleTime: Infinity,
+  });
+  const isLoading = history.status === "loading" || observing && observedQuery.isPending;
+  const [continuePlayback, setContinuePlayback] = useState(false);
+  const playback = usePlayback(events.length, () => {
+    if (readyWindow?.window.next_cursor) {
+      selectWindow({ cursor: readyWindow.window.next_cursor });
+      setContinuePlayback(true);
+    }
+  });
   const { viewMode, setViewMode } = useViewMode();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   // Flags MARK matching events on the scrubber (search text + actor chips);
   // the replay fold and the board are never filtered by them.
   const [flagQuery, setFlagQuery] = useState<FlagQuery>(EMPTY_FLAG_QUERY);
 
-  const columnNames = useMemo(() => buildColumnNames(events, baseline?.columns ?? []), [events, baseline]);
-  const cardFacets = useMemo(() => buildCardFacets(events, baseline), [events, baseline]);
-  const cardTitles = useMemo(() => Object.fromEntries(cardFacets.map((card) => [card.id, card.title])), [cardFacets]);
-  // agent_id → role across the whole log, so the step panel can name the runner
-  // role behind an agent-driven step even when that agent isn't a participant on
-  // the current card's snapshot (it's a participant on some card in the log).
-  const agentRoleIndex = useMemo(
-    () => buildAgentRoleIndex(events, baseline),
-    [events, baseline],
-  );
+  const selectedPrefix = useMemo(() => events.slice(0, playback.frameIndex + 1), [events, playback.frameIndex]);
+  const presentationState = observing && observedQuery.data ? observedQuery.data.state : anchorState;
+  const columnNames = useMemo(() => buildColumnNames(selectedPrefix, presentationState.columns), [selectedPrefix, presentationState]);
+  const cardFacets = useMemo(() => buildCardFacets(events, anchorState), [events, anchorState]);
+  const flagCardTitles = useMemo(() => Object.fromEntries(cardFacets.map((card) => [card.id, card.title])), [cardFacets]);
+  const cardTitles = useMemo(() => Object.fromEntries(buildCardFacets(selectedPrefix, presentationState).map((card) => [card.id, card.title])), [selectedPrefix, presentationState]);
+  const agentRoleIndex = useMemo(() => buildAgentRoleIndex(selectedPrefix, presentationState), [selectedPrefix, presentationState]);
+  const facetRoleIndex = useMemo(() => buildAgentRoleIndex(events, anchorState), [events, anchorState]);
   const actorFacets = useMemo(
-    () => buildActorFacets(events, agentRoleIndex),
-    [events, agentRoleIndex],
+    () => buildActorFacets(events, facetRoleIndex),
+    [events, facetRoleIndex],
   );
   const actorAccents = useMemo(() => buildActorAccents(events.map(eventActorKey)), [events]);
   const eventFacets = useMemo(() => buildEventFacets(events), [events]);
   const flaggedIndices = useMemo(
-    () => computeFlaggedIndices(events, flagQuery, cardTitles),
-    [events, flagQuery, cardTitles],
+    () => computeFlaggedIndices(events, flagQuery, flagCardTitles),
+    [events, flagQuery, flagCardTitles],
   );
   const frame = useMemo(
-    () => reconstructState(events, playback.frameIndex, baseline),
-    [events, playback.frameIndex, baseline],
+    () => observing && observedQuery.data
+      ? reconstructWindowState({ through_seq: observedQuery.data.head_seq, state: observedQuery.data.state, coverage: { quality: "reconstructed", unknown_origin: false, missing_structural_snapshots: "0", reasons: [] } }, [], -1)
+      : reconstructWindowState(anchor, events, playback.frameIndex),
+    [anchor, events, playback.frameIndex, observing, observedQuery.data],
   );
-  // Stable column lanes (every column the board ever had) + current-frame card
-  // placement, so column chrome stays put while cards animate between lanes.
-  // The baseline supplies lanes for legacy boards whose log has no column events.
-  const displayColumns = useMemo(
-    () => buildDisplayColumns(events, frame, baseline),
-    [events, frame, baseline],
-  );
+  const displayColumns = frame.columns;
+  const [selectionRevision, setSelectionRevision] = useState(0);
+  const pendingSelection = useRef<HistorySelector | null>(null);
+  const pendingEnd = useRef(false);
+  const previousWindow = useRef<string | undefined>(undefined);
+  const { seek, play, pause } = playback;
+  useEffect(() => {
+    if (!readyWindow) return;
+    const identity = `${readyWindow.generation_id}:${readyWindow.window.first_seq}`;
+    if (previousWindow.current === identity) return;
+    previousWindow.current = identity;
+    const target = pendingSelection.current;
+    let index = pendingEnd.current ? events.length - 1 : 0;
+    pendingEnd.current = false;
+    if (target && "at_seq" in target) {
+      index = events.findIndex((event) => BigInt(event.seq) >= BigInt(target.at_seq!));
+      if (index < 0) index = events.length - 1;
+    } else if (target && "at_time" in target && events.length) {
+      const time = Date.parse(target.at_time!);
+      index = events.reduce((closest, event, candidate) => Math.abs(Date.parse(event.created_at) - time) < Math.abs(Date.parse(events[closest]!.created_at) - time) ? candidate : closest, 0);
+    }
+    seek(index);
+    pendingSelection.current = null;
+    if (continuePlayback) { play(); setContinuePlayback(false); }
+  }, [readyWindow, events, seek, play, selectionRevision, continuePlayback]);
+  useEffect(() => {
+    if (["preparing", "failed", "expired", "error"].includes(history.status)) setContinuePlayback(false);
+  }, [history.status]);
+  const { playing, toggle, atStart, atEnd, stepBack: stepBackWithin, stepForward: stepForwardWithin } = playback;
+  const selectHistoryWindow = history.selectWindow;
+  const selectWindow = useCallback((selector: HistorySelector) => {
+    pause();
+    setContinuePlayback(false);
+    setObserving(false);
+    setSelectedCardId(null);
+    pendingEnd.current = "cursor" in selector && selector.cursor === readyWindow?.window.previous_cursor;
+    previousWindow.current = undefined;
+    pendingSelection.current = selector;
+    selectHistoryWindow(selector);
+    setSelectionRevision((value) => value + 1);
+  }, [pause, readyWindow?.window.previous_cursor, selectHistoryWindow]);
+  const stepBack = useCallback(() => {
+    if (atStart && readyWindow?.window.previous_cursor) selectWindow({ cursor: readyWindow.window.previous_cursor });
+    else stepBackWithin();
+  }, [atStart, readyWindow?.window.previous_cursor, selectWindow, stepBackWithin]);
+  const stepForward = useCallback(() => {
+    if (atEnd && readyWindow?.window.next_cursor) selectWindow({ cursor: readyWindow.window.next_cursor });
+    else stepForwardWithin();
+  }, [atEnd, readyWindow?.window.next_cursor, selectWindow, stepForwardWithin]);
+  const firstHistorySeq = history.generation?.first_seq ?? history.overview?.first_seq;
+  const togglePlayback = useCallback(() => {
+    if (!playing && atEnd && readyWindow?.window.next_cursor) {
+      selectWindow({ cursor: readyWindow.window.next_cursor });
+      setContinuePlayback(true);
+    } else if (!playing && atEnd && firstHistorySeq && readyWindow?.window.first_seq !== firstHistorySeq) {
+      selectWindow({ at_seq: firstHistorySeq });
+      setContinuePlayback(true);
+    } else toggle();
+  }, [playing, atEnd, readyWindow?.window.next_cursor, readyWindow?.window.first_seq, firstHistorySeq, selectWindow, toggle]);
+  const refresh = () => {
+    const selected = events[playback.frameIndex];
+    selectWindow(selected ? { at_seq: selected.seq } : {});
+    history.refresh();
+  };
 
-  // The partial-history note reflects the WHOLE log, not just the current frame:
-  // if ANY card/column event lacks a snapshot, history is reconstructed
-  // best-effort and the note stays up regardless of where the scrubber sits.
-  const hasLegacyEvent = useMemo(
-    () =>
-      events.some(
-        (e) =>
-          (e.entity_type === "card" || e.entity_type === "column") &&
-          e.action !== "deleted" &&
-          e.after_state === null,
-      ),
-    [events],
-  );
-
-  const currentEvent = events[playback.frameIndex] ?? null;
+  const currentEvent = observing ? null : events[playback.frameIndex] ?? null;
   // Board-time anchors for the StepPanel chips: the log's first event dates
   // "Day N"; the previous event exposes the real gap the uniform playback
   // cadence hides. Derived here so StepPanel stays pure.
-  const firstEventAt = events[0]?.created_at;
+  const firstEventAt = history.overview?.first_at ?? events[0]?.created_at;
   const prevEventAt =
     playback.frameIndex > 0 ? (events[playback.frameIndex - 1]?.created_at ?? null) : null;
   // The current step's structured descriptor drives the rich step panel, the
@@ -160,10 +218,9 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   // double-fire or hijack a focused widget. Also bail while the read-only
   // detail panel is open so keys don't drive the board behind it. Only fires
   // when there's a log.
-  const { toggle, stepBack, stepForward } = playback;
   const detailOpen = selectedCardId !== null;
   useEffect(() => {
-    if (events.length === 0 || detailOpen) return;
+    if (events.length === 0 || detailOpen || observing) return;
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       if (
@@ -177,7 +234,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
       }
       if (e.key === " " || e.key === "Spacebar") {
         e.preventDefault();
-        toggle();
+        togglePlayback();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         stepForward();
@@ -188,7 +245,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [events.length, detailOpen, toggle, stepBack, stepForward]);
+  }, [events.length, detailOpen, observing, togglePlayback, stepBack, stepForward]);
 
   // Resolve the selected card's snapshot AT the current frame; if it's not in
   // the frame (created later / deleted earlier) keep the panel closed.
@@ -203,10 +260,10 @@ export function TimelineSimulator({ slug, boardId }: Props) {
 
   const analytics = useMemo(
     () =>
-      selectedCardId && generatedAt
-        ? computeCardAnalytics(events.slice(0, playback.frameIndex + 1), selectedCardId, currentEvent?.created_at ?? generatedAt)
+      selectedCardId && currentEvent && !observing
+        ? computeCardAnalytics(events.slice(0, playback.frameIndex + 1), selectedCardId, currentEvent.created_at)
         : null,
-    [events, selectedCardId, generatedAt, playback.frameIndex, currentEvent],
+    [events, selectedCardId, observing, playback.frameIndex, currentEvent],
   );
 
   const seekToEvent = (index: number) => {
@@ -214,51 +271,18 @@ export function TimelineSimulator({ slug, boardId }: Props) {
     playback.seek(index);
   };
 
-  if (isError) {
-    return (
-      <div data-testid="timeline-error">
-        <EmptyState
-          icon={AlertTriangle}
-          title={t("timeline.error.title")}
-          description={t("timeline.error.body")}
-          action={
-            <Button variant="outline" onClick={() => void refetch()}>
-              {t("timeline.error.retry")}
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-
-  // Loaded but truly empty — no history to replay AND no current cards to show.
-  // A legacy board with cards but only null-snapshot events (or no events at
-  // all) still has a baseline to render, so it must NOT fall into the empty
-  // state; only a board with neither events nor baseline cards is truly empty.
-  const baselineCardCount = baseline?.cards.length ?? 0;
-  if (!isLoading && events.length === 0 && baselineCardCount === 0) {
-    return (
-      <div data-testid="timeline-empty">
-        <EmptyState
-          icon={Clapperboard}
-          title={t("timeline.empty.title")}
-          description={t("timeline.empty.body")}
-        />
-      </div>
-    );
-  }
-
+  const expired = history.status === "expired" || observing && observedQuery.error instanceof ApiError && observedQuery.error.status === 410;
   const transportControls = (
     <TransportControls
       playing={playback.playing}
       speed={playback.speed}
-      atStart={playback.atStart}
-      atEnd={playback.atEnd}
+      atStart={playback.atStart && !readyWindow?.window.previous_cursor}
+      atEnd={playback.atEnd && !readyWindow?.window.next_cursor}
       currentTimestamp={null}
       caption=""
-      onToggle={playback.toggle}
-      onStepBack={playback.stepBack}
-      onStepForward={playback.stepForward}
+      onToggle={togglePlayback}
+      onStepBack={stepBack}
+      onStepForward={stepForward}
       onSpeedCycle={playback.cycleSpeed}
     />
   );
@@ -267,23 +291,15 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   return (
     <div className="flex h-full flex-col gap-2">
       <div data-testid="timeline-controls" className="shrink-0 space-y-2">
-        {data?.truncated ? (
-          <div
-            data-testid="timeline-truncated-note"
-            className="rounded-[calc(var(--radius-md))] border-l-2 border-l-[color:var(--color-warning)] bg-warning/10 px-3 py-2 text-xs text-[color:var(--color-warning-foreground)]"
-          >
-            {t("timeline.partial.truncated", { count: events.length })}
-          </div>
-        ) : null}
-        {hasLegacyEvent || frame.partial ? (
-          <div
-            data-testid="timeline-partial-note"
-            className="rounded-[calc(var(--radius-md))] border-l-2 border-l-[color:var(--color-warning)] bg-warning/10 px-3 py-2 text-xs text-[color:var(--color-warning-foreground)]"
-          >
-            {t("timeline.partial.note")}
-          </div>
-        ) : null}
-
+        {history.generation && history.overview && <TimelineHistoryOverview
+          key={history.generation.id} slug={slug} boardId={boardId} generation={history.generation} overview={history.overview}
+          window={readyWindow} hasNewActivity={history.hasNewActivity} busy={history.busy} observing={observing}
+          onSelect={selectWindow} onRefresh={refresh} onObserve={() => { pause(); setContinuePlayback(false); setSelectedCardId(null); setObserving((value) => !value); }}
+        />}
+        {observing && observedQuery.data && <p role="status" className="text-xs text-muted-foreground">{t("timeline.history.observation", { time: formatDateTime(observedQuery.data.observed_at) })}</p>}
+        {!observing && readyWindow && (frame.partial || readyWindow.coverage.quality === "partial") && <p data-testid="timeline-partial-note" className="rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-foreground">{t("timeline.history.partial")}</p>}
+        {continuePlayback && !readyWindow && <Button variant="outline" onClick={() => setContinuePlayback(false)}>{t("timeline.transport.pause")}</Button>}
+        <div hidden={observing || !readyWindow} className="space-y-2">
         {events.length > 0 ? (
           <TimelineFlagBar
             query={flagQuery}
@@ -330,7 +346,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
           actorAccents={actorAccents}
           flags={flaggedIndices}
         />
-
+        </div>
       </div>
 
       <div className="relative min-h-[24rem] flex-1">
@@ -338,6 +354,16 @@ export function TimelineSimulator({ slug, boardId }: Props) {
           <div data-testid="timeline-loading" className="space-y-4">
             <Skeleton className="h-[28rem] rounded-[calc(var(--radius-xl))]" />
           </div>
+        ) : history.status === "error" || history.status === "expired" || observedQuery.isError && observing ? (
+          <div data-testid="timeline-error"><EmptyState icon={AlertTriangle} title={t(expired ? "timeline.history.expiredTitle" : "timeline.error.title")} description={t(expired ? "timeline.history.expired" : "timeline.error.body")} action={<Button variant="outline" onClick={() => { if (expired) refresh(); else if (observing) void observedQuery.refetch(); else history.retry(); }}>{t(expired ? "timeline.history.refresh" : "timeline.error.retry")}</Button>} /></div>
+        ) : !observing && history.window && history.window.status !== "ready" ? (
+          <div role="status" className="space-y-3 py-8 text-center">
+            <p className="text-sm font-medium">{t(history.window.status === "failed" ? "timeline.history.preparationFailed" : "timeline.history.preparing")}</p>
+            <p className="text-xs tabular-nums text-muted-foreground">{t("timeline.history.progress", { total: formatNumber(BigInt(history.window.progress.processed_events)) })}</p>
+            {(history.window.status === "preparing" || history.window.retryable) && <Button variant="outline" disabled={history.busy} onClick={history.retry}>{t(history.window.status === "preparing" ? "timeline.history.checkProgress" : "timeline.error.retry")}</Button>}
+          </div>
+        ) : !observing && !events.length && !anchorState.cards.length ? (
+          <div data-testid="timeline-empty"><EmptyState icon={Clapperboard} title={t("timeline.empty.title")} description={t("timeline.empty.body")} /></div>
         ) : (
           <>
             {currentEvent && descriptor ? (
@@ -370,6 +396,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
         }}
         card={selectedCard}
         analytics={analytics}
+        analyticsScope={observing ? undefined : t("timeline.history.analyticsScope")}
         columnNames={columnNames}
       />
     </div>

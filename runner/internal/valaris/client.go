@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	neturl "net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -1021,32 +1022,10 @@ func (c *Client) LogExecutionStartWithSkills(
 	skills []AssignmentSkill,
 ) (string, error) {
 	url := fmt.Sprintf("%s/api/agents/%s/executions", c.baseURL, agentID)
-	payload := map[string]any{
-		"workspace_slug": workspaceSlug,
-		"action":         action,
-		"input_summary":  inputSummary,
-	}
-	if boardID != "" {
-		payload["board_id"] = boardID
-	}
-	if cardID != "" {
-		payload["card_id"] = cardID
-	}
-	if role != "" {
-		payload["role"] = role
-	}
-	if promptSlug != "" {
-		payload["prompt_slug"] = promptSlug
-	}
-	if model != "" {
-		payload["model"] = model
-	}
-	if provider != "" {
-		payload["provider"] = provider
-	}
-	if len(skills) > 0 {
-		payload["skills"] = skills
-	}
+	payload := ExecutionStart{
+		WorkspaceSlug: workspaceSlug, Action: action, BoardID: boardID, CardID: cardID, InputSummary: inputSummary,
+		Role: role, PromptSlug: promptSlug, Model: model, Provider: provider, Skills: skills,
+	}.payload()
 
 	var exec Execution
 	if err := c.jsonRequestDecode(ctx, http.MethodPost, url, payload, &exec); err != nil {
@@ -1382,6 +1361,11 @@ func (e *APIError) Error() string {
 type NextAssignmentRequest struct {
 	RoleOverride string `json:"role_override,omitempty"`
 	BoardID      string `json:"board_id,omitempty"`
+	// ContextDispatchVersion 1 asks for an assignment under the negotiated
+	// policy revision and requires its acknowledgement; 0 is the legacy
+	// request, unchanged.
+	ContextDispatchVersion        int    `json:"context_dispatch_version,omitempty"`
+	ContextDispatchPolicyRevision string `json:"context_dispatch_policy_revision,omitempty"`
 }
 
 // AssignmentBoard / AssignmentColumn / AssignmentRepo / Reservation mirror
@@ -1470,15 +1454,26 @@ type NextAssignmentResponse struct {
 	// additive: backends predating the skills registry omit the field, which
 	// decodes to nil and makes the skills_setup step a no-op.
 	Skills []AssignmentSkill `json:"skills"`
+	// ContextRevision and ContextManifest identify the rendered context;
+	// ContextDispatch is the floor a v1 assignment was negotiated under.
+	ContextRevision string                `json:"context_revision,omitempty"`
+	ContextManifest json.RawMessage       `json:"context_manifest,omitempty"`
+	ContextDispatch *ContextDispatchStamp `json:"context_dispatch,omitempty"`
 }
 
 // NextAssignment asks the backend scheduler for one card to work on.
 // Returns (nil, nil) on 204 (no eligible card right now). On 409 (the
 // agent has an active execution on another card) the returned APIError
 // carries the conflict body. On 404 (older backend without this
-// endpoint) callers may fall back to legacy discover+claim.
+// endpoint) callers may fall back to legacy discover+claim. A v1 request
+// (ContextDispatchVersion 1) is answered only by an acknowledged, matching
+// assignment or no-work; anything else is an error, never a fallback.
 func (c *Client) NextAssignment(ctx context.Context, workspaceSlug, agentID string, req NextAssignmentRequest) (*NextAssignmentResponse, error) {
 	url := fmt.Sprintf("%s/api/workspaces/%s/agents/%s/next-assignment", c.baseURL, workspaceSlug, agentID)
+	negotiated := req.ContextDispatchVersion != 0
+	if negotiated && req.ContextDispatchVersion != ContextDispatchVersion {
+		return nil, fmt.Errorf("next-assignment: context dispatch version %d is not supported", req.ContextDispatchVersion)
+	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -1490,13 +1485,26 @@ func (c *Client) NextAssignment(ctx context.Context, workspaceSlug, agentID stri
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if negotiated {
+		httpReq.Header.Set(ContextDispatchHeader, strconv.Itoa(ContextDispatchVersion))
+	}
 
-	resp, err := c.httpClient.Do(httpReq)
+	client := c.httpClient
+	if negotiated {
+		client = c.noFollow()
+	}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if negotiated && redirected(resp) {
+		return nil, fmt.Errorf("next-assignment: refused a redirect (HTTP %d)", resp.StatusCode)
+	}
+	if negotiated && resp.StatusCode < 400 && !acknowledged(resp) {
+		return nil, fmt.Errorf("next-assignment: HTTP %d without the v1 acknowledgement", resp.StatusCode)
+	}
 	if resp.StatusCode == http.StatusNoContent {
 		return nil, nil
 	}
@@ -1513,6 +1521,11 @@ func (c *Client) NextAssignment(ctx context.Context, workspaceSlug, agentID stri
 	var out NextAssignmentResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
 		return nil, fmt.Errorf("unmarshaling next-assignment response: %w", err)
+	}
+	if negotiated {
+		if err := validateAssignment(req, &out); err != nil {
+			return nil, err
+		}
 	}
 	if out.Card.ID != "" {
 		slog.Info("next-assignment reserved",

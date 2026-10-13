@@ -36,6 +36,10 @@ from app.exceptions import BadRequestError, ValidationError
 from app.models.agents.team import AgentTeam
 from app.schemas.agents.prompt_config import PromptConfigCreate
 from app.schemas.workspace_config import WorkspaceConfigUpdate
+from app.services.agents.context_dispatch import (
+    ContextDispatchPolicyService,
+    canonical_copy,
+)
 from app.services.agents.prompt_config import PromptConfigService
 from app.services.export.envelope import SCHEMA_VERSION, build_envelope
 from app.services.pipeline_config_validation import validate_pipeline_config
@@ -130,6 +134,9 @@ class PipelineBundleService:
         defensive ordering. Returns a result with `dry_run`, `validation`, and a
         `preview` of prompt actions."""
         if not dry_run:
+            # The apply's pipeline write takes this lock too; it must come
+            # before authorize_mutation's workspace row lock.
+            await ContextDispatchPolicyService(self.db).lock_for_policy_write(workspace_id)
             await self.prompt_config.authorize_mutation(workspace_id, created_by_id)
         self._guard_envelope(bundle)
         data = bundle.get("data") or {}
@@ -145,6 +152,20 @@ class PipelineBundleService:
             for e in validate_pipeline_config(pipeline_config)
             if e.get("severity", "error") == "error"
         ]
+        if not pipeline_errors:
+            # Preview and apply share the config write's policy guard: an
+            # agent key gets 403 even for a dry run, and unavailable
+            # enrollment is reported here instead of silently copied.
+            stored = await self.workspace_config.repo.get_by_workspace(workspace_id)
+            pipeline_errors = [
+                dict(e)
+                for e in await ContextDispatchPolicyService(self.db).check_pipeline_write(
+                    workspace_id,
+                    stored.pipeline_config if stored else None,
+                    canonical_copy(pipeline_config),
+                    created_by_id,
+                )
+            ]
 
         prompt_configs = data.get("prompt_configs") or []
         team_id_by_slug = await self._resolve_team_slugs(

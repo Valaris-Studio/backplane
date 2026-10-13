@@ -38,6 +38,22 @@ Changes in the source tree that are not yet part of a published platform release
   attachments readable after signed storage URLs expire.
 - Documentation reads can select one anchored section, including a single MCP
   tool entry.
+- Companion daemon and desktop source for scoped coding-session capture, with
+  per-device controls, retention and private session readers.
+- Session readers support bounded excerpts and an explicit handoff to card
+  notes. Sharing an excerpt does not make the raw session public.
+- Runner source can prepare mandatory context through the backend, record the
+  dispatched input and acknowledge it before calling an agent. Optional context
+  budgets bound configured inputs while preserving required context.
+
+#### Changed
+
+- Session and card views provide clearer capture status, reading and handoff
+  controls across the registered interface languages.
+- Frontend asset retention keeps up to five retired releases for seven days
+  and supports history baked into replacement images. Mounted-volume retention
+  is detected automatically, excluding memory-backed tmpfs; set
+  `RETAIN_ASSETS_TO_VOLUME` explicitly to enable or disable it.
 
 #### Fixed
 
@@ -52,6 +68,26 @@ Changes in the source tree that are not yet part of a published platform release
   registration verifies that the uploaded object exists.
 - Local storage responses and rich text handling reject unsafe media and link
   URLs, including approval text and payloads.
+- Session content remains owner-private; excerpt handoff checks access to the
+  destination card. Context preparation, acknowledgement and replay recheck
+  current authorization.
+
+#### Upgrade notes
+
+- These additions are an unreleased source preview, not new platform, runner,
+  MCP package or Companion binary releases. The release table above is unchanged.
+  Build matching backend and runner source before enabling required-context
+  policies; the linked runner 0.8.5 binaries do not implement this protocol.
+- Companion and rich capture remain disabled by default. Enable them deliberately
+  and configure device scope, capture level and retention before collecting data.
+- The source backend applies migrations through 122 even when these features are
+  disabled. Back up and qualify upgrades from the installed version before use.
+  Schema compatibility alone does not qualify an older runtime for rollback:
+  keep context policies in legacy mode with no budgets until all workers and
+  runners, including the rollback runtime, support the enabled policies.
+- MCP excerpt tooling in this source must be installed from the reviewed commit
+  or a wheel built from it. The existing PyPI 0.9.2 package is not republished by
+  this preview.
 
 ---
 

@@ -41,6 +41,31 @@ async def test_runner_cannot_stop_as_objective_complete_with_pending_acceptance(
     assert human_stop.status_code == 200, human_stop.text
 
 
+async def _pending_acceptance(client, agent_client, f):
+    loop_url = f"/api/workspaces/default/boards/{f.board.id}/loop"
+    saved = await client.put(loop_url, json={"enabled": True, "loop_prompt": "Work"})
+    assert saved.status_code == 200, saved.text
+    with patch("app.services.kanban.reconciler.board_scoped_pr_status", new=AsyncMock(return_value=status())):
+        await submit(agent_client, f)
+    return f"{loop_url}/state"
+
+
+async def test_installation_key_can_stop_as_objective_complete_with_pending_acceptance(
+    client, agent_client, installation_key_client, completion_fixture
+):
+    state_url = await _pending_acceptance(client, agent_client, completion_fixture)
+    response = await installation_key_client.patch(state_url, json={"enabled": False, "reason": "objective_complete"})
+    assert response.status_code == 200, response.text
+
+
+async def test_plain_user_key_can_stop_as_objective_complete_with_pending_acceptance(
+    client, agent_client, plain_key_client, completion_fixture
+):
+    state_url = await _pending_acceptance(client, agent_client, completion_fixture)
+    response = await plain_key_client.patch(state_url, json={"enabled": False, "reason": "objective_complete"})
+    assert response.status_code == 200, response.text
+
+
 async def test_inherited_workspace_policy_edit_and_revert_invalidates_candidate(client, agent_client, completion_fixture):
     f = completion_fixture
     initial = policy(source_review="none", review_role=None, postmerge_validation=None, auto_complete=False)

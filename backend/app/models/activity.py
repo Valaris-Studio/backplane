@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.models.base import Base, UUIDMixin
+from app.models.activity_transaction import CurrentTransaction, TransactionID
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -100,6 +101,7 @@ class Activity(Base, UUIDMixin):
         Index("ix_activities_entity", "entity_type", "entity_id"),
         Index("ix_activities_actor", "actor_id"),
         Index("ix_activities_agent", "agent_id"),
+        Index("ix_activities_mcp_invocation", "mcp_invocation_id", "actor_id", "workspace_id"),
     )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(
@@ -128,12 +130,22 @@ class Activity(Base, UUIDMixin):
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
     )
+    # NULL means unknown (legacy/old writer), never an inferred human. Unlike
+    # the display FK, this authenticated provenance survives agent deletion.
+    principal_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # The outcome arrives after the mutation; no FK or client-authored Activity.
+    mcp_invocation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     via_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     # Timeline insertion order. NO python default — see the module note above:
     # Postgres lets the IDENTITY assign it (INSERT omits the column); SQLite is
     # filled by `_fill_seq_on_sqlite` below.
     seq: Mapped[int] = mapped_column(BigInteger, Identity(always=False), nullable=False)
+
+    recorded_transaction: Mapped[str | None] = mapped_column(
+        String().with_variant(TransactionID(), "postgresql"),
+        server_default=CurrentTransaction(), nullable=True,
+    )
 
     actor: Mapped["User"] = relationship("User", foreign_keys=[actor_id], lazy="noload")
 

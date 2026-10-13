@@ -75,7 +75,7 @@ func TestMCPSelectionWizardProfileRelaunchUsesOnlyChosenConfig(t *testing.T) {
 printf invoked > "$MARKER"
 while IFS= read -r line; do
  case "$line" in
- *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture-B","version":"0.8.0"}}}';;
+ *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture-B","version":"0.9.1"}}}';;
  *'"tools/list"'*) printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_board_loop"},{"name":"get_completion_policy"},{"name":"get_completion_status"},{"name":"submit_completion_candidate"},{"name":"request_landing"},{"name":"retry_completion"}]}}';;
  *'"tools/call"'*) printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"completion_policy\":{\"version\":1},\"completion_policy_hash\":\"picker-policy\",\"completion_context\":\"Fixture mandatory policy.\"}"}]}}';;
  esac

@@ -12,6 +12,7 @@ import { BackendStartingGate } from "@/features/auth/components/BackendStartingG
 import { LoginPage } from "@/features/auth/components/LoginPage";
 import { SetupPage } from "@/features/auth/components/SetupPage";
 import { SetupGate } from "@/features/auth/components/SetupGate";
+import { ResumeAfterSignIn } from "@/features/auth/components/ResumeAfterSignIn";
 import { useSetupStatus } from "@/features/auth/api/use-setup-status";
 
 // Every page module is lazy so its (and its heavy deps') chunk only downloads
@@ -62,6 +63,10 @@ const DocumentationPage = lazyPage(() => import("@/pages/DocumentationPage"), "D
 const DocumentationLanding = lazyPage(() => import("@/pages/documentation"), "DocumentationLanding");
 const DocumentationSection = lazyPage(() => import("@/pages/documentation"), "DocumentationSection");
 const DocumentationStandalone = lazyPage(() => import("@/pages/documentation"), "DocumentationStandalone");
+const CompanionPairPage = lazyPage(() => import("@/features/companion-pairing/components/CompanionPairPage"), "CompanionPairPage");
+const MySessionsPage = lazyPage(() => import("@/features/sessions/components/MySessionsPage"), "MySessionsPage");
+const DevicesPage = lazyPage(() => import("@/features/sessions/components/DevicesPage"), "DevicesPage");
+const SessionDetailPage = lazyPage(() => import("@/features/sessions/components/SessionDetailPage"), "SessionDetailPage");
 
 // A fresh instance (empty users table) routes to first-run setup regardless
 // of the requested private path; standalone documentation stays public.
@@ -85,6 +90,7 @@ export function App() {
       <BackendStartingGate>
         <AuthModesBootstrap />
         <FirstRunRedirect />
+        <ResumeAfterSignIn />
         <SetupGate>
           <Routes>
             <Route path="/" element={<WorkspacesPage />} />
@@ -92,6 +98,9 @@ export function App() {
                 /:slug — and reachable while signed out, unlike everything else. */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/setup" element={<SetupPage />} />
+            {/* Companion browser-code pairing (RFC 8628). Static, so it outranks
+                /:slug; signed-out visitors sign in and come back with the code. */}
+            <Route path="/companion/pair" element={<CompanionPairPage />} />
             {/* Slug-independent docs: readable before any workspace exists.
                 The static segment outranks /:slug, so no route collision. */}
             <Route path="/documentation" element={<DocumentationStandalone />}>
@@ -119,6 +128,13 @@ export function App() {
                 <Route path="git" element={<BoardGitPage />} />
                 <Route path="alerts" element={<BoardAlertsPage />} />
               </Route>
+              {/* Owner-only Companion sessions. With COMPANION_ENABLED off both
+                  render an in-shell "capture is off" state and call no API. */}
+              <Route path="/:slug/sessions" element={<MySessionsPage />} />
+              {/* Static, so it outranks :sessionId; the desktop app's
+                  "Manage on the web" deep-links here. */}
+              <Route path="/:slug/sessions/devices" element={<DevicesPage />} />
+              <Route path="/:slug/sessions/:sessionId" element={<SessionDetailPage />} />
               <Route path="/:slug/resources" element={<WorkspaceResourcesPage />} />
               <Route path="/:slug/channels" element={<WorkspaceChannelsPage />} />
               <Route path="/:slug/notes" element={<WorkspaceNotesPage />} />

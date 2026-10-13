@@ -1,0 +1,14 @@
+{
+  "model": "ContentError",
+  "http": {
+    "method": "POST",
+    "path": "/api/me/companion/installations/{installation_id}/mappings",
+    "status": 409
+  },
+  "body": {
+    "detail": "Rich capture is not enabled on this Backplane",
+    "error_code": "rich_capture_unavailable",
+    "error_params": {},
+    "context": null
+  }
+}

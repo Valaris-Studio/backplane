@@ -94,6 +94,10 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
   pg_restore -U backplane -d backplane --clean --if-exists --exit-on-error \
   < backplane-2026-07-25.dump
 
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  psql -X -U backplane -d backplane -v ON_ERROR_STOP=1 \
+  < backend/scripts/normalize_timeline_restore.sql
+
 BACKPLANE_RESOURCE_VOLUME="\${COMPOSE_PROJECT_NAME}_backplane-storage"
 docker volume create "$BACKPLANE_RESOURCE_VOLUME"
 docker run --rm \
@@ -103,6 +107,8 @@ docker run --rm \
 
 docker compose -f docker-compose.prod.yml up -d --build --wait`}
       </CodeExample>
+
+      <p>Logical restores must reset timeline visibility metadata from the source PostgreSQL cluster. The normalization step preserves activity records and clears derived history caches before the application starts.</p>
 
       <ImportantNote title="Newer source automatically upgrades an older dump">
         If you intentionally start a newer checkout, backend startup applies

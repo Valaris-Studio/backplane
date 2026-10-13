@@ -8,6 +8,8 @@ import Link from "@tiptap/extension-link";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import MarkdownIt from "markdown-it";
 import { FileAttachment } from "@/extensions/file-attachment";
+import { Checklist, ChecklistItem } from "@/extensions/checklist";
+import { markdownTaskLists } from "@/lib/markdown-task-lists";
 
 // Re-exported so existing `import { extractPlainText } from "@/lib/editor-utils"`
 // keeps working. The implementation lives in the dependency-free text-utils so
@@ -24,6 +26,8 @@ const EXTENSIONS = [
   TableRow,
   TableCell,
   TableHeader,
+  Checklist,
+  ChecklistItem,
 ];
 
 const EMPTY_DOC = { type: "doc", content: [] };
@@ -50,7 +54,7 @@ export function looksLikeMarkdown(text: string): boolean {
   return MARKDOWN_HINT_RE.test(text);
 }
 
-const md = new MarkdownIt({ html: false, linkify: false, breaks: false });
+const md = new MarkdownIt({ html: false, linkify: false, breaks: false }).use(markdownTaskLists);
 
 /**
  * Parse content string into a TipTap-compatible ProseMirror JSON document.

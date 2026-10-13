@@ -30,7 +30,7 @@ export function CoreConceptsNotes() {
       <p>
         The editor and the API share one closed vocabulary: headings (levels
         1–3), paragraphs, bold, italic, strikethrough, inline code, links,
-        bullet and numbered lists, block quotes, horizontal rules, tables,
+        bullet and numbered lists, checklists, block quotes, horizontal rules, tables,
         code blocks with a language, Mermaid diagrams, mentions, images and
         file attachments. A Mermaid diagram is an ordinary code block whose
         language is <code>mermaid</code>; the editor draws it in place.
@@ -156,10 +156,47 @@ update_note(
         attachment.
       </p>
 
+      <h2 id="checklists">Checklists</h2>
+      <p>
+        A checklist is a list whose items each carry a box. In the editor,
+        press the Checklist button in the toolbar, or start a line with{" "}
+        <code>[ ]</code> and a space. Tab nests an item under the one above it
+        and Shift+Tab lifts it back out. Click a box to tick it, or press
+        Ctrl+Enter (⌘+Enter on a Mac) to tick the item under the cursor.
+      </p>
+      <p>
+        Over MCP, write a checklist as Markdown task items in{" "}
+        <code>create_note</code> or <code>update_note</code>. Reading the note
+        with <code>format=&quot;markdown&quot;</code> returns the same form, so
+        an agent ticks an item by changing <code>[ ]</code> to{" "}
+        <code>[x]</code> and writing the note back.
+      </p>
+      <CodeExample language="markdown" title="A checklist in Markdown">
+        {`- [x] Tag the release
+- [ ] Publish
+  - [x] Container image
+  - [ ] Python package`}
+      </CodeExample>
+      <p>
+        Every item of the list must start with <code>[ ]</code> or{" "}
+        <code>[x]</code>; a list that mixes task items with plain items stays
+        an ordinary bullet list. Indent a nested item by two spaces. To start a
+        plain list item with a literal bracket, escape it as{" "}
+        <code>\[ ]</code>. HTML input works too: TipTap&apos;s{" "}
+        <code>&lt;ul data-type=&quot;taskList&quot;&gt;</code>, or any list
+        whose every item starts with an{" "}
+        <code>&lt;input type=&quot;checkbox&quot;&gt;</code>.
+      </p>
+      <ImportantNote title="Boxes are ticked while editing">
+        Wherever a note or a card description is shown read-only, its boxes
+        show the saved state but cannot be changed. Open the editor to tick an
+        item, so the change is saved, and attributed, like any other edit.
+      </ImportantNote>
+
       <h2 id="round-trip-guarantees">Round-trip guarantees</h2>
       <p>
         Reading a note as Markdown, editing the text and writing it back keeps
-        the document intact: headings, marks, links, lists, quotes, rules,
+        the document intact: headings, marks, links, lists, checklists with their ticks, quotes, rules,
         tables, code blocks and Mermaid diagrams, images with their alt text
         and title, and attachments with their name, size and type all come
         back as the same nodes, at the same stable paths.
@@ -168,8 +205,7 @@ update_note(
         A mention becomes plain @Name text, a table cell is flattened to one
         line, and table column alignment is dropped. Headings deeper than
         level 3 are stored as level 3. An attachment whose upload never
-        finished has no link and comes back as its bare file name. Markdown
-        checklists are not converted yet. When a note holds mentions you need
+        finished has no link and comes back as its bare file name. When a note holds mentions you need
         to keep, edit it with <code>mode=&quot;section&quot;</code> around them
         or write ProseMirror JSON.
       </HonestRemark>

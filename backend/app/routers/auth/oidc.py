@@ -76,6 +76,12 @@ async def auth_modes() -> dict[str, object]:
         "oidc_enabled": oidc_is_configured(),
         "password_enabled": password_is_enabled(),
         "dev_mode": settings.is_development,
+        # The /companion/pair page reads this so a deployment with the
+        # companion off shows "not available" instead of a pairing form.
+        "companion_enabled": settings.COMPANION_ENABLED,
+        # Whether mappings may take the rich level here; the devices page
+        # shows it unavailable otherwise.
+        "rich_capture_enabled": settings.RICH_CAPTURE_ENABLED,
         "login_path": f"{router.prefix}/login",
         "logout_path": f"{router.prefix}/logout",
     }
@@ -148,7 +154,9 @@ async def oidc_callback(
     except OidcError as exc:
         return _error_redirect(exc.error_code)
 
-    response = RedirectResponse(url=settings.FRONTEND_URL.rstrip("/"), status_code=302)
+    # The fragment tells the app a sign-in just completed (e.g. to resume a
+    # companion pairing); browsers never send fragments to a server.
+    response = RedirectResponse(url=settings.FRONTEND_URL.rstrip("/") + "/#signed_in", status_code=302)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=write_session(user.id, signing_key=settings.OAUTH_STATE_SIGNING_KEY),

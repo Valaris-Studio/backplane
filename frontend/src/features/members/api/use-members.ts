@@ -15,11 +15,12 @@ function getBasePath(slug: string) {
   return `/workspaces/${slug}/members`;
 }
 
-export function useMembers(slug: string) {
+export function useMembers(slug: string, options?: { enabled?: boolean }) {
   useDomainSync("activity.member", memberKeys.list(slug));
 
   return useQuery({
     queryKey: memberKeys.list(slug),
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const { data } = await api.get<WorkspaceMember[]>(getBasePath(slug));
       return data;

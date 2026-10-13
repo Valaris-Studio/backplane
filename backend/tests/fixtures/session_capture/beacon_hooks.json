@@ -1,0 +1,542 @@
+[
+  {
+    "schema_version": 1,
+    "capture_id": "e2baf8a75164e9dd4fd6166c9203436c",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.007916Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "hook_event": "SessionStart",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "SessionStart",
+      "session_id": "sc01-synthetic-session"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "session.started",
+          "category": "session",
+          "fidelity": "observed",
+          "id": "73c4f5fe-0161-5f98-889d-f00d1a74e684",
+          "kind": "agent_runtime"
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "message": "Agent session started",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.007018000Z",
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "5ae784708be14f24294409acc7be8333",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.033875Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "hook_event": "UserPromptSubmit",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "UserPromptSubmit",
+      "prompt": "Inspect synthetic fixture token=[REDACTED]",
+      "session_id": "sc01-synthetic-session"
+    },
+    "beacon_events": [
+      {
+        "content": {
+          "bytes": 42,
+          "hash": "2fd9b1c2ea0e0cd8239d2d7425941d4561bf24a43ecd6b9340fe7dfcaa7f2c89",
+          "included": true,
+          "retention": "full"
+        },
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "prompt.submitted",
+          "category": "prompt",
+          "fidelity": "observed",
+          "id": "319eb962-7b2d-5348-9a33-f1252474c2f3",
+          "kind": "agent_runtime"
+        },
+        "gen_ai": {
+          "input": {
+            "messages": [
+              {
+                "parts": [
+                  {
+                    "content": "Inspect synthetic fixture token=[REDACTED]",
+                    "type": "text"
+                  }
+                ],
+                "role": "user"
+              }
+            ]
+          }
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "message": "Prompt submitted to agent",
+        "product": "endpoint-agent",
+        "prompt": {
+          "text": "Inspect synthetic fixture token=[REDACTED]"
+        },
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.032953000Z",
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "4286fcc75d70dd012639729276e06333",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.057766Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "native_tool_call_id": "toolu_evidence_1",
+    "hook_event": "PreToolUse",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "PreToolUse",
+      "session_id": "sc01-synthetic-session",
+      "tool_input": {
+        "card_id": "synthetic-card"
+      },
+      "tool_name": "mcp__backplane__get_card",
+      "tool_use_id": "toolu_evidence_1"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "tool.invoked",
+          "category": "tool",
+          "fidelity": "observed",
+          "id": "d71cbee7-d227-530d-8aa4-918365646a08",
+          "kind": "agent_runtime"
+        },
+        "gen_ai": {
+          "operation": {
+            "name": "execute_tool"
+          },
+          "tool": {
+            "call": {
+              "arguments": {
+                "card_id": "synthetic-card"
+              },
+              "id": "toolu_evidence_1"
+            },
+            "name": "get_card"
+          }
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "mcp": {
+          "method": {
+            "name": "tools/call"
+          },
+          "server": "backplane",
+          "tool": "get_card"
+        },
+        "message": "Tool invocation observed",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.056859000Z",
+        "tool": {
+          "name": "mcp__backplane__get_card"
+        },
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session",
+          "span_id": "toolu_evidence_1"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "9b2fec7691671ac55a462ee7913c2c9d",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.081979Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "native_tool_call_id": "toolu_evidence_1",
+    "hook_event": "PostToolUse",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "PostToolUse",
+      "session_id": "sc01-synthetic-session",
+      "tool_name": "mcp__backplane__get_card",
+      "tool_response": {
+        "result": "Synthetic card"
+      },
+      "tool_use_id": "toolu_evidence_1"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "mcp.tool_invoked",
+          "category": "mcp",
+          "fidelity": "observed",
+          "id": "44d0e43e-6d0f-5e4a-ac9d-6623ac9ba466",
+          "kind": "agent_runtime"
+        },
+        "gen_ai": {
+          "operation": {
+            "name": "execute_tool"
+          },
+          "tool": {
+            "call": {
+              "id": "toolu_evidence_1",
+              "result": {
+                "result": "Synthetic card"
+              }
+            },
+            "name": "get_card"
+          }
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "mcp": {
+          "method": {
+            "name": "tools/call"
+          },
+          "server": "backplane",
+          "tool": "get_card"
+        },
+        "message": "Tool execution observed",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.080879000Z",
+        "tool": {
+          "name": "mcp__backplane__get_card"
+        },
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session",
+          "span_id": "toolu_evidence_1"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "805818087bd89959bf1b23a0314d884c",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.106022Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "native_tool_call_id": "toolu_evidence_2",
+    "hook_event": "PostToolUseFailure",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "error": "synthetic failure",
+      "hook_event_name": "PostToolUseFailure",
+      "session_id": "sc01-synthetic-session",
+      "tool_input": {
+        "content": "synthetic content",
+        "file_path": "synthetic.py"
+      },
+      "tool_name": "Write",
+      "tool_use_id": "toolu_evidence_2"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "tool.failed",
+          "category": "tool",
+          "fidelity": "observed",
+          "id": "f8420f2d-4ac2-58c3-921d-6d4949252dd8",
+          "kind": "agent_runtime"
+        },
+        "gen_ai": {
+          "tool": {
+            "call": {
+              "id": "toolu_evidence_2"
+            }
+          }
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "message": "Tool execution failed",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "high",
+        "timestamp": "2026-09-24T02:21:28.104968000Z",
+        "tool": {
+          "name": "Write"
+        },
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session",
+          "span_id": "toolu_evidence_2"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "acedf8fa9cc05850be6c0c6ec1f61ed5",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.129299Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "hook_event": "Stop",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "Stop",
+      "session_id": "sc01-synthetic-session"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "tool.completed",
+          "category": "tool",
+          "fidelity": "observed",
+          "id": "b92de17c-9bdb-57c0-8429-405da644fde2",
+          "kind": "agent_runtime"
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "message": "Agent response completed",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.128426000Z",
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  },
+  {
+    "schema_version": 1,
+    "capture_id": "f018b9d4114dd254eb2928fab9588358",
+    "project_id": "6a322893dc209e39a67a467bd13b5f1d",
+    "captured_at": "2026-09-24T02:21:28.151798Z",
+    "harness": "claude_code",
+    "native_session_id": "sc01-synthetic-session",
+    "hook_event": "SessionEnd",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "beacon_sha256": "9a1807cc9aa3a2f4ef74ef7177796aea26644de012d35b89387674a7acec4924",
+    "coverage": {
+      "transcript": "not_read",
+      "assistant_output": "unavailable",
+      "truncated_fields": [],
+      "removed_fields": [],
+      "redaction": "heuristic_v1",
+      "omitted_field_paths": 0
+    },
+    "payload": {
+      "cwd": "/synthetic/project",
+      "hook_event_name": "SessionEnd",
+      "session_id": "sc01-synthetic-session"
+    },
+    "beacon_events": [
+      {
+        "endpoint": {
+          "hostname": "synthetic-host",
+          "os": "darwin"
+        },
+        "event": {
+          "action": "session.ended",
+          "category": "session",
+          "fidelity": "observed",
+          "id": "614d859f-47ce-5dee-a295-32b3dc5c9cba",
+          "kind": "agent_runtime"
+        },
+        "harness": {
+          "collection_method": "hook",
+          "name": "claude_code"
+        },
+        "message": "Agent session ended",
+        "product": "endpoint-agent",
+        "repository": "/synthetic/project",
+        "schema_version": "1.0",
+        "sequence": 1,
+        "session": {
+          "id": "sc01-synthetic-session",
+          "working_directory": "/synthetic/project"
+        },
+        "severity": "info",
+        "timestamp": "2026-09-24T02:21:28.150795000Z",
+        "trace": {
+          "id": "session:claude_code:sc01-synthetic-session"
+        },
+        "user": {
+          "name": "synthetic",
+          "uid": "1000"
+        },
+        "vendor": "beacon"
+      }
+    ]
+  }
+]

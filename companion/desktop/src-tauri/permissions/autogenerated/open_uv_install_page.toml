@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-uv-install-page"
+description = "Enables the open_uv_install_page command without any pre-configured scope."
+commands.allow = ["open_uv_install_page"]
+
+[[permission]]
+identifier = "deny-open-uv-install-page"
+description = "Denies the open_uv_install_page command without any pre-configured scope."
+commands.deny = ["open_uv_install_page"]

@@ -1,0 +1,29 @@
+{
+  "model": "ContentDeclaration",
+  "why": "display_path is placed (relative or ~/), never absolute",
+  "body": {
+    "role": "user",
+    "channel": "instruction",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "a0b1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "order": 13
+    },
+    "occurred_at": "2026-10-08T14:01:00Z",
+    "observed_at": "2026-10-08T14:01:01Z",
+    "media_type": "text/markdown",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "coverage": "captured",
+    "delivery": "inline",
+    "byte_count": 49,
+    "sha256": "63e86bb383f2ae55e78371e020b1650ab3e400d6671f19e19ded56a22219c6e4",
+    "inline_text": "# Project rules\n\nRun make test before committing.",
+    "content_key": "71ed10c2984724c7fb6215177aff773e9040dccde7662add8a5d6c4c0607bbd4",
+    "display_path": "/home/dev/project/CLAUDE.md"
+  }
+}

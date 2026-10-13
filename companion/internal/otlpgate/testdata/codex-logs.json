@@ -1,0 +1,412 @@
+{
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "codex_exec"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "0.144.1"
+      }
+     },
+     {
+      "key": "env",
+      "value": {
+       "stringValue": "dev"
+      }
+     },
+     {
+      "key": "host.name",
+      "value": {
+       "stringValue": "laptop.local"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "codex_otel.log_only"
+     },
+     "logRecords": [
+      {
+       "timeUnixNano": "1790000000000000000",
+       "body": {
+        "stringValue": "codex.conversation_starts"
+       },
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "codex.conversation_starts"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-09-24T12:00:00.000Z"
+         }
+        },
+        {
+         "key": "conversation.id",
+         "value": {
+          "stringValue": "thread-root"
+         }
+        },
+        {
+         "key": "app.version",
+         "value": {
+          "stringValue": "0.144.1"
+         }
+        },
+        {
+         "key": "auth_mode",
+         "value": {
+          "stringValue": "chatgpt"
+         }
+        },
+        {
+         "key": "originator",
+         "value": {
+          "stringValue": "codex_exec"
+         }
+        },
+        {
+         "key": "user.account_id",
+         "value": {
+          "stringValue": "acct-123"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "person@example.com"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "slug",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "provider_name",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "approval_policy",
+         "value": {
+          "stringValue": "on-request"
+         }
+        }
+       ]
+      },
+      {
+       "timeUnixNano": "1790000000000000000",
+       "body": {
+        "stringValue": "codex.user_prompt"
+       },
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "codex.user_prompt"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-09-24T12:00:00.000Z"
+         }
+        },
+        {
+         "key": "conversation.id",
+         "value": {
+          "stringValue": "thread-root"
+         }
+        },
+        {
+         "key": "app.version",
+         "value": {
+          "stringValue": "0.144.1"
+         }
+        },
+        {
+         "key": "auth_mode",
+         "value": {
+          "stringValue": "chatgpt"
+         }
+        },
+        {
+         "key": "originator",
+         "value": {
+          "stringValue": "codex_exec"
+         }
+        },
+        {
+         "key": "user.account_id",
+         "value": {
+          "stringValue": "acct-123"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "person@example.com"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "slug",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "prompt_length",
+         "value": {
+          "intValue": "27"
+         }
+        },
+        {
+         "key": "prompt",
+         "value": {
+          "stringValue": "refactor the SECRET module"
+         }
+        }
+       ],
+       "traceId": "0af7651916cd43dd8448eb211c80319c"
+      },
+      {
+       "timeUnixNano": "1790000000000000000",
+       "body": {
+        "stringValue": "codex.tool_result"
+       },
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "codex.tool_result"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-09-24T12:00:00.000Z"
+         }
+        },
+        {
+         "key": "conversation.id",
+         "value": {
+          "stringValue": "thread-child"
+         }
+        },
+        {
+         "key": "app.version",
+         "value": {
+          "stringValue": "0.144.1"
+         }
+        },
+        {
+         "key": "auth_mode",
+         "value": {
+          "stringValue": "chatgpt"
+         }
+        },
+        {
+         "key": "originator",
+         "value": {
+          "stringValue": "codex_exec"
+         }
+        },
+        {
+         "key": "user.account_id",
+         "value": {
+          "stringValue": "acct-123"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "person@example.com"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "slug",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "tool_name",
+         "value": {
+          "stringValue": "exec_command"
+         }
+        },
+        {
+         "key": "call_id",
+         "value": {
+          "stringValue": "call_1"
+         }
+        },
+        {
+         "key": "arguments",
+         "value": {
+          "stringValue": "{\"cmd\":\"cat SECRET.txt\"}"
+         }
+        },
+        {
+         "key": "duration_ms",
+         "value": {
+          "stringValue": "12"
+         }
+        },
+        {
+         "key": "success",
+         "value": {
+          "stringValue": "true"
+         }
+        },
+        {
+         "key": "output",
+         "value": {
+          "stringValue": "SECRET contents"
+         }
+        }
+       ]
+      },
+      {
+       "timeUnixNano": "1790000000000000000",
+       "body": {
+        "stringValue": "codex.user_prompt"
+       },
+       "attributes": [
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "codex.user_prompt"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-09-24T12:00:00.000Z"
+         }
+        },
+        {
+         "key": "conversation.id",
+         "value": {
+          "stringValue": "thread-out"
+         }
+        },
+        {
+         "key": "app.version",
+         "value": {
+          "stringValue": "0.144.1"
+         }
+        },
+        {
+         "key": "auth_mode",
+         "value": {
+          "stringValue": "chatgpt"
+         }
+        },
+        {
+         "key": "originator",
+         "value": {
+          "stringValue": "codex_exec"
+         }
+        },
+        {
+         "key": "user.account_id",
+         "value": {
+          "stringValue": "acct-123"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "person@example.com"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "slug",
+         "value": {
+          "stringValue": "gpt-5"
+         }
+        },
+        {
+         "key": "prompt_length",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "prompt",
+         "value": {
+          "stringValue": "OTHER_REPO_PROMPT"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

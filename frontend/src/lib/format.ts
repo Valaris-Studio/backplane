@@ -60,7 +60,7 @@ function splitNumberSegments(
 }
 
 export function formatNumber(
-  value: number,
+  value: number | bigint,
   options?: Intl.NumberFormatOptions,
 ): string {
   return new Intl.NumberFormat(applicationLocale(), options).format(value);

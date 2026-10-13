@@ -156,6 +156,78 @@ jobs:
       - name: Browser survives frontend replacement
         run: bash frontend/scripts/test-deployment.sh
 
+  companion:
+    if: github.repository == 'Valaris-Studio/backplane'
+    name: Companion — source + build contracts (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPANION_GATE_REPORT_DIR: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.8"
+          cache-dependency-path: companion/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.3
+          cache: pnpm
+          cache-dependency-path: companion/desktop/pnpm-lock.yaml
+      - name: Go source checks outside the checkout
+        timeout-minutes: 15
+        run: ./scripts/companion-source-gate.sh go
+      - name: Packaging contracts without release credentials
+        timeout-minutes: 5
+        run: ./scripts/companion-source-gate.sh packaging
+      - name: Desktop frontend checks and build
+        timeout-minutes: 10
+        run: ./scripts/companion-source-gate.sh frontend
+      - name: Retain Go test events and skip summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-go-linux-test-events
+          path: ${{ runner.temp }}/companion-go.*/*
+          if-no-files-found: error
+          retention-days: 14
+      # Real Beacon, installed-app and signed release qualification are separate.
+
+  companion-rust:
+    if: github.repository == 'Valaris-Studio/backplane'
+    name: Companion desktop — Rust source contracts (macOS)
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.3
+          cache: pnpm
+          cache-dependency-path: companion/desktop/pnpm-lock.yaml
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            companion/desktop/src-tauri/target
+          key: companion-cargo-${{ runner.os }}-${{ runner.arch }}-rust1.98.1-${{ hashFiles('companion/desktop/src-tauri/Cargo.lock') }}
+      - name: Build frontend and test Rust source contracts
+        timeout-minutes: 35
+        run: ./scripts/companion-source-gate.sh rust
+      # No native integration targets, ignored tests, bundle or updater execution.
+
   runner:
     if: github.repository == 'Valaris-Studio/backplane'
     name: Runner — go vet + tests

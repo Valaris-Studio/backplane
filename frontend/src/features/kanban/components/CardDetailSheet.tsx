@@ -18,6 +18,7 @@ import { usePipelineConfig } from "@/features/agents/hooks/usePipelineConfig";
 import { useNotes, useUpdateNote } from "@/features/notes/api/use-notes";
 import { AgentInfoSubtab } from "@/components/agentic/agent-info-section";
 import { EntityLink } from "@/components/shared/EntityLink";
+import { CardSessionsSection } from "@/features/sessions/components/LinkedSessionsSection";
 import {
   Sheet,
   SheetContent,
@@ -1008,6 +1009,11 @@ export function CardDetailSheet({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Last in the sheet, so its lazy reveal never shifts a field being
+              edited. Owner-only; renders nothing with capture off or for
+              viewers without Companion devices or linked sessions. */}
+          {card ? <CardSessionsSection slug={slug} boardId={boardId} cardId={card.id} /> : null}
         </div>
 
         <SheetFooter className="shrink-0 border-t border-border/60 px-6 pb-6 pt-4">

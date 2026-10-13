@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/Asymptote-Labs/agent-beacon",
+  "commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+  "archive_url": "https://codeload.github.com/Asymptote-Labs/agent-beacon/tar.gz/b17031414618cf86f7aad2b485935e548e8a8e63",
+  "archive_sha256": "91fea2299c43196ca88547fd28c5e96124dd3c18888ff0ee9b3e0daf6b44765c",
+  "component": "cli/beacon-hooks",
+  "license": "MIT",
+  "patches": []
+}

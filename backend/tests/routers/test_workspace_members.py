@@ -807,6 +807,34 @@ async def test_update_member_role_agent_key_allows_non_owner_change(
     assert stored == "viewer"
 
 
+async def test_update_member_role_installation_key_can_grant_owner(
+    installation_key_client: AsyncClient,
+    workspace_with_member: Workspace,
+    member_user: User,
+    db_session: AsyncSession,
+):
+    response = await installation_key_client.patch(
+        _member_url(member_user.id), json={"role": "owner"}
+    )
+    assert response.status_code == 200, response.text
+    stored = await _stored_role(db_session, workspace_with_member.id, member_user.id)
+    assert stored == "owner"
+
+
+async def test_update_member_role_plain_user_key_can_grant_owner(
+    plain_key_client: AsyncClient,
+    workspace_with_member: Workspace,
+    member_user: User,
+    db_session: AsyncSession,
+):
+    response = await plain_key_client.patch(
+        _member_url(member_user.id), json={"role": "owner"}
+    )
+    assert response.status_code == 200, response.text
+    stored = await _stored_role(db_session, workspace_with_member.id, member_user.id)
+    assert stored == "owner"
+
+
 async def test_add_member_duplicate_does_not_change_role(
     client: AsyncClient,
     workspace_with_member: Workspace,

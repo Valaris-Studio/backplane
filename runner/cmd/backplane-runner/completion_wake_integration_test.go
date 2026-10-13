@@ -96,7 +96,7 @@ exit 99
 	mcp := `#!/bin/sh
 while IFS= read -r line; do
   case "$line" in
-    *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture","version":"0.8.0"}}}';;
+    *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture","version":"0.9.1"}}}';;
     *'"tools/list"'*) printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_board_loop"},{"name":"get_completion_policy"},{"name":"get_completion_status"},{"name":"submit_completion_candidate"},{"name":"request_landing"},{"name":"retry_completion"}]}}';;
     *'"tools/call"'*) printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"completion_policy\":{\"version\":1},\"completion_policy_hash\":\"policy-fixture\",\"completion_context\":\"Mandatory fixture policy.\"}"}]}}';;
   esac
@@ -137,7 +137,7 @@ done
 	if !subscribed.Load() || unsupported.Load() || loopGets.Load() != 2 {
 		t.Fatalf("incomplete completion wake/handshake: subscribed=%v unsupported=%v loop_gets=%d", subscribed.Load(), unsupported.Load(), loopGets.Load())
 	}
-	for _, want := range []string{"MCP launch verified", "mcp_version=0.8.0", "mcp_config=" + cfg.LLM.MCPConfigPath, "mcp_executable=" + filepath.Join(bin, "fixture-mcp")} {
+	for _, want := range []string{"MCP launch verified", "mcp_version=0.9.1", "mcp_config=" + cfg.LLM.MCPConfigPath, "mcp_executable=" + filepath.Join(bin, "fixture-mcp")} {
 		if !strings.Contains(string(output), want) {
 			t.Errorf("launch summary is missing %q: %s", want, output)
 		}

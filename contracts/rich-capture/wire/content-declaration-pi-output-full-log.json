@@ -1,0 +1,33 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "tool",
+    "channel": "tool_output",
+    "source": {
+      "kind": "pi_session",
+      "parser": "companion-pi-session/1",
+      "schema_version": "pi-session/0.84",
+      "native_ref": "a1b2c3d4",
+      "order": 16,
+      "body_from": "harness_temp_log"
+    },
+    "occurred_at": "2026-10-09T02:24:11.208Z",
+    "observed_at": "2026-10-09T02:24:12Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "497c44b0ff3ab43b33144e41a81e69eda89ec87b4448b1b2e04fa344ca6de4b6",
+    "call_id": "call_Zk3|fc_0a1b2c",
+    "coverage": "captured",
+    "delivery": "upload",
+    "byte_count": 126001,
+    "sha256": "e6a87097c85f396afcd14d4fcb5828895c12111188f4ad9b7266c10ca315c4eb"
+  }
+}

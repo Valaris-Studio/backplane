@@ -46,6 +46,14 @@ curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.5/
         {`docker pull ghcr.io/valaris-studio/backplane-runner:0.8.5`}
       </CodeExample>
 
+      <ImportantNote title="Prepared context requires matching source builds">
+        Required-context policies and context budgets are unreleased source
+        features. The published runner downloads above do not implement this
+        protocol. Build matching backend and runner source, and drain
+        incompatible processes before enabling these policies. Keep legacy
+        policies with no budgets until the fleet and rollback runtime are ready.
+      </ImportantNote>
+
       <h2 id="config">2. Prepare the exported bundle</h2>
       <p>
         Download the runner-scoped bundle from the Launch runner wizard or the

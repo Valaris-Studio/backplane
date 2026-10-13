@@ -1,0 +1,10 @@
+{
+  "model": "ContentError",
+  "why": "deleted content is indistinguishable from unknown content: 404 content_not_found",
+  "body": {
+    "detail": "x",
+    "error_code": "content_dropped",
+    "error_params": {},
+    "context": null
+  }
+}

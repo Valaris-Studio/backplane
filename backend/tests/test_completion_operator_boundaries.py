@@ -45,6 +45,48 @@ async def test_agent_cannot_move_manually_accepted_work_to_done(
     assert response.status_code == 403, response.status_code
 
 
+async def test_installation_key_can_move_manually_accepted_work_to_done(
+    client, agent_client, installation_key_client, completion_fixture
+):
+    f = completion_fixture
+    await _accepted(client, agent_client, f)
+    response = await installation_key_client.patch(
+        f"/api/workspaces/default/boards/{f.board.id}/cards/{f.card.id}/move",
+        json={"column_id": str(f.done.id)},
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_plain_user_key_can_move_manually_accepted_work_to_done(
+    client, agent_client, plain_key_client, completion_fixture
+):
+    f = completion_fixture
+    await _accepted(client, agent_client, f)
+    response = await plain_key_client.patch(
+        f"/api/workspaces/default/boards/{f.board.id}/cards/{f.card.id}/move",
+        json={"column_id": str(f.done.id)},
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_installation_key_can_select_completion_policy(
+    installation_key_client, completion_fixture
+):
+    response = await installation_key_client.put(
+        f"{completion_fixture.url}/policy", json={"policy": policy()}
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_plain_user_key_can_select_completion_policy(
+    plain_key_client, completion_fixture
+):
+    response = await plain_key_client.put(
+        f"{completion_fixture.url}/policy", json={"policy": policy()}
+    )
+    assert response.status_code == 200, response.text
+
+
 async def test_repository_delete_with_completion_history_is_handled(
     client, agent_client, completion_fixture
 ):

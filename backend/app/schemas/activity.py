@@ -15,6 +15,7 @@ class ActivityRead(UTCModel):
     board_id: uuid.UUID | None
     actor_id: uuid.UUID
     agent_id: uuid.UUID | None = None
+    mcp_invocation_id: uuid.UUID | None = None
     entity_type: ActivityEntityType
     entity_id: uuid.UUID
     action: ActivityAction
@@ -59,6 +60,7 @@ class ActivityListRead(UTCModel):
     board_id: uuid.UUID | None
     actor_id: uuid.UUID
     agent_id: uuid.UUID | None = None
+    mcp_invocation_id: uuid.UUID | None = None
     entity_type: ActivityEntityType
     entity_id: uuid.UUID
     action: ActivityAction

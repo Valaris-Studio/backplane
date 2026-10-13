@@ -225,6 +225,10 @@ type Loop struct {
 	// the card (see approval_park.go for the restart contract).
 	parkedApprovals   map[string]*parkedApproval
 	parkedApprovalsMu sync.Mutex
+
+	// pauses holds the roles released after a dispatch configuration change
+	// whose release or refresh is not recorded yet; they take no new work.
+	pauses rolePauses
 }
 
 // prResolver returns the live open PR URL for a branch (or "" when none).
@@ -543,7 +547,9 @@ func appendMissingRoles(priorityOrder, known []string) []string {
 // early with no work; the runner stays alive and reports the gap in
 // health_config_errors.
 func (l *Loop) applyPlatformAuthority(ctx context.Context) {
-	if len(l.ownedStrategies) == 0 {
+	// A scheduler whose owned roles were all disabled still reconciles, so
+	// a role added to the pipeline in its scope can be built.
+	if l.ownedStrategies == nil || len(l.ownedStrategies) == 0 && l.scheduler == nil {
 		return
 	}
 	pipelineCfg := PipelineConfigForAgent(l.WorkspaceConfig())
@@ -551,6 +557,9 @@ func (l *Loop) applyPlatformAuthority(ctx context.Context) {
 
 	enabled := make(map[string]Strategy, len(l.ownedStrategies))
 	for role, strat := range l.ownedStrategies {
+		if l.pauses.disabled(role) {
+			continue
+		}
 		stage := StageForRole(pipelineCfg, role)
 		if stage == nil {
 			// Role no longer in pipeline — drop.
@@ -628,6 +637,11 @@ func (l *Loop) reconcileOwnedStrategies(pipelineCfg valaris.PipelineConfig) {
 			continue
 		}
 		if _, owned := l.ownedStrategies[role]; owned {
+			continue
+		}
+		// A paused role is rebuilt by its own refresh, never from the cached
+		// config it was paused against; an excluded one only by a restart.
+		if l.pauses.disabled(role) {
 			continue
 		}
 		if l.scopedTeamRoles != nil {
@@ -961,6 +975,7 @@ func (l *Loop) pollCycle(loopCtx, tickCtx context.Context) bool {
 	// dropped role (and vice versa: a deleted prompt disables it).
 	l.RefreshPromptCache(loopCtx)
 	l.RefreshPlatformConfig(loopCtx)
+	l.resumePausedRoles(loopCtx)
 	l.applyPlatformAuthority(loopCtx)
 	// FIX #3: check parked approval-gated cards before ticking. This is the
 	// poll-fallback resume trigger; the approval-decided WS event wakes this
@@ -1394,7 +1409,12 @@ func (l *Loop) execute(ctx context.Context, prompt string, opts llm.Options) (*l
 	dispatch := l.assignmentLLM()
 	provider := l.providerFor(dispatch)
 	opts.Model = l.modelForProvider(provider, dispatch, opts.Model)
+	return l.invoke(ctx, provider, prompt, opts)
+}
 
+// invoke runs provider with exactly prompt and opts, with cost logging and
+// telemetry; the caller has already waited for its rate permit.
+func (l *Loop) invoke(ctx context.Context, provider llm.Provider, prompt string, opts llm.Options) (*llm.Result, error) {
 	ctx, llmSpan := telemetry.StartLLMSpan(ctx, opts.Model)
 	defer llmSpan.End()
 
@@ -1741,6 +1761,9 @@ type discoverResult struct {
 	// here so skills_setup can materialize them without a second fetch. Nil on
 	// a pre-registry backend, which makes the step a no-op.
 	Skills []valaris.AssignmentSkill `json:"-"`
+	// Dispatch is the hold and floor of an assignment negotiated under
+	// context dispatch, which its start must bind; nil for a legacy card.
+	Dispatch *dispatchHold `json:"-"`
 }
 
 func defaultBranchOrMain(branch string) string {
@@ -2080,11 +2103,11 @@ func (l *Loop) claim(ctx context.Context, card *discoverResult, stage valaris.St
 	// (post tier_providers remap), so the row records what executed, not the
 	// backend's tier suggestion.
 	resolvedProvider, resolvedModel := l.resolvedProviderModel(card.AssignmentLLM)
-	execID, err := l.client.LogExecutionStartWithSkills(
-		ctx, agentID, ws, stage.Claim.ExecutionAction, card.BoardID, card.CardID,
-		fmt.Sprintf("%s: %s", executionLogDescription(stage), card.CardID), stage.Role,
-		card.AssignmentLLM.PromptSlug, resolvedModel, resolvedProvider, card.Skills,
-	)
+	execID, err := l.startExecution(ctx, card, valaris.ExecutionStart{
+		WorkspaceSlug: ws, Action: stage.Claim.ExecutionAction, BoardID: card.BoardID, CardID: card.CardID,
+		InputSummary: fmt.Sprintf("%s: %s", executionLogDescription(stage), card.CardID), Role: stage.Role,
+		PromptSlug: card.AssignmentLLM.PromptSlug, Model: resolvedModel, Provider: resolvedProvider, Skills: card.Skills,
+	})
 	if err != nil {
 		return "", fmt.Errorf("log_execution_start: %w", err)
 	}
@@ -2101,44 +2124,59 @@ func (l *Loop) implement(ctx context.Context, card *discoverResult, executionID,
 	// Fetch project directives via REST and inject into the prompt so the LLM
 	// treats them as mandatory instructions (not optional tool-call context).
 	directivesText := l.fetchDirectives(ctx, card.BoardID)
-
-	pctx := PromptContext{
-		Workspace:         l.cfg.Valaris.WorkspaceSlug,
-		AgentID:           agentID,
-		BoardID:           card.BoardID,
-		CardID:            card.CardID,
-		ExecutionID:       executionID,
-		ProjectDirectives: directivesText,
-		ContextSources:    card.ContextSources,
-		// Cluster I: when this card was budget-suspended, tell the agent to resume
-		// from the WIP checkpoint on the branch instead of re-implementing.
-		ResumeBrief: buildResumeBrief(card.Labels),
-	}
-	// context_sources kinds replace runner-side fetchers (board_definition →
-	// fetchDirectives, review_history → fetchReviewHistory); aliasing keeps
-	// existing templates referencing {{.ProjectDirectives}}/{{.ReviewHistory}}
-	// rendering unchanged (CTX-2, CTX-5).
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("implement", pctx, func() string {
-		return implementPrompt(pctx)
-	})
-	// The hardcoded fallback renders {{.ResumeBrief}}, but the backend-cached
-	// implement template (the prod path) won't reference it — so the brief would
-	// be silently dropped and the agent would re-implement from scratch, re-
-	// burning the budget the suspend was meant to save. Prepend it to whichever
-	// template won so resume instructions survive regardless of backend config.
-	prompt = prependResumeBrief(prompt, pctx.ResumeBrief)
-
-	opts := l.llmOpts("implement")
-	opts.WorkingDir = repoDir
+	// Cluster I: when this card was budget-suspended, tell the agent to resume
+	// from the WIP checkpoint on the branch instead of re-implementing.
+	resumeBrief := buildResumeBrief(card.Labels)
 
 	// Resume existing session if available (avoids re-reading codebase).
+	resumeSessionID := ""
 	if l.sessions != nil {
-		opts.ResumeSessionID = l.sessions.Get(agentID, card.CardID, "implement")
+		resumeSessionID = l.sessions.Get(agentID, card.CardID, "implement")
 	}
 
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
+	}
 	costBefore := l.tickCost
-	result, err := l.execute(ctx, prompt, opts)
+	var result *llm.Result
+	var prompt string
+	if required {
+		result, prompt, err = l.invokePrepared(ctx, preparedCall{
+			card: card, executionID: executionID, repoDir: repoDir, local: PromptContext{ProjectDirectives: directivesText, ResumeBrief: resumeBrief}, resumeSessionID: resumeSessionID,
+			finish: func(input string) string { return prependResumeBrief(input, resumeBrief) },
+		})
+	} else {
+		pctx := PromptContext{
+			Workspace:         l.cfg.Valaris.WorkspaceSlug,
+			AgentID:           agentID,
+			BoardID:           card.BoardID,
+			CardID:            card.CardID,
+			ExecutionID:       executionID,
+			ProjectDirectives: directivesText,
+			ContextSources:    card.ContextSources,
+			ResumeBrief:       resumeBrief,
+		}
+		// context_sources kinds replace runner-side fetchers (board_definition →
+		// fetchDirectives, review_history → fetchReviewHistory); aliasing keeps
+		// existing templates referencing {{.ProjectDirectives}}/{{.ReviewHistory}}
+		// rendering unchanged (CTX-2, CTX-5).
+		applyContextSourceAliases(&pctx)
+		prompt = l.resolvePrompt("implement", pctx, func() string {
+			return implementPrompt(pctx)
+		})
+		// The hardcoded fallback renders {{.ResumeBrief}}, but the backend-cached
+		// implement template (the prod path) won't reference it — so the brief would
+		// be silently dropped and the agent would re-implement from scratch, re-
+		// burning the budget the suspend was meant to save. Prepend it to whichever
+		// template won so resume instructions survive regardless of backend config.
+		prompt = prependResumeBrief(prompt, pctx.ResumeBrief)
+
+		opts := l.llmOpts("implement")
+		opts.WorkingDir = repoDir
+		opts.ResumeSessionID = resumeSessionID
+		result, err = l.execute(ctx, prompt, opts)
+	}
 	l.persistPrompt(ctx, executionID, prompt)
 
 	// Store session for potential retry regardless of outcome.
@@ -2186,30 +2224,45 @@ func (l *Loop) implementAfterApproval(ctx context.Context, card *discoverResult,
 
 	directivesText := l.fetchDirectives(ctx, card.BoardID)
 
-	pctx := PromptContext{
-		Workspace:         l.cfg.Valaris.WorkspaceSlug,
-		AgentID:           agentID,
-		BoardID:           card.BoardID,
-		CardID:            card.CardID,
-		ExecutionID:       executionID,
-		ApprovalSummary:   approvalSummary,
-		ProjectDirectives: directivesText,
-		ContextSources:    card.ContextSources,
-	}
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("implement_after_approval", pctx, func() string {
-		return implementAfterApprovalPrompt(pctx)
-	})
-
-	opts := l.llmOpts("implement")
-	opts.WorkingDir = repoDir
-
 	// Resume the implement session — post-approval continues the same context.
+	resumeSessionID := ""
 	if l.sessions != nil {
-		opts.ResumeSessionID = l.sessions.Get(agentID, card.CardID, "implement")
+		resumeSessionID = l.sessions.Get(agentID, card.CardID, "implement")
 	}
 
-	result, err := l.execute(ctx, prompt, opts)
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
+	}
+	var result *llm.Result
+	var prompt string
+	if required {
+		ctx = withCallSemantics(withDispatchInvocation(ctx, valaris.DispatchInvocation{Kind: "post_approval", PromptSlot: "implement_after_approval"}), nil)
+		result, prompt, err = l.invokePrepared(ctx, preparedCall{
+			card: card, executionID: executionID, repoDir: repoDir, resumeSessionID: resumeSessionID,
+			local: PromptContext{ApprovalSummary: approvalSummary, ProjectDirectives: directivesText},
+		})
+	} else {
+		pctx := PromptContext{
+			Workspace:         l.cfg.Valaris.WorkspaceSlug,
+			AgentID:           agentID,
+			BoardID:           card.BoardID,
+			CardID:            card.CardID,
+			ExecutionID:       executionID,
+			ApprovalSummary:   approvalSummary,
+			ProjectDirectives: directivesText,
+			ContextSources:    card.ContextSources,
+		}
+		applyContextSourceAliases(&pctx)
+		prompt = l.resolvePrompt("implement_after_approval", pctx, func() string {
+			return implementAfterApprovalPrompt(pctx)
+		})
+
+		opts := l.llmOpts("implement")
+		opts.WorkingDir = repoDir
+		opts.ResumeSessionID = resumeSessionID
+		result, err = l.execute(ctx, prompt, opts)
+	}
 	l.persistPrompt(ctx, executionID, prompt)
 
 	if result != nil && l.sessions != nil {
@@ -2242,6 +2295,13 @@ type mediationResult struct {
 // This runs between discover and reworkImplement to synthesize context from
 // prior review cycles into clear, actionable instructions.
 func (l *Loop) mediateRework(ctx context.Context, card *discoverResult, reworkAttempt int) (*mediationResult, error) {
+	return l.mediateReworkIn(ctx, card, "", reworkAttempt)
+}
+
+// mediateReworkIn is mediateRework within executionID: a card under a
+// required dispatch floor mediates as a prepared invocation of that already
+// bound execution. A legacy mediation runs outside any execution.
+func (l *Loop) mediateReworkIn(ctx context.Context, card *discoverResult, executionID string, reworkAttempt int) (*mediationResult, error) {
 	agentID := ""
 	if l.client.Agent != nil {
 		agentID = l.client.Agent.ID
@@ -2251,21 +2311,34 @@ func (l *Loop) mediateRework(ctx context.Context, card *discoverResult, reworkAt
 	// doesn't need to call list_notes and mentally filter by card ID.
 	reviewHistory := l.fetchReviewHistory(ctx, card.BoardID, card.CardID)
 
-	pctx := PromptContext{
-		Workspace:         l.cfg.Valaris.WorkspaceSlug,
-		AgentID:           agentID,
-		BoardID:           card.BoardID,
-		CardID:            card.CardID,
-		ReviewHistory:     reviewHistory,
-		ReworkAttempt:     reworkAttempt,
-		MaxReworkAttempts: l.WorkspaceConfig().MaxReworkAttempts,
-		ContextSources:    card.ContextSources,
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
 	}
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("mediate_rework", pctx, func() string {
-		return mediateReworkPrompt(pctx)
-	})
-	result, err := l.execute(ctx, prompt, l.llmOpts("mediate"))
+	var result *llm.Result
+	if required {
+		ctx = withCallSemantics(withDispatchInvocation(ctx, valaris.DispatchInvocation{Kind: "mediation", PromptSlot: "mediate_rework"}), nil)
+		result, _, err = l.invokePrepared(ctx, preparedCall{
+			card: card, executionID: executionID,
+			local: PromptContext{ReviewHistory: reviewHistory, ReworkAttempt: reworkAttempt, MaxReworkAttempts: l.WorkspaceConfig().MaxReworkAttempts},
+		})
+	} else {
+		pctx := PromptContext{
+			Workspace:         l.cfg.Valaris.WorkspaceSlug,
+			AgentID:           agentID,
+			BoardID:           card.BoardID,
+			CardID:            card.CardID,
+			ReviewHistory:     reviewHistory,
+			ReworkAttempt:     reworkAttempt,
+			MaxReworkAttempts: l.WorkspaceConfig().MaxReworkAttempts,
+			ContextSources:    card.ContextSources,
+		}
+		applyContextSourceAliases(&pctx)
+		prompt := l.resolvePrompt("mediate_rework", pctx, func() string {
+			return mediateReworkPrompt(pctx)
+		})
+		result, err = l.execute(ctx, prompt, l.llmOpts("mediate"))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -2350,6 +2423,16 @@ func (l *Loop) reworkClaim(ctx context.Context, card *discoverResult, role strin
 	}
 
 	resolvedProvider, resolvedModel := l.resolvedProviderModel(card.AssignmentLLM)
+	if card.Dispatch != nil {
+		if err := l.recheckDispatch(ctx, card.Dispatch); err != nil {
+			return "", err
+		}
+		return l.startExecution(ctx, card, valaris.ExecutionStart{
+			WorkspaceSlug: l.cfg.Valaris.WorkspaceSlug, Action: "rework_card", BoardID: card.BoardID, CardID: card.CardID,
+			InputSummary: fmt.Sprintf("Reworking card after review rejection: %s", card.CardID), Role: role,
+			PromptSlug: card.AssignmentLLM.PromptSlug, Model: resolvedModel, Provider: resolvedProvider, Skills: card.Skills,
+		})
+	}
 	execID, err := l.client.LogExecutionStartWithSkills(
 		ctx, agentID, l.cfg.Valaris.WorkspaceSlug, "rework_card", card.BoardID, card.CardID,
 		fmt.Sprintf("Reworking card after review rejection: %s", card.CardID), role,
@@ -2370,30 +2453,43 @@ func (l *Loop) reworkImplement(ctx context.Context, card *discoverResult, execut
 
 	directivesText := l.fetchDirectives(ctx, card.BoardID)
 
-	pctx := PromptContext{
-		Workspace:         l.cfg.Valaris.WorkspaceSlug,
-		AgentID:           agentID,
-		BoardID:           card.BoardID,
-		CardID:            card.CardID,
-		ExecutionID:       executionID,
-		ActionPlan:        actionPlan,
-		ProjectDirectives: directivesText,
-		ContextSources:    card.ContextSources,
-	}
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("rework_implement", pctx, func() string {
-		return reworkImplementPrompt(pctx)
-	})
-
-	opts := l.llmOpts("implement")
-	opts.WorkingDir = repoDir
-
 	// Clear prior session — rework has new context from mediator that may contradict stale session memory.
 	if l.sessions != nil {
 		l.sessions.Clear(agentID, card.CardID)
 	}
 
-	result, err := l.execute(ctx, prompt, opts)
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
+	}
+	var result *llm.Result
+	var prompt string
+	if required {
+		ctx = withCallSemantics(withDispatchInvocation(ctx, valaris.DispatchInvocation{Kind: "stage", PromptSlot: "rework_implement"}), nil)
+		result, prompt, err = l.invokePrepared(ctx, preparedCall{
+			card: card, executionID: executionID, repoDir: repoDir,
+			local: PromptContext{ActionPlan: actionPlan, ProjectDirectives: directivesText},
+		})
+	} else {
+		pctx := PromptContext{
+			Workspace:         l.cfg.Valaris.WorkspaceSlug,
+			AgentID:           agentID,
+			BoardID:           card.BoardID,
+			CardID:            card.CardID,
+			ExecutionID:       executionID,
+			ActionPlan:        actionPlan,
+			ProjectDirectives: directivesText,
+			ContextSources:    card.ContextSources,
+		}
+		applyContextSourceAliases(&pctx)
+		prompt = l.resolvePrompt("rework_implement", pctx, func() string {
+			return reworkImplementPrompt(pctx)
+		})
+
+		opts := l.llmOpts("implement")
+		opts.WorkingDir = repoDir
+		result, err = l.execute(ctx, prompt, opts)
+	}
 	l.persistPrompt(ctx, executionID, prompt)
 
 	if result != nil && l.sessions != nil {
@@ -3157,24 +3253,37 @@ func (l *Loop) reviewCode(ctx context.Context, card *discoverResult, executionID
 		agentID = l.client.Agent.ID
 	}
 
-	pctx := PromptContext{
-		Workspace:      l.cfg.Valaris.WorkspaceSlug,
-		AgentID:        agentID,
-		BoardID:        card.BoardID,
-		CardID:         card.CardID,
-		ExecutionID:    executionID,
-		ContextSources: card.ContextSources,
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
 	}
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("review", pctx, func() string {
-		return reviewCodePrompt(pctx)
-	})
+	var result *llm.Result
+	var prompt string
+	if required {
+		// The snapshot's current schema stands; the decision schema serves
+		// only when it names none.
+		result, prompt, err = l.invokePrepared(ctx, preparedCall{
+			card: card, executionID: executionID, repoDir: repoDir, defaultSchema: decisionOutputSchema,
+		})
+	} else {
+		pctx := PromptContext{
+			Workspace:      l.cfg.Valaris.WorkspaceSlug,
+			AgentID:        agentID,
+			BoardID:        card.BoardID,
+			CardID:         card.CardID,
+			ExecutionID:    executionID,
+			ContextSources: card.ContextSources,
+		}
+		applyContextSourceAliases(&pctx)
+		prompt = l.resolvePrompt("review", pctx, func() string {
+			return reviewCodePrompt(pctx)
+		})
 
-	opts := l.llmOpts("review")
-	opts.WorkingDir = repoDir
-	opts.OutputSchema = decisionOutputSchema
-
-	result, err := l.execute(ctx, prompt, opts)
+		opts := l.llmOpts("review")
+		opts.WorkingDir = repoDir
+		opts.OutputSchema = decisionOutputSchema
+		result, err = l.execute(ctx, prompt, opts)
+	}
 	l.persistPrompt(ctx, executionID, prompt)
 	if err != nil {
 		return nil, err
@@ -3272,23 +3381,32 @@ func (l *Loop) generateDocs(ctx context.Context, card *discoverResult, execution
 		agentID = l.client.Agent.ID
 	}
 
-	pctx := PromptContext{
-		Workspace:      l.cfg.Valaris.WorkspaceSlug,
-		AgentID:        agentID,
-		BoardID:        card.BoardID,
-		CardID:         card.CardID,
-		ExecutionID:    executionID,
-		ContextSources: card.ContextSources,
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
 	}
-	applyContextSourceAliases(&pctx)
-	prompt := l.resolvePrompt("document", pctx, func() string {
-		return generateDocsPrompt(pctx)
-	})
+	var result *llm.Result
+	var prompt string
+	if required {
+		result, prompt, err = l.invokePrepared(ctx, preparedCall{card: card, executionID: executionID, repoDir: repoDir})
+	} else {
+		pctx := PromptContext{
+			Workspace:      l.cfg.Valaris.WorkspaceSlug,
+			AgentID:        agentID,
+			BoardID:        card.BoardID,
+			CardID:         card.CardID,
+			ExecutionID:    executionID,
+			ContextSources: card.ContextSources,
+		}
+		applyContextSourceAliases(&pctx)
+		prompt = l.resolvePrompt("document", pctx, func() string {
+			return generateDocsPrompt(pctx)
+		})
 
-	opts := l.llmOpts("document")
-	opts.WorkingDir = repoDir
-
-	result, err := l.execute(ctx, prompt, opts)
+		opts := l.llmOpts("document")
+		opts.WorkingDir = repoDir
+		result, err = l.execute(ctx, prompt, opts)
+	}
 	l.persistPrompt(ctx, executionID, prompt)
 	if err != nil {
 		return nil, err
@@ -3492,4 +3610,15 @@ func newCmd(name string, args ...string) *exec.Cmd {
 	cmd := exec.Command(name, args...)
 	cmd.Env = git.SubprocessEnv("")
 	return cmd
+}
+
+// closeEscalatedExecution ends a bound rework execution whose mediator
+// escalated: no implementation follows, so it must not stay active.
+func (l *Loop) closeEscalatedExecution(card *discoverResult, executionID string, reworkAttempt int) {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	summary := fmt.Sprintf("rework mediator escalated card %s after %d attempts; no implementation ran", card.CardID, reworkAttempt)
+	if err := l.client.LogExecutionUpdate(cleanupCtx, agentIDOf(l), executionID, "failed", summary); err != nil {
+		slog.Warn("failed to close escalated rework execution", "execution_id", executionID, "error", err)
+	}
 }

@@ -30,10 +30,11 @@ export function useNote(slug: string, noteId: string | undefined, boardId?: stri
       return data;
     },
     enabled: !!noteId,
-    // Re-render the open editor only when the BODY lands. Subscribing to the
-    // whole query state also fires on the fetching/status flips, and the
-    // editor sheet's entrance timeline re-keys off that render and re-hides
-    // the panel mid-animation.
-    notifyOnChangeProps: ["data"],
+    // Re-render the open editor only when the BODY lands (or the request
+    // fails, so a deep link can report it). Subscribing to the whole query
+    // state also fires on the fetching/status flips, and the editor sheet's
+    // entrance timeline re-keys off that render and re-hides the panel
+    // mid-animation.
+    notifyOnChangeProps: ["data", "error"],
   });
 }

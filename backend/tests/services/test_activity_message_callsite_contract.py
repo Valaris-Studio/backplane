@@ -107,7 +107,7 @@ def test_every_product_activity_record_with_summary_declares_structured_fields()
     helper_calls = [call for _, call in calls if call.func.attr == "_record_activity"]
 
     # Pins the audited surface so a new callsite cannot slip through silently.
-    assert len(direct_calls) == 66
+    assert len(direct_calls) == 67
     assert len(helper_calls) == 9
     missing = []
     for path, call in calls:
@@ -141,6 +141,10 @@ def test_backend_keys_and_param_names_match_the_shared_frontend_contract_exactly
             actual_param_sets.setdefault(key, set()).add(frozenset(param_names))
 
     assert not unresolved, "\n".join(unresolved)
+    # Retained aggregate rows still render; new bulk writes emit per-card snapshots.
+    retained_legacy_params = {"activity.card.bulk_created": {frozenset({"card_count"})}}
+    assert actual_param_sets.keys().isdisjoint(retained_legacy_params)
+    actual_param_sets.update(retained_legacy_params)
     assert set(actual_param_sets) == set(contract)
 
     mismatches = []

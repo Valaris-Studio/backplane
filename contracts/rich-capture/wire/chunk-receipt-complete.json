@@ -1,0 +1,17 @@
+{
+  "model": "ChunkReceipt",
+  "http": {
+    "method": "PUT",
+    "path": "/api/companion/contents/4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f/chunks/0",
+    "status": 200
+  },
+  "body": {
+    "content_id": "4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f",
+    "index": 0,
+    "received_chunks": [
+      0
+    ],
+    "chunk_count": 1,
+    "complete": true
+  }
+}

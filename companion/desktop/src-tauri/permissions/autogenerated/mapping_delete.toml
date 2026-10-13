@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mapping-delete"
+description = "Enables the mapping_delete command without any pre-configured scope."
+commands.allow = ["mapping_delete"]
+
+[[permission]]
+identifier = "deny-mapping-delete"
+description = "Denies the mapping_delete command without any pre-configured scope."
+commands.deny = ["mapping_delete"]

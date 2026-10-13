@@ -55,7 +55,7 @@ func TestDoctorCompletionWorkflow(t *testing.T) {
 			}
 			row := checkCompletionWorkflow(context.Background(), cfg, Credentials{APIURL: server.URL, APIKey: "vlr_test", Workspace: "acme", MCPConfigPath: "/explicit/config.json"}, lookup, func(context.Context, string, string, string, *valaris.BoardLoopConfig) (workloop.MCPLaunchReport, error) {
 				mcpCalls++
-				return workloop.MCPLaunchReport{ConfigPath: "/explicit/config.json", Executable: "uvx", Version: "0.8.0"}, nil
+				return workloop.MCPLaunchReport{ConfigPath: "/explicit/config.json", Executable: "uvx", Version: "0.9.1"}, nil
 			})
 			if scenario == "server_readiness_failure" {
 				if row.State != tui.StateFail || !strings.Contains(row.Detail, "credential") || readinessProbes != 1 {

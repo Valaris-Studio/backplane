@@ -61,6 +61,9 @@ type parkedApproval struct {
 	Strategy    *DataDrivenStrategy // fallback when the role left ownedStrategies
 	ParkedAt    time.Time
 	LastWarnAt  time.Time
+	// unsupportedReported records that this park's unsupported required
+	// resume was reported, so retries do not report it again.
+	unsupportedReported bool
 }
 
 func (l *Loop) parkApproval(e *parkedApproval) {
@@ -122,9 +125,21 @@ func (l *Loop) resumeDecidedApprovals(ctx context.Context) {
 
 		switch approval.Status {
 		case "approved", "auto_approved":
-			l.unparkApproval(e.CardID)
+			if l.pauses.paused(e.Role) {
+				// Its role is paused after a configuration change: the card
+				// stays parked until the role is refreshed.
+				continue
+			}
+			if reason, excluded := l.pauses.excluded(e.Role); excluded {
+				// The park-time strategy is stale; it never resumes work.
+				l.unparkApproval(e.CardID)
+				slog.Error("approved card's role is disabled on this runner — card stays labeled for a human",
+					"card_id", e.CardID, "role", e.Role, "reason", reason)
+				continue
+			}
 			s := l.strategyForParkedApproval(e)
 			if s == nil {
+				l.unparkApproval(e.CardID)
 				slog.Error("no strategy available to resume approved card — card stays labeled for a human",
 					"card_id", e.CardID, "role", e.Role)
 				continue
@@ -134,6 +149,13 @@ func (l *Loop) resumeDecidedApprovals(ctx context.Context) {
 			}
 
 		case "rejected":
+			if l.pauses.paused(e.Role) {
+				// Applied by the poll after the role's release and refresh
+				// are recorded.
+				continue
+			}
+			// A withdrawn role's rejection is bookkeeping only (no
+			// inference), applied with its park-time strategy as before.
 			l.unparkApproval(e.CardID)
 			if s := l.strategyForParkedApproval(e); s != nil {
 				s.rejectDecidedApproval(ctx, l, e, approval)
@@ -265,10 +287,21 @@ func (s *DataDrivenStrategy) parkForApproval(ctx, tickCtx context.Context, l *Lo
 }
 
 // resumeApprovedCard continues a parked card after its approval was granted:
-// idempotent re-claim (fresh execution) → unpark label → branch recovery →
-// implementAfterApproval on the SAME session → the same post-LLM machinery as
-// a normal tick (sensors, commit/push, PR, post-actions).
+// unpark → idempotent re-claim (fresh execution) → unpark label → branch
+// recovery → implementAfterApproval on the SAME session → the same post-LLM
+// machinery as a normal tick (sensors, commit/push, PR, post-actions). Under
+// a required dispatch floor the card stays parked, untouched, and the
+// unsupported flow is reported once.
 func (s *DataDrivenStrategy) resumeApprovedCard(ctx context.Context, l *Loop, e *parkedApproval, approval *valaris.ApprovalStatus) error {
+	required, err := l.parkedResumeRequired(ctx, e)
+	if err != nil {
+		return fmt.Errorf("resume (%s) card %s: %w", s.config.Role, e.CardID, err)
+	}
+	if required {
+		l.reportParkedResumeUnsupported(ctx, e)
+		return errParkedResumeUnsupported
+	}
+	l.unparkApproval(e.CardID)
 	card := e.Card
 	logger := slog.With("card_id", card.CardID, "approval_id", e.ApprovalID, "role", s.config.Role)
 	logger.Info("approval granted — resuming parked card", "status", approval.Status)

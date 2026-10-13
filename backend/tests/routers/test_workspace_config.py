@@ -1481,6 +1481,28 @@ async def test_update_workspace_config_gate_refuses_agent_key(
     assert readback.json()["enforce_done_merge_gate"] is True
 
 
+async def test_update_workspace_config_gate_installation_key_can_set(
+    installation_key_client: AsyncClient, test_workspace: Workspace,
+):
+    response = await installation_key_client.patch(
+        f"/api/workspaces/{test_workspace.slug}/config",
+        json={"enforce_done_merge_gate": False},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["enforce_done_merge_gate"] is False
+
+
+async def test_update_workspace_config_gate_plain_user_key_can_set(
+    plain_key_client: AsyncClient, test_workspace: Workspace,
+):
+    response = await plain_key_client.patch(
+        f"/api/workspaces/{test_workspace.slug}/config",
+        json={"enforce_done_merge_gate": False},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["enforce_done_merge_gate"] is False
+
+
 async def test_update_workspace_config_gate_refuses_agent_key_re_arm(
     agent_client: AsyncClient, test_workspace: Workspace,
     db_session: AsyncSession,

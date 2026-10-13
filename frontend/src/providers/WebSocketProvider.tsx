@@ -24,7 +24,15 @@ interface WebSocketContextValue {
     eventPattern: string,
     handler: (event: WebSocketEvent) => void,
   ) => () => void;
+  /**
+   * Patterns the server refused on the current connection. "connected" alone
+   * does not mean every subscription is live. Optional so test doubles of
+   * this context may omit it (read as "nothing denied").
+   */
+  deniedPatterns?: ReadonlySet<string>;
 }
+
+const NO_DENIED_PATTERNS: ReadonlySet<string> = new Set();
 
 // Exported so tests can supply a controllable `subscribe` without the real
 // provider, which opens an actual socket on mount. App code should use
@@ -49,6 +57,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const slug = extractWorkspaceSlug(pathname);
   const serviceRef = useRef<WebSocketService | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
+  const [deniedPatterns, setDeniedPatterns] =
+    useState<ReadonlySet<string>>(NO_DENIED_PATTERNS);
   // Bumped each time a new service is created so child effects re-subscribe.
   const [serviceEpoch, setServiceEpoch] = useState(0);
 
@@ -60,11 +70,25 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     serviceRef.current = service;
     setServiceEpoch((e) => e + 1);
 
-    const unsub = service.onStatusChange(setStatus);
+    setDeniedPatterns(NO_DENIED_PATTERNS);
+    const unsubStatus = service.onStatusChange((next) => {
+      setStatus(next);
+      // The server decides denials per connection, and every new connection
+      // resends the full pattern set, so earlier refusals no longer apply.
+      if (next === "connected") setDeniedPatterns(NO_DENIED_PATTERNS);
+    });
+    const unsubDenied = service.onSubscriptionDenied(({ patterns }) => {
+      setDeniedPatterns((previous) =>
+        patterns.every((pattern) => previous.has(pattern))
+          ? previous
+          : new Set([...previous, ...patterns]),
+      );
+    });
     service.connect();
 
     return () => {
-      unsub();
+      unsubStatus();
+      unsubDenied();
       service.disconnect();
       serviceRef.current = null;
     };
@@ -82,8 +106,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<WebSocketContextValue>(
-    () => ({ status, subscribe }),
-    [status, subscribe],
+    () => ({ status, subscribe, deniedPatterns }),
+    [status, subscribe, deniedPatterns],
   );
 
   return (

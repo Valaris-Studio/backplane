@@ -6,6 +6,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftRight,
+  AudioWaveform,
   Bot,
   Clock,
   FolderOpen,
@@ -18,15 +19,27 @@ import {
   GitMerge,
   StickyNote,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthModes } from "@/features/auth/api/use-auth-modes";
 import { ApprovalBadge } from "@/features/approvals/components/ApprovalBadge";
+import { SessionsLiveCount } from "@/features/sessions/components/SessionsLiveCount";
 import { useResolvedWorkspaceSlug } from "@/features/workspaces/hooks/use-workspace-resolved";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 
-const navItems = [
+interface NavItem {
+  label: string;
+  icon: LucideIcon;
+  path: string;
+  // Shown only where this Backplane accepts Companion sessions.
+  requiresCompanion?: boolean;
+}
+
+const allNavItems: NavItem[] = [
   { label: "nav.dashboard", icon: LayoutDashboard, path: "" },
   { label: "nav.boards", icon: Kanban, path: "/boards" },
+  { label: "nav.sessions", icon: AudioWaveform, path: "/sessions", requiresCompanion: true },
   { label: "nav.notes", icon: StickyNote, path: "/notes" },
   { label: "nav.resources", icon: FolderOpen, path: "/resources" },
   { label: "nav.skills", icon: GraduationCap, path: "/skills" },
@@ -62,6 +75,11 @@ export function Sidebar({
   // the badge uses the RESOLVED one, so it never queries a workspace the
   // gate has not confirmed exists.
   const resolvedSlug = useResolvedWorkspaceSlug(slug);
+  const companionEnabled = useAuthModes().data?.companion_enabled === true;
+  const navItems = useMemo(
+    () => allNavItems.filter((item) => !item.requiresCompanion || companionEnabled),
+    [companionEnabled],
+  );
   const location = useLocation();
   const { t } = useTranslation();
   const itemRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
@@ -80,7 +98,7 @@ export function Sidebar({
           (item.path !== "" && location.pathname.startsWith(href))
         );
       })?.label,
-    [location.pathname, slug],
+    [location.pathname, slug, navItems],
   );
 
   useEffect(() => {
@@ -231,6 +249,9 @@ export function Sidebar({
                     resolvedSlug && (
                       <ApprovalBadge slug={resolvedSlug} />
                     )}
+                  {item.label === "nav.sessions" && !collapsed && resolvedSlug ? (
+                    <SessionsLiveCount slug={resolvedSlug} />
+                  ) : null}
                 </Link>
               );
             })}

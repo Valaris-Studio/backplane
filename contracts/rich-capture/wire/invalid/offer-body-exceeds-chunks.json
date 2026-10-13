@@ -1,0 +1,19 @@
+{
+  "model": "RichCaptureOffer",
+  "why": "a largest body must fit in chunk_bytes x max_chunks",
+  "body": {
+    "version": 1,
+    "limits": {
+      "max_contents_per_record": 256,
+      "max_inline_body_bytes": 16384,
+      "max_inline_bytes_per_record": 1048576,
+      "max_text_body_bytes": 33554432,
+      "max_attachment_bytes": 20971520,
+      "chunk_bytes": 1048576,
+      "max_chunks": 8,
+      "staging_ttl_seconds": 604800,
+      "session_body_bytes": 536870912,
+      "installation_body_bytes": 10737418240
+    }
+  }
+}

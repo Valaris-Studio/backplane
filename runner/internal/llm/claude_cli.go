@@ -79,6 +79,9 @@ func (c *ClaudeCLI) CanEnforceBudget(opts Options) bool {
 }
 
 func (c *ClaudeCLI) Execute(ctx context.Context, prompt string, opts Options) (*Result, error) {
+	if err := CheckPromptChannels(c.Capabilities().PromptChannels, opts.ResumeSessionID != "", opts); err != nil {
+		return nil, err
+	}
 	// Materialize a per-launch MCP config whenever a template is configured,
 	// so the spawned MCP server boots with VALARIS_MCP_TOOLSETS=all and — for a
 	// non-empty grant — VALARIS_MCP_ALLOWLIST in its env and can enforce the
@@ -186,8 +189,9 @@ func (c *ClaudeCLI) Execute(ctx context.Context, prompt string, opts Options) (*
 }
 
 func (c *ClaudeCLI) buildArgs(prompt string, opts Options) []string {
-	// Prompt must immediately follow -p as its positional argument.
-	args := []string{"-p", prompt, "--verbose"}
+	// -p is a boolean print flag and the prompt a positional: it goes last,
+	// after --, so one beginning with - is never parsed as an option.
+	args := []string{"-p", "--verbose"}
 
 	// Always use stream-json for cost/session tracking. The parser extracts
 	// the text output from the structured events.
@@ -258,7 +262,7 @@ func (c *ClaudeCLI) buildArgs(prompt string, opts Options) []string {
 		args = append(args, "--add-dir", dir)
 	}
 
-	return args
+	return append(args, "--", prompt)
 }
 
 // SupportsResume returns true — Claude CLI supports --resume.
@@ -291,6 +295,9 @@ func (c *ClaudeCLI) Capabilities() Capabilities {
 		// names verbatim; nested shells escape the prefix match.
 		EnforcesShellDeny:  true,
 		ShellDenyMechanism: "disallowed-tools",
+		// -p and --system-prompt carry both channels verbatim, fresh or
+		// --resume.
+		PromptChannels: PromptChannels{Version: 1, FreshInput: true, FreshSystem: true, ResumeInput: true, ResumeSystem: true},
 	}
 }
 

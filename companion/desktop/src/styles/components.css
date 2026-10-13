@@ -1,0 +1,664 @@
+/*
+ * The DK-0 mockup's component rules, ported onto tokens.css. Variants are
+ * data-* attributes set by the React primitives; layout around a primitive is
+ * left to Tailwind utilities at the call site.
+ */
+@layer components {
+  /* ── Buttons ─────────────────────────────────────────────────────── */
+  .bp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--control-height-md);
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-control);
+    font-size: var(--text-body);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    background: color-mix(in oklab, var(--color-foreground) 8%, transparent);
+    color: var(--color-foreground);
+    box-shadow: var(--shadow-control);
+    transition:
+      transform var(--duration-press) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-standard),
+      filter var(--duration-fast) var(--ease-standard);
+  }
+  .bp-btn > svg { width: 14px; height: 14px; flex: none; }
+  .bp-btn:hover { background: color-mix(in oklab, var(--color-foreground) 12%, transparent); }
+  .bp-btn:active { transform: scale(0.97); }
+  .bp-btn[data-variant="primary"] { background: var(--color-primary); color: var(--color-primary-foreground); }
+  .bp-btn[data-variant="primary"]:hover { filter: brightness(1.06); }
+  .bp-btn[data-variant="danger"] { background: var(--color-destructive); color: var(--color-destructive-foreground); }
+  .bp-btn[data-variant="ghost-danger"] { background: transparent; box-shadow: none; color: var(--color-error-foreground); padding: 0 4px; }
+  .bp-btn[data-variant="ghost-danger"]:hover { background: color-mix(in oklab, var(--color-error) 10%, transparent); }
+  .bp-btn[data-size="sm"] { height: var(--control-height-sm); padding: 0 9px; font-size: var(--text-footnote); border-radius: 5px; }
+  .bp-btn[data-size="lg"] { height: var(--control-height-lg); padding: 0 16px; }
+  .bp-btn[data-block="true"] { width: 100%; }
+  .bp-btn:disabled, .bp-btn[aria-busy="true"] { opacity: 0.45; cursor: default; transform: none; }
+  .bp-btn[aria-busy="true"] { opacity: 1; }
+
+  .bp-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .bp-icon-btn {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-muted-foreground);
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-press) var(--ease-out);
+  }
+  .bp-icon-btn > svg { width: 16px; height: 16px; }
+  .bp-icon-btn:hover { background: var(--color-row-hover); color: var(--color-foreground); }
+  .bp-icon-btn:active { transform: scale(0.94); background: var(--color-row-press); }
+  .bp-icon-btn:disabled { opacity: 0.4; cursor: default; transform: none; background: transparent; }
+
+  .bp-link-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    white-space: nowrap;
+    color: var(--color-primary);
+    font-size: var(--text-footnote);
+    font-weight: var(--weight-medium);
+  }
+  .bp-link-btn > svg { width: 12px; height: 12px; }
+  .bp-link-btn:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* ── Switch ──────────────────────────────────────────────────────── */
+  .bp-switch {
+    flex: none;
+    position: relative;
+    width: 32px;
+    height: 19px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--color-foreground) 18%, transparent);
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+  .bp-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    transition: transform var(--duration-base) var(--ease-out);
+  }
+  .bp-switch[aria-checked="true"] { background: var(--color-primary); }
+  .bp-switch[aria-checked="true"]::after { transform: translateX(13px); }
+  .bp-switch:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── Segmented control (radiogroup) ──────────────────────────────── */
+  .bp-seg {
+    display: flex;
+    padding: 2px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--color-foreground) 7%, transparent);
+  }
+  .bp-seg > button {
+    flex: 1;
+    height: 22px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    font-size: var(--text-footnote);
+    font-weight: var(--weight-medium);
+    color: var(--color-muted-foreground);
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+  .bp-seg > button[aria-checked="true"] {
+    background: var(--color-popover);
+    color: var(--color-foreground);
+    box-shadow: var(--shadow-control), 0 0 0 0.5px var(--color-hairline);
+  }
+  .bp-seg > button[aria-checked="true"][data-tone="warning"] { color: var(--color-warning-foreground); }
+  .bp-seg[aria-disabled="true"] { opacity: 0.5; }
+  .bp-seg[aria-disabled="true"] > button { cursor: default; }
+  .bp-seg > button[data-unavailable]:not([aria-checked="true"]) { opacity: 0.45; cursor: default; }
+
+  .bp-privacy-help { margin: 6px 2px 0; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .bp-privacy-help b { color: var(--color-foreground); font-weight: var(--weight-medium); }
+
+  /* The detail follows the selected level, like the help line above it. */
+  .bp-privacy-more { margin: 4px 0 0; }
+  .bp-privacy-detail {
+    margin: 2px 0 0;
+    padding: 10px 10px 8px;
+    border-radius: var(--radius-control);
+    background: color-mix(in oklab, var(--color-foreground) 4%, transparent);
+    font-size: var(--text-footnote);
+    line-height: var(--leading-footnote);
+    color: var(--color-muted-foreground);
+  }
+  .bp-privacy-cols { display: grid; gap: 10px; }
+  .bp-privacy-detail h4 { margin: 0 0 4px; font-size: var(--text-caption); font-weight: var(--weight-semibold); color: var(--color-foreground); letter-spacing: 0.01em; }
+  .bp-privacy-detail ul { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+  .bp-privacy-detail li { display: grid; grid-template-columns: 12px 1fr; gap: 5px; font-size: var(--text-caption); line-height: var(--leading-caption); }
+  .bp-privacy-detail li > svg { width: 11px; height: 11px; margin-top: 2px; }
+  .bp-privacy-detail [data-list="sent"] li { color: var(--color-foreground); }
+  .bp-privacy-detail [data-list="sent"] li > svg { color: var(--color-primary); }
+  .bp-privacy-detail p { margin: 8px 0 0; font-size: var(--text-caption); line-height: var(--leading-caption); }
+
+  /* ── Choice cards (radiogroup) ───────────────────────────────────── */
+  .bp-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--radius-sheet);
+    text-align: left;
+    background: color-mix(in oklab, var(--color-popover) 70%, transparent);
+    box-shadow: 0 0 0 0.5px var(--color-hairline);
+    transition: box-shadow var(--duration-fast) var(--ease-standard);
+  }
+  .bp-choice[aria-checked="true"] { box-shadow: 0 0 0 1.5px var(--color-primary); }
+  .bp-choice-radio {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: var(--color-popover);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-foreground) 35%, transparent);
+  }
+  .bp-choice[aria-checked="true"] .bp-choice-radio { background: var(--color-primary); box-shadow: none; }
+  .bp-choice[aria-checked="true"] .bp-choice-radio::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary-foreground); }
+  .bp-choice b { display: block; font-weight: var(--weight-semibold); }
+  .bp-choice small { display: block; color: var(--color-muted-foreground); font-size: var(--text-footnote); line-height: var(--leading-footnote); }
+
+  /* ── Tabs (segmented, with a sliding thumb) ──────────────────────── */
+  .bp-tabs {
+    position: relative;
+    display: flex;
+    margin: 10px 0 8px;
+    padding: 2px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--color-foreground) 7%, transparent);
+  }
+  .bp-tabs[data-variant="sub"] { margin: 4px 0 10px; }
+  .bp-tab {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 24px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    font-size: var(--text-footnote);
+    font-weight: var(--weight-medium);
+    color: var(--color-muted-foreground);
+  }
+  .bp-tab[aria-selected="true"] { color: var(--color-foreground); }
+  .bp-tab-thumb {
+    position: absolute;
+    z-index: 0;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    border-radius: 5px;
+    background: var(--color-popover);
+    box-shadow: var(--shadow-control), 0 0 0 0.5px var(--color-hairline);
+  }
+  .bp-tab-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    background: color-mix(in oklab, var(--color-foreground) 10%, transparent);
+  }
+  .bp-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 0 1.5px var(--color-popover); }
+
+  /* ── Groups, rows, section heads ─────────────────────────────────── */
+  .bp-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 12px 4px 6px; }
+  .bp-section-head:first-child { margin-top: 4px; }
+  .bp-section-head h3 { flex: 1; min-width: 0; margin: 0; font-size: var(--text-footnote); font-weight: var(--weight-semibold); color: var(--color-muted-foreground); letter-spacing: 0.01em; }
+  .bp-section-aside { font-size: var(--text-caption); color: var(--color-muted-foreground); }
+
+  .bp-group {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-sheet);
+    background: color-mix(in oklab, var(--color-popover) 70%, transparent);
+    box-shadow: 0 0 0 0.5px var(--color-hairline);
+  }
+  .bp-group > li + li { border-top: 0.5px solid var(--color-hairline); }
+
+  .bp-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 9px 12px; }
+  .bp-row-text { flex: 1; min-width: 0; }
+  .bp-row-sub { display: block; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .bp-row-value { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }
+
+  .bp-help { margin: 6px 4px 0; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+
+  /* ── Tone carriers: banner, pill, panel ──────────────────────────── */
+  [data-tone="warning"] { --tone: var(--color-warning); --tone-ink: var(--color-warning-foreground); }
+  [data-tone="info"] { --tone: var(--color-info); --tone-ink: var(--color-info-foreground); }
+  [data-tone="error"] { --tone: var(--color-error); --tone-ink: var(--color-error-foreground); }
+  [data-tone="success"] { --tone: var(--color-success); --tone-ink: var(--color-success-foreground); }
+
+  .bp-banner {
+    display: flex;
+    gap: 10px;
+    margin: 4px 0 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sheet);
+    background: color-mix(in oklab, var(--tone, var(--color-warning)) 16%, var(--color-popover));
+    box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--tone, var(--color-warning)) 45%, transparent);
+  }
+  .bp-banner > svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--tone-ink, var(--color-warning-foreground)); }
+  .bp-banner-title { font-weight: var(--weight-semibold); }
+  .bp-banner-body { margin: 2px 0 8px; font-size: var(--text-footnote); line-height: var(--leading-footnote); }
+  .bp-banner-body:last-child { margin-bottom: 0; }
+
+  /* The command and its button wrap as one unit; a command split across lines is hard to read and to retype. */
+  .bp-command { display: inline; white-space: nowrap; }
+  .bp-command code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    background: color-mix(in oklab, var(--color-foreground) 8%, transparent);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .bp-command-copy {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    vertical-align: -4px;
+    border-radius: 4px;
+    color: var(--color-muted-foreground);
+  }
+  .bp-command-copy:hover { color: var(--color-foreground); background: color-mix(in oklab, var(--color-foreground) 8%, transparent); }
+  .bp-command-copy > svg { width: 12px; height: 12px; }
+  .bp-command[data-copied="true"] .bp-command-copy { color: var(--color-success-foreground); }
+  /* Never display:none: a live region taken out of the tree misses its own announcement. */
+  .bp-command-status { font-size: var(--text-caption); white-space: normal; color: var(--color-muted-foreground); }
+  .bp-command-status:not(:empty) { margin-left: 4px; }
+  .bp-command[data-copied="true"] .bp-command-status { color: var(--color-success-foreground); }
+
+  .bp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 18px;
+    padding: 0 7px 0 6px;
+    border-radius: 9px;
+    white-space: nowrap;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    background: color-mix(in oklab, var(--tone, var(--color-foreground)) 14%, transparent);
+    color: var(--tone-ink, var(--color-muted-foreground));
+  }
+  .bp-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--tone, var(--color-muted-foreground)); }
+
+  .bp-panel { padding: 20px 8px 8px; }
+  .bp-panel-glyph {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--tone, var(--color-foreground)) 14%, transparent);
+    color: var(--tone-ink, var(--color-muted-foreground));
+  }
+  .bp-panel-glyph > svg { width: 20px; height: 20px; }
+  .bp-panel h3 { margin: 0 0 4px; font-size: var(--text-title); line-height: var(--leading-title); letter-spacing: var(--tracking-title); }
+  .bp-panel-body { margin: 0 0 14px; max-width: 40ch; color: var(--color-muted-foreground); }
+  .bp-panel-fine { margin: 10px 0 0; max-width: 40ch; font-size: var(--text-footnote); color: var(--color-muted-foreground); }
+
+  /* ── Agent tiles ─────────────────────────────────────────────────── */
+  [data-agent="claude_code"] { --agent: var(--color-agent-claude); }
+  [data-agent="codex_cli"], [data-agent="codex_desktop"] { --agent: var(--color-agent-codex); }
+  [data-agent="pi_cli"] { --agent: var(--color-agent-pi); }
+  .bp-agent-tile {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.02em;
+    color: var(--color-foreground);
+    background: color-mix(in oklab, var(--agent, var(--color-muted-foreground)) 26%, var(--color-popover));
+    box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--agent, var(--color-muted-foreground)) 55%, transparent);
+  }
+  .bp-agent-tile[data-size="sm"] { width: 22px; height: 22px; border-radius: 6px; font-size: 9.5px; }
+
+  /* ── App icon ────────────────────────────────────────────────────── */
+  /* The tile PNG has its own rounded corners (Apple's 185/824 radius); matching them lets the
+     hairline give the white tile an edge on light surfaces. */
+  .bp-app-icon {
+    flex: none;
+    border-radius: 22.5%;
+    box-shadow: 0 0 0 0.5px var(--color-border);
+  }
+
+  /* ── Fields ──────────────────────────────────────────────────────── */
+  .bp-field-label { display: block; margin-bottom: 6px; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .bp-input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    height: var(--control-height-md);
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: var(--color-popover);
+    font-size: var(--text-body);
+    box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--color-foreground) 28%, transparent), var(--shadow-control);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .bp-input:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--color-ring), var(--shadow-focus); }
+  .bp-input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--color-error), 0 0 0 3px color-mix(in oklab, var(--color-error) 24%, transparent); }
+  .bp-field-msg { display: flex; align-items: center; gap: 6px; margin: 6px 2px 0; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .bp-field-msg[data-tone="error"] { color: var(--color-error-foreground); }
+  .bp-field-msg[data-tone="ok"] { color: var(--color-success-foreground); }
+  .bp-field-msg > svg { flex: none; width: 13px; height: 13px; }
+
+  /* ── Spinner and live dots ───────────────────────────────────────── */
+  .bp-spinner {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in oklab, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    animation: bp-spin 700ms linear infinite;
+  }
+  @keyframes bp-spin { to { transform: rotate(360deg); } }
+
+  .bp-live-dot { position: relative; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); }
+  .bp-live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-success);
+    animation: bp-live-ring var(--duration-pulse) cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+  }
+  @keyframes bp-live-ring {
+    0% { transform: scale(1); opacity: 0.7; }
+    70%, 100% { transform: scale(2.6); opacity: 0; }
+  }
+  .bp-idle-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in oklab, var(--color-foreground) 28%, transparent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bp-spinner { animation-duration: 2s; }
+    .bp-live-dot::after { animation: none; opacity: 0; }
+  }
+
+  /* ── Layers: sheet, dialog, toast ────────────────────────────────── */
+  .bp-layer { position: absolute; inset: 0; z-index: var(--z-sheet); display: flex; flex-direction: column; justify-content: flex-end; }
+  .bp-layer[data-layer="dialog"] { z-index: var(--z-dialog); justify-content: center; align-items: center; padding: 16px; }
+  .bp-scrim { position: absolute; inset: 0; background: var(--color-scrim); }
+
+  .bp-sheet {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100% - 44px);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    background: var(--material-sheet);
+    box-shadow: var(--shadow-sheet), inset 0 0.5px 0 var(--material-edge);
+  }
+  .bp-sheet-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px; }
+  .bp-sheet-head h2 { flex: 1; margin: 0; font-size: var(--text-title); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-title); }
+  .bp-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 8px; }
+  .bp-sheet-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px 12px; border-top: 0.5px solid var(--color-hairline); }
+
+  .bp-dialog {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    padding: 16px;
+    border-radius: var(--radius-sheet);
+    text-align: left;
+    background: var(--material-sheet);
+    box-shadow: var(--shadow-menu);
+  }
+  .bp-dialog h2 { margin: 0 0 6px; font-size: var(--text-title); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-title); }
+  .bp-dialog-body { font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .bp-dialog-body p { margin: 0 0 8px; }
+  .bp-dialog-body ul { margin: 0 0 12px; padding-left: 16px; }
+  .bp-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+  .bp-toast {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: var(--z-toast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sheet);
+    font-size: var(--text-footnote);
+    line-height: var(--leading-footnote);
+    background: color-mix(in oklab, var(--color-foreground) 88%, transparent);
+    color: var(--color-popover);
+    box-shadow: var(--shadow-menu);
+  }
+  .bp-toast > svg { flex: none; width: 14px; height: 14px; color: color-mix(in oklab, var(--tone, var(--color-success)) 70%, var(--color-popover)); }
+
+  /* ── Shell chrome ────────────────────────────────────────────────── */
+  .bp-status { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+  .bp-status { --status-tint: var(--color-success); --status-ink: var(--color-success-foreground); }
+  .bp-status[data-tone="warning"] { --status-tint: var(--color-warning); --status-ink: var(--color-warning-foreground); }
+  .bp-status[data-tone="error"] { --status-tint: var(--color-error); --status-ink: var(--color-error-foreground); }
+  .bp-status[data-tone="neutral"] { --status-tint: var(--color-foreground); --status-ink: var(--color-muted-foreground); }
+  .bp-status-glyph {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--status-tint) 18%, transparent);
+    color: var(--status-ink);
+  }
+  .bp-status-glyph > svg { width: 18px; height: 18px; }
+  .bp-status-text { flex: 1; min-width: 0; }
+  .bp-status-title { font-size: var(--text-title); line-height: var(--leading-title); letter-spacing: var(--tracking-title); font-weight: var(--weight-semibold); }
+  .bp-status-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+
+  .bp-navbar { display: flex; align-items: center; gap: 4px; min-height: 36px; margin-bottom: 6px; }
+  .bp-navbar-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px 4px 2px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--color-primary);
+    font-weight: var(--weight-medium);
+  }
+  .bp-navbar-back > svg { width: 16px; height: 16px; }
+  .bp-navbar-back:hover { background: var(--color-row-hover); }
+  .bp-navbar h1 { flex: 1; margin: 0; padding-right: 60px; text-align: center; font-size: var(--text-body); font-weight: var(--weight-semibold); }
+
+  .bp-view { display: flex; flex-direction: column; min-height: 100%; padding: 8px 12px 16px; }
+  .bp-view > * { flex: none; }
+  [data-view][data-leaving="true"] { position: absolute; inset: 0 0 auto 0; pointer-events: none; }
+
+  @media (hover: none) {
+    .bp-icon-btn:hover { background: transparent; }
+  }
+}
+
+@layer components {
+  .bp-tab-thumb[data-ready="true"] {
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      width var(--duration-base) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bp-tab-thumb[data-ready="true"] { transition: none; }
+  }
+}
+
+@layer components {
+  /* Switch: the thumb jumps rather than slides under reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    .bp-switch::after { transition: none; }
+  }
+
+  /* ── Select (the DK-0 channel picker) ───────────────────────────── */
+  .bp-select {
+    min-width: 0;
+    max-width: 100%;
+    height: var(--control-height-md);
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-popover);
+    font-size: var(--text-footnote);
+  }
+
+  /* ── Listbox (combobox board picker) ────────────────────────────── */
+  .bp-search { position: relative; margin-bottom: 8px; }
+  .bp-search > svg { position: absolute; left: 9px; top: 7px; width: 14px; height: 14px; color: var(--color-muted-foreground); }
+  .bp-search > .bp-input { padding-left: 30px; }
+  .bp-listbox-group { margin: 10px 10px 4px; font-size: var(--text-caption); font-weight: var(--weight-semibold); color: var(--color-muted-foreground); }
+  .bp-listbox-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border-radius: var(--radius-control); text-align: left; }
+  .bp-listbox-option:hover, .bp-listbox-option[data-active="true"] { background: var(--color-row-hover); }
+  .bp-listbox-option[aria-selected="true"] { background: color-mix(in oklab, var(--color-primary) 14%, transparent); }
+  .bp-listbox-option[data-active="true"] { box-shadow: inset 0 0 0 1.5px var(--color-ring); }
+  .bp-listbox-text { flex: 1; min-width: 0; }
+  .bp-listbox-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--color-muted-foreground); }
+  .bp-listbox-check { display: grid; color: var(--color-primary); visibility: hidden; }
+  .bp-listbox-check > svg { width: 14px; height: 14px; }
+  .bp-listbox-check[data-check] { visibility: visible; }
+  .bp-listbox-empty { padding: 16px 10px; margin: 0; font-size: var(--text-footnote); color: var(--color-muted-foreground); }
+  .bp-badge { padding: 1px 5px; border-radius: var(--radius-chip); font-size: 10.5px; font-weight: var(--weight-semibold); color: var(--color-success-foreground); background: color-mix(in oklab, var(--color-success) 18%, transparent); }
+
+  /* ── Disclosure ──────────────────────────────────────────────────── */
+  .bp-disclosure { display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; border: 0; border-radius: 4px; background: none; font-size: var(--text-footnote); color: var(--color-muted-foreground); }
+  .bp-disclosure > svg { width: 12px; height: 12px; transition: transform var(--duration-fast) var(--ease-out); }
+  .bp-disclosure[aria-expanded="true"] > svg { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) {
+    .bp-disclosure > svg { transition: none; }
+  }
+
+  /* ── Menu button (single choice) ─────────────────────────────────── */
+  .bp-menu-wrap { position: relative; flex: none; }
+  .bp-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: var(--z-menu);
+    width: 184px;
+    padding: 4px;
+    border-radius: 8px;
+    background: var(--material-menu);
+    -webkit-backdrop-filter: blur(var(--material-blur)) saturate(var(--material-saturate));
+    backdrop-filter: blur(var(--material-blur)) saturate(var(--material-saturate));
+    box-shadow: var(--shadow-menu);
+    transform-origin: top right;
+  }
+  .bp-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 26px;
+    padding: 0 8px 0 4px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-footnote);
+    text-align: left;
+  }
+  /* Hover moves focus (as a native menu does), so focus is the one highlight. */
+  .bp-menu-item:focus { outline: none; background: var(--color-primary); color: var(--color-primary-foreground); }
+  .bp-menu-check { display: grid; place-items: center; width: 14px; }
+  .bp-menu-check > svg { width: 12px; height: 12px; }
+  .bp-menu-note {
+    margin: 4px 0 0;
+    padding: 6px 8px 3px;
+    border-top: 0.5px solid var(--color-hairline);
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    color: var(--color-muted-foreground);
+  }
+
+  /* ── Step list and stepper dots ─────────────────────────────────── */
+  .bp-steps { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; counter-reset: step; }
+  .bp-steps > li { counter-increment: step; display: grid; grid-template-columns: 20px 1fr; gap: 8px; font-size: var(--text-footnote); line-height: var(--leading-footnote); }
+  .bp-steps > li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    background: color-mix(in oklab, var(--color-warning) 24%, transparent);
+    color: var(--color-warning-foreground);
+  }
+  .bp-quote { quotes: "“" "”"; font-weight: var(--weight-semibold); color: var(--color-foreground); }
+
+  .bp-stepper { display: flex; gap: 5px; }
+  .bp-stepper > i {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background: color-mix(in oklab, var(--color-foreground) 18%, transparent);
+    transition: width var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-standard);
+  }
+  .bp-stepper > i[data-step="current"] { width: 16px; background: var(--color-primary); }
+  .bp-stepper > i[data-step="done"] { background: color-mix(in oklab, var(--color-primary) 55%, transparent); }
+  @media (prefers-reduced-motion: reduce) {
+    .bp-stepper > i { transition: none; }
+  }
+
+  /* ── Toast regions: always mounted so screen readers track them ─── */
+  .bp-toast-region { position: absolute; left: 0; right: 0; bottom: 0; height: 0; z-index: var(--z-toast); pointer-events: none; }
+  .bp-toast-region > .bp-toast { pointer-events: auto; }
+
+  .bp-dialog-error { margin: 8px 0 0; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-error-foreground); }
+}

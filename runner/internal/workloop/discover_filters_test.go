@@ -70,6 +70,9 @@ func newLabelAwareScanServer(t *testing.T, cards []valaris.Card, includeGitRepo 
 // DefaultPipelineConfig — Loop.New requires a pipeline at construction time.
 // Returns true when the request was handled.
 func serveDefaultPlatformConfig(w http.ResponseWriter, r *http.Request) bool {
+	if servePreNegotiationBackend(w, r) {
+		return true
+	}
 	if r.URL.Path != "/api/agents/me/config" {
 		return false
 	}

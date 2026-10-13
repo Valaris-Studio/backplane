@@ -128,6 +128,25 @@ describe("useDomainSync", () => {
     vi.useRealTimers();
   });
 
+  it("leaves out the queries the invalidation predicate rejects", async () => {
+    vi.useFakeTimers();
+    const client = new QueryClient();
+    for (const part of ["list", "immutable"]) {
+      await client.fetchQuery({ queryKey: ["sessions", "acme", part], queryFn: async () => part });
+    }
+
+    renderHook(
+      () => useDomainSync("agent_session", ["sessions", "acme"], { debounceMs: 100, predicate: (query) => query.queryKey[2] !== "immutable" }),
+      { wrapper: withClient(client) },
+    );
+    subscriptions[0]!.handler({ event: "agent_session.updated", payload: {} });
+    vi.advanceTimersByTime(100);
+
+    expect(client.getQueryState(["sessions", "acme", "list"])?.isInvalidated).toBe(true);
+    expect(client.getQueryState(["sessions", "acme", "immutable"])?.isInvalidated).toBe(false);
+    vi.useRealTimers();
+  });
+
   it("skips events rejected by the filter predicate", () => {
     vi.useFakeTimers();
     const client = new QueryClient();

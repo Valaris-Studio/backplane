@@ -1,0 +1,204 @@
+// __OWNERSHIP_MARKER__
+// Backplane companion capture extension for Pi. Managed by `backplane-companion
+// agents install pi`; changes are overwritten. Adapted from Beacon's MIT-licensed
+// Pi extension (plugins/pi-beacon/src/beacon.ts).
+//
+// It observes only: every handler returns undefined, so it never blocks a tool
+// call or rewrites input, and a failure to reach the companion costs one event,
+// never the Pi run.
+
+// Passed to spawn as an argv array, with no shell and so no quoting to get wrong.
+const companionArgv: string[] = __COMPANION_ARGV__
+
+const debugEnabled = process.env.BACKPLANE_PI_DEBUG === "1"
+
+// A send still running after this long is abandoned.
+const sendTimeoutMs = 2000
+
+const maxDepth = 8
+
+type PiEvent = Record<string, unknown> & { type: string }
+
+interface PiSessionManager {
+  getSessionId?: () => string
+  getSessionFile?: () => string | undefined
+  getCwd?: () => string
+}
+
+interface PiContext {
+  cwd?: string
+  sessionManager?: PiSessionManager
+  model?: { id?: string; name?: string; provider?: string } | undefined
+  mode?: string
+}
+
+// The seven events beacon-hooks maps for Pi. Pi exposes no operator approval
+// decision, so none is subscribed to or invented.
+const subscribedEvents = [
+  "session_start",
+  "session_shutdown",
+  "input",
+  "tool_call",
+  "tool_result",
+  "user_bash",
+  "message_end",
+] as const
+
+function debugLog(message: string, extra?: unknown) {
+  if (!debugEnabled) return
+  try {
+    // eslint-disable-next-line no-console
+    console.error("[backplane-companion-pi]", message, extra ?? "")
+  } catch {
+    // Best effort.
+  }
+}
+
+// safeClone makes a live Pi event JSON-serializable: cycles, functions, bigints
+// and Errors would otherwise make JSON.stringify throw or lose the payload.
+function safeClone(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (value === null) return null
+  const kind = typeof value
+  if (kind === "function" || kind === "symbol" || kind === "undefined") return undefined
+  if (kind === "bigint") return String(value)
+  if (kind !== "object") return value
+  if (depth >= maxDepth) return undefined
+  const object = value as object
+  if (seen.has(object)) return undefined
+  if (value instanceof Error) return { name: value.name, message: value.message }
+  if (value instanceof Date) return value.toISOString()
+  seen.add(object)
+  try {
+    if (Array.isArray(value)) return value.map((item) => safeClone(item, depth + 1, seen))
+    const out: Record<string, unknown> = {}
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      const cloned = safeClone(nested, depth + 1, seen)
+      if (cloned !== undefined) out[key] = cloned
+    }
+    return out
+  } finally {
+    seen.delete(object)
+  }
+}
+
+async function sendToCompanion(payload: Record<string, unknown>): Promise<void> {
+  let body: string
+  try {
+    body = JSON.stringify(safeClone(payload))
+  } catch (err) {
+    debugLog("payload could not be serialized", err)
+    return
+  }
+  if (!body) return
+  try {
+    // Imported lazily so a host without node:child_process fails to send
+    // rather than failing to load the extension.
+    const { spawn } = await import("node:child_process")
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const finish = () => {
+        if (!settled) {
+          settled = true
+          resolve()
+        }
+      }
+      let child
+      try {
+        child = spawn(companionArgv[0], companionArgv.slice(1), {
+          stdio: ["pipe", "ignore", "ignore"],
+          windowsHide: true,
+        })
+      } catch (err) {
+        debugLog("companion could not be spawned", err)
+        finish()
+        return
+      }
+      const timer = setTimeout(() => {
+        try {
+          child.kill()
+        } catch {
+          // Already gone.
+        }
+        finish()
+      }, sendTimeoutMs)
+      // An unreferenced timer never keeps Pi alive at exit.
+      if (typeof timer.unref === "function") timer.unref()
+      const done = () => {
+        clearTimeout(timer)
+        finish()
+      }
+      child.on("error", (err) => {
+        debugLog("companion failed", err)
+        done()
+      })
+      child.on("close", done)
+      // A child that exits before reading stdin must not raise EPIPE in Pi.
+      child.stdin?.on("error", () => {})
+      try {
+        child.stdin?.end(body)
+      } catch (err) {
+        debugLog("payload could not be written", err)
+      }
+    })
+  } catch (err) {
+    debugLog("send failed", err)
+  }
+}
+
+// identity reads the session id, its file and cwd per event: /new, resume
+// and fork replace the session without reloading the extension. The session
+// file is always set (undefined is not sent), so an event can never name
+// another session's file.
+function identity(ctx: PiContext | undefined): Record<string, unknown> {
+  const fields: Record<string, unknown> = { sessionFile: undefined }
+  if (!ctx) return fields
+  const manager = ctx.sessionManager
+  try {
+    const sessionId = manager?.getSessionId?.()
+    if (sessionId) fields.sessionId = sessionId
+  } catch (err) {
+    debugLog("session id could not be read", err)
+  }
+  // An in-memory session or an older Pi has none.
+  let sessionFile: unknown
+  try {
+    sessionFile = manager?.getSessionFile?.()
+  } catch (err) {
+    debugLog("session file could not be read", err)
+  }
+  fields.sessionFile = typeof sessionFile === "string" && sessionFile ? sessionFile : undefined
+  let cwd = ctx.cwd
+  if (!cwd) {
+    try {
+      cwd = manager?.getCwd?.()
+    } catch (err) {
+      debugLog("cwd could not be read", err)
+    }
+  }
+  if (cwd) fields.cwd = cwd
+  const model = ctx.model
+  if (model) {
+    const name = model.id || model.name
+    if (name) fields.model = model.provider ? `${model.provider}/${name}` : name
+  }
+  if (ctx.mode) fields.piMode = ctx.mode
+  return fields
+}
+
+type PiExtensionAPI = {
+  on: (event: string, handler: (event: PiEvent, ctx: PiContext) => Promise<void> | void) => void
+}
+
+export default function backplaneCompanionExtension(pi: PiExtensionAPI) {
+  for (const name of subscribedEvents) {
+    pi.on(name, async (event: PiEvent, ctx: PiContext) => {
+      // Identity from ctx wins so an event can never claim another session or
+      // cwd; an event's own cwd (e.g. user_bash) travels as eventCwd.
+      const own = typeof event.cwd === "string" ? { eventCwd: event.cwd } : {}
+      const pending = sendToCompanion({ ...event, ...own, ...identity(ctx) }).catch((err) => debugLog("handler failed", err))
+      // Fire-and-forget keeps Pi's agent loop at full speed; only the final
+      // event is awaited (bounded by sendTimeoutMs) so it is not lost at exit.
+      if (name === "session_shutdown") await pending
+    })
+  }
+}

@@ -11,8 +11,9 @@ This module is the single source of truth for the wire-format contract:
 every value the API accepts as `content` is converted here, and the result
 is stored verbatim. The set of supported nodes/marks matches the StarterKit
 + Link + Table extensions configured in `RichTextRenderer.tsx` (tables emit
-the canonical TipTap shape: table → tableRow → tableHeader/tableCell), plus
-the image and fileAttachment nodes in the markdown form `media_markdown`
+the canonical TipTap shape: table → tableRow → tableHeader/tableCell), the
+taskList/taskItem checklist nodes (`- [ ]` / `- [x]`), plus the image and
+fileAttachment nodes in the markdown form `media_markdown`
 defines — so a note read as markdown can be written back without loss.
 """
 from __future__ import annotations
@@ -44,7 +45,7 @@ _EMPTY_DOC: dict[str, Any] = {"type": "doc", "content": []}
 # what TipTap's StarterKit renders; everything else falls through to a
 # paragraph wrapping the inner text.
 _HTML_BLOCK_RE = re.compile(
-    r"<(h[1-3]|p|ul|ol|li|pre|code|blockquote)[^>]*>(.*?)</\1>",
+    r"<(h[1-3]|p|ul|ol|li|pre|code|blockquote)([^>]*)>(.*?)</\1>",
     re.IGNORECASE | re.DOTALL,
 )
 _HTML_IMG_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
@@ -90,7 +91,7 @@ def normalize_note_content(content: Any) -> str:
             raise InvalidContentError(
                 "dict content must be a ProseMirror doc (type=='doc')"
             )
-        return json.dumps(strip_unsafe_media(copy.deepcopy(content)))
+        return json.dumps(_coerce_task_checked(strip_unsafe_media(copy.deepcopy(content))))
 
     if not isinstance(content, str):
         raise InvalidContentError(
@@ -104,12 +105,26 @@ def normalize_note_content(content: Any) -> str:
         except json.JSONDecodeError:
             parsed = None
         if isinstance(parsed, dict) and parsed.get("type") == "doc":
-            return json.dumps(strip_unsafe_media(parsed))
+            return json.dumps(_coerce_task_checked(strip_unsafe_media(parsed)))
 
     if _is_html_document(content):
         return json.dumps(_html_to_doc(content))
 
     return json.dumps(_markdown_to_doc(content))
+
+
+def _coerce_task_checked(node: Any) -> Any:
+    """A taskItem is done only when `checked` is literally true. The editor reads
+    the attr by truthiness, so a JSON writer's `"false"` would render ticked."""
+    if isinstance(node, dict):
+        if node.get("type") == "taskItem":
+            attrs = node.get("attrs") if isinstance(node.get("attrs"), dict) else {}
+            node["attrs"] = {**attrs, "checked": attrs.get("checked") is True}
+        content = node.get("content")
+        if isinstance(content, list):
+            for child in content:
+                _coerce_task_checked(child)
+    return node
 
 
 # --- Markdown → ProseMirror -------------------------------------------------
@@ -160,8 +175,7 @@ def _consume_blocks(
 
         elif t == "bullet_list_open":
             close_idx = _find_close(tokens, i, "bullet_list_close")
-            items = _consume_list_items(tokens, i + 1, close_idx)
-            nodes.append({"type": "bulletList", "content": items})
+            nodes.append(_bullet_or_task_list(tokens, i + 1, close_idx))
             i = close_idx + 1
 
         elif t == "ordered_list_open":
@@ -261,6 +275,66 @@ def _consume_list_items(
         items.append({"type": "listItem", "content": inner or [{"type": "paragraph"}]})
         i = close_idx + 1
     return items
+
+
+# GFM's task marker, read from the item's RAW source so an escaped `\[ ]` stays
+# literal text: `[ ]`/`[x]`/`[X]`, then whitespace or the end of the item.
+_TASK_MARKER_RE = re.compile(r"^\[([ xX])\](?:\s+|$)")
+
+
+def _bullet_or_task_list(tokens: list[Token], start: int, end: int) -> dict[str, Any]:
+    """A bullet list is a checklist only when EVERY item carries a task marker;
+    a mixed list stays a bullet list with the brackets as text (the frontend
+    parser applies the same rule)."""
+    items = _consume_list_items(tokens, start, end)
+    checked_states = [_task_checked_state(tokens, i) for i in _list_item_opens(tokens, start, end)]
+    if not items or None in checked_states:
+        return {"type": "bulletList", "content": items}
+    return {
+        "type": "taskList",
+        "content": [
+            {"type": "taskItem", "attrs": {"checked": checked}, "content": _strip_task_marker(item["content"])}
+            for item, checked in zip(items, checked_states)
+        ],
+    }
+
+
+def _list_item_opens(tokens: list[Token], start: int, end: int) -> list[int]:
+    opens: list[int] = []
+    i = start
+    while i < end:
+        if tokens[i].type == "list_item_open":
+            opens.append(i)
+            i = _find_close(tokens, i, "list_item_close")
+        i += 1
+    return opens
+
+
+def _task_checked_state(tokens: list[Token], item_open: int) -> bool | None:
+    """True/False for a task item's box, None when the item is not a task."""
+    if item_open + 2 >= len(tokens) or tokens[item_open + 1].type != "paragraph_open":
+        return None
+    inline = tokens[item_open + 2]
+    children = inline.children or []
+    match = _TASK_MARKER_RE.match(inline.content)
+    if match is None or not children or children[0].type != "text":
+        return None
+    return match.group(1) in "xX"
+
+
+def _strip_task_marker(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop `[ ] ` from the item's leading paragraph, and the whitespace runs it
+    leaves behind; the box now lives in the taskItem's `checked` attr."""
+    first, *rest = blocks
+    runs = [dict(run) for run in first.get("content", [])]
+    if runs and "text" in runs[0]:
+        runs[0]["text"] = _TASK_MARKER_RE.sub("", runs[0]["text"], count=1)
+    while runs and "text" in runs[0] and not runs[0]["text"].strip():
+        runs.pop(0)
+    if runs and "text" in runs[0]:
+        runs[0]["text"] = runs[0]["text"].lstrip()
+    paragraph = {"type": "paragraph", "content": runs} if runs else {"type": "paragraph"}
+    return [paragraph, *rest]
 
 
 def _find_close(tokens: list[Token], open_idx: int, close_type: str) -> int:
@@ -416,8 +490,7 @@ def _html_to_doc(html: str) -> dict[str, Any]:
             if leading:
                 nodes.extend(_split_out_images(leading))
         tag = match.group(1).lower()
-        inner = match.group(2)
-        nodes.extend(_html_block_nodes(tag, inner))
+        nodes.extend(_html_block_nodes(tag, match.group(2), match.group(3)))
         pos = match.end()
 
     trailing = _inline_html_pieces(html[pos:])
@@ -452,7 +525,46 @@ def _html_paragraph_blocks(inner: str) -> list[dict[str, Any]]:
     return _split_out_images(_inline_html_pieces(inner))
 
 
-def _html_block_nodes(tag: str, inner: str) -> list[dict[str, Any]]:
+_HTML_LI_RE = re.compile(r"<li\b([^>]*)>(.*?)</li>", re.IGNORECASE | re.DOTALL)
+# A checkbox that LEADS its item, past any wrapper tags: GitHub's
+# `<li><input type="checkbox"> text` and TipTap's `<li><label><input …>`.
+_HTML_LEADING_INPUT_RE = re.compile(
+    r"^\s*(?:<(?!input\b)[a-z][^>]*>\s*)*<input\b([^>]*)>", re.IGNORECASE
+)
+_HTML_CHECKED_ATTR_RE = re.compile(r"(?:^|\s)checked(?=[\s=/>]|$)", re.IGNORECASE)
+
+
+def _html_task_list(ul_attrs: str, inner: str) -> dict[str, Any] | None:
+    """`<ul data-type="taskList">`, or a list whose every item leads with a
+    checkbox. Anything else is an ordinary bullet list."""
+    items = list(_HTML_LI_RE.finditer(inner))
+    boxes = [_html_leading_checkbox(item.group(2)) for item in items]
+    is_tiptap_task_list = (_attr_from_tag(ul_attrs, "data-type") or "").casefold() == "tasklist"
+    if not items or not (is_tiptap_task_list or None not in boxes):
+        return None
+    task_items = []
+    for item, box_attrs in zip(items, boxes):
+        data_checked = _attr_from_tag(item.group(1), "data-checked")
+        if data_checked is not None:
+            checked = data_checked.casefold() in ("", "true")
+        else:
+            checked = box_attrs is not None and _HTML_CHECKED_ATTR_RE.search(box_attrs) is not None
+        task_items.append({
+            "type": "taskItem",
+            "attrs": {"checked": checked},
+            "content": _html_paragraph_blocks(item.group(2)),
+        })
+    return {"type": "taskList", "content": task_items}
+
+
+def _html_leading_checkbox(li_inner: str) -> str | None:
+    match = _HTML_LEADING_INPUT_RE.match(li_inner)
+    if match is None or (_attr_from_tag(match.group(1), "type") or "").casefold() != "checkbox":
+        return None
+    return match.group(1)
+
+
+def _html_block_nodes(tag: str, attrs: str, inner: str) -> list[dict[str, Any]]:
     if tag in {"h1", "h2", "h3"}:
         pieces = _inline_html_pieces(inner)
         heading = {
@@ -464,6 +576,10 @@ def _html_block_nodes(tag: str, inner: str) -> list[dict[str, Any]]:
         return [heading, *(p for p in pieces if p["type"] == "image")]
     if tag == "p":
         return _html_paragraph_blocks(inner)
+    if tag == "ul":
+        task_list = _html_task_list(attrs, inner)
+        if task_list is not None:
+            return [task_list]
     if tag in {"ul", "ol"}:
         items = [
             {"type": "listItem", "content": _html_paragraph_blocks(li.group(1))}

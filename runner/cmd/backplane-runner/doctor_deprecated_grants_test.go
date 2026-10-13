@@ -21,8 +21,8 @@ import (
 func servedWithDeprecatedClaimCard() []workloop.ServedMCPTool {
 	return []workloop.ServedMCPTool{
 		{Name: "get_card"},
-		{Name: "claim_card", Deprecated: &workloop.MCPDeprecation{Replacement: "next_assignment", RemovedIn: "0.8.0"}},
-		{Name: "remove_card_participants_by_role", Deprecated: &workloop.MCPDeprecation{Replacement: "remove_card_participant(pipeline_role=...)", RemovedIn: "0.8.0"}},
+		{Name: "claim_card", Deprecated: &workloop.MCPDeprecation{Replacement: "next_assignment", RemovedIn: "0.10.0"}},
+		{Name: "remove_card_participants_by_role", Deprecated: &workloop.MCPDeprecation{Replacement: "remove_card_participant(pipeline_role=...)", RemovedIn: "0.10.0"}},
 	}
 }
 
@@ -72,7 +72,7 @@ func TestCheckMCPDeprecatedGrants_WarnsNamingStageToolAndReplacement(t *testing.
 	if row.State != tui.StateWarn {
 		t.Fatalf("state = %v, want WARN (the grants still work today)", row.State)
 	}
-	for _, want := range []string{"implementer", "mcp__valaris__claim_card", "next_assignment", "rework_mediator", "remove_card_participants_by_role", "0.8.0"} {
+	for _, want := range []string{"implementer", "mcp__valaris__claim_card", "next_assignment", "rework_mediator", "remove_card_participants_by_role", "0.10.0"} {
 		if !strings.Contains(row.Detail, want) {
 			t.Errorf("detail must carry %q: %q", want, row.Detail)
 		}

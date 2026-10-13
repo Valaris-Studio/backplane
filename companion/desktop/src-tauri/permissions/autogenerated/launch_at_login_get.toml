@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-at-login-get"
+description = "Enables the launch_at_login_get command without any pre-configured scope."
+commands.allow = ["launch_at_login_get"]
+
+[[permission]]
+identifier = "deny-launch-at-login-get"
+description = "Denies the launch_at_login_get command without any pre-configured scope."
+commands.deny = ["launch_at_login_get"]

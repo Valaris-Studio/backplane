@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-companion-service"
+description = "Enables the start_companion_service command without any pre-configured scope."
+commands.allow = ["start_companion_service"]
+
+[[permission]]
+identifier = "deny-start-companion-service"
+description = "Denies the start_companion_service command without any pre-configured scope."
+commands.deny = ["start_companion_service"]

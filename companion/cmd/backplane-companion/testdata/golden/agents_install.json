@@ -1,0 +1,9 @@
+[
+  {
+    "id": "claude_code",
+    "integration": {
+      "state": "installed",
+      "config_path": "<HOME>/.claude/settings.json"
+    }
+  }
+]

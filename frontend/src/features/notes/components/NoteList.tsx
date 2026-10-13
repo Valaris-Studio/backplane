@@ -38,6 +38,7 @@ import { newIdsSince } from "@/features/kanban/utils/new-ids";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { NOTE_SEARCH_PARAM } from "../utils/note-link";
+import { isApiError } from "@/lib/api-error";
 import type { Note, NoteSummary } from "@/types/note";
 
 interface NoteListProps {
@@ -226,8 +227,18 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
   // clicked card alike. The list payload has no `content` at all now.
   const {
     data: fullSelectedNote,
-    isError: detailFailed,
+    error: detailError,
+    refetch: refetchDetail,
   } = useNote(slug, deepLinkId ?? openNoteId ?? undefined, boardId);
+
+  // A failed ?note= is never stripped: the reader keeps the link they followed.
+  // 403/404 cannot tell "deleted" from "no access", so neither is claimed.
+  const deepLinkFailure: "unavailable" | "transient" | null =
+    !noteParam || !detailError || fullSelectedNote?.id === noteParam
+      ? null
+      : isApiError(detailError) && (detailError.status === 403 || detailError.status === 404)
+        ? "unavailable"
+        : "transient";
 
   const clearNoteParam = useCallback(() => {
     setSearchParams(
@@ -241,17 +252,11 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
   }, [setSearchParams]);
 
   useEffect(() => {
-    if (!noteParam) return;
-    if (fullSelectedNote?.id === noteParam) {
+    if (noteParam && fullSelectedNote?.id === noteParam) {
       setSelectedNoteId(noteParam);
       setEditorOpen(true);
-      return;
     }
-    // Only a definitive "no such note" strips the link. Stripping while the
-    // request is still in flight would break every link to a note that simply
-    // isn't on the first page.
-    if (detailFailed) clearNoteParam();
-  }, [noteParam, fullSelectedNote, detailFailed, clearNoteParam]);
+  }, [noteParam, fullSelectedNote]);
 
   // Closing the editor must also drop the ?note= param, else the deep-link
   // effect re-opens it on the next render. Leaves other params untouched.
@@ -263,11 +268,17 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
     [noteParam, clearNoteParam],
   );
 
-  const openNote = useCallback((note: NoteSummary) => {
-    setSelectedNoteId(note.id);
-    setSelectedSummary(note);
-    setEditorOpen(true);
-  }, []);
+  // The detail query follows ?note= first, so a kept-but-failed deep link must
+  // give way, or the clicked note's body would never be requested.
+  const openNote = useCallback(
+    (note: NoteSummary) => {
+      if (noteParam && noteParam !== note.id) clearNoteParam();
+      setSelectedNoteId(note.id);
+      setSelectedSummary(note);
+      setEditorOpen(true);
+    },
+    [noteParam, clearNoteParam],
+  );
 
   const isSelectedBodyLoaded =
     !!fullSelectedNote && fullSelectedNote.id === selectedNoteId;
@@ -390,6 +401,25 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
           </div>
         }
       />
+
+      {deepLinkFailure ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-[min(var(--radius-cap),calc(var(--radius-xl)-0.1rem))] border border-border/60 bg-[color:var(--color-surface-2)] px-4 py-3">
+          <p className="text-sm text-foreground">
+            {deepLinkFailure === "unavailable"
+              ? t("notes.deepLink.unavailable")
+              : t("notes.deepLink.loadFailed")}
+          </p>
+          {deepLinkFailure === "unavailable" ? (
+            <Button type="button" variant="outline" size="sm" onClick={clearNoteParam}>
+              {t("notes.deepLink.back")}
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={() => void refetchDetail()}>
+              {t("notes.deepLink.retry")}
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       {totalCount === 0 && !hasActiveQuery ? (
         <EmptyState

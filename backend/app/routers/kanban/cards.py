@@ -132,7 +132,11 @@ async def get_card(
 ):
     service = CardService(db)
     return await service.get_card(
-        card_id, board_id, as_markdown=format == CardFormat.markdown
+        card_id,
+        board_id,
+        as_markdown=format == CardFormat.markdown,
+        workspace_id=ctx.workspace.id,
+        reader_id=ctx.user.id,
     )
 
 

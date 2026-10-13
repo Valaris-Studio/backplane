@@ -1,0 +1,11 @@
+{
+  "model": "ContentBodyPage",
+  "why": "next_offset is the page's end",
+  "body": {
+    "content_id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+    "offset": 0,
+    "next_offset": 5,
+    "total_bytes": 48213,
+    "text": "I'll add the backoff in uploader.go: "
+  }
+}

@@ -200,21 +200,22 @@ describe("TimelineScrubber — story-arc tick colors (describeEvent accents)", (
   });
 });
 
-// jsdom rects are all-zero; give the range input a real geometry so the hover
-// math (track inset = 4px each side) resolves to deterministic indices.
-function primeSliderRect(slider: HTMLElement, width = 208) {
-  slider.getBoundingClientRect = () =>
+// jsdom rects are all-zero; model the measured track independently of the input.
+function primeSliderRect(slider: HTMLElement, width = 200, left = 4) {
+  const track = screen.getByTestId("scrubber-progress-fill").parentElement!;
+  track.getBoundingClientRect = () =>
     ({
-      left: 0,
+      left,
       top: 0,
-      right: width,
+      right: left + width,
       bottom: 24,
       width,
       height: 24,
-      x: 0,
+      x: left,
       y: 0,
       toJSON: () => ({}),
     }) as DOMRect;
+  slider.getBoundingClientRect = () => ({ left: 0, width: left + width + 40 }) as DOMRect;
 }
 
 function hoverAt(slider: HTMLElement, clientX: number, pointerType = "mouse") {
@@ -266,6 +267,16 @@ describe("TimelineScrubber — hover preview bubble", () => {
     expect(
       screen.getByTestId("scrubber-hover-dot").style.backgroundColor,
     ).toContain("--color-success");
+  });
+
+  it("uses the rendered track bounds when the gutter or density changes", () => {
+    setup(threeEvents());
+    const slider = screen.getByRole("slider");
+    primeSliderRect(slider, 120, 80);
+    hoverAt(slider, 105);
+    expect(screen.getByTestId("scrubber-hover-preview")).toHaveTextContent("First thing happened");
+    hoverAt(slider, 175);
+    expect(screen.getByTestId("scrubber-hover-preview")).toHaveTextContent("Third thing happened");
   });
 
   it("uses the hovered event's kind accent for the dot (delete = destructive)", () => {

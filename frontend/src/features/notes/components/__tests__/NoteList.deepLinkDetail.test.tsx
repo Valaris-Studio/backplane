@@ -10,6 +10,7 @@ import {
   userEvent,
   stubReducedMotion,
 } from "@/test/test-utils";
+import { ApiError } from "@/lib/api-error";
 import type { Note, NoteSummary } from "@/types/note";
 
 // With the list paginated, a ?note= target is very often on a page that was
@@ -166,18 +167,20 @@ describe("NoteList — ?note= resolves through the detail fetch, not list member
     );
   });
 
-  it("strips a ?note= the detail endpoint says does not exist", async () => {
+  it("keeps a ?note= the detail endpoint says does not exist and states it is unavailable", async () => {
     noteQuery.mockReturnValue({
       data: undefined,
       isFetching: false,
       isError: true,
+      error: new ApiError("Not found", 404),
     });
 
     renderList("/acme/notes?note=ghost");
 
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(/\/acme\/notes$/),
-    );
+    expect(
+      await screen.findByText("This note is unavailable or you no longer have access."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(/\/acme\/notes\?note=ghost$/);
   });
 });
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useEffect, useRef } from "react";
-import { useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQueryClient, type Query, type QueryKey } from "@tanstack/react-query";
 import { useWebSocketEvent } from "@/hooks/use-websocket";
 import type { WebSocketEvent } from "@/lib/websocket";
 
@@ -36,6 +36,14 @@ export interface DomainSyncOptions {
    * round-trip.
    */
   patch?: (event: WebSocketEvent) => boolean | void;
+  /** Leaves out queries under `queryKey` that the event can never change. */
+  predicate?: (query: Query) => boolean;
+  /**
+   * Subscribe to this one event type instead of `${domain}.*`. The server
+   * reserves some whole namespaces (e.g. `execution.*`) for observers, while a
+   * single event in them may be readable by every member.
+   */
+  event?: string;
 }
 
 /**
@@ -76,8 +84,10 @@ export function useDomainSync(
   filterRef.current = options.filter;
   const patchRef = useRef(options.patch);
   patchRef.current = options.patch;
+  const predicateRef = useRef(options.predicate);
+  predicateRef.current = options.predicate;
 
-  useWebSocketEvent(`${domain}.*`, (event) => {
+  useWebSocketEvent(options.event ?? `${domain}.*`, (event) => {
     if (filterRef.current && !filterRef.current(event)) return;
 
     if (patchRef.current) {
@@ -90,7 +100,8 @@ export function useDomainSync(
     }
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      queryClient.invalidateQueries({ queryKey });
+      const predicate = predicateRef.current;
+      queryClient.invalidateQueries(predicate ? { queryKey, predicate } : { queryKey });
     }, debounceMs);
   });
 

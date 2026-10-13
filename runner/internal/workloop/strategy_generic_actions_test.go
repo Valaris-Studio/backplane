@@ -549,6 +549,9 @@ func TestTickCard_SensorOnlyCreateBranch_PassDoesNotFail(t *testing.T) {
 	var passBranchMoveObserved bool
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 		body, _ := io.ReadAll(r.Body)
@@ -945,6 +948,9 @@ func TestTick_BudgetCheckError_HaltsWithoutClaim(t *testing.T) {
 	var healthStatus string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 

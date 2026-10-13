@@ -24,7 +24,10 @@ description = "Anthropic API key"
 regex = '''sk-ant-[A-Za-z0-9_\-]{20,}'''
 keywords = ["sk-ant"]
 
-[allowlist]
+# gitleaks 8.30 refuses the legacy single [allowlist] table alongside the
+# rule-scoped one below, so both use the [[allowlists]] array form. This entry
+# keeps the legacy default: a path OR a sentinel regex suffices.
+[[allowlists]]
 description = "Placeholders, reference configs, and test fixtures — not real secrets"
 # Paths that legitimately contain key-SHAPED strings that are NOT live secrets.
 paths = [
@@ -55,3 +58,16 @@ regexes = [
   '''vlr_ab12cd34.*''',
   '''\$\{VALARIS_API_KEY\}''',
 ]
+
+# Rich-capture wire examples carry `content_key` sha256 digests that the
+# generic-api-key rule mistakes for keys. Exempt ONLY that rule, ONLY that exact
+# line shape, ONLY in the repo-root wire example files: `condition = "AND"`
+# needs the path AND the line to match (the default OR would turn either alone
+# into a blanket bypass). Every other rule, and any other value, still fires.
+[[allowlists]]
+description = "rich-capture wire content_key digests"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^contracts/rich-capture/wire/(invalid/)?[^/]+\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"content_key":\s*"[0-9a-f]{64}",?\s*$''']

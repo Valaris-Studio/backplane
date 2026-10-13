@@ -4,9 +4,12 @@
 import uuid
 from datetime import datetime
 
+from pydantic import Field, StrictInt
+
 from app.core.json_response import UTCModel
 
 from app.models.agents.execution import ExecutionStatus
+from app.schemas.agents.context import SHA256_HEX_PATTERN, ContextBindingRead
 
 
 class ExecutionCreate(UTCModel):
@@ -34,6 +37,15 @@ class ExecutionCreate(UTCModel):
     # Skills Registry W3: the manifest of skills the runner materialized for
     # this stage. Optional so old runners keep posting unmodified.
     skills: list[dict] | None = None
+    # The assignment hold to promote into this execution's durable context
+    # binding. Omitted by legacy callers, whose executions stay unbound.
+    reservation_id: uuid.UUID | None = None
+    # Context-dispatch negotiation, echoed from the assignment. Absent on
+    # legacy starts; a required-floor agent cannot start without them.
+    context_dispatch_version: StrictInt | None = None
+    context_dispatch_policy_revision: str | None = Field(
+        default=None, pattern=SHA256_HEX_PATTERN
+    )
 
 
 class ExecutionWarningCreate(UTCModel):
@@ -134,8 +146,18 @@ class ExecutionRead(UTCModel):
     model: str | None = None
     provider: str | None = None
     tool_invocations: list[ToolInvocationRead] = []
+    # Set only for executions started from an assignment hold; NULL means a
+    # legacy start whose context was never recorded.
+    context_binding: ContextBindingRead | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ExecutionDetailRead(ExecutionRead):
+    """Single-execution detail: counts its retained context receipts rather
+    than embedding them (history pages through its own endpoint)."""
+
+    context_receipt_count: int = 0
 
 
 class ExecutionListRead(UTCModel):

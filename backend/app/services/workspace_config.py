@@ -362,6 +362,18 @@ DEFAULT_PIPELINE_CONFIG = {
                 "context_sources": [
                     {"kind": "card_notes", "as": "PlanNote", "filter": {"kind": "plan"}}
                 ],
+                # Server-owned targets for this stage's auxiliary calls, so a
+                # required-dispatch rework never falls back to a prompt
+                # compiled into the runner. Seed values, not an allowlist:
+                # operators may map any slot to any configured role/stage.
+                "prompt_slots": {
+                    "mediate_rework": {"role": "rework_mediator", "stage": "mediate_rework"},
+                    "implement_after_approval": {
+                        "role": "implementer",
+                        "stage": "implement_after_approval",
+                    },
+                    "rework_implement": {"role": "implementer", "stage": "rework_implement"},
+                },
             },
             "sensors": [],
             "lifecycle": [
@@ -1795,6 +1807,16 @@ class WorkspaceConfigService:
             from app.services.completion_policy import CompletionPolicyService
 
             policy_service = CompletionPolicyService(self.db)
+            if "pipeline_config" in update_dict and not _seed_defaults:
+                from app.services.agents.context_dispatch import (
+                    ContextDispatchPolicyService,
+                )
+
+                # Before any row lock: the context-dispatch policy lock is
+                # always first (policy -> workspace -> config).
+                await ContextDispatchPolicyService(self.db).lock_for_policy_write(
+                    workspace_id
+                )
             # Serialize before reading the optimistic version or deciding
             # whether a pipeline controls explicit completion work.
             await policy_service.repo.lock_workspace(workspace_id)
@@ -1812,6 +1834,18 @@ class WorkspaceConfigService:
                 await policy_service.authorize(workspace_id, actor_id, operator=True)
         else:
             config = await self.repo.get_by_workspace(workspace_id)
+        if actor_id is not None and not _seed_defaults:
+            from app.services.agents.context_dispatch import (
+                ContextDispatchPolicyService,
+            )
+
+            # After every wait above (policy lock, workspace/config rows): the
+            # route's admin check ran before them, and roles, memberships and
+            # agent state can change meanwhile. actor_id None is the internal
+            # path (default seeding, upstream-authorized service calls).
+            await ContextDispatchPolicyService(self.db).verify_current_config_writer(
+                workspace_id, actor_id
+            )
         if "completion_policy" in update_dict:
             from app.services.completion_policy import CompletionPolicyService
             await CompletionPolicyService(self.db).validate_workspace_policy(
@@ -1867,6 +1901,37 @@ class WorkspaceConfigService:
             blocking = [e for e in findings if e.get("severity", "error") == "error"]
             if blocking:
                 raise ValidationError(detail=[dict(e) for e in blocking])
+            if not _seed_defaults:
+                from app.services.agents.context_dispatch import (
+                    ContextDispatchPolicyService,
+                )
+
+                # Every pipeline write path lands here (PATCH, bundle apply,
+                # internal callers), so the protected-policy guard cannot be
+                # skipped by choosing another route.
+                context_policy = ContextDispatchPolicyService(self.db)
+                stored_pipeline = config.pipeline_config if config else None
+                policy_findings = await context_policy.check_pipeline_write(
+                    workspace_id, stored_pipeline, pipeline_config, actor_id
+                )
+                if policy_findings:
+                    raise ValidationError(detail=[dict(e) for e in policy_findings])
+                await context_policy.guard_floor_raise(
+                    workspace_id, stored_pipeline, pipeline_config
+                )
+
+        if (
+            "pipeline_config" in update_dict
+            and pipeline_config is None
+            and not _seed_defaults
+        ):
+            from app.services.agents.context_dispatch import (
+                ContextDispatchPolicyService,
+            )
+
+            await ContextDispatchPolicyService(self.db).check_pipeline_reset(
+                workspace_id, config.pipeline_config if config else None, actor_id
+            )
 
         if policy_service is not None and not _seed_defaults:
             from app.services.completion import CompletionService

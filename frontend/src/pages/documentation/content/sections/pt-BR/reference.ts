@@ -740,6 +740,10 @@ const PT_BR_MCP_TOOL_CATALOG = {
     "Envie content como markdown; o backend normaliza markdown, HTML, texto simples e JSON ProseMirror para ProseMirror canônico antes de armazenar (títulos h1-h3, negrito/itálico, código, listas, links e citações).",
   "Pass true to get the stored body (ProseMirror JSON) back in the receipt. Default false: the receipt carries content_chars instead.":
     "Passe true para receber o corpo armazenado (JSON ProseMirror) na resposta. Padrão false: a resposta traz content_chars no lugar.",
+  "UUID retry key for an excerpt save; required with excerpt_source. Repeating the same save returns the same note; reusing it for a different save is a 409.":
+    "Chave UUID de nova tentativa para salvar um trecho; obrigatória junto com excerpt_source. Repetir o mesmo salvamento devolve a mesma nota; reutilizá-la para um salvamento diferente retorna 409.",
+  "Publish reviewed text from your own captured session: {workspace_id, session_id, items: [{content_id, sha256}]}. Needs board_id, a non-empty ProseMirror doc as content, and a personal key (agent and Companion launch keys are refused).":
+    "Publique texto revisado da sua própria sessão capturada: {workspace_id, session_id, items: [{content_id, sha256}]}. Exige board_id, um documento ProseMirror não vazio como content e uma chave pessoal (chaves de agentes e as que o Companion entrega aos agentes que inicia são recusadas).",
   "The receipt omits the note body by default and reports its stored size as content_chars, so a long note never floods the reply. Read the body with get_note(format=\"markdown\"), or pass return_content=true.":
     "A resposta omite o corpo da nota por padrão e informa seu tamanho armazenado como content_chars, para que uma nota longa nunca sobrecarregue a resposta. Leia o corpo com get_note(format=\"markdown\") ou passe return_content=true.",
   "kind is NOT validated — any string is stored verbatim (deliberately operator-extensible), so a typo silently creates an inert note. Only known kinds (plan, rework_brief, review_verdict, system) drive pipeline behavior.":
@@ -2109,6 +2113,9 @@ export const PT_BR_REFERENCE = {
     " (terminal status)": " (status terminal)",
     "; an in-flight warning, not completion":
       "; um aviso durante a execução, não uma conclusão",
+    " after the preparing transaction commits":
+      " depois que a transação de preparação é confirmada",
+    "; never sent for an exact replay": "; nunca enviado para uma repetição exata",
     " on activate / deactivate / re- activate":
       " ao ativar / desativar / reativar",
     " (WS-gated; 503 without an active connection)":
@@ -2474,6 +2481,18 @@ export const PT_BR_REFERENCE = {
       "Handshake opcional para trusted-proxy mode: quando definido, as solicitações também devem incluir ",
     " with this value. Configure the proxy to inject it.":
       " com esse valor. Configure o proxy para injetá-lo.",
+    "Comma-separated IPs or CIDRs of your own proxies. The client IP used for rate limits and audit logs is the rightmost":
+      "IPs ou CIDRs dos seus próprios proxies, separados por vírgulas. O IP do cliente usado nos rate limits e nos logs de auditoria é a entrada mais à direita de",
+    " entry that is not in this list, never the leftmost (the caller writes that). List every proxy between the client and the hop nearest the backend, e.g. a load balancer's address.":
+      " que não está nesta lista, nunca a mais à esquerda (quem chama a escreve). Inclua cada proxy entre o cliente e o salto mais próximo do backend, por exemplo o endereço de um load balancer.",
+    "Shared secret between the bundled frontend nginx and the backend. Set it on both: nginx then forwards the chain it saw in ":
+      "Segredo compartilhado entre o nginx incluído no frontend e o backend. Defina-o em ambos: o nginx então encaminha a cadeia que observou em ",
+    ", and the backend trusts that header only when":
+      ", e o backend confia nesse header somente quando",
+    " matches. It is pasted raw into the nginx config, so generate it as hex with":
+      " corresponde. Ele é inserido como está na configuração do nginx, então gere-o em hexadecimal com",
+    "; the frontend refuses to start if it contains anything outside":
+      "; o frontend se recusa a iniciar se ele contiver algo fora de",
     "Comma-separated domains for verified IAP, trusted-proxy, and OIDC identities. It also gates local setup and admin-invite paths that create a password-capable account. Empty allows any verified domain; API keys and dev mode are exempt.":
       "Domínios separados por vírgulas para identidades verificadas de IAP, trusted proxy e OIDC. Também restringe o setup local e os convites de admin que criam uma conta com senha. Vazio permite qualquer domínio verificado; API keys e dev mode não são afetados.",
     "Create user accounts on first verified sign-in. ":
@@ -2512,6 +2531,10 @@ export const PT_BR_REFERENCE = {
       "Telemetria anônima da instância com ativação explícita. Não envia nada sem estar habilitada e ter um endpoint configurado.",
     "Receiver for opt-in telemetry. Empty keeps telemetry a no-op even when the enable flag is true.":
       "Receptor da telemetria opcional. Vazio mantém a telemetria inativa mesmo quando o flag está habilitado.",
+    "Enables the Backplane Companion: device pairing, session capture and its retention sweep. Off, every companion, pairing and captured-session endpoint answers 404 and the pairing page reports the feature unavailable.":
+      "Ativa o Backplane Companion: pareamento de dispositivos, captura de sessões e sua limpeza por retenção. Desativado, todo endpoint de companion, pareamento e sessões capturadas responde 404 e a página de pareamento informa que o recurso não está disponível.",
+    "Enables rich session capture: devices may upload prompt, reply and tool bodies beside the events, stored like other uploads (the bucket, or the local storage directory). Off, devices are offered no rich capture and new project mappings default to the standard level. Needs the Companion enabled.":
+      "Ativa a captura enriquecida de sessões: os dispositivos podem enviar o conteúdo de prompts, respostas e ferramentas junto aos eventos, armazenado como os demais uploads (o bucket ou o diretório de armazenamento local). Desativada, nenhuma captura enriquecida é oferecida aos dispositivos e os novos mapeamentos de projeto usam o nível standard por padrão. Requer o Companion ativado.",
     "Operator-facing backend URL baked into exported runner bundles (runner YAML and MCP JSON). Set to the public URL in prod so exports are launch-ready.":
       "URL do backend voltada ao operador, incorporada aos bundles exportados do runner (YAML do runner e JSON do MCP). Defina a URL pública em produção para que as exportações fiquem prontas para iniciar.",
     "Uvicorn bind port. Cloud Run overrides to its injected":
@@ -2532,6 +2555,8 @@ export const PT_BR_REFERENCE = {
       "Identidade de commit usada pelo worker de merge do backend.",
     "Age after which board health reports a non-terminal merge-queue entry as stale.":
       "Idade após a qual a integridade do quadro marca como obsoleta uma entrada não terminal da fila de merge.",
+    "JSON object of instance maxima for opted-in context budgets (note body, fetch, record, managed and invocation bytes; source count; diagnostic entries and bytes; JSON depth and node count). Omitted fields keep their defaults; invalid values fail startup. Raising a maximum does not raise workspace defaults.":
+      "Objeto JSON com os máximos da instância para os orçamentos de contexto ativados (bytes de corpo de nota, de leitura, de registro, gerenciados e de invocação; número de fontes; entradas e bytes de diagnóstico; profundidade e número de nós JSON). Campos omitidos mantêm seus padrões; valores inválidos impedem a inicialização. Aumentar um máximo não aumenta os padrões do espaço de trabalho.",
     "Base64-encoded 32-byte Fernet key for encrypting the tokens stored by Git Connections. Empty makes token encryption and decryption fail loudly instead of storing plaintext.":
       "Chave Fernet de 32 bytes codificada em Base64 para criptografar os tokens armazenados por Git Connections. Vazia faz a criptografia e a descriptografia falharem explicitamente em vez de armazenar texto simples.",
     "GitHub OAuth App credentials for workspace git integrations. Empty disables the OAuth start endpoint.":

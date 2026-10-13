@@ -1,0 +1,249 @@
+{
+  "model": "ContentPage",
+  "http": {
+    "method": "GET",
+    "path": "/api/workspaces/{slug}/sessions/6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f/contents?limit=100",
+    "status": 200
+  },
+  "body": {
+    "items": [
+      {
+        "id": "4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "user",
+        "channel": "attachment",
+        "display_path": null,
+        "media_type": "image/png",
+        "coverage": "captured",
+        "coverage_reason": null,
+        "byte_count": 284211,
+        "original_byte_count": null,
+        "sha256": "6a09bfb6492050ab65118bf80f308c59214326e806938d3e8d7a73b01c31ff5f",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 39
+        },
+        "occurred_at": "2026-10-08T14:02:58Z",
+        "render": "image",
+        "preview": null
+      },
+      {
+        "id": "0b8f6a52-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": "09ec6835f8eb308d56ed6bea9a3e89a35e3f7ec3c7f4d43874da465636969036",
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": "turn-7",
+        "role": "user",
+        "channel": "prompt",
+        "display_path": null,
+        "media_type": "text/plain",
+        "coverage": "captured",
+        "coverage_reason": null,
+        "byte_count": 78,
+        "original_byte_count": null,
+        "sha256": "51a5647886991fe0e4806854318187194d92a0dafc9e767f667de80fd13ac928",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 41
+        },
+        "occurred_at": "2026-10-08T14:03:10.120Z",
+        "render": "text",
+        "preview": {
+          "text": "Add a retry with exponential backoff to the uploader and keep the tests green.",
+          "truncated": false
+        }
+      },
+      {
+        "id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": "turn-7",
+        "role": "assistant",
+        "channel": "reply",
+        "display_path": null,
+        "media_type": "text/markdown",
+        "coverage": "partially_redacted",
+        "coverage_reason": "secret_filter",
+        "byte_count": 48213,
+        "original_byte_count": null,
+        "sha256": "964f268b6cbc702d9b2ea7dcfe543caca4e6f8c6753ae4d6cb80ac81172c37e2",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 2
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 44
+        },
+        "occurred_at": "2026-10-08T14:03:52.900Z",
+        "render": "text",
+        "preview": {
+          "text": "I'll add the backoff in uploader.go: [REDACTED] is read from …",
+          "truncated": true
+        }
+      },
+      {
+        "id": "3ebc9d85-4f60-4182-9d2e-3f4a5b6c7d8e",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": "toolu_01AbCdEfGhIjKlMn",
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "tool",
+        "channel": "tool_output",
+        "display_path": null,
+        "media_type": "text/plain",
+        "coverage": "withheld_by_policy",
+        "coverage_reason": "quota_exceeded",
+        "byte_count": null,
+        "original_byte_count": 91226112,
+        "sha256": null,
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 47
+        },
+        "occurred_at": "2026-10-08T14:04:20Z",
+        "render": "none",
+        "preview": null
+      },
+      {
+        "id": "50debfa7-6182-43a4-9f40-5b6c7d8e9fa0",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "user",
+        "channel": "attachment",
+        "display_path": null,
+        "media_type": "application/zip",
+        "coverage": "withheld_by_policy",
+        "coverage_reason": "media_type_not_permitted",
+        "byte_count": null,
+        "original_byte_count": 1048576,
+        "sha256": null,
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 39
+        },
+        "occurred_at": "2026-10-08T14:02:58Z",
+        "render": "none",
+        "preview": null
+      },
+      {
+        "id": "83a1e2da-94b5-46d7-a273-8e9fa0b1c2d3",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "user",
+        "channel": "instruction",
+        "display_path": "CLAUDE.md",
+        "media_type": "text/markdown",
+        "coverage": "captured",
+        "coverage_reason": null,
+        "byte_count": 49,
+        "original_byte_count": null,
+        "sha256": "63e86bb383f2ae55e78371e020b1650ab3e400d6671f19e19ded56a22219c6e4",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 13
+        },
+        "occurred_at": "2026-10-08T14:01:00Z",
+        "render": "text",
+        "preview": {
+          "text": "# Project rules\n\nRun make test before committing.",
+          "truncated": false
+        }
+      },
+      {
+        "id": "72f0d1c9-83a4-45c6-9162-7d8e9fa0b1c2",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": "exec-01a11e75-0c4e-7b21-9a3f-5d6e7f809a1b",
+        "parent_call_id": "call_Qm8xYp2LrT5vWn3K",
+        "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983",
+        "role": "tool",
+        "channel": "command_output",
+        "display_path": null,
+        "media_type": "text/plain",
+        "coverage": "truncated",
+        "coverage_reason": "source_limit",
+        "byte_count": 1048606,
+        "original_byte_count": 1200017,
+        "sha256": "2083d1e56e26da850fd5e0ba8fca30c151d06f5f0b0a07e24db6fdc1b7251f7d",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "codex_rollout",
+          "order": 15
+        },
+        "occurred_at": "2026-10-09T02:21:07.412Z",
+        "render": "text",
+        "preview": {
+          "text": "line 000001 ok\nline 000002 ok\n",
+          "truncated": true
+        }
+      },
+      {
+        "id": "61efc0b8-7293-44b5-8051-6c7d8e9fa0b1",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "user",
+        "channel": "attachment",
+        "display_path": null,
+        "media_type": "application/pdf",
+        "coverage": "captured",
+        "coverage_reason": null,
+        "byte_count": 90112,
+        "original_byte_count": null,
+        "sha256": "6a09bfb6492050ab65118bf80f308c59214326e806938d3e8d7a73b01c31ff5f",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 39
+        },
+        "occurred_at": "2026-10-08T14:02:58Z",
+        "render": "download",
+        "preview": null
+      }
+    ],
+    "next_cursor": "MjAyNi0xMC0wOFQxNDowNDoyMFp8NjFlZmMwYjg"
+  }
+}

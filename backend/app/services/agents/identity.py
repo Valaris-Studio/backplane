@@ -4,9 +4,13 @@
 import uuid
 from collections.abc import Callable
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.auth import current_agent_id
+from app.core.workspace import enforce_agent_scope
 from app.exceptions import ForbiddenError
 from app.models.agents.agent import Agent
+from app.repositories.workspace import WorkspaceMemberRepository
 
 
 def verify_caller_owns_agent(
@@ -50,4 +54,31 @@ def verify_caller_owns_agent(
         raise ForbiddenError(
             "You did not create this agent",
             error_code="agent_identity_mismatch",
+        )
+
+
+async def verify_agent_may_work_in_workspace(
+    db: AsyncSession,
+    agent: Agent,
+    *,
+    workspace_slug: str,
+    workspace_id: uuid.UUID,
+    caller_id: uuid.UUID | None,
+) -> None:
+    """Current authority for bound agent work, re-checked on every call.
+
+    Authentication alone is not enough: a plain owner key still authenticates
+    after its agent is deactivated, and carries no agent scope at all. So the
+    BOUND agent's own state is checked here: active, scoped to this workspace,
+    and its owner (plus the caller) still a member. Nothing is cached from the
+    scheduler hold that originally authorized the work.
+    """
+    if not agent.is_active:
+        raise ForbiddenError("Agent is deactivated", error_code="agent_inactive")
+    await enforce_agent_scope(agent.id, workspace_slug, db)
+    required = {agent.created_by_id} | ({caller_id} if caller_id else set())
+    members = await WorkspaceMemberRepository(db).member_user_ids(workspace_id, required)
+    if members != required:
+        raise ForbiddenError(
+            "Not a member of this workspace", error_code="agent_not_in_workspace"
         )

@@ -22,6 +22,8 @@ PATH, so the observed exit codes are the script's own, not the scanner's.
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import os
 import shutil
@@ -233,6 +235,173 @@ def test_untracked_finding_is_ignored(tmp_path: Path):
     run = _run_scan(shim_dir=shim)
     assert run.returncode == 0, f"rc={run.returncode}\n{run.output}"
     assert CLEAN_MESSAGE in run.stdout
+
+
+@requires_git
+def test_tracked_archive_member_finding_fails_with_exit_1(tmp_path: Path):
+    # gitleaks names a finding inside a zip/tar member `<archive>!<member>`;
+    # matching that whole string against `git ls-files` discarded it as untracked.
+    tracked_archive = "contracts/rich-capture/sources/codex-desktop/rollout-main.jsonl.gz"
+    member_finding = {"File": f"{tracked_archive}!rollout-main.jsonl", "StartLine": 3, "RuleID": "shim-rule"}
+    shim = make_gitleaks_shim(tmp_path, exit_code=1, report_body=json.dumps([member_finding]))
+    run = _run_scan(shim_dir=shim)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert f"{tracked_archive}!rollout-main.jsonl:3: shim-rule" in run.stdout
+
+
+@requires_git
+def test_untracked_archive_member_finding_is_ignored(tmp_path: Path):
+    member_finding = {"File": "definitely-not-tracked-zzz.zip!inner.txt", "StartLine": 1, "RuleID": "shim-rule"}
+    shim = make_gitleaks_shim(tmp_path, exit_code=1, report_body=json.dumps([member_finding]))
+    run = _run_scan(shim_dir=shim)
+    assert run.returncode == 0, f"rc={run.returncode}\n{run.output}"
+    assert CLEAN_MESSAGE in run.stdout
+
+
+# --- real gitleaks against the shipped .gitleaks.toml, in a throwaway repo --
+#
+# Sentinels are derived from a fixed label at runtime: they have the shape and
+# entropy of a live credential, but are not, and never were, a real secret.
+
+
+def _sentinel(label: str, length: int) -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    digest = hashlib.sha512(f"backplane-scan-sentinel:{label}".encode()).digest()
+    return "".join(alphabet[byte % len(alphabet)] for byte in digest[:length])
+
+
+GENERIC_SENTINEL_LINE = f'api_key = "{_sentinel("generic", 32)}"\n'
+PLATFORM_KEY_SENTINEL = "vlr_" + _sentinel("platform", 44)
+ALLOWED_CONTENT_KEY = hashlib.sha256(b"backplane-scan-sentinel:content-key").hexdigest()
+WIRE_DIR = "contracts/rich-capture/wire"
+
+requires_real_gitleaks = pytest.mark.skipif(
+    shutil.which("gitleaks") is None or shutil.which("git") is None,
+    reason="needs the real gitleaks and git",
+)
+
+
+def _scan_repo(tmp_path: Path, files: dict[str, bytes], *, untracked: dict[str, bytes] | None = None) -> Path:
+    """A git repo carrying the shipped gate + config, `files` staged, `untracked` on disk only."""
+    repo = tmp_path / "scan-repo"
+    (repo / "scripts").mkdir(parents=True)
+    shutil.copy(SCAN_SCRIPT, repo / "scripts" / "scan-secrets.sh")
+    shutil.copy(REPO_ROOT / ".gitleaks.toml", repo / ".gitleaks.toml")
+    for relative, body in {**files, **(untracked or {})}.items():
+        target = repo / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "--", ".gitleaks.toml", "scripts", *files], check=True)
+    return repo
+
+
+def _gzip(body: str) -> bytes:
+    return gzip.compress(body.encode(), mtime=0)
+
+
+def _wire_json(key: str, value: str) -> bytes:
+    return json.dumps({"schema": "probe", key: value}, indent=2).encode() + b"\n"
+
+
+@requires_real_gitleaks
+def test_real_scan_catches_credential_inside_tracked_gzip(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {"fixtures/session.jsonl.gz": _gzip(GENERIC_SENTINEL_LINE)})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert "fixtures/session.jsonl.gz" in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_ignores_credential_inside_untracked_gzip(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {}, untracked={"scratch/session.jsonl.gz": _gzip(GENERIC_SENTINEL_LINE)})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 0, f"rc={run.returncode}\n{run.output}"
+    assert CLEAN_MESSAGE in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_catches_generic_credential_under_wire(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {f"{WIRE_DIR}/probe.json": _wire_json("auth_token", _sentinel("wire-token", 32))})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert f"{WIRE_DIR}/probe.json" in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_catches_platform_key_under_wire(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {f"{WIRE_DIR}/probe.json": _wire_json("api_key", PLATFORM_KEY_SENTINEL)})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert "valaris-api-key" in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_allows_content_key_digest_under_wire(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {f"{WIRE_DIR}/probe.json": _wire_json("content_key", ALLOWED_CONTENT_KEY)})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 0, f"rc={run.returncode}\n{run.output}"
+    assert CLEAN_MESSAGE in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_catches_content_key_digest_outside_anchored_wire_path(tmp_path: Path):
+    # The digest allowance is anchored to the repo-root wire dir: the same line
+    # one directory deeper, or under another prefix, is still a finding.
+    repo = _scan_repo(
+        tmp_path,
+        {
+            f"vendor/{WIRE_DIR}/probe.json": _wire_json("content_key", ALLOWED_CONTENT_KEY),
+            f"{WIRE_DIR}/nested/deeper/probe.json": _wire_json("content_key", ALLOWED_CONTENT_KEY),
+        },
+    )
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert f"vendor/{WIRE_DIR}/probe.json" in run.stdout
+    assert f"{WIRE_DIR}/nested/deeper/probe.json" in run.stdout
+
+
+@requires_real_gitleaks
+def test_real_scan_catches_digest_shape_under_other_wire_key(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {f"{WIRE_DIR}/probe.json": _wire_json("secret_key", ALLOWED_CONTENT_KEY)})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+
+
+@requires_real_gitleaks
+def test_real_scan_with_malformed_config_fails_closed(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {})
+    config = repo / ".gitleaks.toml"
+    config.write_text(config.read_text() + '\n[[allowlists]]\ncondition = "XOR"\npaths = [\'\'\'x\'\'\']\n')
+    _assert_scanner_error(_run_scan(cwd=repo), "report missing or empty")
+
+
+FALLBACK_RUNTIME_BINARIES = (*SCRIPT_RUNTIME_BINARIES, "git", "grep", "gzip", "printf")
+
+
+@requires_git
+def test_fallback_sweep_catches_platform_key_inside_tracked_gzip(tmp_path: Path):
+    runtime_bin = tmp_path / "runtime-bin"
+    runtime_bin.mkdir()
+    for binary in FALLBACK_RUNTIME_BINARIES:
+        found = shutil.which(binary)
+        if found is None:
+            pytest.skip(f"{binary} is not installed")
+        (runtime_bin / binary).symlink_to(found)
+    repo = _scan_repo(tmp_path, {"fixtures/session.jsonl.gz": _gzip(f'{{"key": "{PLATFORM_KEY_SENTINEL}"}}\n')})
+    proc = subprocess.run(
+        ["bash", "scripts/scan-secrets.sh"],
+        cwd=repo,
+        env={**os.environ, "PATH": str(runtime_bin)},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    run = ScanRun(proc.returncode, proc.stdout, proc.stderr)
+    assert "built-in fallback sweep" in run.stdout, run.output
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert "fixtures/session.jsonl.gz" in run.stdout
 
 
 # --- real-tool check -------------------------------------------------------

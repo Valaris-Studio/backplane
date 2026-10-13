@@ -53,6 +53,30 @@ class AssetRetentionTests(unittest.TestCase):
         self.module.retain_assets(third, self.archive, now=150, grace=100)
         self.assertEqual([p.name for p in (self.archive / 'assets').iterdir()], ['Page-cccccccc.js'])
 
+    def test_only_the_most_recent_retired_releases_survive_inside_the_grace_window(self):
+        releases = [self.release(f'r{index}', {f'Page-{index}aaaaaaa.js': str(index), 'shared-ssssssss.css': 'shared'}) for index in range(6)]
+        for index, release in enumerate(releases):
+            self.module.retain_assets(release, self.archive, now=index, grace=1000, max_retired_releases=3)
+        kept = sorted(p.name for p in (self.archive / 'assets').iterdir())
+        self.assertEqual(kept, ['Page-2aaaaaaa.js', 'Page-3aaaaaaa.js', 'Page-4aaaaaaa.js', 'Page-5aaaaaaa.js', 'shared-ssssssss.css'])
+        manifest = json.loads((self.archive / '.asset-retention.json').read_text())
+        self.assertEqual(sorted(manifest['expires']), ['Page-2aaaaaaa.js', 'Page-3aaaaaaa.js', 'Page-4aaaaaaa.js'])
+
+    def test_release_cap_applies_to_seeded_history_and_defaults_to_five(self):
+        self.assertEqual(self.module.DEFAULT_MAX_RETIRED_RELEASES, 5)
+        for index in range(8):
+            self.module.retain_assets(self.release(f'r{index}', {f'Page-{index}aaaaaaa.js': str(index)}), self.archive, now=index, grace=1000, max_retired_releases=10)
+        self.assertEqual(len(list((self.archive / 'assets').iterdir())), 8)
+        rebuilt = self.root / 'rebuilt'
+        self.module.retain_assets(self.archive, rebuilt, now=10, grace=1000)
+        self.module.retain_assets(self.release('next', {'Page-9aaaaaaa.js': 'next'}), rebuilt, now=10, grace=1000)
+        kept = sorted(p.name for p in (rebuilt / 'assets').iterdir())
+        self.assertEqual(kept, [f'Page-{index}aaaaaaa.js' for index in (3, 4, 5, 6, 7, 9)])
+
+    def test_release_cap_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            self.module.retain_assets(self.release('r', {'Page-aaaaaaaa.js': 'a'}), self.archive, now=0, grace=100, max_retired_releases=0)
+
     def test_baked_history_survives_empty_cloud_instance_without_resetting_expiry(self):
         first = self.release('first', {'Page-aaaaaaaa.js': 'a'})
         second = self.release('second', {'Page-bbbbbbbb.js': 'b'})

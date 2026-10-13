@@ -1,0 +1,14 @@
+{
+  "model": "ContentError",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d/finalize",
+    "status": 422
+  },
+  "body": {
+    "detail": "The body does not match the declared digest; its chunks were discarded",
+    "error_code": "body_checksum_mismatch",
+    "error_params": {},
+    "context": null
+  }
+}

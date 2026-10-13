@@ -1,0 +1,17 @@
+{
+  "model": "ContentError",
+  "http": {
+    "method": "PUT",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d/chunks/1",
+    "status": 422
+  },
+  "body": {
+    "detail": "Every chunk but the last is chunk_bytes long; the last is the rest of the body",
+    "error_code": "chunk_size_mismatch",
+    "error_params": {
+      "expected_bytes": 4194304,
+      "received_bytes": 1048576
+    },
+    "context": null
+  }
+}

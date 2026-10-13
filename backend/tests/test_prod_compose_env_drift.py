@@ -17,8 +17,9 @@ test_env_example_drift.py, one layer further down the pipe.
 import re
 from pathlib import Path
 
+import pytest
 import yaml
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from app.config import Settings
 
@@ -113,6 +114,8 @@ def test_passthrough_defaults_match_settings():
     fields = Settings.model_fields
     mismatches: list[str] = []
     for key, value in env.items():
+        # Null mappings have no compose default; they are pinned by the
+        # NULL_PASSTHROUGHS contract tests below.
         if key not in fields or not isinstance(value, str):
             continue
         match = PASSTHROUGH.match(value)
@@ -148,3 +151,42 @@ def test_active_env_example_keys_are_forwarded():
         "passthroughs, or if compose-only/pinned/derived, add to "
         "NON_BACKEND_KEYS / NOT_FORWARDED with a reason."
     )
+
+
+# Settings whose compose default cannot be written as `${VAR:-default}` (a JSON
+# object's `}` would end the interpolation) and for which an empty string is
+# deliberately invalid. A YAML null mapping (`KEY:`) forwards the variable only
+# when the operator sets it, so unset keeps the Settings default.
+NULL_PASSTHROUGHS = {"CONTEXT_BUDGET_CEILINGS"}
+
+
+def test_null_passthroughs_are_exactly_the_declared_settings():
+    env = _backend_environment()
+    nulls = {key for key, value in env.items() if value is None}
+    assert nulls == NULL_PASSTHROUGHS
+    assert NULL_PASSTHROUGHS <= set(Settings.model_fields)
+
+
+def _settings_from(monkeypatch, forwarded):
+    # What the container sees: absent when the host leaves it unset, else the
+    # exact forwarded bytes.
+    monkeypatch.delenv("CONTEXT_BUDGET_CEILINGS", raising=False)
+    if forwarded is not None:
+        monkeypatch.setenv("CONTEXT_BUDGET_CEILINGS", forwarded)
+    return Settings(_env_file=None)
+
+
+def test_null_passthrough_unset_keeps_the_settings_default(monkeypatch):
+    assert _settings_from(monkeypatch, None).CONTEXT_BUDGET_CEILINGS == (
+        Settings(_env_file=None).CONTEXT_BUDGET_CEILINGS
+    )
+
+
+def test_null_passthrough_explicit_empty_still_fails_startup(monkeypatch):
+    with pytest.raises(ValidationError):
+        _settings_from(monkeypatch, "")
+
+
+def test_null_passthrough_forwards_exact_object_and_partial_values(monkeypatch):
+    assert _settings_from(monkeypatch, "{}").CONTEXT_BUDGET_CEILINGS.max_sources == 32
+    assert _settings_from(monkeypatch, '{"max_sources":16}').CONTEXT_BUDGET_CEILINGS.max_sources == 16

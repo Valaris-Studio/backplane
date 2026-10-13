@@ -1,0 +1,33 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "tool",
+    "channel": "tool_output",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b",
+      "order": 66,
+      "body_from": "harness_session_store"
+    },
+    "occurred_at": "2026-10-08T14:06:02Z",
+    "observed_at": "2026-10-08T14:06:03Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "9928985bb3f7067af006cb534e4b6353ea5219577be7a5f5ac80aeb16b584f74",
+    "call_id": "toolu_01PqRsTuVwXyZaBc",
+    "coverage": "captured",
+    "delivery": "upload",
+    "byte_count": 126001,
+    "sha256": "cded0fcc9d01e1deaa423038a99156766ea11424045640f6a314c828f13f2b1a"
+  }
+}

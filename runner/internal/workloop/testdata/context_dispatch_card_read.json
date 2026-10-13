@@ -1,0 +1,55 @@
+{
+  "id": "00000000-0000-4000-8000-000000000150",
+  "column_id": "00000000-0000-4000-8000-000000000153",
+  "column_name": "Ready é",
+  "column_type": "backlog",
+  "board_id": "00000000-0000-4000-8000-000000000149",
+  "title": "Actual card é🧪",
+  "description": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"literal <>& {{.ExecutionID}}\"}]}]}",
+  "card_type": "task",
+  "priority": "none",
+  "position": 1041.25,
+  "created_by": "00000000-0000-4000-8000-000000000160",
+  "due_date": null,
+  "status": null,
+  "labels": [
+    "évidence",
+    "🧪"
+  ],
+  "parent_card_id": null,
+  "pr_url": null,
+  "branch_name": null,
+  "budget_usd_override": null,
+  "git_repo_slug": null,
+  "completion_mode": "source",
+  "participants": [
+    {
+      "user_id": "00000000-0000-4000-8000-000000000160",
+      "agent_id": "00000000-0000-4000-8000-000000000147",
+      "role": "hero",
+      "pipeline_role": "operator-research-47",
+      "added_at": "2026-10-13T00:00:00+00:00",
+      "user": {
+        "id": "00000000-0000-4000-8000-000000000160",
+        "name": "Reader é",
+        "email": "reader@example.invalid",
+        "avatar_url": null
+      },
+      "agent": {
+        "id": "00000000-0000-4000-8000-000000000147",
+        "name": "Configured agent 🧪",
+        "agent_type": "operator-tool"
+      }
+    }
+  ],
+  "has_pending_approval": true,
+  "pending_approval_id": "00000000-0000-4000-8000-000000000161",
+  "agent_presence": "active",
+  "active_execution_id": "00000000-0000-4000-8000-000000000152",
+  "last_agent_activity_at": null,
+  "depends_on_count": 2,
+  "blocks_count": 1,
+  "dependency_status": "blocked",
+  "created_at": "2026-10-13T00:00:00+00:00",
+  "updated_at": "2026-10-13T00:00:01+00:00"
+}

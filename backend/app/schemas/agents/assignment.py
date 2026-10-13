@@ -4,15 +4,26 @@
 import uuid
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import Field, StrictInt
 from app.core.json_response import UTCModel
 
+from app.schemas.agents.context import (
+    SHA256_HEX_PATTERN,
+    ContextDispatchStamp,
+    ContextManifest,
+)
 from app.schemas.kanban.card import CardRead
 
 
 class NextAssignmentRequest(UTCModel):
     role_override: str | None = None
     board_id: uuid.UUID | None = None
+    # Context-dispatch negotiation from the agent's contract. Absent on
+    # legacy polls; a required-floor agent is refused without them.
+    context_dispatch_version: StrictInt | None = None
+    context_dispatch_policy_revision: str | None = Field(
+        default=None, pattern=SHA256_HEX_PATTERN
+    )
 
 
 class AssignmentBoard(UTCModel):
@@ -117,6 +128,11 @@ class NextAssignmentResponse(UTCModel):
         default_factory=dict,
         description="Pre-rendered context_sources keyed by `as` alias.",
     )
+    # Additive provenance for `context`, rendered from the same selection:
+    # ordered sources/records plus a timestamp-independent revision digest.
+    # Old runners ignore both.
+    context_manifest: ContextManifest | None = None
+    context_revision: str | None = None
     llm: AssignmentLLM
     # LIFECYCLE-1 A.1: when the stage carries a `lifecycle: [...]` array
     # (the new generic walker DSL), pass it through verbatim. The runner
@@ -130,3 +146,5 @@ class NextAssignmentResponse(UTCModel):
     # slug-ascending, for the skills_setup lifecycle step. None (not []) when
     # the board has no bound skills so old runners see nothing new.
     skills: list[AssignmentSkill] | None = None
+    # Present only when the poll negotiated context-dispatch v1.
+    context_dispatch: ContextDispatchStamp | None = None

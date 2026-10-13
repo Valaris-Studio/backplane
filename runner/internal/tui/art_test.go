@@ -102,6 +102,7 @@ func TestArt_PlainWhenColorDisabled(t *testing.T) {
 }
 
 func TestArt_GradientColorsWhenEnabled(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	restore := forceProfileTrueColor()
 	defer restore()
 

@@ -1,0 +1,89 @@
+[package]
+name = "backplane-companion-desktop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[lib]
+name = "backplane_companion_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Test-only: the embedded WebDriver server and wdio bridge behind `pnpm test:smoke`.
+# lib.rs refuses to compile it into a release build.
+e2e-webdriver = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.0", features = [] }
+
+[dependencies]
+# macos-private-api: the transparent popover window (contract v1.3; Developer ID, not App Store).
+tauri = { version = "=2.12.0", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-single-instance = "=2.5.0"
+tauri-plugin-opener = "=2.6.0"
+tauri-plugin-log = "=2.10.0"
+tauri-plugin-positioner = { version = "=2.4.0", features = ["tray-icon"] }
+# Rust-side only (DK-4c): no dialog, autostart or notification permission reaches JS.
+tauri-plugin-dialog = "=2.8.0"
+tauri-plugin-autostart = "=2.6.0"
+tauri-plugin-notification = "=2.5.0"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.12"
+hyper = { version = "1.11", features = ["client", "http1"] }
+hyper-util = { version = "0.1.21", features = ["client-legacy", "http1", "tokio"] }
+http-body-util = "0.1.5"
+tokio = { version = "1.53", features = ["rt-multi-thread", "net", "time", "sync", "macros", "io-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+semver = "1"
+libc = "0.2"
+thiserror = "2"
+url = "2.5"
+regex = "1.13"
+time = { version = "0.3.55", features = ["parsing"] }
+log = "0.4"
+sha2 = "0.10"
+getrandom = "0.3"
+tauri-plugin-wdio = { version = "=1.4.0", optional = true }
+tauri-plugin-wdio-webdriver = { version = "=1.4.0", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-nspanel = "=2.1.0"
+# D6: in-app updates swap a signed macOS bundle; no updater elsewhere.
+tauri-plugin-updater = "=2.13.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# Tauri applies window effects without reporting failure; calling it directly
+# lets the popover fall back from Mica to Acrylic to a solid background.
+window-vibrancy = "=0.8.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# D1: the tray speaks StatusNotifierItem over D-Bus (ksni) instead of dlopening
+# libayatana-appindicator, which panics where the library is missing. Tauri
+# pins tray-icon's libappindicator feature; tray-icon picks ksni whenever its
+# `ksni` feature is on, and this entry turns it on by feature unification.
+tray-icon = { version = "=0.25.1", default-features = false, features = ["ksni"] }
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+
+[dev-dependencies]
+base64 = "0.22"
+minisign-verify = "0.2"
+tempfile = "3"
+tokio = { version = "1.53", features = ["full", "test-util"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true

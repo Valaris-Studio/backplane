@@ -1,0 +1,226 @@
+/* Home, from DK-0's .session/.totals/.kv rules; tokens only. */
+
+/* This file can load before app.css; restating Tailwind's layer order keeps preflight (base) below these rules. */
+@layer theme, base, components, utilities;
+
+@layer components {
+  .home-screen { display: flex; flex-direction: column; }
+
+  .home-screen .bp-panel-body p { margin: 0 0 14px; }
+  .home-screen .bp-panel-body p:last-child { margin-bottom: 0; }
+  .home-banner-line { margin: 0; }
+  .home-screen .bp-section-head h3:focus:not(:focus-visible) { outline: none; }
+
+  .home-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: var(--text-footnote); }
+  .home-kv dt { color: var(--color-muted-foreground); }
+  .home-kv dd { margin: 0; color: var(--color-foreground); font-variant-numeric: tabular-nums; }
+
+  .home-sessions { list-style: none; margin: 0; padding: 0; }
+  .home-session { border-radius: var(--radius-sheet); }
+  .home-session + .home-session { margin-top: 2px; }
+  .home-session[data-open="true"] { background: color-mix(in oklab, var(--color-foreground) 4%, transparent); }
+  .home-session-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border: 0;
+    border-radius: var(--radius-sheet);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+  .home-session-main:hover { background: var(--color-row-hover); }
+  .home-session-main:active { background: var(--color-row-press); }
+  .home-session-main:focus-visible { outline: 2px solid var(--color-ring); outline-offset: -2px; }
+  @media (hover: none) { .home-session-main:hover { background: transparent; } }
+
+  .home-s-body { display: grid; flex: 1; gap: 1px; min-width: 0; }
+  .home-s-line1 { display: flex; align-items: center; gap: 5px; min-width: 0; font-weight: var(--weight-medium); }
+  .home-s-repo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-s-line1 > svg { flex: none; width: 11px; height: 11px; color: var(--color-muted-foreground); }
+  .home-s-board { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-muted-foreground); font-weight: var(--weight-regular); }
+  .home-s-line2 { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--text-footnote); color: var(--color-muted-foreground); }
+  .home-s-line2 > * { flex: none; }
+  .home-s-line2 > .home-s-shrink { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .home-s-meta { display: grid; flex: none; gap: 1px; padding-left: 4px; text-align: right; }
+  .home-s-cost { font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+  .home-s-basis { font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--color-muted-foreground); }
+  .home-s-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: var(--radius-chip);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    background: color-mix(in oklab, var(--color-warning) 22%, transparent);
+    color: var(--color-warning-foreground);
+  }
+
+  .home-s-detail { padding: 0 10px 10px 46px; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .home-s-detail dl { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 2px 8px; margin: 0 0 8px; }
+  .home-s-detail dt { font-size: var(--text-caption); white-space: nowrap; }
+  .home-s-detail dd { margin: 0; color: var(--color-foreground); font-variant-numeric: tabular-nums; font-weight: var(--weight-medium); }
+  .home-s-detail p { margin: 0 0 8px; max-width: 46ch; }
+  .home-s-detail .home-s-scope { font-size: var(--text-caption); line-height: var(--leading-caption); }
+
+  /* The tip spans the whole figure grid, just under it, so no column's tip runs off the popover. */
+  .home-s-detail dl { position: relative; }
+  .home-tip-term {
+    display: inline-block;
+    border-radius: var(--radius-cap);
+    cursor: help;
+    text-decoration: underline dotted color-mix(in oklab, currentColor 55%, transparent);
+    text-underline-offset: 2px;
+  }
+  .home-tip-term:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 0; }
+  .home-tip-bubble {
+    position: absolute;
+    inset-inline: 0;
+    top: calc(100% + 4px);
+    z-index: var(--z-menu);
+    padding: 6px 8px;
+    border-radius: var(--radius-control);
+    background: var(--color-popover);
+    box-shadow: var(--shadow-menu);
+    color: var(--color-popover-foreground);
+    font-size: var(--text-footnote);
+    line-height: var(--leading-footnote);
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard);
+  }
+  .home-tip:hover > .home-tip-bubble,
+  .home-tip-term:focus-visible + .home-tip-bubble { opacity: 1; visibility: visible; }
+  .home-tip > .home-tip-bubble[data-dismissed="true"] { opacity: 0; visibility: hidden; }
+  @media (max-width: 340px) {
+    .home-s-detail { padding-left: 10px; }
+    .home-s-detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; }
+  }
+
+  .home-sessions[data-compact="true"] .home-session-main { padding: 6px 8px; }
+  .home-sessions[data-compact="true"] .home-s-line1 { font-weight: var(--weight-regular); }
+
+  /* Sticky so the controls stay reachable while a long day scrolls under them; bleeds into the view's 12px gutter. */
+  .home-tools {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -8px -12px 0;
+    padding: 8px 12px 6px;
+    background: var(--material-sheet);
+    -webkit-backdrop-filter: blur(var(--material-blur)) saturate(var(--material-saturate));
+    backdrop-filter: blur(var(--material-blur)) saturate(var(--material-saturate));
+  }
+
+  .home-filter { position: relative; flex: 1; min-width: 0; }
+  .home-filter > svg { position: absolute; left: 8px; top: 7px; width: 14px; height: 14px; color: var(--color-muted-foreground); pointer-events: none; }
+  .home-filter > .bp-input { padding: 0 26px 0 27px; font-size: var(--text-footnote); }
+  .home-filter > .bp-input::placeholder { color: var(--color-muted-foreground); }
+  .home-filter > .bp-input::-webkit-search-cancel-button { display: none; }
+  .home-filter-key {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    display: grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-chip);
+    font: var(--weight-medium) 10.5px/1 var(--font-sans);
+    color: var(--color-muted-foreground);
+    box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--color-foreground) 28%, transparent);
+    pointer-events: none;
+  }
+  .home-filter-clear {
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--color-muted-foreground);
+  }
+  .home-filter-clear > svg { width: 12px; height: 12px; }
+  .home-filter-clear:hover { background: var(--color-row-hover); color: var(--color-foreground); }
+  .home-filter-clear:focus-visible { outline: 2px solid var(--color-ring); outline-offset: -1px; }
+
+  .home-agents {
+    display: flex;
+    flex: none;
+    gap: 1px;
+    padding: 2px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--color-foreground) 7%, transparent);
+  }
+  .home-agent {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    transition: background-color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard), filter var(--duration-fast) var(--ease-standard);
+  }
+  .home-agent:hover { background: var(--color-row-hover); }
+  .home-agent:focus-visible { outline: 2px solid var(--color-ring); outline-offset: -1px; }
+  .home-agent[aria-pressed="true"] { background: var(--color-popover); box-shadow: var(--shadow-control), 0 0 0 0.5px var(--color-hairline); }
+  .home-agents[data-solo="true"] .home-agent[aria-pressed="false"] { opacity: 0.4; filter: saturate(0.2); }
+  .home-agent .bp-agent-tile[data-size="sm"] { width: 20px; height: 20px; border-radius: 5px; font-size: 9px; }
+
+  .home-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: var(--control-height-md);
+    padding: 0 7px 0 6px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    font-size: var(--text-footnote);
+    font-weight: var(--weight-medium);
+    color: var(--color-muted-foreground);
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+  .home-sort > svg { width: 13px; height: 13px; }
+  .home-sort:hover, .home-sort[aria-expanded="true"] { background: var(--color-row-hover); color: var(--color-foreground); }
+  .home-sort:focus-visible { outline: 2px solid var(--color-ring); outline-offset: -1px; }
+  @media (prefers-reduced-motion: reduce) {
+    .home-agent, .home-sort { transition: none; }
+  }
+
+  .home-noresults { display: grid; justify-items: start; gap: 6px; margin: 16px 4px; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); }
+  .home-noresults p { margin: 0; }
+  .home-noresults b { color: var(--color-foreground); font-weight: var(--weight-semibold); }
+  .home-noresults .bp-link-btn { margin-left: -4px; }
+
+  .home-totals {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.6fr);
+    align-items: baseline;
+    gap: 0 10px;
+    padding: 10px 16px 12px;
+    border-top: 0.5px solid var(--color-hairline);
+    background: color-mix(in oklab, var(--color-foreground) 3%, transparent);
+  }
+  .home-t-cell { display: grid; }
+  .home-t-v { font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+  .home-t-costs { justify-items: end; text-align: right; }
+  .home-t-k { white-space: nowrap; font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--color-muted-foreground); }
+}

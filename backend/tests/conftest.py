@@ -1,7 +1,9 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import hashlib
 import os
+import secrets
 import uuid
 
 import pytest
@@ -24,8 +26,10 @@ from app.models.agents.team import AgentTeam, AgentTeamMember  # noqa: F401
 from app.models.approvals.approval import ApprovalRequest  # noqa: F401
 from app.models.webhooks.webhook import Webhook  # noqa: F401
 from app.models.alerts.alert_threshold import AlertThreshold  # noqa: F401
+from app.models.api_key import ApiKey
 from app.models.base import Base
 from app.models.channels.channel import Channel, ChannelType
+from app.models.companion import CompanionInstallation
 from app.models.git.git_repo import GitProvider, GitRepo
 from app.models.definitions.definition import Definition
 from app.models.kanban.board import Board
@@ -40,6 +44,17 @@ from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.models.workspace_config import WorkspaceConfig  # noqa: F401
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def _empty_iap_claims_cache():
+    # Process-wide cache: a token verified (or mocked) in one test must not
+    # skip verification in the next.
+    from app.core.iap_claims_cache import clear_verified_iap_claims_cache
+
+    clear_verified_iap_claims_cache()
+    yield
+    clear_verified_iap_claims_cache()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -58,6 +73,12 @@ def _integrations_token_key():
     )
     os.environ.setdefault("GITHUB_OAUTH_CLIENT_ID", "test-client-id")
     os.environ.setdefault("GITHUB_OAUTH_CLIENT_SECRET", "test-client-secret")
+    # Off by default in code; the suite exercises the companion surfaces, and
+    # tests of the off state flip it back per test.
+    os.environ.setdefault("COMPANION_ENABLED", "true")
+    # Like COMPANION_ENABLED: the rich-capture tests run with it on and flip
+    # it off per test for the off state.
+    os.environ.setdefault("RICH_CAPTURE_ENABLED", "true")
     # Re-read settings so the new env vars are picked up by anything that
     # imported settings before they were set. Mutate the EXISTING singleton
     # in place instead of rebinding `config_module.settings`: test/app modules
@@ -121,29 +142,6 @@ async def db_session(db_engine):
     session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:
         yield session
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def _api_key_touch_uses_test_engine(db_engine, monkeypatch):
-    """Keep ApiKeyService's usage stamp off the real database.
-
-    The touch runs on EVERY API-key-authenticated request and deliberately opens
-    its own session (it must survive get_db's rollback), so unpatched it resolves
-    `app.database.async_session` — the real engine, pointed at whatever
-    DATABASE_URL says. With a dev Postgres up on localhost that means live
-    connections opened mid-suite: they bind to the per-test event loop, outlive
-    it, and produce order-dependent failures plus a hang at interpreter exit.
-    The touch swallows its own exceptions, so this leaks SILENTLY from any test
-    that authenticates with a vlr_ key, not just the ones that test stamping.
-
-    Autouse and unconditional: the hazard belongs to the auth path, not to the
-    handful of suites that assert on it.
-    """
-    factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
-    import app.services.api_key as api_key_module
-
-    monkeypatch.setattr(api_key_module, "async_session", factory)
-    return factory
 
 
 @pytest_asyncio.fixture
@@ -350,3 +348,83 @@ async def agent_client(db_session: AsyncSession, test_user: User, test_agent: Ag
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+async def _api_key_client(db_session: AsyncSession, key: ApiKey, raw_key: str):
+    """No get_current_user override — the Bearer vlr_ verifier runs for real."""
+    db_session.add(key)
+    await db_session.flush()
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {raw_key}"},
+    )
+
+
+def _raw_api_key(user: User, name: str, installation_id: uuid.UUID | None = None):
+    raw_key = "vlr_" + secrets.token_urlsafe(32)
+    key = ApiKey(
+        user_id=user.id,
+        name=name,
+        key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
+        key_prefix=raw_key[:8],
+        installation_id=installation_id,
+    )
+    return key, raw_key
+
+
+@pytest_asyncio.fixture
+async def installation_key_client(db_session: AsyncSession, test_user: User) -> AsyncClient:
+    """The key a companion installation hands the agents it launches: no linked
+    Agent row. Its person's full reach, except managing credentials."""
+    installation = CompanionInstallation(
+        owner_id=test_user.id,
+        name="Laptop",
+        platform="darwin",
+        token_hash=hashlib.sha256(secrets.token_bytes(16)).hexdigest(),
+        token_prefix="bpc_test",
+    )
+    db_session.add(installation)
+    await db_session.flush()
+    key, raw_key = _raw_api_key(test_user, "Companion · Laptop · agents", installation.id)
+    async with await _api_key_client(db_session, key, raw_key) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def plain_key_client(db_session: AsyncSession, test_user: User) -> AsyncClient:
+    """A person's own API key: no Agent, no installation — a human caller."""
+    key, raw_key = _raw_api_key(test_user, "personal")
+    async with await _api_key_client(db_session, key, raw_key) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def device_client(db_session: AsyncSession) -> AsyncClient:
+    """No credential override: device tokens and API keys are checked for real."""
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+def content_storage(tmp_path, monkeypatch):
+    """Session content bodies in a private local directory: no bucket, no
+    cloud credentials."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "LOCAL_STORAGE_DIR", str(tmp_path / "storage"))
+    monkeypatch.setattr(settings, "GCS_BUCKET", "")
+    return tmp_path / "storage"

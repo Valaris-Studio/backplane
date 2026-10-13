@@ -11,13 +11,14 @@ import (
 	"github.com/Valaris-Studio/backplane/runner/internal/llm"
 )
 
-// The MCP server retires tools behind deprecated aliases for one minor
-// version (backplane-mcp 0.7.0 → 0.8.0). A stored grant — loop_config.tools or
+// The MCP server retires tools behind deprecated aliases until an announced
+// version (0.7.0 announced 0.8.0; the removal has since moved to 0.10.0). A
+// stored grant — loop_config.tools or
 // a pipeline stage's llm.tools — that still names an alias keeps working until
 // the alias goes, and the only place that can see the alias coming is the
 // served catalog: every alias carries `_meta.deprecated` on tools/list.
 
-const deprecatedClaimCardEntry = `{"name":"claim_card","description":"DEPRECATED, removed in backplane-mcp 0.8.0: call next_assignment instead of claim_card.","inputSchema":{"type":"object"},"_meta":{"deprecated":{"replacement":"next_assignment","removed_in":"0.8.0"}}}`
+const deprecatedClaimCardEntry = `{"name":"claim_card","description":"DEPRECATED, removed in backplane-mcp 0.10.0: call next_assignment instead of claim_card.","inputSchema":{"type":"object"},"_meta":{"deprecated":{"replacement":"next_assignment","removed_in":"0.10.0"}}}`
 const liveGetCardEntry = `{"name":"get_card","description":"x","inputSchema":{"type":"object"}}`
 const liveSetBoardLoopEntry = `{"name":"set_board_loop","description":"x","inputSchema":{"type":"object"}}`
 
@@ -36,7 +37,7 @@ func TestReadToolsListResult_ParsesDeprecationMeta(t *testing.T) {
 	if served[1].Name != "claim_card" || served[1].Deprecated == nil {
 		t.Fatalf("claim_card must carry the deprecation: %+v", served[1])
 	}
-	if served[1].Deprecated.Replacement != "next_assignment" || served[1].Deprecated.RemovedIn != "0.8.0" {
+	if served[1].Deprecated.Replacement != "next_assignment" || served[1].Deprecated.RemovedIn != "0.10.0" {
 		t.Errorf("deprecation = %+v", served[1].Deprecated)
 	}
 }
@@ -44,16 +45,16 @@ func TestReadToolsListResult_ParsesDeprecationMeta(t *testing.T) {
 func TestDeprecatedGrants_MatchesEitherSpellingAndSkipsLiveTools(t *testing.T) {
 	served := []ServedMCPTool{
 		{Name: "get_card"},
-		{Name: "claim_card", Deprecated: &MCPDeprecation{Replacement: "next_assignment", RemovedIn: "0.8.0"}},
-		{Name: "append_note", Deprecated: &MCPDeprecation{Replacement: "update_note(mode='append')", RemovedIn: "0.8.0"}},
+		{Name: "claim_card", Deprecated: &MCPDeprecation{Replacement: "next_assignment", RemovedIn: "0.10.0"}},
+		{Name: "append_note", Deprecated: &MCPDeprecation{Replacement: "update_note(mode='append')", RemovedIn: "0.10.0"}},
 	}
 	granted := []string{"Bash", "mcp__valaris__get_card", "mcp__valaris__claim_card", "append_note", "mcp__valaris__claim_card"}
 
 	got := DeprecatedGrants(granted, served)
 
 	want := []DeprecatedGrant{
-		{Tool: "mcp__valaris__claim_card", Replacement: "next_assignment", RemovedIn: "0.8.0"},
-		{Tool: "append_note", Replacement: "update_note(mode='append')", RemovedIn: "0.8.0"},
+		{Tool: "mcp__valaris__claim_card", Replacement: "next_assignment", RemovedIn: "0.10.0"},
+		{Tool: "append_note", Replacement: "update_note(mode='append')", RemovedIn: "0.10.0"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("DeprecatedGrants = %+v, want %+v", got, want)
@@ -95,7 +96,7 @@ func TestLoopMode_DeprecatedGrantPreflight_WarnsOncePerRun(t *testing.T) {
 	if got := strings.Count(logs(), deprecatedGrantsWarning); got != 1 {
 		t.Errorf("deprecated-grant warning appeared %d times across 3 iterations, want exactly 1; log: %s", got, logs())
 	}
-	for _, want := range []string{"level=WARN", "mcp__valaris__claim_card", "next_assignment", "0.8.0"} {
+	for _, want := range []string{"level=WARN", "mcp__valaris__claim_card", "next_assignment", "0.10.0"} {
 		if !strings.Contains(logs(), want) {
 			t.Errorf("warning must carry %q; log: %s", want, logs())
 		}

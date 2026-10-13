@@ -17,6 +17,11 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from app.services.agents.context_dispatch_policy import (
+    canonical_agent_id,
+    enrollment_shape_errors,
+    prompt_slot_shape_errors,
+)
 from app.services.agents.lifecycle_kinds import LIFECYCLE_KINDS
 from app.services.llm_tiers import model_value_error
 
@@ -210,7 +215,17 @@ def canonicalize_pipeline_config(config: dict) -> dict:
     if "mode" not in scheduling:
         scheduling["mode"] = "priority"
 
+    _canonicalize_enrollment(config)
     return config
+
+
+def _canonicalize_enrollment(config: dict) -> None:
+    # UUID text case is not identity: store one spelling so set comparisons
+    # (new vs unchanged enrollment) and the policy revision are stable.
+    block = config.get("context_dispatch")
+    ids = block.get("required_agent_ids") if isinstance(block, dict) else None
+    if isinstance(ids, list):
+        block["required_agent_ids"] = [canonical_agent_id(v) or v for v in ids]
 
 
 def _mirror_lifecycle_llm_into_flat(stage: dict) -> None:
@@ -453,6 +468,16 @@ def validate_pipeline_config(
                         f"(expected one of {sorted(_SCHEDULING_MODES)})"
                     ),
                     value=mode,
+                )
+            )
+
+    if "context_dispatch" in config:
+        for suffix, message in enrollment_shape_errors(config["context_dispatch"]):
+            errors.append(
+                ValidationError(
+                    code="invalid_context_dispatch",
+                    field=f"context_dispatch{suffix}",
+                    message=message,
                 )
             )
 
@@ -881,6 +906,16 @@ def _validate_llm(llm: Any, path: str, errors: list[ValidationError]) -> None:
     if "tool_policy" in llm:
         _validate_tool_policy(llm.get("tool_policy"), f"{path}.tool_policy", errors)
 
+    if "prompt_slots" in llm:
+        for suffix, message in prompt_slot_shape_errors(llm["prompt_slots"]):
+            errors.append(
+                ValidationError(
+                    code="invalid_prompt_slots",
+                    field=f"{path}.prompt_slots{suffix}",
+                    message=message,
+                )
+            )
+
     _validate_llm_model_value(llm.get("model"), f"{path}.model", errors)
 
     if kind not in _POST_PROCESS_KINDS:
@@ -1155,6 +1190,16 @@ def _validate_context_sources(
                 )
             )
             continue
+
+        if "required" in source and not isinstance(source["required"], bool):
+            errors.append(
+                ValidationError(
+                    code="invalid_context_source_required",
+                    field=f"{item_path}.required",
+                    message=f"{item_path}.required must be true or false",
+                    value=source["required"],
+                )
+            )
 
         source_kind = source.get("kind")
         if not isinstance(source_kind, str) or not source_kind:
@@ -2105,6 +2150,14 @@ def _validate_lifecycle_params(
 
     if kind == "llm":
         _validate_llm_model_value(params.get("model"), f"{path}.model", errors)
+        # Not in the kind's params schema (unknown keys pass), but a named
+        # step's sources and tool policy are dispatched verbatim.
+        if "context_sources" in params:
+            _validate_context_sources(
+                params["context_sources"], f"{path}.context_sources", errors
+            )
+        if "tool_policy" in params:
+            _validate_tool_policy(params["tool_policy"], f"{path}.tool_policy", errors)
 
     if kind == "wake_role":
         roles = params.get("roles")

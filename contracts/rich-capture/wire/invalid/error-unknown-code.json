@@ -1,0 +1,10 @@
+{
+  "model": "ContentError",
+  "why": "no error says whether another owner's content exists",
+  "body": {
+    "detail": "x",
+    "error_code": "content_exists",
+    "error_params": {},
+    "context": null
+  }
+}

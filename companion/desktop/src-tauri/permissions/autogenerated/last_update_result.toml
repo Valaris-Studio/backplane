@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-last-update-result"
+description = "Enables the last_update_result command without any pre-configured scope."
+commands.allow = ["last_update_result"]
+
+[[permission]]
+identifier = "deny-last-update-result"
+description = "Denies the last_update_result command without any pre-configured scope."
+commands.deny = ["last_update_result"]

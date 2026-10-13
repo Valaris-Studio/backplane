@@ -1,0 +1,32 @@
+{
+  "model": "RichCaptureStatus",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/status",
+    "member": "rich_capture"
+  },
+  "body": {
+    "sources": [
+      {
+        "harness": "claude_code",
+        "state": "capturing"
+      },
+      {
+        "harness": "codex_desktop",
+        "state": "unsupported",
+        "detail": "no local rollout for this host"
+      },
+      {
+        "harness": "pi_cli",
+        "state": "stalled",
+        "detail": "spool full; reading resumes when uploads drain"
+      }
+    ],
+    "spool": {
+      "pending_bodies": 3,
+      "pending_bytes": 9437184,
+      "oldest_pending_at": "2026-10-08T14:03:12Z",
+      "failed_total": 0
+    }
+  }
+}

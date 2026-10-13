@@ -1,0 +1,274 @@
+/* Backplane Companion desktop tokens (DK-0).
+   Names follow frontend/src/index.css wherever a web token maps; color values are
+   the web app's, so the Companion reads as the same brand. Desktop-only additions
+   (material, window radius, springs) are grouped at the end of each section. */
+
+:root {
+  color-scheme: light;
+
+  /* ── Brand (identical to the web app) ─────────────────────────────── */
+  --color-brand-300: oklch(0.80 0.13 144);
+  --color-brand-400: oklch(0.72 0.17 143);
+  --color-brand-500: oklch(0.85 0.29 142);
+  --color-brand-600: oklch(0.52 0.16 145);
+  --color-brand-700: oklch(0.35 0.09 147);
+  --color-brand-900: oklch(0.22 0.01 145);
+  --color-brand-950: oklch(0.15 0.005 145);
+
+  /* ── Semantic surfaces and text ───────────────────────────────────── */
+  --color-background: oklch(0.985 0.008 145);
+  --color-foreground: oklch(0.236 0.026 145);
+  --color-popover: oklch(0.995 0.004 145);
+  --color-popover-foreground: oklch(0.236 0.026 145);
+  --color-card: oklch(0.992 0.004 145);
+  --color-primary: oklch(0.52 0.16 145);
+  --color-primary-foreground: oklch(0.99 0.005 145);
+  --color-secondary: oklch(0.952 0.013 145);
+  --color-secondary-foreground: oklch(0.288 0.031 145);
+  --color-muted: oklch(0.955 0.008 145);
+  /* 0.47 rather than the web's 0.52: secondary text sits on a translucent
+     material here, so it keeps AA even when the wallpaper lightens the surface. */
+  --color-muted-foreground: oklch(0.47 0.025 145);
+  --color-accent: oklch(0.942 0.02 145);
+  --color-accent-foreground: oklch(0.29 0.03 145);
+  --color-border: oklch(0.89 0.01 145);
+  --color-input: oklch(0.93 0.009 145);
+  --color-ring: oklch(0.52 0.16 145);
+  --color-surface-1: oklch(0.978 0.007 145);
+  --color-surface-2: oklch(0.965 0.009 145);
+  --color-surface-3: oklch(0.943 0.013 145);
+
+  /* Status: base hue for dots, fills and tints; *-foreground for text on a tint. */
+  --color-success: oklch(0.7 0.149 154.9);
+  --color-success-foreground: oklch(0.36 0.09 154.9);
+  --color-warning: oklch(0.812 0.149 82.6);
+  --color-warning-foreground: oklch(0.36 0.07 68.2);
+  --color-error: oklch(0.638 0.218 27.7);
+  --color-error-foreground: oklch(0.45 0.17 27.7);
+  --color-info: oklch(0.707 0.136 232.1);
+  --color-info-foreground: oklch(0.38 0.08 232.5);
+  --color-destructive: oklch(0.55 0.2 27.7);
+  --color-destructive-foreground: oklch(0.99 0.005 28.4);
+
+  /* Agents reuse the web data palette so an agent keeps its color across apps. */
+  --color-agent-claude: oklch(0.77 0.128 38.8);  /* data-7 */
+  --color-agent-codex: oklch(0.726 0.153 255.6); /* data-6 */
+  --color-agent-pi: oklch(0.694 0.173 300.4);    /* data-5 */
+
+  /* Desktop material: translucent popover with vibrancy. The native shell
+     (NSVisualEffectView / Mica) supplies the blur; the webview paints this tint. */
+  --material-popover: color-mix(in oklab, var(--color-popover) 82%, transparent);
+  --material-sheet: color-mix(in oklab, var(--color-popover) 96%, transparent);
+  --material-menu: color-mix(in oklab, var(--color-popover) 86%, transparent);
+  --material-blur: 30px;
+  --material-saturate: 180%;
+  --material-edge: color-mix(in oklab, white 70%, transparent);
+  --color-hairline: color-mix(in oklab, var(--color-foreground) 12%, transparent);
+  --color-row-hover: color-mix(in oklab, var(--color-foreground) 5%, transparent);
+  --color-row-press: color-mix(in oklab, var(--color-foreground) 9%, transparent);
+  --color-scrim: color-mix(in oklab, var(--color-brand-950) 26%, transparent);
+
+  /* ── Type: SF system stack, macOS sizes (body 13) ─────────────────── */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI Variable Text", "Segoe UI", Ubuntu, Cantarell, "Noto Sans", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI Variable Display", "Segoe UI", Ubuntu, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-caption: 11px;   --leading-caption: 14px;  --tracking-caption: 0.01em;
+  --text-footnote: 12px;  --leading-footnote: 16px; --tracking-footnote: 0;
+  --text-body: 13px;      --leading-body: 18px;     --tracking-body: -0.003em;
+  --text-title: 15px;     --leading-title: 20px;    --tracking-title: -0.01em;
+  --text-title-lg: 20px;  --leading-title-lg: 24px; --tracking-title-lg: -0.015em;
+  --text-display: 26px;   --leading-display: 30px;  --tracking-display: -0.022em;
+  --text-code: 30px;      --leading-code: 36px;     --tracking-code: 0.08em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ── Spacing: 8pt grid with a 4pt half-step ───────────────────────── */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --control-height-sm: 22px;
+  --control-height-md: 28px;
+  --control-height-lg: 32px;
+  --row-padding-x: 12px;
+  --row-padding-y: 8px;
+  --popover-width: 360px;
+  --popover-height: 540px;
+  --menubar-gap: 6px;
+
+  /* ── Radius: the web caps controls at 0.2rem; the window shell follows the OS ── */
+  --radius-cap: 3.2px;      /* web --radius-cap (0.2rem at 16px) */
+  --radius-chip: 4px;
+  --radius-control: 6px;
+  --radius-sheet: 10px;
+  --radius-window: 12px;    /* macOS menubar window; Windows 11 flyout uses 8px */
+  --radius-full: 999px;
+
+  /* ── Elevation ────────────────────────────────────────────────────── */
+  --shadow-control: 0 0.5px 1px color-mix(in oklab, var(--color-brand-950) 18%, transparent);
+  --shadow-popover:
+    0 0 0 0.5px color-mix(in oklab, var(--color-brand-950) 22%, transparent),
+    0 18px 48px -12px color-mix(in oklab, var(--color-brand-950) 34%, transparent),
+    0 6px 16px -6px color-mix(in oklab, var(--color-brand-950) 22%, transparent);
+  --shadow-sheet: 0 -8px 28px -12px color-mix(in oklab, var(--color-brand-950) 30%, transparent);
+  --shadow-menu:
+    0 0 0 0.5px color-mix(in oklab, var(--color-brand-950) 20%, transparent),
+    0 10px 28px -8px color-mix(in oklab, var(--color-brand-950) 32%, transparent);
+  --shadow-focus: 0 0 0 3px color-mix(in oklab, var(--color-ring) 38%, transparent);
+
+  /* ── Layers ───────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-popover: 100;
+  --z-sheet: 200;
+  --z-dialog: 300;
+  --z-menu: 400;
+  --z-toast: 500;
+
+  /* ── Motion ───────────────────────────────────────────────────────── */
+  --duration-press: 100ms;
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 260ms;
+  --duration-tick: 240ms;
+  --duration-pulse: 2000ms;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-standard: ease;
+
+  /* Distances; reduced motion zeroes them so every moment becomes a fade. */
+  --motion-scale-from: 0.965;
+  --motion-shift: 6px;
+  --motion-push: 24px;
+
+  /* Springs for Motion (mass 1). Ratio = damping / (2·√stiffness). */
+  --spring-popover-stiffness: 520;  --spring-popover-damping: 44;  /* ratio 0.96, ≈ bounce 0, 0.2 s */
+  --spring-push-stiffness: 380;     --spring-push-damping: 38;     /* ratio 0.97, ≈ bounce 0, 0.26 s */
+  --spring-sheet-stiffness: 300;    --spring-sheet-damping: 30;    /* ratio 0.87, ≈ bounce 0.1, 0.3 s: drag-dismissable */
+  --spring-list-stiffness: 420;     --spring-list-damping: 42;     /* ratio 1.02, critically damped */
+  --spring-badge-stiffness: 600;    --spring-badge-damping: 34;    /* ratio 0.69, one small overshoot: tray badge only */
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: oklch(0.166 0.018 148);
+  --color-foreground: oklch(0.94 0.011 145);
+  --color-popover: oklch(0.195 0.022 148);
+  --color-popover-foreground: oklch(0.94 0.011 145);
+  --color-card: oklch(0.205 0.02 148);
+  --color-primary: oklch(0.75 0.22 142);
+  --color-primary-foreground: oklch(0.188 0.026 145);
+  --color-secondary: oklch(0.254 0.021 148);
+  --color-secondary-foreground: oklch(0.924 0.011 145);
+  --color-muted: oklch(0.234 0.016 148);
+  --color-muted-foreground: oklch(0.74 0.019 145);
+  --color-accent: oklch(0.262 0.028 145);
+  --color-accent-foreground: oklch(0.953 0.012 145);
+  --color-border: oklch(0.308 0.019 148);
+  --color-input: oklch(0.286 0.017 148);
+  --color-ring: oklch(0.75 0.22 142);
+  --color-surface-1: oklch(0.192 0.019 148);
+  --color-surface-2: oklch(0.216 0.019 148);
+  --color-surface-3: oklch(0.252 0.023 148);
+  --color-success-foreground: oklch(0.86 0.18 154.9);
+  --color-warning-foreground: oklch(0.9 0.16 82.6);
+  --color-error-foreground: oklch(0.85 0.18 27.7);
+  --color-info-foreground: oklch(0.85 0.16 232.1);
+  --color-destructive: oklch(0.68 0.2 27.7);
+  --color-destructive-foreground: oklch(0.16 0.02 28);
+  --material-popover: color-mix(in oklab, var(--color-popover) 78%, transparent);
+  --material-sheet: color-mix(in oklab, var(--color-popover) 96%, transparent);
+  --material-menu: color-mix(in oklab, var(--color-popover) 84%, transparent);
+  --material-edge: color-mix(in oklab, white 12%, transparent);
+  --color-scrim: color-mix(in oklab, black 42%, transparent);
+  --shadow-popover:
+    0 0 0 0.5px color-mix(in oklab, black 70%, transparent),
+    0 18px 48px -12px color-mix(in oklab, black 60%, transparent),
+    0 6px 16px -6px color-mix(in oklab, black 40%, transparent);
+  --shadow-sheet: 0 -8px 28px -12px color-mix(in oklab, black 60%, transparent);
+  --shadow-menu:
+    0 0 0 0.5px color-mix(in oklab, black 70%, transparent),
+    0 10px 28px -8px color-mix(in oklab, black 55%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-background: oklch(0.166 0.018 148);
+    --color-foreground: oklch(0.94 0.011 145);
+    --color-popover: oklch(0.195 0.022 148);
+    --color-popover-foreground: oklch(0.94 0.011 145);
+    --color-card: oklch(0.205 0.02 148);
+    --color-primary: oklch(0.75 0.22 142);
+    --color-primary-foreground: oklch(0.188 0.026 145);
+    --color-secondary: oklch(0.254 0.021 148);
+    --color-secondary-foreground: oklch(0.924 0.011 145);
+    --color-muted: oklch(0.234 0.016 148);
+    --color-muted-foreground: oklch(0.74 0.019 145);
+    --color-accent: oklch(0.262 0.028 145);
+    --color-accent-foreground: oklch(0.953 0.012 145);
+    --color-border: oklch(0.308 0.019 148);
+    --color-input: oklch(0.286 0.017 148);
+    --color-ring: oklch(0.75 0.22 142);
+    --color-surface-1: oklch(0.192 0.019 148);
+    --color-surface-2: oklch(0.216 0.019 148);
+    --color-surface-3: oklch(0.252 0.023 148);
+    --color-success-foreground: oklch(0.86 0.18 154.9);
+    --color-warning-foreground: oklch(0.9 0.16 82.6);
+    --color-error-foreground: oklch(0.85 0.18 27.7);
+    --color-info-foreground: oklch(0.85 0.16 232.1);
+    --color-destructive: oklch(0.68 0.2 27.7);
+    --color-destructive-foreground: oklch(0.16 0.02 28);
+    --material-popover: color-mix(in oklab, var(--color-popover) 78%, transparent);
+    --material-sheet: color-mix(in oklab, var(--color-popover) 96%, transparent);
+    --material-menu: color-mix(in oklab, var(--color-popover) 84%, transparent);
+    --material-edge: color-mix(in oklab, white 12%, transparent);
+    --color-scrim: color-mix(in oklab, black 42%, transparent);
+    --shadow-popover:
+      0 0 0 0.5px color-mix(in oklab, black 70%, transparent),
+      0 18px 48px -12px color-mix(in oklab, black 60%, transparent),
+      0 6px 16px -6px color-mix(in oklab, black 40%, transparent);
+    --shadow-sheet: 0 -8px 28px -12px color-mix(in oklab, black 60%, transparent);
+    --shadow-menu:
+      0 0 0 0.5px color-mix(in oklab, black 70%, transparent),
+      0 10px 28px -8px color-mix(in oklab, black 55%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale-from: 1;
+    --motion-shift: 0px;
+    --motion-push: 0px;
+    --duration-slow: 140ms;
+    --duration-base: 140ms;
+    --duration-tick: 0ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-popover: var(--color-popover);
+    --material-menu: var(--color-popover);
+    --material-blur: 0px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-hairline: color-mix(in oklab, var(--color-foreground) 38%, transparent);
+    --material-popover: var(--color-popover);
+  }
+}

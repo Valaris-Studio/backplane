@@ -29,6 +29,7 @@ func TestClaudeCLI_Capabilities(t *testing.T) {
 		// --disallowedTools (Bash(...) prefix rules; nested shells escape).
 		EnforcesShellDeny:  true,
 		ShellDenyMechanism: "disallowed-tools",
+		PromptChannels:     PromptChannels{Version: 1, FreshInput: true, FreshSystem: true, ResumeInput: true, ResumeSystem: true},
 	}
 	if got != want {
 		t.Errorf("ClaudeCLI.Capabilities() = %+v, want %+v", got, want)

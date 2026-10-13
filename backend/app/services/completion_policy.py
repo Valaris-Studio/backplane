@@ -70,16 +70,15 @@ class CompletionPolicyService:
                 "Only a human workspace admin may select completion policy or mode",
                 error_code="admin_required",
             )
-        membership = await WorkspaceMemberRepository(self.db).get_membership(
+        # Current role, not the request session's membership object: callers
+        # authorize after lock waits a role change can commit during.
+        role = await WorkspaceMemberRepository(self.db).current_role(
             workspace_id, actor_id
         )
         if (
-            not membership
-            or (
-                operator
-                and membership.role not in (WorkspaceRole.admin, WorkspaceRole.owner)
-            )
-            or (member and membership.role == WorkspaceRole.viewer)
+            role is None
+            or (operator and role not in (WorkspaceRole.admin, WorkspaceRole.owner))
+            or (member and role == WorkspaceRole.viewer)
         ):
             raise ForbiddenError(
                 "Insufficient workspace permissions",

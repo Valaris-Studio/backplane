@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.workspace import WorkspaceContext, get_workspace
 from app.database import get_db
-from app.schemas.agents.execution import ExecutionListRead, ExecutionRead
+from app.schemas.agents.execution import (
+    ExecutionDetailRead,
+    ExecutionListRead,
+    ExecutionRead,
+)
 from app.services.agents.execution import ExecutionService
 
 router = APIRouter(
@@ -99,7 +103,7 @@ async def list_workspace_executions(
 # Declared last on purpose: FastAPI matches in registration order, so the
 # literal /skipped-card-ids above must be registered before this path param
 # or it would parse as an execution_id and 422.
-@router.get("/{execution_id}", response_model=ExecutionRead)
+@router.get("/{execution_id}", response_model=ExecutionDetailRead)
 async def get_workspace_execution(
     execution_id: uuid.UUID,
     ctx: WorkspaceContext = Depends(get_workspace),

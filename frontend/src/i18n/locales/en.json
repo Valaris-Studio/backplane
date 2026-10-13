@@ -95,6 +95,7 @@
     "home": "Home",
     "dashboard": "Dashboard",
     "boards": "Boards",
+    "sessions": "My sessions",
     "notes": "Notes",
     "resources": "Resources",
     "skills": "Skills",
@@ -312,6 +313,47 @@
       },
       "noteCard": "On {{card}}",
       "noteSection": "Section: {{heading}}"
+    },
+    "history": {
+      "overview": "History overview",
+      "total": "{{total}} events",
+      "observedBoard": "Observed board",
+      "returnReplay": "Return to replay",
+      "refresh": "Refresh history",
+      "newActivity": "New activity · Refresh",
+      "activityDistribution": "Activity across all history",
+      "bucket": "{{start}} to {{end}} · {{total}} events",
+      "date": "Date (UTC)",
+      "period": "Period",
+      "periods": {
+        "all": "All history",
+        "year": "Year",
+        "month": "Month",
+        "week": "Week"
+      },
+      "goToDate": "Go to date",
+      "earlier": "Earlier",
+      "later": "Later",
+      "selectedPeriod": "Selected period: {{start}} – {{end}}. Replay follows source order.",
+      "searchLabel": "Search all history",
+      "search": "Search",
+      "closeSearch": "Close search",
+      "searching": "Searching history…",
+      "searchResults": "History search results",
+      "noMatches": "No recorded summaries match this search.",
+      "moreMatches": "More results",
+      "localSearch": "Flag events in this window",
+      "expiredTitle": "History view expired",
+      "expired": "Refresh history to open a new view of the retained activity.",
+      "observation": "Board observed at {{time}}. This observation is separate from historical replay.",
+      "partial": "This reconstruction shows only evidenced state. The retained history has an unknown origin, missing snapshots, or conflicting evidence.",
+      "preparing": "Preparing historical state",
+      "preparationFailed": "Historical preparation interrupted",
+      "progress": "{{total}} events processed",
+      "checkProgress": "Check progress",
+      "analyticsScope": "Analytics cover this window through the selected event.",
+      "zoomDetail": "Selected period detail",
+      "bucketScope": "Counts describe whole recorded buckets, including clipped portions."
     }
   },
   "runner": {
@@ -765,7 +807,10 @@
     "namePlaceholder": "My Workspace",
     "slugLabel": "URL Slug",
     "slugPlaceholder": "my-workspace",
-    "slugHelper": "This will be used in the URL: /{{slug}}"
+    "slugHelper": "This will be used in the URL: /{{slug}}",
+    "slugInvalid": "Use only lowercase letters, numbers and single hyphens, with no hyphen at the start or end.",
+    "slugTaken": "That slug is already taken. Choose a different one.",
+    "slugUnderivable": "Couldn't derive a URL slug from this name. Type one to enable Create."
   },
   "boards": {
     "title": "Boards",
@@ -1275,6 +1320,12 @@
       "idCopied": "ID copied",
       "copyLink": "Copy link",
       "linkCopied": "Link copied"
+    },
+    "deepLink": {
+      "unavailable": "This note is unavailable or you no longer have access.",
+      "loadFailed": "Couldn't load this note.",
+      "back": "Back to notes",
+      "retry": "Retry"
     }
   },
   "channels": {
@@ -1734,6 +1785,12 @@
       "resolved": "Resolved",
       "live": "Active",
       "closedBy": "closed by: {{summary}}"
+    },
+    "companion": {
+      "mapping_created": "bound a project to this board from a companion device",
+      "mapping_updated": "changed a companion project binding",
+      "mapping_deleted": "removed a companion project binding",
+      "settings_updated": "changed companion capture settings"
     }
   },
   "editor": {
@@ -1747,6 +1804,9 @@
     "h3": "Heading 3",
     "bulletList": "Bullet List",
     "orderedList": "Numbered List",
+    "taskList": "Checklist",
+    "taskItemCheckbox": "Checklist item: {{text}}",
+    "taskItemEmpty": "empty item",
     "blockquote": "Quote",
     "horizontalRule": "Divider",
     "link": "Link",
@@ -2061,16 +2121,107 @@
     "backToTimeline": "Back to Timeline",
     "viewDetails": "View details",
     "inputSummary": "Input",
-    "renderedPrompt": "Rendered Prompt",
     "tabs": {
       "overview": "Overview",
       "prompt": "Prompt"
     },
     "prompt": {
-      "empty": "Prompt not captured — this execution predates prompt logging.",
-      "copy": "Copy",
-      "copied": "Prompt copied to clipboard",
-      "captured": "Captured"
+      "empty": "No prompt was retained for this execution.",
+      "copied": "Prompt copied to clipboard"
+    },
+    "receipts": {
+      "invocation": "Invocation",
+      "optionLabel": "Invocation {{ordinal}} · {{time}}",
+      "optionLabelUntimed": "Invocation {{ordinal}}",
+      "optionLatest": "{{label}} · Latest",
+      "older": "Older",
+      "newer": "Newer",
+      "refresh": "Refresh",
+      "retry": "Retry",
+      "prepared": "Prepared",
+      "notVerified": "Prompt retained. Agent execution and source use have not been verified.",
+      "useVerification": "Use verification: {{value}}",
+      "requiredFoundVerbatim": "Required context was found verbatim in this prompt.",
+      "noRequiredSources": "No context source was required for this invocation.",
+      "inclusionVerification": "Inclusion verification:",
+      "promptHeading": "Prompt",
+      "bytes_one": "{{formatted}} byte",
+      "bytes_other": "{{formatted}} bytes",
+      "copyPrompt": "Copy prompt",
+      "copySystemPrompt": "Copy system prompt",
+      "systemCopied": "System prompt copied to clipboard",
+      "systemPrompt": "System prompt",
+      "noSystemPrompt": "No system prompt retained",
+      "selectedContext": "Selected context",
+      "selectedContextHint": "Sources selected for this invocation, in configured order. Byte counts are each source's rendered size, not its share of the prompt.",
+      "noSources": "No shared context sources were selected.",
+      "occurrences_one": "{{count}} occurrence",
+      "occurrences_other": "{{count}} occurrences",
+      "renderedBytes_one": "{{formatted}} rendered byte",
+      "renderedBytes_other": "{{formatted}} rendered bytes",
+      "sourceSnapshot": "source snapshot",
+      "sourceOnly": "Source snapshot only; individual records were not traced.",
+      "noRecords": "No records were selected from this source.",
+      "candidatesLeftOut_one": "{{count}} candidate left out by context limits.",
+      "candidatesLeftOut_other": "{{count}} candidates left out by context limits.",
+      "required": "required",
+      "admittedOf": "{{admitted}} of {{candidates}} admitted",
+      "nothingMatched": "nothing matched",
+      "moreNotesMatched_one": "more than {{count}} note matched",
+      "moreNotesMatched_other": "more than {{count}} notes matched",
+      "inclusionExact": "found verbatim in prompt",
+      "inclusionNotObserved": "not found verbatim",
+      "inclusionEmpty": "rendered nothing",
+      "allLeftOut": "Every candidate was left out by context limits.",
+      "nothingMatchedSource": "Nothing matched this source.",
+      "windowFull": "More notes matched than this source reads (first {{limit}}). The rest were not considered or counted.",
+      "foundVerbatimTimes_one": "Found verbatim {{count}} time in the prompt ({{formatted}} bytes).",
+      "foundVerbatimTimes_other": "Found verbatim {{count}} times in the prompt ({{formatted}} bytes).",
+      "contributionUnknown": "Its exact block is not in the prompt; it may have been reworded or omitted. Its contribution is unknown.",
+      "renderedNothingDetail": "This source rendered nothing, so nothing could enter the prompt.",
+      "leftOutHeading": "Left out ({{total}})",
+      "leftOutBounded": "Showing {{shown}} of {{total}}. The receipt keeps a bounded list.",
+      "boardDefinition": "Board definition",
+      "sourceBlock": "Source block",
+      "rawBytes_one": "{{formatted}} raw byte",
+      "rawBytes_other": "{{formatted}} raw bytes",
+      "reasonRawBodyLimit": "Larger than the per-note read limit",
+      "reasonFetchBudget": "Note read budget already used",
+      "reasonRecordTooLarge": "Too large for an optional source",
+      "reasonSourceBudget": "Source size limit reached",
+      "reasonTotalBudget": "Shared context limit reached",
+      "reasonStructureDepthLimit": "Note structure nested too deeply",
+      "reasonStructureNodeLimit": "Note structure has too many parts",
+      "filter": "Filter",
+      "openCurrentNote": "(opens the current note)",
+      "noteUpdated": "Note updated {{time}}",
+      "noteId": "Note {{id}}",
+      "evidence": "Receipt evidence",
+      "contextRevision": "Context revision",
+      "promptDigest": "Prompt SHA-256",
+      "systemPromptDigest": "System prompt SHA-256",
+      "manifestVersion": "Manifest version",
+      "manifestVersionValue": "schema {{schema}} · {{renderer}}",
+      "clientRequestId": "Client request ID",
+      "sourceEvidenceHeading": "Source {{order}}: {{alias}}",
+      "sourceDigest": "Rendered source SHA-256",
+      "recordEvidenceHeading": "Record {{order}}: {{title}} ({{id}})",
+      "recordRevisionDigest": "Note revision SHA-256",
+      "recordRenderedDigest": "Rendered record SHA-256",
+      "notRecorded": "Context receipt not recorded.",
+      "noSnapshotYet": "No invocation snapshot yet.",
+      "legacyPrompt": "Legacy prompt",
+      "legacyExplanation": "Last prompt saved on this execution. It is not tied to a recorded invocation.",
+      "historyUnsupported": "This server does not report invocation history.",
+      "historyLoadFailed": "Couldn't load invocation history.",
+      "snapshotLoadFailed": "Couldn't load this invocation snapshot.",
+      "snapshotUnavailable": "This invocation snapshot is unavailable.",
+      "accessLost": "You no longer have access to this invocation snapshot.",
+      "staleSnapshot": "Showing the last loaded snapshot. Refreshing it failed.",
+      "liveUnavailable": "Live updates unavailable. Use Refresh to check for new invocations.",
+      "newInvocation": "New invocation available",
+      "viewLatest": "View latest",
+      "showing": "Showing invocation {{ordinal}}"
     },
     "status": {
       "completed": "Completed",
@@ -9130,6 +9281,761 @@
       "board_definition": "Board definition",
       "section_separators": "Section separators",
       "note": "Note"
+    }
+  },
+  "companionPairing": {
+    "title": "Connect a companion device",
+    "subtitle": "A Backplane Companion is asking to connect to your account.",
+    "codeLabel": "Pairing code",
+    "continue": "Continue",
+    "loading": "Checking the code…",
+    "device": "Device",
+    "unnamedDevice": "Unnamed device",
+    "platform": "Platform",
+    "requested": "Requested",
+    "expires": "Expires",
+    "warning": "Only approve if you just started this on your own computer. Backplane will never ask you for this code.",
+    "approve": "Approve",
+    "deny": "Deny",
+    "rateLimited": "Too many codes tried. Wait a few minutes and try again.",
+    "unavailable": "The code could not be checked. Try again.",
+    "signInBody": "Sign in to review this device.",
+    "signIn": "Sign in",
+    "outcome": {
+      "companionOff": {
+        "title": "Companion is not available",
+        "body": "This Backplane server does not accept companion devices. Ask your administrator to enable the companion."
+      },
+      "approved": {
+        "title": "Device connected",
+        "body": "The companion on that computer finishes connecting on its own. You can close this page."
+      },
+      "denied": {
+        "title": "Request denied",
+        "body": "The device was not connected. If you did start this, start pairing again from the companion."
+      },
+      "expired": {
+        "title": "Code expired",
+        "body": "This code is no longer valid. Start pairing again from the companion to get a new one."
+      },
+      "invalid": {
+        "title": "Code not recognized",
+        "body": "Check the code the companion shows and enter it again."
+      }
+    }
+  },
+  "sessions": {
+    "title": "My sessions",
+    "description": "Agent sessions Companion captured on your devices. Only you can see them.",
+    "captureOff": {
+      "title": "Session capture is off here",
+      "description": "This Backplane doesn't accept sessions from Companion. Whoever runs it can turn capture on.",
+      "docsLink": "How capture works"
+    },
+    "firstRun": {
+      "title": "See what your agents did",
+      "description": "Companion records the sessions your coding agents run, and links them to the cards and notes they touched.",
+      "stepsLabel": "How to start",
+      "install": "Install Companion",
+      "installBody": "On the computer where your agents run.",
+      "signIn": "Sign in from Companion",
+      "signInBody": "Approve the request here.",
+      "folder": "Choose a folder to capture",
+      "folderBody": "You pick what gets sent."
+    },
+    "loadError": {
+      "title": "Couldn't load your sessions",
+      "description": "Backplane didn't answer. Your sessions are safe. Try again in a moment.",
+      "agentKey": "Agent keys can't read captured sessions.",
+      "retry": "Try again"
+    },
+    "noMatch": {
+      "title": "No sessions match",
+      "description": "Nothing in {{period}} matches {{filters}}.",
+      "descriptionNoFilters": "Nothing was captured in {{period}}.",
+      "clear": "Clear filters",
+      "widen": "Try 30 days",
+      "subagentsOnly": "Only subagent sessions were captured, and subagents are hidden."
+    },
+    "period": {
+      "label": "Period",
+      "today": "Today",
+      "d7": "7 days",
+      "d30": "30 days",
+      "phrase": {
+        "today": "today",
+        "d7": "the last 7 days",
+        "d30": "the last 30 days"
+      }
+    },
+    "filters": {
+      "label": "Filter sessions",
+      "agents": "Agents",
+      "agentToggle": "Only {{agent}}",
+      "state": "State",
+      "stateAny": "Any state",
+      "board": "Board",
+      "boardAny": "Any board",
+      "boardSummary": "the {{board}} board",
+      "linkedOnly": "Linked work only",
+      "linkedOnlySummary": "linked work only",
+      "showSubagents": "Show subagents",
+      "clear": "Clear filters",
+      "search": "Search sessions",
+      "searchPlaceholder": "Search titles, repos, branches",
+      "querySummary": "“{{q}}”",
+      "sort": "Sort",
+      "sorts": {
+        "recent": "Recent activity",
+        "started": "Started",
+        "duration": "Longest",
+        "tokens": "Most tokens",
+        "cost": "Highest cost"
+      },
+      "more": "Filters"
+    },
+    "states": {
+      "active": "Live",
+      "idle": "Idle",
+      "ended": "Ended",
+      "incomplete": "Incomplete",
+      "paused": "Paused",
+      "disconnected": "Disconnected",
+      "usageOnly": "Usage only"
+    },
+    "stateHints": {
+      "gaps_one": "{{count}} record wasn't captured",
+      "gaps_other": "{{count}} records weren't captured",
+      "abandoned": "No end signal arrived, so the session closed after a day of silence",
+      "paused": "Capture is paused for this device, agent or folder",
+      "disconnected": "This device stopped checking in"
+    },
+    "groups": {
+      "live": "Live now",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "liveHint": "Updates as they run"
+    },
+    "columns": {
+      "agent": "Agent",
+      "session": "Session",
+      "linkedWork": "Linked work",
+      "time": "Time",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "state": "State"
+    },
+    "row": {
+      "titleWithheld": "{{folder}} · title not sent at Metadata",
+      "titleWithheldNoFolder": "Title not sent at Metadata",
+      "usageOnlyTitle": "{{agent}} session",
+      "usageOnlyMeta": "Usage only: this agent reported tokens, not activity",
+      "noLinkedWork": "No linked work",
+      "moreLinks": "+{{count}}",
+      "moreLinksLabel_one": "{{count}} more linked item",
+      "moreLinksLabel_other": "{{count}} more linked items",
+      "subagents_one": "{{count}} subagent",
+      "subagents_other": "{{count}} subagents",
+      "repository": "Repository",
+      "branch": "Branch",
+      "device": "Device"
+    },
+    "work": {
+      "changed": "Changed",
+      "consulted": "Consulted",
+      "card": "Card",
+      "note": "Note",
+      "correlatedHint": "Matched by timing, not by an exact call id",
+      "accessible": "{{relation}}: {{title}}",
+      "accessibleCorrelated": "{{relation}}: {{title}}, matched by timing",
+      "loadingTitle": "Loading title"
+    },
+    "cost": {
+      "apiEquivalent": "API-equivalent",
+      "spend": "spend",
+      "estimated": "est.",
+      "estimatedHint": "Estimated from list prices",
+      "incompleteHint": "Some usage has no price yet",
+      "none": "No price yet"
+    },
+    "list": {
+      "caption": "Your captured sessions, grouped by day",
+      "showing_one": "Showing {{count}} session in {{period}}",
+      "showing_other": "Showing {{count}} sessions in {{period}}",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "newSessions_one": "{{count}} session updated",
+      "newSessions_other": "{{count}} sessions updated",
+      "showingOf_one": "Showing {{shown}} of {{count}} session in {{period}}",
+      "showingOf_other": "Showing {{shown}} of {{count}} sessions in {{period}}"
+    },
+    "hidePrompts": {
+      "label": "Presenter mode",
+      "hint": "Blurs prompts, titles, call arguments and output while you share your screen. Tool names, file paths and command names stay readable.",
+      "hidden": "Prompt hidden",
+      "contentHidden": "Content hidden"
+    },
+    "facts": {
+      "agent": "Agent",
+      "model": "Model",
+      "repository": "Repository",
+      "board": "Board",
+      "device": "Device",
+      "started": "Started <time>{{time}}</time>",
+      "since": "since {{time}}",
+      "wallTime": "wall time",
+      "tokens": "tokens"
+    },
+    "detail": {
+      "back": "My sessions",
+      "label": "Session",
+      "subagentOf": "Subagent of",
+      "parentSession": "the parent session",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "copyFailed": "Couldn't copy the link",
+      "moreActions": "More actions",
+      "delete": "Delete session",
+      "deleteTitle": "Delete this session?",
+      "deleteBody": "Deletes this session from Backplane. It stays on your device.",
+      "deleteBodyChildren_one": "Deletes this session and its {{count}} subagent session from Backplane. It stays on your device.",
+      "deleteBodyChildren_other": "Deletes this session and its {{count}} subagent sessions from Backplane. It stays on your device.",
+      "deleteConfirm": "Delete",
+      "deleted": "Session deleted",
+      "deleteFailed": "Couldn't delete the session",
+      "notFound": {
+        "title": "This session isn't here anymore",
+        "description": "It may have been deleted, or removed by your retention rule.",
+        "back": "Back to My sessions"
+      },
+      "loadError": {
+        "title": "Couldn't load this session",
+        "description": "Backplane didn't answer. The session is safe. Try again in a moment."
+      },
+      "tabs": {
+        "label": "Session sections",
+        "timeline": "Timeline",
+        "linkedWork": "Linked work",
+        "cost": "Cost"
+      }
+    },
+    "banners": {
+      "usageOnlyTitle": "Usage only",
+      "usageOnlyBody": "{{agent}} reported token usage for this session, but no activity. There's no timeline to show, and this doesn't mean nothing happened.",
+      "incompleteTitle_one": "{{count}} record wasn't captured",
+      "incompleteTitle_other": "{{count}} records weren't captured",
+      "incompleteBody": "Some of this session is missing, so the timeline and totals may be short.",
+      "levelChangedTitle": "Captured at more than one level",
+      "levelChangedBody": "Part of this session was captured at {{first}} and part at {{second}}."
+    },
+    "timeline": {
+      "title": "Timeline",
+      "turns_one": "{{count}} turn",
+      "turns_other": "{{count}} turns",
+      "calls_one": "{{count}} call",
+      "calls_other": "{{count}} calls",
+      "failed_one": "{{count}} failed",
+      "failed_other": "{{count}} failed",
+      "reasoning_one": "{{count}} reasoning block",
+      "reasoning_other": "{{count}} reasoning blocks",
+      "filterLabel": "Show calls",
+      "filters": {
+        "all": "All calls",
+        "work": "Backplane work",
+        "failures": "Failures"
+      },
+      "you": "You",
+      "beforeFirstPrompt": "Before the first prompt",
+      "turnLabel": "Turn at {{time}}",
+      "running": "Running",
+      "promptWithheld": "Prompt not sent",
+      "promptWithheldSize": "Prompt not sent · {{size}} as reported",
+      "argsWithheld": "Arguments not sent",
+      "argsWithheldSize": "Arguments not sent · {{size}} as reported",
+      "outputWithheld": "Output withheld",
+      "outputWithheldSize": "Output withheld · {{size}} as reported",
+      "outputWithheldLabel": "Output not sent at this capture level",
+      "outputWithheldLabelSize": "Output not sent at this capture level, {{size}} as reported",
+      "noOutput": "No output",
+      "outcome": {
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "exit": "Exit {{code}}",
+        "running": "Running",
+        "unknown": "No result captured"
+      },
+      "showDetails": "Show details for {{name}}",
+      "detail": {
+        "error": "Error",
+        "output": "Output",
+        "callId": "Call id",
+        "loading": "Loading the call…",
+        "loadError": "Couldn't load this call.",
+        "outputStayed": "Output stayed on your device.",
+        "noOutput": "The call produced no output.",
+        "copyOutput": "Copy output",
+        "copied": "Copied",
+        "truncated": "Showing the first 16 KB"
+      },
+      "collapsedRun_one": "{{count}} more call",
+      "collapsedRun_other": "{{count}} more calls",
+      "show": "Show",
+      "subagent": {
+        "untitled": "Subagent session",
+        "open": "Open",
+        "openLabel": "Open subagent session: {{title}}",
+        "calls_one": "{{count}} call",
+        "calls_other": "{{count}} calls",
+        "callsSoFar_one": "{{count}} call so far",
+        "callsSoFar_other": "{{count}} calls so far",
+        "tokens": "{{value}} tokens"
+      },
+      "idle": "Idle {{duration}}",
+      "loadEarlier": "Load earlier calls",
+      "loadingEarlier": "Loading earlier calls…",
+      "liveFooter": "New calls appear as they arrive",
+      "newCalls_one": "{{count}} new call",
+      "newCalls_other": "{{count}} new calls",
+      "empty": "No calls were captured for this session yet.",
+      "emptyWork": "No call in this session touched Backplane work.",
+      "emptyFailures": "No call in this session failed.",
+      "loadError": "Couldn't load the timeline.",
+      "retry": "Try again",
+      "showRun_one": "Show {{count}} more call",
+      "showRun_other": "Show {{count}} more calls",
+      "turnKeysHint": "Press [ or ] to move between turns"
+    },
+    "rail": {
+      "cost": {
+        "title": "Cost",
+        "auth": {
+          "subscription": "Subscription",
+          "api": "API account",
+          "enterprise": "Enterprise",
+          "unknown": "Unknown login"
+        },
+        "explainSubscription": "What these tokens would cost at API prices. Your subscription covers them, so this isn't money spent.",
+        "explainApiEquivalent": "What these tokens would cost at API prices. This isn't money spent.",
+        "explainSpend": "Billed to your API account.",
+        "none": "No price yet for this session's usage.",
+        "model": "Model",
+        "tokens": "Tokens",
+        "amount": "Cost",
+        "unknownModel": "Unknown model",
+        "unpriced": "Some usage has no price yet",
+        "priceTable": "Price table {{version}}"
+      },
+      "tokens": {
+        "title": "Tokens",
+        "cacheRead": "Cache read",
+        "input": "Input",
+        "cacheWrite": "Cache write",
+        "output": "Output",
+        "reasoning": "Reasoning",
+        "reasoningHint": "Part of output",
+        "barLabel": "Token mix: {{summary}}"
+      },
+      "linked": {
+        "title": "Linked work",
+        "none": "This session didn't change or consult any card or note.",
+        "calls_one": "{{count}} call",
+        "calls_other": "{{count}} calls",
+        "card": "card",
+        "note": "note",
+        "matchedByTiming": "matched by timing",
+        "boardName": "{{board}} board"
+      },
+      "captured": {
+        "title": "What was captured",
+        "levels": {
+          "metadata": "Metadata",
+          "standard": "Standard",
+          "full": "Full",
+          "rich": "Rich"
+        },
+        "levelMeter": "Capture level: {{level}}",
+        "legacy": "Captured before levels were recorded",
+        "sent": {
+          "metadata": "Which tools ran, when, and for how long",
+          "standard": "Prompts, commands and tool arguments",
+          "full": "Prompts, commands, arguments and tool output up to 16 KB",
+          "rich": "Prompts, replies, complete tool output, edits and attached images"
+        },
+        "kept": {
+          "metadata": "Prompts, commands and output stayed on your device",
+          "standard": "Tool output and the agent's replies stayed on your device",
+          "full": "The agent's replies stayed on your device",
+          "rich": "Anything outside the bound folder stayed on your device"
+        },
+        "coverage": "Coverage",
+        "coverageFull": "Full activity, no gaps",
+        "coverageUsageOnly": "Usage only",
+        "coverageGaps_one": "{{count}} record wasn't captured",
+        "coverageGaps_other": "{{count}} records weren't captured",
+        "folder": "Folder"
+      },
+      "subagents": {
+        "title": "Subagents"
+      }
+    },
+    "duration": {
+      "seconds": "{{s}}s",
+      "minutes": "{{m}}m",
+      "hours": "{{h}}h",
+      "hoursMinutes": "{{h}}h {{m}}m",
+      "days": "{{d}}d",
+      "daysHours": "{{d}}d {{h}}h"
+    },
+    "bytes": {
+      "b": "{{value}} B",
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    },
+    "linked": {
+      "cardTitle": "Your sessions on this card",
+      "noteTitle": "Your sessions on this note",
+      "allSessions": "All my sessions",
+      "countLabel_one": "session",
+      "countLabel_other": "sessions",
+      "noneCard": "None of your sessions touched this card.",
+      "noneNote": "None of your sessions touched this note.",
+      "privacyCard": "Only your own sessions are listed. Other people's sessions on this card stay private to them.",
+      "privacyNote": "Only your own sessions are listed. Other people's sessions on this note stay private to them.",
+      "subagentOfAbove": "subagent of the session above",
+      "spanLive": "{{start}} – now",
+      "loadError": "Couldn't load your sessions here."
+    },
+    "totals": {
+      "label": "Totals for {{period}}",
+      "partial": "Totals ignore search, state and linked-work filters.",
+      "unpriced": "Some usage has no price yet",
+      "sessions_one": "session",
+      "sessions_other": "sessions",
+      "partialAgent": "Totals count every agent.",
+      "unpricedLabel": "plus usage with no price yet"
+    },
+    "liveCount_one": "{{count}} live session",
+    "liveCount_other": "{{count}} live sessions",
+    "tabs": {
+      "label": "My sessions sections",
+      "sessions": "Sessions",
+      "devices": "Devices"
+    },
+    "rhythm": {
+      "title": "Session rhythm",
+      "wallTime": "wall time",
+      "overlapNote": "subagent time overlaps and is counted once",
+      "legend": {
+        "label": "Legend",
+        "prompt": "Your prompts",
+        "tool": "Tools",
+        "file": "File edits",
+        "work": "Backplane work",
+        "error": "Failures"
+      },
+      "mainLane": "Main thread",
+      "idle": "idle {{duration}}",
+      "now": "now",
+      "gaps_one": "{{count}} record wasn't captured; when is unknown",
+      "gaps_other": "{{count}} records weren't captured; when is unknown",
+      "summary": "Session rhythm from {{start}} to {{end}}: {{counts}}",
+      "prompts_one": "{{count}} prompt",
+      "prompts_other": "{{count}} prompts",
+      "calls_one": "{{count}} call",
+      "calls_other": "{{count}} calls",
+      "failures_one": "{{count}} failed",
+      "failures_other": "{{count}} failed",
+      "subagents_one": "{{count}} subagent",
+      "subagents_other": "{{count}} subagents",
+      "quiet": "no activity",
+      "stripLabel": "Activity over time. Use the arrow keys to move, Enter to jump to that turn.",
+      "tableCaption": "Rhythm as a list",
+      "time": "Time",
+      "loadError": "Couldn't load the rhythm."
+    },
+    "devices": {
+      "states": {
+        "capturing": "Capturing",
+        "paused": "Paused",
+        "disconnected": "Disconnected",
+        "signedOut": "Signed out"
+      },
+      "facts": {
+        "version": "Companion {{version}}",
+        "checkedIn": "Checked in {{when}}",
+        "neverCheckedIn": "Never checked in",
+        "queue_one": "{{count}} record waiting to upload",
+        "queue_other": "{{count}} records waiting to upload",
+        "signedOutOn": "Signed out {{date}}",
+        "sessionsStay": "Its sessions stay in your list"
+      },
+      "agentStates": {
+        "capturing": "capturing",
+        "not_installed": "not installed",
+        "disabled": "turned off",
+        "error": "error"
+      },
+      "actions": {
+        "pause": "Pause capture",
+        "resume": "Resume capture",
+        "more": "More actions for {{device}}",
+        "rename": "Rename",
+        "renameTitle": "Rename this device",
+        "renameLabel": "Device name",
+        "save": "Save",
+        "cancel": "Cancel",
+        "deleteSessions": "Delete this device's sessions",
+        "deleteSessionsTitle": "Delete every session from this device?",
+        "deleteSessionsBody": "Permanently deletes every session this device captured, in all your workspaces, not only this one. This can't be undone. Linked cards and notes are kept; only their links to these sessions go away. The copies on the device itself aren't touched.",
+        "deleteSessionsConfirm": "Delete all sessions",
+        "deleteSessionsCountTitle_one": "Delete {{count}} session from this device?",
+        "deleteSessionsCountTitle_other": "Delete {{count}} sessions from this device?",
+        "deleteSessionsCountConfirm_one": "Delete {{count}} session",
+        "deleteSessionsCountConfirm_other": "Delete {{count}} sessions",
+        "deleted_one": "Deleted {{count}} session",
+        "deleted_other": "Deleted {{count}} sessions",
+        "signOut": "Sign out this device",
+        "signOutTitle": "Sign out this device?",
+        "signOutBody": "It stops sending sessions until you pair it again. Sessions it already sent stay in your list.",
+        "signOutConfirm": "Sign out",
+        "renamed": "Device renamed",
+        "failed": "Couldn't update the device"
+      },
+      "folders": {
+        "title": "Folders sending to {{workspace}}",
+        "autoMatch": "Matching repos bind automatically",
+        "folder": "Folder",
+        "board": "Board",
+        "sent": "What's sent",
+        "on": "On",
+        "noBoard": "No board",
+        "noRepo": "no repository",
+        "origin": {
+          "explicit": "added by you",
+          "auto_repo": "matched by repo"
+        },
+        "toggle": "Capture {{folder}}",
+        "levelLabel": "What {{folder}} sends",
+        "levelChanged": "Applies to what's captured next. Sessions already sent keep what they sent.",
+        "otherWorkspaces_one": "{{count}} folder sends to other workspaces",
+        "otherWorkspaces_other": "{{count}} folders send to other workspaces",
+        "none": "No folder on this device sends to this workspace yet.",
+        "autoRepo": "Any matching repository",
+        "capture": {
+          "device_unsupported": "Captured as Full until this computer's Companion is updated.",
+          "server_disabled": "Captured as Full: rich capture is off on this Backplane."
+        },
+        "richUnavailable": "Rich capture isn't enabled on this Backplane."
+      },
+      "policy": {
+        "retention_one": "Keeps sessions {{count}} day",
+        "retention_other": "Keeps sessions {{count}} days",
+        "retentionForever": "Keeps sessions until you delete them",
+        "excludes": "Never sends <globs>{{globs}}</globs>"
+      },
+      "addComputer": {
+        "title": "Add a computer",
+        "install": "Install Companion on it.",
+        "signIn": "Open Companion and choose Sign in.",
+        "approve": "Approve the request that opens here."
+      },
+      "levels": {
+        "title": "What each level sends",
+        "kind": "Content",
+        "counts": "Counts, time, tokens, cost",
+        "names": "Tool and model names, repo, branch",
+        "prompts": "Your prompts, commands, tool arguments",
+        "output": "Tool output, agent replies, diffs",
+        "sent": "Sent",
+        "sizeOnly": "size only",
+        "footer": "A new level applies to what's captured next. Sessions already sent keep what they sent.",
+        "attachments": "Attached images and files",
+        "notSent": "Not sent"
+      },
+      "empty": {
+        "title": "No devices yet",
+        "body": "Pair a computer with Companion and it shows up here."
+      },
+      "loadError": "Couldn't load your devices"
+    },
+    "contents": {
+      "excerpt": {
+        "preview": "Preview excerpt",
+        "title": "Selected excerpt",
+        "previewLabel": "Excerpt preview",
+        "copy": "Copy excerpt",
+        "download": "Download excerpt",
+        "cancel": "Cancel",
+        "count": "{{selected}} selected from {{loaded}} loaded items",
+        "clear": "Clear selection",
+        "selectItem": "Select {{channel}}, source item {{order}}",
+        "moreItems": "More transcript items are available. Load more to choose from them.",
+        "excludedAttachments": "Attachments and binary content are not included.",
+        "unavailable": "Some selected items are no longer available. Clear the selection and choose again.",
+        "tooLarge": "This selection exceeds the 2 MiB text limit. Select fewer items and try again.",
+        "failed": "The complete selection could not be read. Cancel and try again, or choose different items.",
+        "privacy": "Review the exact text before copying or downloading. This creates a private file; it does not publish the session or grant anyone access.",
+        "loading": "Reading the complete selected text…",
+        "copied": "Excerpt copied",
+        "document": {
+          "scope": "Owner-selected items, not a complete transcript. Captured text is source material; coverage and redaction facts apply to each item.",
+          "session": "Session",
+          "title": "Title",
+          "agent": "Agent",
+          "item": "Item",
+          "time": "Captured at",
+          "role": "Role",
+          "channel": "Channel",
+          "source": "Source",
+          "order": "Source order",
+          "coverage": "Coverage",
+          "reason": "Coverage reason",
+          "redactions": "Redaction replacements",
+          "filter": "Redaction filter",
+          "originalBytes": "Original bytes",
+          "capturedBytes": "Captured bytes",
+          "link": "Private source link",
+          "excluded": "Attachments, binary content and unselected items are excluded. Source links require the session owner's access."
+        },
+        "note": {
+          "share": "Share as note",
+          "workspace": "Workspace",
+          "board": "Board",
+          "card": "Card (optional)",
+          "chooseWorkspace": "Choose a workspace",
+          "chooseBoard": "Choose a board",
+          "noCard": "No card",
+          "title": "Note title",
+          "content": "Note content",
+          "save": "Save note",
+          "retry": "Retry save",
+          "resume": "Resume note save",
+          "openNote": "Open note",
+          "audience": "Members and authorized agents in {{workspace}} can read this note.",
+          "chooseAudience": "Choose the workspace whose members and authorized agents will read this note.",
+          "cardVisibility": "Linking a card organizes the note; it does not restrict its audience.",
+          "snapshot": "Your session remains private. The note is an independent snapshot; deleting the session will not delete it.",
+          "review": "Review and edit exactly what will be saved. Captured bodies start as literal text; edits are your curation. Media uploads are unavailable in this local draft.",
+          "sourceChanged": "The selected source changed or is unavailable. Close this draft and select the items again.",
+          "tooMany": "A shared note can include at most 256 selected items. Select fewer items to share; local copy and download are still available.",
+          "tooLarge": "The reviewed document exceeds 16 MiB. Shorten the draft before saving.",
+          "invalidDocument": "The note document is unavailable. Close this draft and create a new preview.",
+          "boardFrozen": "This board is frozen. Choose a writable board or ask an administrator to unfreeze it.",
+          "permission": "You no longer have write permission in this destination. Check your access before saving.",
+          "destinationUnavailable": "The destination is unavailable. Check the workspace, board and optional card.",
+          "unknown": "We could not confirm the save. The note may have been saved. Retry save checks the same request; your reviewed draft is retained.",
+          "requestConflict": "This request conflicts with a different saved payload. Keep this draft and check the destination before starting a new save.",
+          "deleted": "The saved note was deleted. This request cannot recreate it.",
+          "rejected": "The note could not be saved. Check the destination and retry the same request.",
+          "serverUnsupported": "This server does not support saving excerpts right now. Keep this draft and retry after the server is updated.",
+          "saving": "Saving the reviewed note. Closing this dialog does not cancel the request.",
+          "saved": "Note saved.",
+          "hide": "Hide for now",
+          "revise": "Revise draft"
+        }
+      },
+      "title": "Transcript",
+      "filterLabel": "Records",
+      "filters": {
+        "conversation": "Conversation",
+        "everything": "Everything"
+      },
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "notLoadedTarget": "Load more to reach this item.",
+      "onlyRaw": "Only raw records were captured. Choose Everything to see them.",
+      "loadError": "Couldn't load the transcript.",
+      "refused": "You can't read this session's content.",
+      "retry": "Try again",
+      "copyLink": "Copy link to this item",
+      "labels": {
+        "you": "You",
+        "agent": "Agent",
+        "reasoning": "Reasoning",
+        "summary": "Summary",
+        "instruction": "Instructions",
+        "attachment": "Attachment",
+        "error": "Error",
+        "native_record": "Raw record",
+        "call": "Tool call"
+      },
+      "parts": {
+        "tool_input": "Input",
+        "tool_output": "Output",
+        "command_output": "Output",
+        "diff": "Edit",
+        "file_content": "File",
+        "error": "Error",
+        "withPath": "{{part}} · {{path}}"
+      },
+      "source": {
+        "claude_transcript": "Claude Code transcript",
+        "codex_rollout": "Codex rollout",
+        "pi_session": "Pi session",
+        "hook": "Hook",
+        "otlp": "Telemetry",
+        "plugin": "Plugin",
+        "reference": "{{source}} #{{order}}"
+      },
+      "media": "{{type}} · {{size}}",
+      "coverage": {
+        "captured": "Captured",
+        "partially_redacted": "Partly masked",
+        "withheld_by_policy": "Withheld",
+        "source_unavailable": "Not available at the source",
+        "not_yet_uploaded": "Uploading",
+        "collection_failed": "Couldn't collect",
+        "truncated": "Cut short",
+        "expired": "Expired"
+      },
+      "reasons": {
+        "secret_filter_one": "{{count}} secret masked.",
+        "secret_filter_other": "{{count}} secrets masked.",
+        "content_level": "Not kept: rich capture wasn't on for this folder then.",
+        "excluded_path": "The file matches an exclude rule.",
+        "outside_mapped_root": "The file is outside the bound folder.",
+        "media_type_not_permitted": "This file type isn't captured.",
+        "attachment_oversized": "The attachment is larger than 20 MB.",
+        "quota_exceeded": "The session's or the device's storage limit was reached.",
+        "pre_admission_context": "It restates activity from before capture started.",
+        "harness_context": "Context the agent adds, which can identify your account, stayed on your device.",
+        "file_missing": "The file was gone before it could be read.",
+        "remote_reference": "It points to a remote address, which is never fetched.",
+        "source_not_supported": "The agent doesn't record this.",
+        "source_replaced": "The agent replaced the file before it was read.",
+        "encrypted_at_source": "The agent stores it encrypted.",
+        "parse_error": "The agent's record couldn't be read.",
+        "record_too_large": "The record was too large to read.",
+        "file_changed": "The file changed while it was being read.",
+        "spool_full": "The device's upload space was full.",
+        "source_stalled": "Reading the agent's files stalled.",
+        "upload_failed": "The upload kept failing.",
+        "placement_failed": "It still held a device path, so it wasn't stored.",
+        "body_limit": "Cut on your device at 32 MB.",
+        "source_limit": "The agent itself kept only part of it.",
+        "upload_pending": "Your device is still uploading it.",
+        "staging_expired": "The upload didn't finish within 7 days."
+      },
+      "reasonsSized": {
+        "body_limit": "Cut on your device at 32 MB: {{kept}} of {{original}}.",
+        "source_limit": "The agent itself kept only part of it: {{kept}} of {{original}}."
+      },
+      "body": {
+        "showAll": "Show all ({{size}})",
+        "show": "Show content",
+        "loadMore": "Load more ({{shown}} of {{total}})",
+        "showLess": "Show less",
+        "loading": "Loading…",
+        "storage": "Storage is unavailable right now. Try again in a moment.",
+        "gone": "This content isn't here anymore.",
+        "failed": "Couldn't load this content.",
+        "offline": "Waiting for a connection…"
+      },
+      "image": {
+        "alt": "Attached image, {{size}}"
+      },
+      "download": "Download",
+      "downloading": "Downloading…"
     }
   }
 }

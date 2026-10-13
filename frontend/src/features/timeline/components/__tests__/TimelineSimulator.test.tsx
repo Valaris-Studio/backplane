@@ -11,6 +11,7 @@ import {
 } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import { TimelineSimulator } from "../TimelineSimulator";
+import { generation, overview, coverage } from "../../__tests__/history-fixtures";
 import type {
   CardSnapshot,
   ColumnSnapshot,
@@ -77,7 +78,19 @@ function response(overrides: Partial<TimelineResponse> = {}): TimelineResponse {
 }
 
 function mockTimeline(body: TimelineResponse) {
-  server.use(http.get(URL, () => HttpResponse.json(body)));
+  const metadata = { ...generation(), board_id: BOARD, event_count: body.truncated ? "10001" : String(body.events.length) };
+  const partial = body.events.some((event) => (event.entity_type === "card" || event.entity_type === "column") && ["created", "updated", "moved"].includes(event.action) && !event.after_state);
+  server.use(
+    http.post(`${URL}/generations`, () => HttpResponse.json(metadata)),
+    http.get(`${URL}/generations/${metadata.id}/overview`, () => HttpResponse.json({ ...overview(), event_count: metadata.event_count, first_at: body.events[0]?.created_at ?? null })),
+    http.get(`${URL}/generations/${metadata.id}/window`, () => HttpResponse.json({
+      status: "ready", generation_id: metadata.id,
+      anchor: { through_seq: null, state: body.baseline ?? { columns: [], cards: [] }, coverage: coverage() },
+      events: body.events.map((event, index) => ({ ...event, seq: String(index + 1) })),
+      window: { first_seq: body.events.length ? "1" : null, last_seq: body.events.length ? String(body.events.length) : null, previous_cursor: null, next_cursor: null },
+      coverage: { ...coverage(), quality: partial ? "partial" : "reconstructed", missing_structural_snapshots: partial ? "1" : "0", reasons: partial ? ["missing_structural_snapshot"] : [] },
+    })),
+  );
 }
 
 function render() {
@@ -115,7 +128,7 @@ function boardLog(): TimelineEvent[] {
 describe("TimelineSimulator — async states", () => {
   it("shows a loading skeleton before the timeline resolves", () => {
     server.use(
-      http.get(URL, async () => {
+      http.post(`${URL}/generations`, async () => {
         await new Promise((r) => setTimeout(r, 50));
         return HttpResponse.json(response());
       }),
@@ -133,7 +146,7 @@ describe("TimelineSimulator — async states", () => {
   });
 
   it("shows an error state with a retry control on a 500", async () => {
-    server.use(http.get(URL, () => new HttpResponse(null, { status: 500 })));
+    server.use(http.post(`${URL}/generations`, () => new HttpResponse(null, { status: 500 })));
     render();
     await waitFor(() => {
       expect(screen.getByTestId("timeline-error")).toBeInTheDocument();
@@ -147,12 +160,14 @@ describe("TimelineSimulator — async states", () => {
 });
 
 describe("TimelineSimulator — board reconstruction + transport", () => {
-  it("renders both columns once the log resolves", async () => {
+  it("reveals each column only after its creation event", async () => {
     mockTimeline(response({ events: boardLog() }));
     render();
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeInTheDocument();
     });
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: /next event/i }));
     expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
@@ -211,7 +226,7 @@ describe("TimelineSimulator — StepPanel board-time wiring", () => {
   });
 });
 
-describe("TimelineSimulator — partial / truncated history notes", () => {
+describe("TimelineSimulator — coverage and complete overview", () => {
   it("shows a partial-history note when a legacy null-snapshot event is folded", async () => {
     const log: TimelineEvent[] = [
       event({ id: "p1", entity_type: "column", action: "created", entity_id: "col-a", after_state: COL_A }),
@@ -225,19 +240,19 @@ describe("TimelineSimulator — partial / truncated history notes", () => {
     });
   });
 
-  it("shows a truncated note when the backend capped the log", async () => {
+  it("shows the full count separately from the bounded replay window", async () => {
     mockTimeline(response({ events: boardLog(), truncated: true }));
     render();
     await waitFor(() => {
-      expect(screen.getByTestId("timeline-truncated-note")).toBeInTheDocument();
+      expect(screen.getByText("10,001 events")).toBeInTheDocument();
+      expect(screen.queryByTestId("timeline-truncated-note")).toBeNull();
+      expect(screen.getByRole("slider")).toHaveAttribute("max", "3");
     });
   });
 });
 
-describe("TimelineSimulator — baseline (v1.1)", () => {
-  // A legacy board: activity rows carry NO snapshots (pre-migration), so a pure
-  // event-fold would render Untitled cards in an Unknown column. The baseline —
-  // the board's CURRENT state — seeds the engine so real titles/columns render.
+describe("TimelineSimulator — historical anchor", () => {
+  // Missing snapshots invalidate the anchor's prior evidence.
   function legacyLog(): TimelineEvent[] {
     return [
       event({
@@ -265,7 +280,7 @@ describe("TimelineSimulator — baseline (v1.1)", () => {
     };
   }
 
-  it("renders real card titles and column names (not Untitled/Unknown) when a baseline seeds the engine", async () => {
+  it("removes stale anchor cards after a structural gap without inventing placeholders", async () => {
     mockTimeline(response({ events: legacyLog(), baseline: baseline() }));
     render();
 
@@ -273,7 +288,7 @@ describe("TimelineSimulator — baseline (v1.1)", () => {
       expect(screen.getByText("Backlog")).toBeInTheDocument();
     });
     expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText("Login bug")).toBeInTheDocument();
+    expect(within(screen.getByTestId("replay-board")).queryByText("Login bug")).toBeNull();
     expect(screen.queryByText("Untitled card")).toBeNull();
     expect(screen.queryByText("Unknown")).toBeNull();
   });
@@ -286,7 +301,7 @@ describe("TimelineSimulator — baseline (v1.1)", () => {
     });
   });
 
-  it("renders the board (not the empty state) when there are no events but the baseline has cards", async () => {
+  it("renders the board (not the empty state) when there are no events but the anchor has cards", async () => {
     mockTimeline(response({ events: [], baseline: baseline() }));
     render();
 
@@ -296,7 +311,7 @@ describe("TimelineSimulator — baseline (v1.1)", () => {
     expect(screen.queryByTestId("timeline-empty")).toBeNull();
   });
 
-  it("still shows the empty state when there are no events AND no baseline cards", async () => {
+  it("still shows the empty state when there are no events AND no anchor cards", async () => {
     mockTimeline(
       response({ events: [], baseline: { columns: [COL_A], cards: [] } }),
     );
@@ -390,7 +405,7 @@ describe("TimelineSimulator — historical inspection", () => {
     expect(screen.getByRole("button", { name: /^play$/i, hidden: true })).toBeInTheDocument();
   });
 
-  it("resolves baseline column names in historical card detail", async () => {
+  it("resolves anchor column names in historical card detail", async () => {
     mockTimeline(response({ events: [event({ after_state: card({ id: "card1", title: "Baseline card", column_id: "col-a" }) })], baseline: { columns: [COL_A], cards: [] } }));
     render();
     const user = userEvent.setup();

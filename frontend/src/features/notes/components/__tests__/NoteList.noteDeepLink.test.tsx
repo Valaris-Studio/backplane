@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, waitFor } from "@/test/test-utils";
+import { ApiError } from "@/lib/api-error";
 import type { Note, NoteSummary } from "@/types/note";
 
 function makeNote(id: string, title: string): Note {
@@ -35,14 +36,14 @@ const notes = [makeSummary("n1", "First note"), makeSummary("n2", "Second note")
 
 // The deep link resolves through the DETAIL endpoint, not through the loaded
 // page — with the list paginated, the target is often on a page nobody fetched.
-// A known id answers with the note; anything else 404s, which is what tells the
-// list the link is stale.
+// A known id answers with the note; anything else 404s, which the list reports
+// as unavailable while keeping the link.
 const detailQuery = vi.fn((_slug: string, noteId?: string, _boardId?: string) => {
   if (!noteId) return { data: undefined, isFetching: false, isError: false };
   const found = notes.find((n) => n.id === noteId);
   return found
     ? { data: makeNote(found.id, found.title), isFetching: false, isError: false }
-    : { data: undefined, isFetching: false, isError: true };
+    : { data: undefined, isFetching: false, isError: true, error: new ApiError("Not found", 404) };
 });
 
 vi.mock("../../api/use-note-detail", () => ({
@@ -126,13 +127,14 @@ describe("NoteList — ?note= deep-linking", () => {
     });
   });
 
-  it("strips a ?note= the detail endpoint cannot resolve, and keeps the editor closed", async () => {
+  it("keeps a ?note= the detail endpoint cannot resolve, states it is unavailable, and keeps the editor closed", async () => {
     renderList("/acme/notes?note=ghost-note");
-    await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        /\/acme\/notes$/,
-      );
-    });
+    expect(
+      await screen.findByText("This note is unavailable or you no longer have access."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      /\/acme\/notes\?note=ghost-note$/,
+    );
     expect(screen.queryByDisplayValue("First note")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue("Second note")).not.toBeInTheDocument();
   });

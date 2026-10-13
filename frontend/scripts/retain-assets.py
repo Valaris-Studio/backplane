@@ -14,6 +14,8 @@ import time
 
 MANIFEST = '.asset-retention.json'
 DEFAULT_GRACE_SECONDS = 7 * 24 * 60 * 60
+# 19 releases shipped in 6 days once (~4k files/199 MB retained); five releases keep long-open tabs working.
+DEFAULT_MAX_RETIRED_RELEASES = 5
 ASSET_NAME = re.compile(r'[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+')
 
 
@@ -49,9 +51,11 @@ def atomic_write(path, data):
             os.unlink(temporary)
 
 
-def retain_assets(source, destination, *, now, grace):
+def retain_assets(source, destination, *, now, grace, max_retired_releases=DEFAULT_MAX_RETIRED_RELEASES):
     if not math.isfinite(grace) or grace <= 0:
         raise ValueError('Asset grace period must be positive')
+    if max_retired_releases < 1:
+        raise ValueError('Retired release cap must be positive')
     destination.mkdir(parents=True, exist_ok=True)
     # Compose replicas may start together. Readers see only complete files.
     with (destination / '.asset-retention.lock').open('a') as lock:
@@ -64,6 +68,9 @@ def retain_assets(source, destination, *, now, grace):
         for name in previous - current:
             expires[name] = now + grace
         expires = {name: expiry for name, expiry in expires.items() if name not in current and expiry > now}
+        # One retirement stamps all of a release's assets with the same expiry, so distinct expiries are releases.
+        newest_releases = set(sorted(set(expires.values()), reverse=True)[:max_retired_releases])
+        expires = {name: expiry for name, expiry in expires.items() if expiry in newest_releases}
         keep = current | expires.keys()
         assets = destination / 'assets'
         assets.mkdir(exist_ok=True)
@@ -89,9 +96,10 @@ if __name__ == '__main__':
     parser.add_argument('destination', type=Path)
     parser.add_argument('--previous', type=Path)
     parser.add_argument('--grace-seconds', type=int, default=DEFAULT_GRACE_SECONDS)
+    parser.add_argument('--max-retired-releases', type=int, default=DEFAULT_MAX_RETIRED_RELEASES)
     args = parser.parse_args()
     now = time.time()
     if args.previous:
         previous = args.previous / '.asset-history'
-        retain_assets(previous if previous.is_dir() else args.previous, args.destination, now=now, grace=args.grace_seconds)
-    retain_assets(args.source, args.destination, now=now, grace=args.grace_seconds)
+        retain_assets(previous if previous.is_dir() else args.previous, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=args.max_retired_releases)
+    retain_assets(args.source, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=args.max_retired_releases)

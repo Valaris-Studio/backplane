@@ -4,7 +4,7 @@
  *
  * Reads the four canonical logo sources in brand/source/ and derives every
  * logo-based asset the platform uses (favicons, PWA icons, apple-touch,
- * maskable icons, OG image, UI logos). Re-run after replacing the sources
+ * maskable icons, OG image, UI logos, the Companion desktop app icon). Re-run after replacing the sources
  * to rebrand everything in one shot:
  *
  *   pnpm brand:assets
@@ -24,6 +24,13 @@ import pngToIco from "png-to-ico";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SRC = (name) => path.join(repoRoot, "brand/source", name);
 const OUT_DIR = path.join(repoRoot, "frontend/public/brand");
+const DESKTOP_ICONS_DIR = path.join(repoRoot, "companion/desktop/src-tauri/icons");
+const DESKTOP_IN_APP_DIR = path.join(repoRoot, "companion/desktop/src/assets/brand");
+const DESKTOP_IN_APP_TILE_SIZES = [48, 96, 256];
+
+// Apple's macOS icon grid: a 1024 canvas holds an 824 rounded-square tile
+// (100 px margin left for the drop shadow) with a ~185 px corner radius.
+const DESKTOP_ICON = { canvas: 1024, tile: 824, cornerRadius: 185, markPadPct: 0.1 };
 
 // Baked-in drop shadows never survive small rasters; a high alpha threshold
 // trims the faint shadow halo so the plane fills the icon canvas.
@@ -45,12 +52,46 @@ async function containPng(source, { size, padPct = 0, trim = TRIM_ICON, backgrou
   return pipeline.png();
 }
 
-async function write(name, pipelineOrBuffer) {
-  const file = path.join(OUT_DIR, name);
+async function write(name, pipelineOrBuffer, outDir = OUT_DIR) {
+  const file = path.join(outDir, name);
   const buffer = Buffer.isBuffer(pipelineOrBuffer) ? pipelineOrBuffer : await pipelineOrBuffer.toBuffer();
   await writeFile(file, buffer);
   const { size } = await sharp(buffer).metadata().catch(() => ({ size: undefined }));
   console.log(`  wrote ${path.relative(repoRoot, file)} (${(buffer.length / 1024).toFixed(1)} KB)`);
+}
+
+// Mirrors the apple-touch icon (mark on white) inside a macOS-style tile so
+// the Dock, Finder, the Windows taskbar and Linux launchers all get the same
+// opaque, rounded icon. `pnpm tauri icon` in companion/desktop derives the
+// .icns/.ico/PNG set from this source.
+const roundedSquare = (size, { offset = 0, canvas = size, fill }) =>
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas}" height="${canvas}">` +
+      `<rect x="${offset}" y="${offset}" width="${size}" height="${size}" rx="${(DESKTOP_ICON.cornerRadius * size) / DESKTOP_ICON.tile}" fill="${fill}"/></svg>`
+  );
+
+// The tile alone (no shadow margin), also the in-app icon the Companion's UI draws.
+async function desktopTile() {
+  const { tile, markPadPct } = DESKTOP_ICON;
+  const mark = await (await containPng("light_transparent.webp", { size: tile, padPct: markPadPct })).toBuffer();
+  return sharp(roundedSquare(tile, { fill: "#ffffff" })).composite([{ input: mark, top: 0, left: 0 }]).png().toBuffer();
+}
+
+async function desktopAppIcon(tile) {
+  const { canvas } = DESKTOP_ICON;
+  const tileOffset = (canvas - DESKTOP_ICON.tile) / 2;
+  const shadow = await sharp(roundedSquare(DESKTOP_ICON.tile, { offset: tileOffset, canvas, fill: "#000000" }))
+    .ensureAlpha(0)
+    .linear([1, 1, 1, 0.28], [0, 0, 0, 0])
+    .blur(14)
+    .png()
+    .toBuffer();
+  return sharp({ create: { width: canvas, height: canvas, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([
+      { input: shadow, top: 10, left: 0 },
+      { input: tile, top: tileOffset, left: tileOffset },
+    ])
+    .png();
 }
 
 // sharp's stats().dominant counts background pixels, which wins on logos with
@@ -79,6 +120,7 @@ async function dominantOpaqueColor(source) {
 
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
+  await mkdir(DESKTOP_IN_APP_DIR, { recursive: true });
   console.log("Generating Backplane brand assets →", path.relative(repoRoot, OUT_DIR));
 
   // Favicons: transparent, aggressively trimmed so the mark reads at 16px.
@@ -135,6 +177,13 @@ async function main() {
       .flatten({ background: "#ffffff" })
       .png()
   );
+
+  const tile = await desktopTile();
+  await write("app-icon-source.png", await desktopAppIcon(tile), DESKTOP_ICONS_DIR);
+  // Rendered at 22-72 CSS px; the UI picks one by device pixel ratio via srcset.
+  for (const size of DESKTOP_IN_APP_TILE_SIZES) {
+    await write(`app-tile-${size}.png`, sharp(tile).resize(size, size, { kernel: "lanczos3" }).png(), DESKTOP_IN_APP_DIR);
+  }
 
   const themeColor = await dominantOpaqueColor("light_transparent.webp");
   await writeFile(

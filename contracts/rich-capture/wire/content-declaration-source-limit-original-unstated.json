@@ -1,0 +1,34 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "tool",
+    "channel": "tool_output",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b",
+      "order": 88
+    },
+    "occurred_at": "2026-10-08T14:06:10Z",
+    "observed_at": "2026-10-08T14:06:11Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "ed3d591e2d0b74bee5edd261d73fde989e43385325b73a558cf3494d44aefd0b",
+    "call_id": "toolu_01SourceLimitUnstated",
+    "coverage": "truncated",
+    "coverage_reason": "source_limit",
+    "delivery": "inline",
+    "byte_count": 82,
+    "sha256": "22353d37e29f21bd775a6be829535e2596624be46d850ada6ff3ded5c5f10425",
+    "inline_text": "...[output cut by the agent; it did not say how much]\nlast lines of the build log\n"
+  }
+}

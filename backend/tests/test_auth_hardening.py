@@ -405,11 +405,12 @@ def _ip_request(headers: dict[str, str], peer: str | None = "10.0.0.1"):
 
 
 def test_forwarded_for_used_when_behind_iap(monkeypatch):
+    """Google appends the client it saw; anything left of it is caller-supplied."""
     from app.core.auth import resolve_client_ip
 
     monkeypatch.setattr(app_settings, "ENV", "production")
     monkeypatch.setattr(app_settings, "IAP_AUDIENCE", "/projects/1/x/2")
-    request = _ip_request({"X-Forwarded-For": "203.0.113.7, 35.191.0.5, 10.0.0.1"})
+    request = _ip_request({"X-Forwarded-For": "1.2.3.4, 203.0.113.7"})
     assert resolve_client_ip(request) == "203.0.113.7"
 
 
@@ -456,7 +457,7 @@ async def test_rejection_log_carries_forwarded_client_ip(monkeypatch, auth_db, c
         async with _make_client(auth_db) as client:
             resp = await client.get(
                 "/api/workspaces",
-                headers={"X-Forwarded-For": "203.0.113.7, 35.191.0.5"},
+                headers={"X-Forwarded-For": "1.2.3.4, 203.0.113.7"},
             )
             assert resp.status_code == 403
     assert "ip=203.0.113.7" in caplog.text
@@ -501,8 +502,8 @@ def test_rate_limiter_keys_unauthed_callers_by_forwarded_ip(monkeypatch):
         assert limit == UNAUTHENTICATED_LIMIT
         return key
 
-    assert key_for("203.0.113.7, 35.191.0.5") == "ip:203.0.113.7"
-    assert key_for("198.51.100.4, 35.191.0.5") == "ip:198.51.100.4"
+    assert key_for("1.2.3.4, 203.0.113.7") == "ip:203.0.113.7"
+    assert key_for("1.2.3.4, 198.51.100.4") == "ip:198.51.100.4"
 
 
 def test_rate_limiter_ignores_forwarded_ip_without_trusted_verifier(monkeypatch):

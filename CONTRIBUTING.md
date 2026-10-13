@@ -150,7 +150,7 @@ Run the linters before pushing from the repository root:
 
 ```bash
 make verify                 # everything CI runs, in one command
-make verify JOB=frontend    # one job: backend | mcp | frontend | go | secrets
+make verify JOB=frontend    # backend | mcp | frontend | companion | companion-rust | go | runner-artifact | secrets
 ```
 
 `scripts/verify-all.sh` mirrors `.github/workflows/ci.yml` job for job, so you
@@ -158,6 +158,25 @@ can get a definitive answer without waiting on (or depending on) GitHub Actions.
 If you add a gate to one, add it to the other — they are meant to stay in
 lockstep. Every job runs even when an earlier one fails, so a single red gate
 doesn't hide the rest.
+
+`make verify JOB=companion` runs the same source and build-contract checks as
+CI through `scripts/companion-source-gate.sh`. It requires Go 1.26.8 and a C
+compiler for race tests, Python 3.12+ (or `BACKPLANE_TEST_PYTHON`), Node 22.23.3 and
+pnpm 11.5.1. It installs desktop dependencies from the frozen lockfile and runs
+Go checks from a temporary copy with a synthetic home, including Windows/amd64
+and macOS/arm64 cross-builds. Go JSON logs and skip summaries remain in the
+printed temporary report directory (set `COMPANION_GATE_REPORT_DIR` to an
+existing parent directory to choose its location); CI retains them as artifacts.
+
+`make verify JOB=companion-rust` runs the separate macOS Rust source-contract
+job. It requires Xcode command-line tools, Rust 1.98.1 installed through rustup,
+and the same Node/pnpm versions. It builds the frozen desktop frontend, then
+runs the library and capability, updater-permission and Linux-window source
+contracts with Cargo's lock enforced. It does not run ignored tests. A complete
+`make verify` therefore needs macOS for this job; on other hosts it fails with
+the prerequisite instead of silently skipping it. Native OS integration, real
+Beacon, installed-app and signing qualification remain separate. Neither
+Companion job produces or publishes an installer.
 
 Two things worth knowing: `pnpm build` is the **only** typecheck (vitest does
 not typecheck), and the backend suite must run from `backend/` because pydantic

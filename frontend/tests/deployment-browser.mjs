@@ -20,7 +20,7 @@ const browser = await chromium.launch({ headless: true });
 
 function start(name, selectedImage, port = "", volume) {
   const args = ["run", "-d", "--name", name, "-p", `127.0.0.1:${port}:8080`, "-e", "BACKEND_URL=http://127.0.0.1:8000"];
-  if (volume) args.push("-v", `${volume}:/var/lib/backplane/frontend`);
+  if (volume) args.push("-e", "RETAIN_ASSETS_TO_VOLUME=true", "-v", `${volume}:/var/lib/backplane/frontend`);
   args.push(selectedImage);
   docker(...args);
   containers.add(name);

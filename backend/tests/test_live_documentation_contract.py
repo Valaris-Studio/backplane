@@ -110,11 +110,15 @@ def test_checked_in_openapi_snapshot_is_not_presented_as_the_live_schema():
     assert "may lag the live schema" in api_surfaces
 
 
-def test_checked_in_openapi_snapshot_matches_the_current_application():
-    from app.main import app
+def test_checked_in_openapi_snapshot_matches_the_current_application(monkeypatch):
+    from app.config import settings
+    from app.main import create_app
 
+    # The snapshot documents the full surface (scripts/export-openapi.py forces
+    # the flag on); companion routes are only mounted when it is.
+    monkeypatch.setattr(settings, "COMPANION_ENABLED", True)
     checked_in = json.loads(_read("docs/api/openapi.json"))
-    assert checked_in == app.openapi()
+    assert checked_in == create_app().openapi()
 
 
 def test_runner_export_openapi_declares_zip_and_the_literal_mcp_placeholder():
@@ -126,6 +130,22 @@ def test_runner_export_openapi_declares_zip_and_the_literal_mcp_placeholder():
     description = operation["description"]
     assert "literal `${VALARIS_API_KEY}`" in description
     assert "materialize a private MCP JSON copy" in description
+
+
+@pytest.mark.parametrize("path", [
+    "/api/workspaces/{slug}/notes",
+    "/api/workspaces/{slug}/boards/{board_id}/notes",
+    "/api/workspaces/{slug}/boards/{board_id}/notes/from-excerpt",
+])
+def test_retryable_note_save_documents_both_created_and_replayed_notes(path):
+    from app.main import create_app
+
+    responses = create_app().openapi()["paths"][path]["post"]["responses"]
+    for status in ("201", "200"):
+        assert status in responses, f"{path} omits successful {status} response"
+        assert responses[status]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/NoteRead",
+        }
 
 
 def test_compose_image_comments_match_the_build_based_stack():

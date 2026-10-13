@@ -187,7 +187,8 @@ async def test_callback_happy_path_provisions_user_and_sets_session(
         )
 
     assert resp.status_code == 302
-    assert resp.headers["location"].startswith("https://app.example")
+    # The fragment tells the app a sign-in just completed; it never reaches a server.
+    assert resp.headers["location"] == "https://app.example/#signed_in"
     raw = resp.cookies.get(SESSION_COOKIE_NAME)
     assert raw, "callback must mint a session cookie"
 

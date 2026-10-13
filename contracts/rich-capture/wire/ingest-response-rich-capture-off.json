@@ -1,0 +1,32 @@
+{
+  "model": "RichIngestResult",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "status": 200
+  },
+  "body": {
+    "acknowledged": [
+      "4a1b2c3d4e5f60718293a4b5c6d7e8f9"
+    ],
+    "rejected": [],
+    "contents": [
+      {
+        "capture_id": "4a1b2c3d4e5f60718293a4b5c6d7e8f9",
+        "content_key": "31cd5d842d6b4a38beb9d020f846ce1c9b9b7cce603bf796b57325bc680437c6",
+        "outcome": "recorded",
+        "content_id": "0b8f6a52-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+        "coverage": "withheld_by_policy",
+        "coverage_reason": "content_level"
+      },
+      {
+        "capture_id": "4a1b2c3d4e5f60718293a4b5c6d7e8f9",
+        "content_key": "c41aa34e627a20884622298fde5e70f9087cc852ea7a4cb26900f023ec70e614",
+        "outcome": "recorded",
+        "content_id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+        "coverage": "withheld_by_policy",
+        "coverage_reason": "content_level"
+      }
+    ]
+  }
+}

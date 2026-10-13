@@ -83,6 +83,20 @@ class WorkspaceMemberRepository:
         await self.db.flush()
         return member
 
+    async def current_role(
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+    ) -> WorkspaceRole | None:
+        """The role committed now, as a column read. A WorkspaceMember the
+        request session already holds (the route dependency keeps one alive)
+        would be returned from the identity map unchanged, so a guard
+        re-checking authority after a lock wait must not use it."""
+        return await self.db.scalar(
+            select(WorkspaceMember.role).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == user_id,
+            )
+        )
+
     async def get_membership(
         self, workspace_id: uuid.UUID, user_id: uuid.UUID
     ) -> WorkspaceMember | None:
@@ -93,6 +107,18 @@ class WorkspaceMemberRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def member_user_ids(
+        self, workspace_id: uuid.UUID, user_ids: set[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """Which of `user_ids` are members right now (a fresh column read)."""
+        result = await self.db.execute(
+            select(WorkspaceMember.user_id).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id.in_(user_ids),
+            )
+        )
+        return set(result.scalars().all())
 
     async def get_membership_with_user(
         self, workspace_id: uuid.UUID, user_id: uuid.UUID

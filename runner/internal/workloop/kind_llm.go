@@ -6,6 +6,7 @@ package workloop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/Valaris-Studio/backplane/runner/internal/lifecycle"
@@ -34,38 +35,22 @@ func lifecycleLLM(ctx context.Context, ws *lifecycle.WalkState, step *valaris.Li
 	}
 
 	prev := s.config.LLM
-	if stage := paramString(step, "stage", ""); stage != "" {
-		s.config.LLM.Stage = stage
-	}
-	if kind := paramString(step, "post_process_kind", ""); kind != "" {
-		s.config.LLM.PostProcessKind = kind
-	}
-	if step.Params != nil {
-		if v, ok := step.Params["tools"].([]any); ok {
-			tools := make([]string, 0, len(v))
-			for _, t := range v {
-				if s, ok := t.(string); ok {
-					tools = append(tools, s)
-				}
-			}
-			s.config.LLM.Tools = tools
-		}
-		if v, ok := step.Params["inject_directives"].(bool); ok {
-			s.config.LLM.InjectDirectives = v
-		}
-		if v, ok := step.Params["approval_enabled"].(bool); ok {
-			s.config.LLM.ApprovalEnabled = v
-		}
-		if v, ok := step.Params["use_minimal_prompt_when_unauthored"].(bool); ok {
-			s.config.LLM.UseMinimalPromptWhenUnauthored = v
-		}
-	}
-	s.config.LLM.Enabled = true
+	s.config.LLM = stepLLM(prev, step)
 	defer func() { s.config.LLM = prev }()
 
 	walkLogger(ws).Info("stage started", "stage", s.config.LLM.Stage, "role", s.config.Role, "card_id", card.CardID)
 
+	// A required dispatch prepares this exact named step, not the stage's
+	// first LLM step.
+	stepName := step.Name
+	ctx = withDispatchInvocation(ctx, valaris.DispatchInvocation{Kind: "lifecycle", StepName: &stepName, PromptSlot: "main"})
 	result, err := s.executeLLM(ctx, ctx, l, card, ws.ExecutionID, ws.RepoDir)
+	if errors.Is(err, ErrDispatchSemanticsChanged) {
+		// The card is released, not failed: stop the walk cleanly, before any
+		// suspend, salvage or on_failure handling, and let tickViaLifecycle
+		// release it.
+		return "", "", fmt.Errorf("%w: %w", lifecycle.ErrSuspended, err)
+	}
 	if err != nil {
 		// Cluster I: a budget cutoff is a SUSPEND, not a failure. Checkpoint the
 		// WIP and park the card instead of letting the walker route to the
@@ -174,4 +159,38 @@ func lifecycleLLM(ctx context.Context, ws *lifecycle.WalkState, step *valaris.Li
 	}
 
 	return result.decision, "", nil
+}
+
+// stepLLM is base with a lifecycle step's LLM params applied: the
+// configuration the step's call runs, and is captured, under.
+func stepLLM(base valaris.LLMDef, step *valaris.LifecycleStep) valaris.LLMDef {
+	llm := base
+	if stage := paramString(step, "stage", ""); stage != "" {
+		llm.Stage = stage
+	}
+	if kind := paramString(step, "post_process_kind", ""); kind != "" {
+		llm.PostProcessKind = kind
+	}
+	if step.Params != nil {
+		if v, ok := step.Params["tools"].([]any); ok {
+			tools := make([]string, 0, len(v))
+			for _, t := range v {
+				if s, ok := t.(string); ok {
+					tools = append(tools, s)
+				}
+			}
+			llm.Tools = tools
+		}
+		if v, ok := step.Params["inject_directives"].(bool); ok {
+			llm.InjectDirectives = v
+		}
+		if v, ok := step.Params["approval_enabled"].(bool); ok {
+			llm.ApprovalEnabled = v
+		}
+		if v, ok := step.Params["use_minimal_prompt_when_unauthored"].(bool); ok {
+			llm.UseMinimalPromptWhenUnauthored = v
+		}
+	}
+	llm.Enabled = true
+	return llm
 }

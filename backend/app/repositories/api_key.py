@@ -4,51 +4,81 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, or_, select, update
 
 from app.models.api_key import ApiKey
+from app.models.companion import CompanionInstallation
 from app.repositories.base import BaseRepository
 
 
 class ApiKeyRepository(BaseRepository[ApiKey]):
     model = ApiKey
 
-    async def claim_first_use(self, key_id: uuid.UUID, used_at: datetime) -> bool:
-        """Stamp a never-used key, returning True only for the winning caller.
+    async def stamp_last_used(
+        self,
+        key_id: uuid.UUID,
+        used_at: datetime,
+        *,
+        older_than: datetime,
+        expect_never_used: bool,
+    ) -> bool:
+        """Stamp a never-used or stale key; True only for the first-use winner.
 
-        The `last_used_at IS NULL` predicate makes never-used -> used a single
-        atomic transition, so concurrent first requests race in the database
-        rather than in Python: exactly one UPDATE matches a row, and its
-        rowcount of 1 is what authorizes publishing API_KEY_FIRST_USED. A
-        read-then-write would let both requests see NULL and double-publish.
+        One conditional UPDATE: concurrent requests race in the database, not in
+        Python. A row that another request already refreshed no longer matches,
+        so it is neither overwritten with an older timestamp nor announced twice.
+        The caller's loaded value says whether this request saw the key unused;
+        RETURNING says whether this request's write is the one that landed.
         """
-        result = await self.db.execute(
+        stamped = await self.db.scalar(
             update(ApiKey)
-            .where(ApiKey.id == key_id, ApiKey.last_used_at.is_(None))
+            .where(
+                ApiKey.id == key_id,
+                or_(ApiKey.last_used_at.is_(None), ApiKey.last_used_at < older_than),
+            )
             .values(last_used_at=used_at)
+            .returning(ApiKey.id)
+            .execution_options(synchronize_session=False)
         )
-        return result.rowcount == 1
-
-    async def refresh_last_used(
-        self, key_id: uuid.UUID, used_at: datetime, *, older_than: datetime
-    ) -> None:
-        """Advance last_used_at only if it is still older than `older_than`.
-
-        The bound repeats the caller's throttle decision as a WHERE clause so a
-        concurrent request that already refreshed the row isn't overwritten with
-        this request's (possibly older) timestamp.
-        """
-        await self.db.execute(
-            update(ApiKey)
-            .where(ApiKey.id == key_id, ApiKey.last_used_at < older_than)
-            .values(last_used_at=used_at)
-        )
+        return expect_never_used and stamped is not None
 
     async def get_by_key_hash(self, key_hash: str) -> ApiKey | None:
         result = await self.db.execute(
             select(ApiKey).where(ApiKey.key_hash == key_hash)
         )
         return result.scalar_one_or_none()
+
+    async def installation_revoked(self, installation_id: uuid.UUID) -> bool:
+        revoked_at = await self.db.scalar(
+            select(CompanionInstallation.revoked_at).where(
+                CompanionInstallation.id == installation_id
+            )
+        )
+        return revoked_at is not None
+
+    async def lock_installation(self, installation_id: uuid.UUID) -> None:
+        """Serialize rotations of one installation's key (a no-op on SQLite)."""
+        await self.db.execute(
+            select(CompanionInstallation.id)
+            .where(CompanionInstallation.id == installation_id)
+            .with_for_update()
+        )
+
+    async def latest_for_installation(self, installation_id: uuid.UUID) -> ApiKey | None:
+        result = await self.db.execute(
+            select(ApiKey)
+            .where(ApiKey.installation_id == installation_id)
+            .order_by(ApiKey.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_for_installation(self, installation_id: uuid.UUID) -> None:
+        await self.db.execute(
+            delete(ApiKey)
+            .where(ApiKey.installation_id == installation_id)
+            .execution_options(synchronize_session="fetch")
+        )
 
     async def list_by_user(self, user_id: uuid.UUID) -> list[ApiKey]:
         result = await self.db.execute(

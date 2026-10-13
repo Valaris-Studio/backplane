@@ -98,6 +98,7 @@ class ColumnService:
                 summary=f"deleted column '{column.name}'",
                 message_key="activity.column.deleted",
                 message_params={"column_name": column.name},
+                changes={"cascade_card_deletion": True},
                 before_state=snapshot_column(column),
             )
         await self.column_repo.delete(column)

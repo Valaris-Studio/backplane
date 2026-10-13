@@ -14,9 +14,10 @@ cd "$(dirname "$0")/.."
 COPYRIGHT="Copyright (c) 2026 Valaris Studio"
 
 license_for() {
-  # LICENSES.md: runner/ is MIT, everything else defaults to AGPL-3.0-or-later
+  # LICENSES.md: runner/ and companion/ are MIT, everything else defaults to AGPL-3.0-or-later
   case "$1" in
     runner/*) echo "MIT" ;;
+    companion/*) echo "MIT" ;;
     *)        echo "AGPL-3.0-or-later" ;;
   esac
 }
@@ -37,8 +38,8 @@ has_header() {
 }
 
 list_source_files() {
-  find backend frontend mcp-server runner scripts infra -type f \
-    \( -name '*.py' -o -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.sh' \) \
+  find backend frontend mcp-server runner companion scripts infra -type f \
+    \( -name '*.py' -o -name '*.go' -o -name '*.rs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.sh' \) \
     -not -path '*/node_modules/*' \
     -not -path '*/.venv/*' \
     -not -path '*/venv/*' \
@@ -63,7 +64,8 @@ while IFS= read -r f; do
   tmp="$(mktemp)"
 
   first_line="$(head -n 1 "$f" 2>/dev/null || true)"
-  if [[ "$first_line" == '#!'* ]]; then
+  # `#![` opens a Rust inner attribute, not a shebang.
+  if [[ "$first_line" == '#!'* && "$first_line" != '#!['* ]]; then
     # Header goes AFTER the shebang line.
     {
       head -n 1 "$f"

@@ -1,0 +1,76 @@
+{
+  "model": "RichCaptureRecord",
+  "why": "a content item is declared once per record",
+  "body": {
+    "capture_id": "5b2c3d4e5f60718293a4b5c6d7e8f90a",
+    "mapping_id": "3d6a1f4e-2b7c-4e8d-9f01-23456789abcd",
+    "harness": "claude_code",
+    "harness_version": "2.1.40",
+    "collection_method": "poll",
+    "native_session_id": "sess-1",
+    "captured_at": "2026-10-08T14:05:00Z",
+    "beacon": {
+      "commit": "a1b2c3d4",
+      "schema_version": "1.0"
+    },
+    "events": [],
+    "contents": [
+      {
+        "role": "assistant",
+        "channel": "reply",
+        "source": {
+          "kind": "claude_transcript",
+          "parser": "companion-claude-transcript/1",
+          "schema_version": "claude-code-jsonl/2",
+          "native_ref": "a7b6c5d4-e3f2-4a1b-9c8d-7e6f5a4b3c2d",
+          "order": 44
+        },
+        "occurred_at": "2026-10-08T14:03:52.900Z",
+        "observed_at": "2026-10-08T14:03:54Z",
+        "media_type": "text/markdown",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 2
+        },
+        "content_key": "c41aa34e627a20884622298fde5e70f9087cc852ea7a4cb26900f023ec70e614",
+        "turn_id": "turn-7",
+        "coverage": "partially_redacted",
+        "coverage_reason": "secret_filter",
+        "delivery": "upload",
+        "byte_count": 48213,
+        "sha256": "964f268b6cbc702d9b2ea7dcfe543caca4e6f8c6753ae4d6cb80ac81172c37e2"
+      },
+      {
+        "role": "assistant",
+        "channel": "reply",
+        "source": {
+          "kind": "claude_transcript",
+          "parser": "companion-claude-transcript/1",
+          "schema_version": "claude-code-jsonl/2",
+          "native_ref": "a7b6c5d4-e3f2-4a1b-9c8d-7e6f5a4b3c2d",
+          "order": 44
+        },
+        "occurred_at": "2026-10-08T14:03:52.900Z",
+        "observed_at": "2026-10-08T14:03:54Z",
+        "media_type": "text/markdown",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 2
+        },
+        "content_key": "c41aa34e627a20884622298fde5e70f9087cc852ea7a4cb26900f023ec70e614",
+        "turn_id": "turn-7",
+        "coverage": "partially_redacted",
+        "coverage_reason": "secret_filter",
+        "delivery": "upload",
+        "byte_count": 48213,
+        "sha256": "964f268b6cbc702d9b2ea7dcfe543caca4e6f8c6753ae4d6cb80ac81172c37e2"
+      }
+    ],
+    "capture_generation": {
+      "id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
+      "profile": "rich",
+      "admitted_from": "2026-10-08T14:00:00Z",
+      "policy_revision": "5ba464a63a45a12848bee0be8bd50bdb82ddc503c9ffaddfd11f03c73d1b73d3"
+    }
+  }
+}

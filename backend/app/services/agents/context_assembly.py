@@ -14,6 +14,7 @@ template never has to branch on presence.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import select
@@ -30,10 +31,21 @@ from app.repositories.agents.execution import ExecutionRepository
 from app.repositories.definitions.definition import DefinitionRepository
 from app.repositories.kanban.card import CardRepository
 from app.repositories.notes.note import NoteRepository
+from app.schemas.agents.context import ContextManifest, ContextRecord, ContextSource
 from app.schemas.definitions.definition import DefinitionContent
+from app.services.agents.context_selection import GuardedSelection
+from app.services.agents.context_manifest import (
+    MANIFEST_SCHEMA_VERSION,
+    RENDERER_VERSION,
+    context_revision,
+    note_revision,
+    sha256_text,
+    utf8_bytes,
+)
 from app.services.kanban.dependencies import DependencyService
 from app.services.kanban.dependency_graph import DependencyGraphService
 from app.services.notes.content_serializer import prosemirror_to_markdown
+from app.services.notes.media_markdown import escape_label
 
 
 def context_source_alias(source: dict) -> str | None:
@@ -42,6 +54,28 @@ def context_source_alias(source: dict) -> str | None:
     if not isinstance(alias, str) or not alias or kind not in _FETCHERS:
         return None
     return alias
+
+
+@dataclass(frozen=True)
+class AssembledContext:
+    """The rendered alias map and the manifest describing it, produced from
+    one fetch so the two can never describe different selections."""
+
+    context: dict[str, str]
+    manifest: ContextManifest
+    revision: str
+    # Each manifest source's own rendered text, index-aligned with
+    # `manifest.sources`. Unlike `context`, a later duplicate alias never
+    # overwrites an earlier source's block.
+    blocks: tuple[str, ...] = ()
+    # Budgeted assemblies only: the exact selection, for in-process reuse.
+    selection: GuardedSelection | None = None
+
+
+@dataclass(frozen=True)
+class _TracedSource:
+    text: str
+    records: list[ContextRecord] = field(default_factory=list)
 
 
 async def assemble_context(
@@ -56,17 +90,41 @@ async def assemble_context(
 ) -> dict[str, str]:
     if not sources:
         return {}
+    assembled = await assemble_context_with_manifest(
+        db,
+        workspace_id=workspace_id,
+        card=card,
+        board=board,
+        sources=sources,
+        stage=stage,
+        pipeline_stages=pipeline_stages,
+    )
+    return assembled.context
 
+
+async def assemble_context_with_manifest(
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    card: Card,
+    board: Board,
+    sources: list[dict],
+    stage: dict | None = None,
+    pipeline_stages: list[dict] | None = None,
+) -> AssembledContext:
     note_repo = NoteRepository(db)
     definition_repo = DefinitionRepository(db)
     card_repo = CardRepository(db)
     rendered: dict[str, str] = {}
-    for source in sources:
+    blocks: list[str] = []
+    manifest_sources: list[ContextSource] = []
+    for source in sources or []:
         kind = source.get("kind")
         alias = context_source_alias(source)
         if alias is None:
             continue
-        rendered[alias] = await _FETCHERS[kind](
+        filter_ = source.get("filter") or {}
+        output = await _FETCHERS[kind](
             db=db,
             note_repo=note_repo,
             definition_repo=definition_repo,
@@ -74,7 +132,7 @@ async def assemble_context(
             workspace_id=workspace_id,
             card=card,
             board=board,
-            filter_=source.get("filter") or {},
+            filter_=filter_,
             # The pipeline_expectations source renders from config, not DB
             # rows: the role's own current stage and (for the all_roles
             # scope) every configured stage. Threaded from /next-assignment,
@@ -82,7 +140,35 @@ async def assemble_context(
             stage=stage,
             pipeline_stages=pipeline_stages,
         )
-    return rendered
+        traced = output if isinstance(output, _TracedSource) else None
+        text = traced.text if traced else output
+        rendered[alias] = text
+        blocks.append(text)
+        manifest_sources.append(
+            ContextSource(
+                source_index=len(manifest_sources),
+                kind=kind,
+                alias=alias,
+                filter=filter_,
+                # Only card_notes has record-level provenance in this version;
+                # every other kind is honestly hashed as one opaque block.
+                coverage="record_traced" if traced else "source_only",
+                rendered_sha256=sha256_text(text),
+                rendered_bytes=utf8_bytes(text),
+                records=traced.records if traced else [],
+            )
+        )
+    manifest = ContextManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        renderer_version=RENDERER_VERSION,
+        sources=manifest_sources,
+    )
+    return AssembledContext(
+        context=rendered,
+        manifest=manifest,
+        revision=context_revision(manifest),
+        blocks=tuple(blocks),
+    )
 
 
 async def _fetch_card_notes(
@@ -92,25 +178,69 @@ async def _fetch_card_notes(
     card: Card,
     filter_: dict[str, Any],
     **_: Any,
-) -> str:
+) -> _TracedSource:
     note_kind = filter_.get("kind")
+    limit = _clamp_limit(filter_, _MAX_CONTEXT_LIMIT)
     if note_kind:
         notes = await note_repo.list_card_notes_by_kind(
-            card_id=card.id, workspace_id=workspace_id, kind=note_kind
+            card_id=card.id, workspace_id=workspace_id, kind=note_kind, limit=limit
         )
     else:
-        notes = await note_repo.list_by_card(card_id=card.id, workspace_id=workspace_id)
-    # Both repo queries order newest first, so slicing keeps the most recent.
-    notes = notes[: _clamp_limit(filter_, _MAX_CONTEXT_LIMIT)]
-    if not notes:
-        return ""
+        notes = await note_repo.list_by_card(
+            card_id=card.id, workspace_id=workspace_id, limit=limit
+        )
+    blocks = [card_note_block(n, kind_marked=not note_kind) for n in notes]
+    records = [
+        ContextRecord(
+            record_index=index,
+            note_id=note.id,
+            title=note.title,
+            kind=note.kind,
+            workspace_id=note.workspace_id,
+            board_id=note.board_id,
+            card_id=note.card_id,
+            updated_at=note.updated_at,
+            revision_sha256=note_revision(note),
+            rendered_sha256=sha256_text(block),
+            rendered_bytes=utf8_bytes(block),
+        )
+        for index, (note, block) in enumerate(zip(notes, blocks))
+    ]
+    return _TracedSource(text="\n\n".join(blocks), records=records)
+
+
+def card_note_block(note, *, kind_marked: bool) -> str:
     # A kind-less source mixes plans, research and verdicts: mark each note's
     # kind so the agent can tell a prior plan from a human hint.
-    kind_marker = "" if note_kind else "[{kind}] "
-    return "\n\n".join(
-        f"- **{kind_marker.format(kind=n.kind)}{n.title}**: {prosemirror_to_markdown(n.content)}"
-        for n in notes
+    marker = f"[{note.kind}] " if kind_marked else ""
+    return (
+        f"- **{marker}{_literal_title(note.title)}**:"
+        f"{_as_list_item_body(prosemirror_to_markdown(note.content))}"
     )
+
+
+def pinned_note_block(note) -> str:
+    return f"NOTE — {note.title}:\n{note.content}"
+
+
+def review_note_block(note) -> str:
+    return f"--- {note.title} (created {note.created_at.isoformat()}) ---\n{note.content}"
+
+
+def _literal_title(title: str) -> str:
+    # A title is metadata, not markup: one line (its newlines would open new
+    # blocks) with every markdown-significant character escaped.
+    return escape_label(" ".join(title.split()))
+
+
+def _as_list_item_body(markdown: str) -> str:
+    # The body starts after a blank line, indented to the bullet's content
+    # column: inline after `**title**:` a leading fence is no longer a fence,
+    # on the very next line it continues the title paragraph (`---` turns it
+    # into a setext heading), and an unindented body escapes the list item.
+    if not markdown:
+        return ""
+    return "\n\n" + "\n".join(f"  {line}" if line else line for line in markdown.split("\n"))
 
 
 async def _fetch_board_definition(
@@ -153,7 +283,7 @@ def render_board_definition(definition, board_notes):
 
     pinned = [n for n in board_notes if n.pinned and n.content]
     for note in pinned:
-        parts.append(f"NOTE — {note.title}:\n{note.content}")
+        parts.append(pinned_note_block(note))
 
     return "\n\n".join(parts)
 
@@ -234,7 +364,7 @@ async def _fetch_pinned_notes(
     pinned = [n for n in notes if n.pinned]
     if not pinned:
         return ""
-    return "\n\n".join(f"NOTE — {n.title}:\n{n.content}" for n in pinned)
+    return "\n\n".join(pinned_note_block(n) for n in pinned)
 
 
 # CTX-5: short prefix for human-scannable card identifiers in rendered lists.
@@ -363,10 +493,7 @@ async def _fetch_review_history(
     )
     if not notes:
         return ""
-    return "\n\n".join(
-        f"--- {n.title} (created {n.created_at.isoformat()}) ---\n{n.content}"
-        for n in notes
-    )
+    return "\n\n".join(review_note_block(n) for n in notes)
 
 
 async def _fetch_dependency_health(

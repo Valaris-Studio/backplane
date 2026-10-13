@@ -1,0 +1,27 @@
+{
+  "model": "ContentDeclaration",
+  "why": "file_missing explains source_unavailable, not withheld",
+  "body": {
+    "role": "user",
+    "channel": "attachment",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "c9d8e7f6-a5b4-4c3d-9e2f-1a0b9c8d7e6f",
+      "order": 39
+    },
+    "occurred_at": "2026-10-08T14:02:58Z",
+    "observed_at": "2026-10-08T14:03:00Z",
+    "media_type": "application/zip",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "cc5e560825d49a6b02b4c9dffa3d91553f7eb2a4a4e81e231270c7a54308f2a8",
+    "coverage": "withheld_by_policy",
+    "coverage_reason": "file_missing",
+    "delivery": "none",
+    "original_byte_count": 1048576
+  }
+}

@@ -16,6 +16,7 @@ interface Props {
   card: CardSnapshot | null;
   analytics: CardAnalytics | null;
   columnNames: Record<string, string>;
+  analyticsScope?: string;
 }
 
 // Read-only card detail. Deliberately NOT CardDetailSheet (which pulls in 6+
@@ -27,6 +28,7 @@ export function TimelineCardDetail({
   card,
   analytics,
   columnNames,
+  analyticsScope,
 }: Props) {
   const { t } = useTranslation();
   if (!card) return null;
@@ -111,6 +113,7 @@ export function TimelineCardDetail({
           </section>
         ) : null}
 
+        {analyticsScope && <p className="text-xs text-muted-foreground">{analyticsScope}</p>}
         <section className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t("timeline.detail.dwellTitle")}

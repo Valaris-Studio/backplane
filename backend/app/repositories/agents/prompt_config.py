@@ -29,6 +29,28 @@ class PromptConfigRepository(BaseRepository[AgentPromptConfig]):
         result = await self.db.scalars(union_all(board_policies, workspace_policies))
         return list(result.all())
 
+    async def effective_for_target(
+        self, workspace_id: uuid.UUID, team_role: str, stage: str
+    ) -> AgentPromptConfig | None:
+        """The template that renders (role, stage) in this workspace: its own
+        row over a system row, oldest first — the dispatch resolver's order.
+        Another workspace's row is never eligible."""
+        return await self.db.scalar(
+            select(AgentPromptConfig)
+            .where(
+                AgentPromptConfig.team_role == team_role,
+                AgentPromptConfig.stage == stage,
+                (AgentPromptConfig.workspace_id == workspace_id)
+                | AgentPromptConfig.workspace_id.is_(None),
+            )
+            .order_by(
+                AgentPromptConfig.workspace_id.is_(None).asc(),
+                AgentPromptConfig.created_at.asc(),
+            )
+            .limit(1)
+            .execution_options(populate_existing=True)
+        )
+
     async def get_by_slug(
         self,
         workspace_id: uuid.UUID,

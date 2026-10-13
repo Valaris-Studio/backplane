@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import config as _config
-from app.core.auth import current_agent_id, forbid_agent_callers, get_current_user
+from app.core.auth import (
+    current_agent_id,
+    forbid_agent_callers,
+    forbid_credential_management,
+    get_current_user,
+)
 from app.database import get_db
 from app.exceptions import ResourceNotFoundError
 from app.models.agents.agent import Agent
@@ -73,7 +78,7 @@ async def list_agents(
 
 
 @router.post(
-    "", response_model=AgentCreated, dependencies=[Depends(forbid_agent_callers)]
+    "", response_model=AgentCreated, dependencies=[Depends(forbid_credential_management)]
 )
 async def create_agent(
     data: AgentCreate,
@@ -255,7 +260,7 @@ async def resume_agent(
 @router.post(
     "/{agent_id}/rotate-key",
     response_model=AgentCreated,
-    dependencies=[Depends(forbid_agent_callers)],
+    dependencies=[Depends(forbid_credential_management)],
 )
 async def rotate_agent_key(
     agent_id: uuid.UUID,

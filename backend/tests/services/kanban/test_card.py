@@ -1213,6 +1213,46 @@ async def test_move_card_to_done_rejects_when_pr_url_missing(
     assert card.column_id == gate_board_cols["review"].id
 
 
+async def test_move_card_to_done_installation_key_skips_gate_when_pr_url_missing(
+    db_session: AsyncSession, test_board: Board, test_user: User, gate_board_cols,
+    gate_board_repo,
+):
+    from app.core.auth import current_api_key_installation_id
+
+    card = await _make_gate_card(
+        db_session, test_board, gate_board_cols["review"], test_user,
+        description="",
+    )
+    data = CardMoveRequest(column_id=gate_board_cols["done"].id, position=1024.0)
+
+    token = current_api_key_installation_id.set(uuid.uuid4())
+    try:
+        moved = await CardService(db_session).move_card(card.id, test_board.id, data)
+    finally:
+        current_api_key_installation_id.reset(token)
+    assert moved.column_id == gate_board_cols["done"].id
+
+
+async def test_move_card_to_done_plain_user_key_skips_gate_when_pr_url_missing(
+    db_session: AsyncSession, test_board: Board, test_user: User, gate_board_cols,
+    gate_board_repo,
+):
+    from app.core.auth import current_api_key_id
+
+    card = await _make_gate_card(
+        db_session, test_board, gate_board_cols["review"], test_user,
+        description="",
+    )
+    data = CardMoveRequest(column_id=gate_board_cols["done"].id, position=1024.0)
+
+    token = current_api_key_id.set(uuid.uuid4())
+    try:
+        moved = await CardService(db_session).move_card(card.id, test_board.id, data)
+    finally:
+        current_api_key_id.reset(token)
+    assert moved.column_id == gate_board_cols["done"].id
+
+
 # --- Board-awareness: a board with no linked git repo cannot produce a PR ---
 #
 # The workspace-wide opt-out was too coarse: ops/triage/doc boards live in the

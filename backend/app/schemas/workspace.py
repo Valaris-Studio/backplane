@@ -4,7 +4,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.core.json_response import UTCModel
 from app.core.password import MIN_PASSWORD_LENGTH
@@ -12,11 +12,23 @@ from app.core.password import MIN_PASSWORD_LENGTH
 from app.models.workspace import WorkspaceRole
 from app.schemas.activity import ActivityListRead, ActivityRead
 from app.schemas.bounded import Str255
+from app.utils import SLUG_FORMAT
 
 
 class WorkspaceCreate(UTCModel):
     name: Str255
+    # Enforced at creation only: legacy rows with non-conforming slugs must
+    # keep resolving, so reads and lookups stay unvalidated.
     slug: Str255
+
+    @field_validator("slug")
+    @classmethod
+    def slug_format(cls, value: str) -> str:
+        if not SLUG_FORMAT.match(value):
+            raise ValueError(
+                "slug must match ^[a-z0-9]+(-[a-z0-9]+)*$ (lowercase, hyphens, no spaces)"
+            )
+        return value
 
 
 class WorkspaceUpdate(UTCModel):
