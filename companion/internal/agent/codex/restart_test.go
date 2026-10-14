@@ -41,8 +41,17 @@ func (f *fakeFinder) Find(query process.Query) ([]process.Process, error) {
 
 const desktopAppServer = "/Applications/ChatGPT.app/Contents/Resources/codex"
 
-func desktopRow(startedAt time.Time) fakeProcess {
-	return fakeProcess{executable: desktopAppServer, argv: []string{desktopAppServer, "-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled"}, startedAt: startedAt}
+func (e testEnv) desktopAppServerPath() string {
+	if filepath.Separator == '/' {
+		return desktopAppServer
+	}
+	// Keep the synthetic macOS bundle suffix while using the host's home path.
+	return filepath.Join(e.Home, "Applications", "ChatGPT.app") + "/Contents/Resources/codex"
+}
+
+func (e testEnv) desktopRow(startedAt time.Time) fakeProcess {
+	executable := e.desktopAppServerPath()
+	return fakeProcess{executable: executable, argv: []string{executable, "-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled"}, startedAt: startedAt}
 }
 
 func (e testEnv) daemonRow(startedAt time.Time, argv ...string) fakeProcess {
@@ -79,7 +88,7 @@ func problems(status agent.IntegrationStatus) map[string]bool {
 func TestRestartRequired_AppServerStartedBeforeTheInstall(t *testing.T) {
 	finder := &fakeFinder{}
 	env, installedAt := installed(t, finder)
-	finder.table = []fakeProcess{desktopRow(installedAt.Add(-7 * 24 * time.Hour))}
+	finder.table = []fakeProcess{env.desktopRow(installedAt.Add(-7 * 24 * time.Hour))}
 
 	status := New().Status(env.Env)
 	if !problems(status)[agent.ProblemRestartRequired] {
@@ -99,7 +108,7 @@ func TestRestartRequired_AppServerStartedBeforeTheInstall(t *testing.T) {
 func TestRestartRequired_AppServerStartedAfterTheInstallIsFine(t *testing.T) {
 	finder := &fakeFinder{}
 	env, installedAt := installed(t, finder)
-	finder.table = []fakeProcess{desktopRow(installedAt.Add(time.Hour))}
+	finder.table = []fakeProcess{env.desktopRow(installedAt.Add(time.Hour))}
 	if status := New().Status(env.Env); problems(status)[agent.ProblemRestartRequired] {
 		t.Fatalf("a Codex app started after the install reads the hooks: %+v", status)
 	}
@@ -110,7 +119,7 @@ func TestRestartRequired_AppServerStartedInTheInstallSecondIsFine(t *testing.T) 
 	env, _ := installed(t, finder)
 	// ps reports whole seconds; a process started in the install's own second
 	// may have read the new files, so it is not flagged.
-	finder.table = []fakeProcess{desktopRow(installChangedAt(env.Env).Truncate(time.Second))}
+	finder.table = []fakeProcess{env.desktopRow(installChangedAt(env.Env).Truncate(time.Second))}
 	if status := New().Status(env.Env); problems(status)[agent.ProblemRestartRequired] {
 		t.Fatalf("same-second start flagged: %+v", status)
 	}
@@ -120,11 +129,12 @@ func TestRestartRequired_CodexCLIIsNeverFlagged(t *testing.T) {
 	finder := &fakeFinder{}
 	env, installedAt := installed(t, finder)
 	old := installedAt.Add(-48 * time.Hour)
+	desktop := env.desktopAppServerPath()
 	finder.table = []fakeProcess{
 		{executable: "/opt/homebrew/Caskroom/codex/0.159.0/bin/codex", argv: []string{"codex"}, startedAt: old},
 		{executable: "/opt/homebrew/Caskroom/codex/0.159.0/bin/codex", argv: []string{"codex", "app-server"}, startedAt: old},
-		{executable: desktopAppServer, argv: []string{desktopAppServer, "exec", "fix it"}, startedAt: old},
-		{executable: "/Applications/ChatGPT.app/Contents/Resources/codex-code-mode-host", argv: []string{"codex-code-mode-host", "app-server"}, startedAt: old},
+		{executable: desktop, argv: []string{desktop, "exec", "fix it"}, startedAt: old},
+		{executable: desktop + "-code-mode-host", argv: []string{"codex-code-mode-host", "app-server"}, startedAt: old},
 	}
 	if status := New().Status(env.Env); len(status.Problems) != 0 {
 		t.Fatalf("terminal Codex, a non app-server run and other bundle helpers are not the app: %+v", status)
@@ -157,7 +167,7 @@ func TestRestartRequired_NoFinderSkipsTheCheck(t *testing.T) {
 
 func TestRestartRequired_NotInstalledNeverWarns(t *testing.T) {
 	env := newEnv(t)
-	env.Processes = &fakeFinder{table: []fakeProcess{desktopRow(time.Now().Add(-time.Hour))}}
+	env.Processes = &fakeFinder{table: []fakeProcess{env.desktopRow(time.Now().Add(-time.Hour))}}
 	if status := New().Status(env.Env); status.State != agent.NotInstalled || len(status.Problems) != 0 {
 		t.Fatalf("without the companion's hooks a restart changes nothing: %+v", status)
 	}
@@ -166,11 +176,11 @@ func TestRestartRequired_NotInstalledNeverWarns(t *testing.T) {
 func TestRestartRequired_ClearsOnceTheAppRestarted(t *testing.T) {
 	finder := &fakeFinder{}
 	env, installedAt := installed(t, finder)
-	finder.table = []fakeProcess{desktopRow(installedAt.Add(-time.Hour))}
+	finder.table = []fakeProcess{env.desktopRow(installedAt.Add(-time.Hour))}
 	if !problems(New().Status(env.Env))[agent.ProblemRestartRequired] {
 		t.Fatal("stale app-server not flagged")
 	}
-	finder.table = []fakeProcess{desktopRow(installedAt.Add(time.Hour))}
+	finder.table = []fakeProcess{env.desktopRow(installedAt.Add(time.Hour))}
 	if status := New().Status(env.Env); len(status.Problems) != 0 {
 		t.Fatalf("after the restart: %+v", status)
 	}
@@ -223,14 +233,21 @@ func TestIntegrationChange_RecordedOnlyWhenTheCompanionChangesSomething(t *testi
 func TestIntegrationChange_FallsBackToTheHooksFileTime(t *testing.T) {
 	finder := &fakeFinder{}
 	env, _ := installed(t, finder)
-	os.Remove(filepath.Join(env.StateDir, integrationChangeFile))
+	if err := os.Remove(filepath.Join(env.StateDir, integrationChangeFile)); err != nil {
+		t.Fatal(err)
+	}
 	hooksTime := time.Date(2026, 9, 29, 9, 24, 0, 0, time.UTC)
-	os.Chtimes(env.hooksFile(), hooksTime, hooksTime)
-	finder.table = []fakeProcess{desktopRow(time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC))}
+	if err := os.Chtimes(env.hooksFile(), hooksTime, hooksTime); err != nil {
+		t.Fatal(err)
+	}
+	if got := installChangedAt(env.Env); !got.Equal(hooksTime) {
+		t.Fatalf("hooks timestamp fallback = %v, want %v", got, hooksTime)
+	}
+	finder.table = []fakeProcess{env.desktopRow(time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC))}
 	if !problems(New().Status(env.Env))[agent.ProblemRestartRequired] {
 		t.Fatal("an install from before this version is dated by hooks.json")
 	}
-	finder.table = []fakeProcess{desktopRow(hooksTime.Add(time.Minute))}
+	finder.table = []fakeProcess{env.desktopRow(hooksTime.Add(time.Minute))}
 	if status := New().Status(env.Env); len(status.Problems) != 0 {
 		t.Fatalf("%+v", status.Problems)
 	}
@@ -240,12 +257,12 @@ func TestRestartRequired_OnlyInstalledAppBundlesCount(t *testing.T) {
 	finder := &fakeFinder{}
 	env, installedAt := installed(t, finder)
 	old := installedAt.Add(-time.Hour)
-	userApps := filepath.Join(env.Home, "Applications", "ChatGPT.app", "Contents", "Resources", "codex")
+	userApps := filepath.Join(env.Home, "Applications", "ChatGPT.app") + "/Contents/Resources/codex"
 	finder.table = []fakeProcess{{executable: userApps, argv: []string{userApps, "app-server"}, startedAt: old}}
 	if !problems(New().Status(env.Env))[agent.ProblemRestartRequired] {
 		t.Fatal("~/Applications is an installed app")
 	}
-	for _, elsewhere := range []string{"/Volumes/ChatGPT/ChatGPT.app/Contents/Resources/codex", filepath.Join(env.Home, "Downloads", "ChatGPT.app", "Contents", "Resources", "codex")} {
+	for _, elsewhere := range []string{"/Volumes/ChatGPT/ChatGPT.app/Contents/Resources/codex", filepath.Join(env.Home, "Downloads", "ChatGPT.app") + "/Contents/Resources/codex"} {
 		finder.table = []fakeProcess{{executable: elsewhere, argv: []string{elsewhere, "app-server"}, startedAt: old}}
 		if status := New().Status(env.Env); len(status.Problems) != 0 {
 			t.Fatalf("%s is not an installed app: %+v", elsewhere, status.Problems)

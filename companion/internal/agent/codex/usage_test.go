@@ -605,8 +605,19 @@ func TestRolloutUsage_ConfinementComparesCanonicalSpellings(t *testing.T) {
 	content := encodeRollout(t, sessionMeta("Codex Desktop"), usageRecord(3*time.Second, rolloutThread, "resp_01", codexTokens(100, 0, 0, 1, 0)))
 	f := newRollout(t, content)
 	upper := filepath.Join(filepath.Dir(f.env.codexHome), ".CODEX", "SESSIONS")
-	if _, err := os.Stat(upper); err != nil {
+	original, err := os.Stat(filepath.Join(f.env.codexHome, "sessions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias, err := os.Stat(upper)
+	if os.IsNotExist(err) {
 		t.Skip("case-sensitive volume")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(original, alias) {
+		t.Skip("volume keeps the case spellings distinct")
 	}
 	respelled := filepath.Join(upper, strings.TrimPrefix(f.path, filepath.Join(f.env.codexHome, "sessions")))
 	if events := f.readPath(t, respelled, time.Time{}); len(events) != 1 {
@@ -617,16 +628,40 @@ func TestRolloutUsage_ConfinementComparesCanonicalSpellings(t *testing.T) {
 	decomposed := filepath.Join(filepath.Dir(f.env.codexHome), "café-codex")
 	custom := filepath.Join(composed, "sessions", "2026", "09", "29", filepath.Base(f.path))
 	write(t, custom, content)
+	customHome := composed
 	f.env.Getenv = func(key string) string {
 		if key == "CODEX_HOME" {
-			return strings.ToUpper(decomposed)
+			return customHome
 		}
 		return ""
 	}
 	f.cursor = nil
-	if events := f.readPath(t, filepath.Join(decomposed, "sessions", "2026", "09", "29", filepath.Base(f.path)), time.Time{}); len(events) != 1 {
-		t.Fatalf("CODEX_HOME and the path in other case and Unicode forms were refused: %v", events)
+	if events := f.readPath(t, custom, time.Time{}); len(events) != 1 {
+		t.Fatalf("the custom CODEX_HOME rollout was refused: %v", events)
 	}
+	t.Run("unicode_alias", func(t *testing.T) {
+		original, err := os.Stat(composed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, alias := range []string{decomposed, strings.ToUpper(decomposed)} {
+			info, err := os.Stat(alias)
+			if os.IsNotExist(err) {
+				t.Skip("volume does not alias the case and Unicode spellings")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !os.SameFile(original, info) {
+				t.Skip("volume keeps the Unicode spellings distinct")
+			}
+		}
+		customHome = strings.ToUpper(decomposed)
+		f.cursor = nil
+		if events := f.readPath(t, filepath.Join(decomposed, "sessions", "2026", "09", "29", filepath.Base(f.path)), time.Time{}); len(events) != 1 {
+			t.Fatalf("CODEX_HOME and the path in other case and Unicode forms were refused: %v", events)
+		}
+	})
 	f.cursor = nil
 	if events := f.readPath(t, filepath.Join(strings.ToUpper(f.env.codexHome), "sessions", "2026", "09", "29", filepath.Base(f.path)), time.Time{}); len(events) != 0 {
 		t.Fatalf("a respelled ~/.codex is still outside a CODEX_HOME elsewhere: %v", events)
