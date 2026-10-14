@@ -220,3 +220,60 @@ func TestInitialPromptDoneMustFitTheUsageStateBeforeAnyEffect(t *testing.T) {
 		})
 	}
 }
+
+// hooklessDelegatedSession writes a Desktop rollout with a delegated opening
+// instruction that no hook has named, created at created.
+func (f *fixture) hooklessDelegatedSession(t *testing.T, created time.Time, prompt string) string {
+	t.Helper()
+	path := f.rolloutPath(desktopThread)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	output := "<codex_delegation>\n<source_thread_id>" + delegationSpawner + "</source_thread_id>\n<input>" + prompt + "</input>\n</codex_delegation>"
+	content := rolloutLine(t, created, "session_meta", map[string]any{
+		"id": desktopThread, "timestamp": created.Format(time.RFC3339Nano), "cwd": f.repo, "originator": "Codex Desktop",
+	}) + rolloutLine(t, created.Add(time.Millisecond), "response_item", map[string]any{"type": "function_call_output", "name": "create_thread", "output": output})
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The initial-prompt contract admits a startup whose first hook arrives within a minute
+// of creation. A hookless discovered thread's first sighting is its header's
+// own creation stamp, which proves nothing about when it was observed: an
+// old session discovered late must not be imported, recent or not, until a
+// hook names it in time. Capture is on before every session here.
+func TestHooklessDelegatedSessionsAwaitAHookInTime(t *testing.T) {
+	for _, discovery := range []struct {
+		name    string
+		age     time.Duration
+		hookAt  time.Duration
+		prompts int
+	}{
+		{"recent hookless session", 5 * time.Second, 0, 0},
+		{"old hookless session discovered late", 2 * time.Hour, 0, 0},
+		{"recent session hooked within a minute after a hookless sighting", 5 * time.Second, 10 * time.Second, 1},
+	} {
+		t.Run(discovery.name, func(t *testing.T) {
+			f := desktopFixture(t)
+			created := f.since(t, time.Minute)
+			f.hooklessDelegatedSession(t, created, "HOOKLESS_PROMPT")
+			*f.clock = created.Add(discovery.age)
+			f.tick(t)
+			if discovery.hookAt > 0 {
+				*f.clock = created.Add(discovery.hookAt)
+				payload, _ := json.Marshal(map[string]any{"session_id": desktopThread, "cwd": f.repo, "transcript_path": f.rolloutPath(desktopThread), "hook_event_name": "SessionStart", "source": "startup"})
+				if err := f.shim.Handle("codex", bytes.NewReader(payload)); err != nil {
+					t.Fatal(err)
+				}
+				f.tick(t)
+				f.daemon = New(f.daemon.config)
+				f.tick(t)
+			}
+			if got := len(promptRecords(f.server.Records())); got != discovery.prompts {
+				t.Fatalf("initial prompts %d, want %d", got, discovery.prompts)
+			}
+		})
+	}
+}
