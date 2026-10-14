@@ -22,6 +22,8 @@ from tests.test_agent_sessions import (
     work_under_invocation,
 )
 
+from tests.test_session_cost import session_named, usage_rows  # noqa: E402
+
 device_client = device_client_fixture
 
 
@@ -182,3 +184,92 @@ async def test_codex_result_links_real_server_work_with_a_native_receipt(
         link["invocation_count"] == 1
         for link in (await links(client, await session_id(client))).values()
     )
+
+
+def daemon_normalized(event):
+    """The same native event as the newer daemon uploads it: completion,
+    MCP identity and duration lifted, and re-encoded at every level."""
+    lifted = copy.deepcopy(event)
+    attributes = lifted["raw"]["attributes"]
+    lifted["event"]["action"] = {"true": "tool.completed", "false": "tool.failed"}[
+        attributes["success"]
+    ]
+    lifted["mcp"] = {
+        "server": attributes["mcp_server"],
+        "tool": attributes["tool_name"],
+    }
+    lifted["command"] = {"duration_ms": int(attributes["duration_ms"])}
+    return lifted
+
+
+def codex_turn_usage():
+    return {
+        "timestamp": "2026-09-24T02:21:31Z",
+        "event": {"id": "codex-turn-usage", "action": "token.usage"},
+        "harness": {"name": "codex_desktop", "collection_method": "otlp"},
+        "model": "gpt-5.4",
+        "gen_ai": {"usage": {"input_tokens": 1000, "output_tokens": 500}},
+        "raw": {"otel_signal": "traces", "source": "codex_turn_span", "turn_id": "t1"},
+    }
+
+
+@pytest.mark.parametrize(
+    "success,expected,errors", [("true", "succeeded", 0), ("false", "failed", 1)]
+)
+@pytest.mark.parametrize("normalized_first", [False, True])
+async def test_codex_result_and_usage_count_once_across_old_and_new_serialization(
+    client,
+    device_client,
+    db_session,
+    test_workspace,
+    test_board,
+    success,
+    expected,
+    errors,
+    normalized_first,
+):
+    # A replay after the upgrade carries the same native ids in a new capture:
+    # usage capture ids hash the encoded bytes, which Full now re-encodes.
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    old = [codex_result(success), codex_turn_usage()]
+    new = [daemon_normalized(codex_result(success)), codex_turn_usage()]
+    for events in (new, old) if normalized_first else (old, new):
+        await upload(
+            device_client, token, [record(events, mapping_id, harness="codex_desktop")]
+        )
+    session = await session_named(db_session, "sc01-synthetic-session")
+    assert session.event_count == 2
+    assert session.tool_call_count == 1
+    assert session.error_count == errors
+    assert (session.input_tokens, session.output_tokens) == (1000, 500)
+    assert len(await usage_rows(db_session, session.id)) == 1
+    [call] = (await client.get(f"{SESSIONS}/{session.id}/calls")).json()["items"]
+    assert (call["outcome"], call["kind"], call["mcp_tool"]) == (
+        expected,
+        "mcp",
+        "get_note",
+    )
+
+
+async def test_a_reserialized_replay_of_one_capture_is_refused_not_duplicated(
+    client, device_client, db_session, test_workspace, test_board
+):
+    # A collector line re-read after the upgrade keeps its position-derived
+    # capture id but not its bytes: the server refuses it as a conflict.
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    first = record([codex_result()], mapping_id, harness="codex_desktop")
+    await upload(device_client, token, [first])
+    replay = {**first, "events": [daemon_normalized(first["events"][0])]}
+    response = await device_client.post(
+        "/api/companion/ingest",
+        json={"records": [replay]},
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert response.status_code == 200, response.text
+    [rejected] = response.json()["rejected"]
+    assert (rejected["capture_id"], rejected["reason"]) == (
+        first["capture_id"],
+        "conflict",
+    )
+    session = await session_named(db_session, "sc01-synthetic-session")
+    assert (session.event_count, session.tool_call_count) == (1, 1)
