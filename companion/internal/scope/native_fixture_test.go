@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-var createPhysicalFixtureDirectory = func(path string) error { return os.MkdirAll(path, 0o700) }
+var createPhysicalFixtureDirectory = func(path string) error { return os.Mkdir(path, 0o700) }
 
 func mkdirPhysicalFixture(t *testing.T, path string) {
 	t.Helper()
