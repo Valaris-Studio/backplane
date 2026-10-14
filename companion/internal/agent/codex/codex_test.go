@@ -271,7 +271,7 @@ func stateFor(t *testing.T, env testEnv, trusted map[string]string) string {
 	t.Helper()
 	var builder strings.Builder
 	for key, hash := range trusted {
-		builder.WriteString("[hooks.state.\"" + key + "\"]\ntrusted_hash = \"" + hash + "\"\n")
+		builder.WriteString("[hooks.state." + tomlString(key) + "]\ntrusted_hash = " + tomlString(hash) + "\n")
 	}
 	return builder.String()
 }
@@ -305,7 +305,7 @@ func TestTrustDetection(t *testing.T) {
 	if status := codex.Status(env.Env); status.State != agent.NeedsTrust || status.Trust != "modified" {
 		t.Fatalf("modified hooks not detected: %+v", status)
 	}
-	write(t, env.configFile(), configText+"[hooks.state.\""+env.hooksFile()+":session_start:0:0\"]\nenabled = false\n")
+	write(t, env.configFile(), configText+"[hooks.state."+tomlString(env.hooksFile()+":session_start:0:0")+"]\nenabled = false\n")
 	if status := codex.Status(env.Env); !contains(status.Problems, "hook_disabled_in_codex") {
 		t.Fatalf("disabled hook not detected: %+v", status)
 	}
@@ -460,7 +460,7 @@ func TestRepairRefreshesTheBlockInPlaceWhenCodexAppendedAfterIt(t *testing.T) {
 	if err := codex.Install(env.Env); err != nil {
 		t.Fatal(err)
 	}
-	appended := "\n[hooks.state.\"" + env.hooksFile() + ":session_start:0:0\"]\ntrusted_hash = \"sha256:x\"\n"
+	appended := "\n[hooks.state." + tomlString(env.hooksFile()+":session_start:0:0") + "]\ntrusted_hash = \"sha256:x\"\n"
 	write(t, env.configFile(), read(t, env.configFile())+appended)
 	if changed, err := codex.Repair(env.Env); err != nil || changed {
 		t.Fatalf("a current block must not be rewritten: %v %v", changed, err)
@@ -526,7 +526,7 @@ func codexAppend(text, tables string) string {
 
 func codexTables(env testEnv) string {
 	return "\n[projects.\"/x\"]\ntrust_level = \"trusted\"\n" +
-		"\n[hooks.state.\"" + env.hooksFile() + ":session_start:0:0\"]\ntrusted_hash = \"sha256:foreign\"\n" +
+		"\n[hooks.state." + tomlString(env.hooksFile()+":session_start:0:0") + "]\ntrusted_hash = \"sha256:foreign\"\n" +
 		"\n[tui]\nnotifications = true\n"
 }
 
