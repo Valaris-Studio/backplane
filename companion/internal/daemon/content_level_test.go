@@ -179,7 +179,7 @@ func TestEnqueue_MetadataRecordCarriesNoParentPathSegment(t *testing.T) {
 func TestEnqueue_StandardRecordKeepsRelativeWorkingDirectory(t *testing.T) {
 	f, _ := folderFixture(t, "standard")
 	for _, directory := range uploadedWorkingDirectories(f) {
-		if directory != parentInProject+"/api" {
+		if directory != filepath.Join(parentInProject, "api") {
 			t.Fatalf("standard sends the path inside the project, got %v", uploadedWorkingDirectories(f))
 		}
 	}
