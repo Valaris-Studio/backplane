@@ -295,7 +295,7 @@ export const AGENTS_OBSERVABILITY_TOOL_DOCS: ToolDoc[] = [
       {
         name: "input_prompt",
         required: false,
-        description: "Full rendered prompt sent to the LLM for this run.",
+        description: "Latest full rendered prompt saved on this execution, including attempts refused before dispatch. Invocation receipts record acknowledged dispatch preparation; they do not confirm provider execution or model use.",
       },
     ],
     gotchas: [
@@ -362,7 +362,7 @@ export const AGENTS_OBSERVABILITY_TOOL_DOCS: ToolDoc[] = [
       {
         name: "input_prompt",
         required: false,
-        description: "Full rendered prompt sent to the LLM for this run.",
+        description: "Latest full rendered prompt saved on this execution, including attempts refused before dispatch. Invocation receipts record acknowledged dispatch preparation; they do not confirm provider execution or model use.",
       },
       {
         name: "duration_seconds",
