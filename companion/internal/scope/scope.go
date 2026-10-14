@@ -280,11 +280,15 @@ func containsPath(paths []string, path string) bool {
 }
 
 func within(root, path string) bool {
+	if !filepath.IsAbs(root) || !filepath.IsAbs(path) {
+		return false
+	}
 	if root == path {
 		return true
 	}
-	relative, err := filepath.Rel(root, path)
-	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
+	// Canonical paths already preserve on-disk case; Rel folds it on Windows.
+	prefix := strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
+	return strings.HasPrefix(path, prefix)
 }
 
 // matchesGlob reports whether pattern matches path or any of its ancestors.
