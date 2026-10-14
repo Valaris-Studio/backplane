@@ -283,10 +283,15 @@ func within(root, path string) bool {
 	if !filepath.IsAbs(root) || !filepath.IsAbs(path) {
 		return false
 	}
+	rootVolume, pathVolume := filepath.VolumeName(root), filepath.VolumeName(path)
+	if !strings.EqualFold(rootVolume, pathVolume) {
+		return false
+	}
+	root, path = root[len(rootVolume):], path[len(pathVolume):]
 	if root == path {
 		return true
 	}
-	// Canonical paths already preserve on-disk case; Rel folds it on Windows.
+	// Only volumes fold case; canonical directory components retain exact spelling.
 	prefix := strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
 	return strings.HasPrefix(path, prefix)
 }
