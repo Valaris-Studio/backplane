@@ -552,6 +552,14 @@ describe("Session detail — facts rail", () => {
     expect(within(linked).getByText(/3 calls/)).toBeInTheDocument();
   });
 
+  it("describes missing work links without claiming no work happened", async () => {
+    serveDetail();
+    renderDetail();
+    const linked = await screen.findByRole("region", { name: "Linked work" });
+    expect(await within(linked).findByText("No card or note links have been recorded for this session.")).toBeInTheDocument();
+    expect(within(linked).queryByText(/didn't change or consult/)).not.toBeInTheDocument();
+  });
+
   it("never claims a level for a session captured before levels were recorded", async () => {
     serveDetail({ session: { capture_levels: [] } });
     renderDetail();

@@ -297,15 +297,14 @@ func (d *Daemon) recordOTelError(code string) {
 }
 
 func applyEventLevel(line json.RawMessage, level privacy.ContentLevel) (json.RawMessage, error) {
-	if privacy.EventLevel(level) == privacy.Full {
-		return line, nil
-	}
+	level = privacy.EventLevel(level)
 	var event map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(line))
 	decoder.UseNumber()
 	if err := decoder.Decode(&event); err != nil {
 		return nil, err
 	}
+	normalizeCodexResult(event)
 	// Named before digesting, so a working directory's fingerprint is its
 	// folder name's and not the local path's.
 	return encodeEvent(privacy.ApplyEventContentLevel(privacy.WorkingDirectoryName(event, level), level))

@@ -9708,7 +9708,7 @@
       },
       "linked": {
         "title": "Trabajo vinculado",
-        "none": "Esta sesión no cambió ni consultó ninguna tarjeta o nota.",
+        "none": "No se han registrado vínculos con tarjetas o notas para esta sesión.",
         "calls_one": "{{count}} llamada",
         "calls_many": "{{count}} llamadas",
         "calls_other": "{{count}} llamadas",
