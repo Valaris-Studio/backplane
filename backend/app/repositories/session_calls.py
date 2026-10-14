@@ -80,11 +80,12 @@ CODEX_HARNESSES = ("codex_cli", "codex_desktop")
 CODEX_RESULT_MARKER = "codex.tool_result"
 
 
-def event_failed(dialect_name: str):
+def event_failed(dialect_name: str, session_id: uuid.UUID):
     """Whether one event failed, as the call display reads it: a nonempty
     indexed outcome wins; otherwise a retained Codex result whose success is
     boolean false or the exact string "false" (never numeric 0)."""
-    payload = Event.event
+    legacy = Event.__table__.alias("legacy_outcomes")
+    payload = legacy.c.event
     harness_name = payload[("harness", "name")].as_string()
     marker = payload[("raw", "attributes", "event.name")].as_string()
     success_path = ("raw", "attributes", "success")
@@ -106,13 +107,17 @@ def event_failed(dialect_name: str):
             payload[success_path].as_string() == "false",
         )
     legacy_failure = and_(
-        or_(Event.outcome.is_(None), Event.outcome == ""),
+        or_(legacy.c.outcome.is_(None), legacy.c.outcome == ""),
         harness_name.in_(CODEX_HARNESSES),
         attributes_are_object,
         marker == CODEX_RESULT_MARKER,
         said_false,
     )
-    return or_(Event.outcome == "failed", legacy_failure)
+    # Keep retained JSON out of the surrounding aggregate's input.
+    failed_legacy_ids = select(legacy.c.id).where(
+        legacy.c.session_id == session_id, legacy_failure
+    )
+    return or_(Event.outcome == "failed", Event.id.in_(failed_legacy_ids))
 
 
 @dataclass(frozen=True)
@@ -183,7 +188,7 @@ class SessionCallRepository:
             query = query.where(anchor_of_event.in_(anchors))
         if failed_only:
             query = query.having(
-                func.max(case((self._event_failed(), 1), else_=0)) == 1
+                func.max(case((self._event_failed(session_id), 1), else_=0)) == 1
             )
         if before is not None:
             before_at, before_anchor = before
@@ -256,7 +261,9 @@ class SessionCallRepository:
                 func.max(case((Event.action == PROMPT_ACTION, 1), else_=0)).label(
                     "prompt"
                 ),
-                func.max(case((self._event_failed(), 1), else_=0)).label("failed"),
+                func.max(case((self._event_failed(session_id), 1), else_=0)).label(
+                    "failed"
+                ),
                 func.max(case((Event.action == REASONING_ACTION, 1), else_=0)).label(
                     "reasoning"
                 ),
@@ -391,8 +398,8 @@ class SessionCallRepository:
             for row in rows
         ]
 
-    def _event_failed(self):
-        return event_failed(self.db.get_bind().dialect.name)
+    def _event_failed(self, session_id: uuid.UUID):
+        return event_failed(self.db.get_bind().dialect.name, session_id)
 
     def _epoch_ms(self, column):
         return func.round(epoch_seconds(self.db.get_bind().dialect.name, column) * 1000)
@@ -432,7 +439,9 @@ class SessionCallRepository:
                 func.max(case((Event.action == PROMPT_ACTION, 1), else_=0)).label(
                     "prompt"
                 ),
-                func.max(case((self._event_failed(), 1), else_=0)).label("failed"),
+                func.max(case((self._event_failed(session_id), 1), else_=0)).label(
+                    "failed"
+                ),
                 func.max(case((touched_work, 1), else_=0)).label("work"),
                 func.max(case((file_tool, 1), else_=0)).label("file"),
             )
