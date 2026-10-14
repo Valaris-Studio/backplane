@@ -256,7 +256,7 @@ func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 	var pin runtime.Pinner
 	pin.Pin(user)
 	defer pin.Unpin()
-	changed, err := windows.BuildSecurityDescriptor(nil, nil, []windows.EXPLICIT_ACCESS{nativeListDeny(user)}, nil, saved)
+	changed, err := nativeBuildListDeny(saved, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,6 +266,7 @@ func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 	}
 	oldACL, newACL := []byte(before.dacl), []byte(after.dacl)
 	denySize := 8 + user.Len()
+	nativeListDenyWitnessFor(before, after, user).log(t, "physical-prewrite")
 	if before.owner != after.owner || before.group != after.group || before.control != after.control ||
 		len(newACL) != len(oldACL)+denySize || binary.LittleEndian.Uint16(newACL[4:6]) != binary.LittleEndian.Uint16(oldACL[4:6])+1 ||
 		newACL[8] != windows.ACCESS_DENIED_ACE_TYPE || newACL[9] != 0 || int(binary.LittleEndian.Uint16(newACL[10:12])) != denySize ||
