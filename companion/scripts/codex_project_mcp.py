@@ -23,8 +23,7 @@ def configure(project: Path, launcher: Path, state: dict, endpoint: str, *, appl
         raise ValueError("Companion endpoint does not match the requested environment")
     mappings = [
         value for value in state.get("mappings", {}).values()
-        if value.get("enabled") and value.get("board_id")
-        and Path(value.get("root", "")).resolve() == project
+        if value.get("enabled") and value.get("board_id") and mapped_root(value) == project
     ]
     if len(mappings) != 1:
         raise ValueError("Project must have exactly one enabled Companion board mapping")
@@ -32,7 +31,8 @@ def configure(project: Path, launcher: Path, state: dict, endpoint: str, *, appl
     path = directory / "config.toml"
     if directory.is_symlink() or path.is_symlink():
         raise ValueError("Refusing a symlinked project configuration")
-    original = path.read_text(encoding="utf-8") if path.exists() else ""
+    prepared_from = read_if_present(path)
+    original = prepared_from or ""
     config = tomllib.loads(original)
     desired = {"command": str(launcher), "args": ["mcp"], "startup_timeout_sec": 60}
     servers = config.get("mcp_servers", {})
@@ -59,13 +59,30 @@ def configure(project: Path, launcher: Path, state: dict, endpoint: str, *, appl
                 file.write(updated)
                 file.flush()
                 os.fsync(file.fileno())
-                if path.exists() and path.read_text(encoding="utf-8") != original:
+                # Absence is part of the compared state: a deletion or a newly
+                # created (even empty) file is a change like any edit.
+                if read_if_present(path) != prepared_from:
                     raise ValueError("Project configuration changed during preparation")
                 os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else 0o600)
                 os.replace(temporary, path)
             finally:
                 temporary.unlink(missing_ok=True)
     return True
+
+
+def mapped_root(mapping: dict) -> Path | None:
+    # An absent, empty or relative root would resolve against the working directory.
+    root = mapping.get("root")
+    if not isinstance(root, str) or not root or not Path(root).is_absolute():
+        return None
+    return Path(root).resolve()
+
+
+def read_if_present(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
 
 
 def main():
