@@ -57,7 +57,7 @@ before upgrading the runner. See the [source upgrade notes](../CHANGELOG.md#unre
 
 | Requirement | Version / detail | Needed for |
 |---|---|---|
-| Go | 1.26.8+ (`go.mod`) | building from source |
+| Go | 1.26.9+ (`go.mod`) | building from source |
 | `claude` and/or `codex` | on `PATH` | the coding agent itself — whichever providers your config names |
 | `git` | any | cloning and pushing work |
 | `gh` (github forge) | authed via `gh auth login` or `GH_TOKEN` | opening, reviewing, and merging PRs |
