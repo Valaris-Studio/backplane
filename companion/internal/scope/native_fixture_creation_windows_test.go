@@ -5,13 +5,34 @@
 
 package scope
 
-import "os"
+import (
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+)
 
 func init() {
 	createPhysicalFixtureDirectory = nativeCreateFixtureDirectory
 }
 
-// Preserve default creation for the independent constructor regression baseline.
 func nativeCreateFixtureDirectory(path string) error {
-	return os.MkdirAll(path, 0o700)
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return err
+	}
+	// A token's default owner can be a group; bind the fixture owner at creation.
+	owner := user.User.Sid.String()
+	security, err := windows.SecurityDescriptorFromString("O:" + owner + "D:P(A;OICI;FA;;;" + owner + ")(A;OICI;FA;;;SY)")
+	if err != nil {
+		return err
+	}
+	attributes := windows.SecurityAttributes{
+		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
+		SecurityDescriptor: security,
+	}
+	return windows.CreateDirectory(name, &attributes)
 }
