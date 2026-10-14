@@ -115,3 +115,33 @@ func TestInitialPromptWaitsForCompleteLineAndRejectsOutsideTranscript(t *testing
 		t.Fatal("linked transcript read")
 	}
 }
+
+// A hookless thread is first seen at its header's creation stamp, which the
+// header line's own timestamp follows: by 22–48 ms in the recorded Desktop
+// rollouts and 1.92 s in the CLI's. A header written well after the thread
+// was first seen is a later or replaced file, not the startup a first hook
+// saw within a minute of creation.
+func TestInitialPromptAdmissionBoundsAHeaderAfterFirstSighting(t *testing.T) {
+	for _, admission := range []struct {
+		name     string
+		lag      time.Duration
+		admitted bool
+	}{
+		{"recorded Desktop header lag", 48 * time.Millisecond, true},
+		{"recorded CLI header lag", 1920 * time.Millisecond, true},
+		{"header written after the first sighting", 10 * time.Minute, false},
+	} {
+		t.Run(admission.name, func(t *testing.T) {
+			f, r, entries := bootstrapFixture(t)
+			r.FirstSeen = entries[0]["timestamp"].(time.Time).Add(-admission.lag)
+			writeBootstrap(t, f, entries)
+			result, err := New().ReadInitialPrompt(r)
+			if err != nil || !result.Done {
+				t.Fatalf("admission undecided: %+v %v", result, err)
+			}
+			if (len(result.Event) > 0) != admission.admitted {
+				t.Fatalf("first seen %s before the header: admitted %v, want %v", admission.lag, len(result.Event) > 0, admission.admitted)
+			}
+		})
+	}
+}

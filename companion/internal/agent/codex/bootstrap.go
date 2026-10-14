@@ -21,6 +21,10 @@ const (
 	// Desktop's first hook follows the injected instruction by a few seconds.
 	// A resumed older thread must not turn this startup read into history import.
 	maxBootstrapAdmissionDelay = time.Minute
+	// A hookless thread is first seen at its header's creation stamp, which
+	// the header line's own timestamp follows by up to ~2 s in recorded
+	// rollouts. A header written later than this is not the observed startup.
+	maxBootstrapHeaderLag = 5 * time.Second
 )
 
 type bootstrapLine struct {
@@ -60,7 +64,7 @@ func (Codex) ReadInitialPrompt(read agent.InitialPromptRead) (agent.InitialPromp
 		}
 		if created.IsZero() {
 			cwd, valid := scope.CanonicalDir(entry.Payload.Cwd)
-			if entry.Type != "session_meta" || entry.Payload.ID != read.SessionID || entry.Payload.Originator != "Codex Desktop" || !valid || cwd != read.Cwd || entry.Timestamp.IsZero() || entry.Timestamp.After(read.Now) || read.FirstSeen.IsZero() || read.FirstSeen.Sub(entry.Timestamp) > maxBootstrapAdmissionDelay {
+			if entry.Type != "session_meta" || entry.Payload.ID != read.SessionID || entry.Payload.Originator != "Codex Desktop" || !valid || cwd != read.Cwd || entry.Timestamp.IsZero() || entry.Timestamp.After(read.Now) || read.FirstSeen.IsZero() || read.FirstSeen.Sub(entry.Timestamp) > maxBootstrapAdmissionDelay || entry.Timestamp.Sub(read.FirstSeen) > maxBootstrapHeaderLag {
 				return done, nil
 			}
 			created = entry.Timestamp
