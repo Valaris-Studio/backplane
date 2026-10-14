@@ -17,7 +17,20 @@ import (
 )
 
 func nativeBuildListDeny(saved *windows.SECURITY_DESCRIPTOR, user *windows.SID) (*windows.SECURITY_DESCRIPTOR, error) {
-	return windows.BuildSecurityDescriptor(nil, nil, []windows.EXPLICIT_ACCESS{nativeListDeny(user)}, nil, saved)
+	control, _, err := saved.Control()
+	if err != nil {
+		return nil, err
+	}
+	changed, err := windows.BuildSecurityDescriptor(nil, nil, []windows.EXPLICIT_ACCESS{nativeListDeny(user)}, nil, saved)
+	if err != nil {
+		return nil, err
+	}
+	// BuildSecurityDescriptor can drop DACL protection; retain original inheritance controls.
+	const daclInheritanceControls = windows.SE_DACL_AUTO_INHERIT_REQ | windows.SE_DACL_AUTO_INHERITED | windows.SE_DACL_PROTECTED
+	if err := changed.SetControl(daclInheritanceControls, control&daclInheritanceControls); err != nil {
+		return nil, err
+	}
+	return changed, nil
 }
 
 type nativeListDenyWitness struct {
