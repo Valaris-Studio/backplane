@@ -10,6 +10,7 @@ import (
 )
 
 var createPhysicalFixtureDirectory = func(path string) error { return os.Mkdir(path, 0o700) }
+var prepareNativeOrdinaryAccess = func(t *testing.T) error { return nil }
 
 func mkdirPhysicalFixture(t *testing.T, path string) {
 	t.Helper()

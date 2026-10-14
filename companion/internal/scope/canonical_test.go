@@ -414,6 +414,9 @@ func TestSpellingFromEntries_RespellsEachComponentFromItsParent(t *testing.T) {
 }
 
 func TestSpellingFromEntries_UnreadableParentFailsClosed(t *testing.T) {
+	if err := prepareNativeOrdinaryAccess(t); err != nil {
+		t.Fatalf("ordinary fixture access: %v", err)
+	}
 	f := newFixture(t)
 	_, child := lockedParent(t, f.root)
 	if got, ok := spellingFromEntries(child); ok {
