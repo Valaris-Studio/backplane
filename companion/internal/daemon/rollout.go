@@ -90,7 +90,10 @@ func (d *Daemon) pollTranscripts(ctx context.Context) error {
 		if index >= maxRolloutPolls || ctx.Err() != nil {
 			break
 		}
-		err := d.pollTranscript(ctx, candidate.id, candidate.thread)
+		err := d.pollInitialPrompt(ctx, candidate.id, candidate.thread)
+		if err == nil {
+			err = d.pollTranscript(ctx, candidate.id, candidate.thread)
+		}
 		if errors.Is(err, errStopDrain) {
 			// The queue is full: the rest waits, unread, for a later pass.
 			return nil

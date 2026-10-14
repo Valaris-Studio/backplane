@@ -245,6 +245,27 @@ type UsageResult struct {
 	Harness string
 }
 
+// InitialPromptSource supplies an initial instruction the harness does not
+// export in telemetry. It never imports the rest of a transcript.
+type InitialPromptSource interface {
+	ReadInitialPrompt(InitialPromptRead) (InitialPromptResult, error)
+}
+
+type InitialPromptRead struct {
+	Transcript, SessionID, Cwd string
+	FirstSeen, Now             time.Time
+	Allowed                    func(time.Time) bool
+	Env                        Env
+}
+
+type InitialPromptResult struct {
+	Event      json.RawMessage
+	Harness    string
+	ObservedAt time.Time
+	// Done also covers a complete startup that has no supported instruction.
+	Done bool
+}
+
 // CommandName is the CLI spelling of an agent id: "claude_code" → "claude-code".
 func CommandName(id string) string { return strings.ReplaceAll(id, "_", "-") }
 
