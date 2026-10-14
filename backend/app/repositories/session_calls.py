@@ -74,6 +74,45 @@ is_timeline_event = or_(
     Event.tool_name.is_not(None),
     Event.mcp_tool.is_not(None),
 )
+# Mirrors app.core.codex_tool_result: only these harnesses and this marker
+# carry a native Codex result.
+CODEX_HARNESSES = ("codex_cli", "codex_desktop")
+CODEX_RESULT_MARKER = "codex.tool_result"
+
+
+def event_failed(dialect_name: str):
+    """Whether one event failed, as the call display reads it: a nonempty
+    indexed outcome wins; otherwise a retained Codex result whose success is
+    boolean false or the exact string "false" (never numeric 0)."""
+    payload = Event.event
+    harness_name = payload[("harness", "name")].as_string()
+    marker = payload[("raw", "attributes", "event.name")].as_string()
+    success_path = ("raw", "attributes", "success")
+    if dialect_name == "postgresql":
+        attributes_are_object = (
+            func.jsonb_typeof(payload[("raw", "attributes")]) == "object"
+        )
+        # ->> renders only boolean false and the string "false" as 'false';
+        # missing keys and non-object containers yield NULL, never an error.
+        said_false = payload[success_path].as_string() == "false"
+    else:
+        attributes_are_object = (
+            func.json_type(payload, '$."raw"."attributes"') == "object"
+        )
+        # SQLite extracts boolean false as integer 0, so the JSON type tells
+        # it apart from a numeric 0; the string "false" extracts as text.
+        said_false = or_(
+            func.json_type(payload, '$."raw"."attributes"."success"') == "false",
+            payload[success_path].as_string() == "false",
+        )
+    legacy_failure = and_(
+        or_(Event.outcome.is_(None), Event.outcome == ""),
+        harness_name.in_(CODEX_HARNESSES),
+        attributes_are_object,
+        marker == CODEX_RESULT_MARKER,
+        said_false,
+    )
+    return or_(Event.outcome == "failed", legacy_failure)
 
 
 @dataclass(frozen=True)
@@ -144,7 +183,7 @@ class SessionCallRepository:
             query = query.where(anchor_of_event.in_(anchors))
         if failed_only:
             query = query.having(
-                func.max(case((Event.outcome == "failed", 1), else_=0)) == 1
+                func.max(case((self._event_failed(), 1), else_=0)) == 1
             )
         if before is not None:
             before_at, before_anchor = before
@@ -217,7 +256,7 @@ class SessionCallRepository:
                 func.max(case((Event.action == PROMPT_ACTION, 1), else_=0)).label(
                     "prompt"
                 ),
-                func.max(case((Event.outcome == "failed", 1), else_=0)).label("failed"),
+                func.max(case((self._event_failed(), 1), else_=0)).label("failed"),
                 func.max(case((Event.action == REASONING_ACTION, 1), else_=0)).label(
                     "reasoning"
                 ),
@@ -352,6 +391,9 @@ class SessionCallRepository:
             for row in rows
         ]
 
+    def _event_failed(self):
+        return event_failed(self.db.get_bind().dialect.name)
+
     def _epoch_ms(self, column):
         return func.round(epoch_seconds(self.db.get_bind().dialect.name, column) * 1000)
 
@@ -390,7 +432,7 @@ class SessionCallRepository:
                 func.max(case((Event.action == PROMPT_ACTION, 1), else_=0)).label(
                     "prompt"
                 ),
-                func.max(case((Event.outcome == "failed", 1), else_=0)).label("failed"),
+                func.max(case((self._event_failed(), 1), else_=0)).label("failed"),
                 func.max(case((touched_work, 1), else_=0)).label("work"),
                 func.max(case((file_tool, 1), else_=0)).label("file"),
             )

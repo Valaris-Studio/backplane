@@ -40,7 +40,6 @@ export function SessionTimeline({ slug, session, headingHidden = false }: Sessio
   const summary = [
     t("sessions.timeline.turns", { count: session.prompt_count }),
     t("sessions.timeline.calls", { count: session.tool_call_count }),
-    ...(session.error_count ? [t("sessions.timeline.failed", { count: session.error_count })] : []),
   ].join(" · ");
 
   return (
