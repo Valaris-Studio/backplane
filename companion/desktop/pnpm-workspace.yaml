@@ -8,6 +8,13 @@ allowBuilds:
   edgedriver: false
   esbuild: false
   geckodriver: false
+# Advisory floors for build/test-only transitives (GHSA-68fv-2mgg-jv7q,
+# GHSA-5c6j-r48x-rmvq, GHSA-qj8w-gfj5-8c6v). serialize-javascript is forced past
+# mocha 10's ^6.0.2 range because mocha 12 needs wdio 10; 7.x keeps the same
+# CommonJS entry and only raises the floor to node >= 20.
+overrides:
+  source-map-js: 1.2.2
+  serialize-javascript@<7.0.5: 7.0.7
 # typescript-eslint 8.71.0 was younger than pnpm 11's minimum release age when
 # pinned on 2026-09-28.
 minimumReleaseAgeExclude:

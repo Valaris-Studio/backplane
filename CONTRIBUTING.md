@@ -160,7 +160,7 @@ lockstep. Every job runs even when an earlier one fails, so a single red gate
 doesn't hide the rest.
 
 `make verify JOB=companion` runs the same source and build-contract checks as
-CI through `scripts/companion-source-gate.sh`. It requires Go 1.26.8 and a C
+CI through `scripts/companion-source-gate.sh`. It requires Go 1.26.9 and a C
 compiler for race tests, Python 3.12+ (or `BACKPLANE_TEST_PYTHON`), Node 22.23.3 and
 pnpm 11.5.1. It installs desktop dependencies from the frozen lockfile and runs
 Go checks from a temporary copy with a synthetic home, including Windows/amd64

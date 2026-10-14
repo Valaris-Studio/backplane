@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Valaris Studio
+// SPDX-License-Identifier: MIT
+
 package agent_test
 
 import (

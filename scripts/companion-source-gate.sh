@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Shared CI/local source checks. No native app, Beacon, signing or publication.
-# Requires Go 1.26.8 + a C compiler, Python 3.12+, Node 22.23.3 and pnpm 11.5.1.
+# Requires Go 1.26.9 + a C compiler, Python 3.12+, Node 22.23.3 and pnpm 11.5.1.
 # The separate rust mode requires macOS, Xcode command-line tools and Rust 1.98.1.
 # Dependency downloads use the committed Go sums and frozen desktop lockfile.
 set -euo pipefail
@@ -73,8 +73,8 @@ check_go() (
   require_tool go
   require_tool git
   require_tool cc
-  if [[ "$(GOTOOLCHAIN=local go env GOVERSION)" != "go1.26.8" ]]; then
-    echo "Companion source checks require Go 1.26.8 (CI toolchain)." >&2
+  if [[ "$(GOTOOLCHAIN=local go env GOVERSION)" != "go1.26.9" ]]; then
+    echo "Companion source checks require Go 1.26.9 (CI toolchain)." >&2
     exit 1
   fi
   companion_check_dir="$(mktemp -d)"
