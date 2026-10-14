@@ -5,8 +5,18 @@ package scope
 
 import (
 	"errors"
+	"os"
 	"testing"
 )
+
+var createPhysicalFixtureDirectory = func(path string) error { return os.MkdirAll(path, 0o700) }
+
+func mkdirPhysicalFixture(t *testing.T, path string) {
+	t.Helper()
+	if err := createPhysicalFixtureDirectory(path); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // Register before the call: a failed write may already have changed the fixture.
 func mutateOwnedFixture(t interface {

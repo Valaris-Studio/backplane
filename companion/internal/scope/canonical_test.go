@@ -245,7 +245,7 @@ func TestDecide_MapsACwdSpelledInAnotherCaseToItsMappedRoot(t *testing.T) {
 func TestDecide_KeepsDistinctCaseFoldersDistinctOnACaseSensitiveVolume(t *testing.T) {
 	f := newFixture(t)
 	parent := filepath.Join(f.home, "sensitive")
-	mkdir(t, parent)
+	mkdirPhysicalFixture(t, parent)
 
 	nativeSensitive := prepareNativeSensitiveDirectory(t, parent)
 	upper, lower := filepath.Join(parent, "Repo"), filepath.Join(parent, "repo")
@@ -368,7 +368,8 @@ func lockedParent(t *testing.T, root string) (parent, child string) {
 	t.Helper()
 	parent = filepath.Join(root, "locked")
 	child = filepath.Join(parent, "Child")
-	mkdir(t, child)
+	mkdirPhysicalFixture(t, parent)
+	mkdirPhysicalFixture(t, child)
 	if prepareNativeUnreadableParent(t, parent, child) {
 		return parent, child
 	}
