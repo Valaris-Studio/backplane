@@ -210,18 +210,6 @@ func nativeDACLFields(control uint16) windows.SECURITY_INFORMATION {
 	return windows.DACL_SECURITY_INFORMATION | windows.UNPROTECTED_DACL_SECURITY_INFORMATION
 }
 
-func nativeListing(path string) error {
-	directory, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	_, readErr := directory.Readdirnames(-1)
-	if err := directory.Close(); err != nil {
-		return fmt.Errorf("close listing handle: %w", err)
-	}
-	return readErr
-}
-
 func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 	t.Helper()
 	h, user := ownedNativeDirectory(t, parent, windows.WRITE_DAC)
@@ -231,7 +219,7 @@ func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 	if err != nil {
 		t.Skipf("UNQUALIFIED native DACL snapshot: %v", err)
 	}
-	if err := nativeListing(parent); err != nil {
+	if err := nativeListing(t, "before-deny", parent, h, user); err != nil {
 		t.Fatalf("owned parent must be listable initially: %v", err)
 	}
 	childBefore := openDirectoryInfo(t, child)
@@ -286,7 +274,7 @@ func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 		if err != nil || got != before {
 			return fmt.Errorf("owner/group/DACL/control restore mismatch: %v", err)
 		}
-		if err := nativeListing(parent); err != nil {
+		if err := nativeListing(t, "restored", parent, h, user); err != nil {
 			return fmt.Errorf("restored parent listing: %w", err)
 		}
 		if err := verifyChild(); err != nil {
@@ -309,7 +297,7 @@ func nativeUnreadableParent(t *testing.T, parent, child string) bool {
 	if err := verifyChild(); err != nil {
 		t.Fatal(err)
 	}
-	if err := nativeListing(parent); !os.IsPermission(err) {
+	if err := nativeListing(t, "after-deny", parent, h, user); !os.IsPermission(err) {
 		t.Fatalf("native fixture did not deny parent listing: %v", err)
 	}
 	if !os.SameFile(childBefore, openDirectoryInfo(t, child)) {
