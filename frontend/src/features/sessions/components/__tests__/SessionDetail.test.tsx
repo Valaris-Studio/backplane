@@ -248,7 +248,32 @@ describe("Session detail — timeline of turns and calls", () => {
     expect(within(turn).getByText("24 calls")).toBeInTheDocument();
     expect(within(turn).getByText("1 failed")).toBeInTheDocument();
     expect(within(turn).getByText("19m")).toBeInTheDocument();
-    expect(screen.getByText("3 turns · 41 calls · 1 failed")).toBeInTheDocument();
+    expect(screen.getByText("3 turns · 41 calls")).toBeInTheDocument();
+  });
+
+  it("does not label ingested failure events as the timeline failed-call total", async () => {
+    serveDetail({
+      session: { error_count: 2 },
+      pages: [callPage(
+        [PROMPT, makeCall({ key: "historical-failure", name: "Read", outcome: "failed" })],
+        [makeTurn({ turn_index: 1, failure_count: 1 })],
+      )],
+    });
+    server.use(http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/rhythm`, () =>
+      HttpResponse.json({
+        start: minutesAgo(72), end: minutesAgo(1), live: true, bucket_seconds: 60,
+        buckets: [{ t: minutesAgo(72), prompt: 1, tool: 0, file: 0, work: 0, error: 1 }],
+        idle_spans: [], children: [], capture_gaps: 0,
+      }),
+    ));
+    renderDetail();
+
+    const turn = await screen.findByRole("article");
+    expect(within(turn).getByText("1 failed")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /Session rhythm.*1 prompt, 1 call, 1 failed/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Failures" })).toBeInTheDocument();
+    expect(screen.getByText("3 turns · 41 calls")).toBeInTheDocument();
+    expect(screen.queryByText(/3 turns · 41 calls · 2 failed/)).not.toBeInTheDocument();
   });
 
   it("is explicit about output: withheld with its size, or none at all", async () => {
