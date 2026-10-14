@@ -392,13 +392,16 @@ class ProxyBufferingTests(unittest.TestCase):
 
     def test_large_api_response_to_a_slow_client_is_not_spooled_to_disk(self):
         with socket.create_connection(('127.0.0.1', self.port), timeout=10) as client:
-            client.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
             client.sendall(b'GET /api/large HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n')
+            # Pause reads to apply backpressure without changing the TCP receive window.
             time.sleep(1.5)
-            received = 0
-            while chunk := client.recv(1 << 20):
-                received += len(chunk)
-        self.assertGreater(received, LARGE_RESPONSE_BYTES)
+            with http.client.HTTPResponse(client) as response:
+                response.begin()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.getheader('Content-Length'), str(LARGE_RESPONSE_BYTES))
+                body = response.read()
+        self.assertEqual(len(body), LARGE_RESPONSE_BYTES)
+        self.assertTrue(body == b'x' * LARGE_RESPONSE_BYTES, 'response body differs from the fixture')
         self.assertNotIn('upstream response is buffered to a temporary file', container_logs(self.name))
 
     def test_api_upload_streams_to_the_backend_without_a_temp_file(self):

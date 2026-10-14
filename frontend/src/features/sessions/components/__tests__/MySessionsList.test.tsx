@@ -156,7 +156,9 @@ describe("My sessions list — grouping and period", () => {
   it.each([0, 12])("drops day groups when sorted by anything but recent activity at local hour %i", async (hour) => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 14, hour, 1));
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
 
     const { requests } = serveSessions(() => ({
       items: [
