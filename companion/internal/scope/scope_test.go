@@ -70,7 +70,7 @@ func TestExclusionsWinInPrecedenceOrder(t *testing.T) {
 		{"missing cwd", func(in *Input) { in.Cwd = filepath.Join(repo, "missing") }, ReasonInvalidCwd},
 		{"cwd is a file", func(in *Input) { in.Cwd = filepath.Join(repo, ".git", "config") }, ReasonInvalidCwd},
 		{"home directory", func(in *Input) { in.Cwd = f.home }, ReasonHomeOrRoot},
-		{"filesystem root", func(in *Input) { in.Cwd = string(filepath.Separator) }, ReasonHomeOrRoot},
+		{"filesystem root", func(in *Input) { in.Cwd = filepath.VolumeName(f.root) + string(filepath.Separator) }, ReasonHomeOrRoot},
 		{"exclude glob", func(in *Input) { in.Policy.Policy.Installation.ExcludeGlobs = []string{"~/code/app"} }, ReasonExcluded},
 		{"exclude glob matches ancestor", func(in *Input) {
 			in.Policy.Policy.Installation.ExcludeGlobs = []string{"**/code"}

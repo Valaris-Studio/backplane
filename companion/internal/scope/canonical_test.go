@@ -80,15 +80,16 @@ func TestCanonicalDir_ReturnsTheOnDiskUnicodeNormalization(t *testing.T) {
 	}
 }
 
-func TestCanonicalDir_KeepsTheGivenSpellingOnACaseSensitiveVolume(t *testing.T) {
+func TestOnDiskSpelling_KeepsTheGivenSpellingWhenProbeIsCaseSensitive(t *testing.T) {
 	f := newFixture(t)
-	requireCaseInsensitiveVolume(t, f.root)
 	withVolumeCaseSensitivity(t, true)
 	project := filepath.Join(f.home, "Shop")
 	mkdir(t, project)
 	spelled := respell(f.root, project)
-	if got, ok := CanonicalDir(spelled); !ok || got != spelled {
-		t.Fatalf("a case-sensitive volume must not fold case: CanonicalDir(%q) = %q, %v", spelled, got, ok)
+	// This controls only the spelling policy; EvalSymlinks may already respell
+	// aliases on the real filesystem before CanonicalDir reaches this seam.
+	if got, ok := onDiskSpelling(spelled); !ok || got != spelled {
+		t.Fatalf("a case-sensitive probe must not fold case: onDiskSpelling(%q) = %q, %v", spelled, got, ok)
 	}
 }
 
@@ -180,7 +181,7 @@ func TestDecide_ExcludeGlobMatchesAnotherCaseOnACaseInsensitiveVolume(t *testing
 	client := filepath.Join(f.home, "clients", "northwind")
 	mkdir(t, client)
 	f.cached.Policy.Mappings = []policy.Mapping{{ID: "m1", WorkspaceID: "w", RootPath: f.home + "/", Enabled: true}}
-	for _, glob := range []string{"~/Clients/**", "~/CLIENTS/*", "NorthWind", "/" + strings.ToUpper(strings.TrimPrefix(client, "/"))} {
+	for _, glob := range []string{"~/Clients/**", "~/CLIENTS/*", "NorthWind", strings.ToUpper(client)} {
 		f.cached.Policy.Installation.ExcludeGlobs = []string{glob}
 		for _, cwd := range []string{client, respell(f.root, client)} {
 			if decision := Decide(f.input(cwd)); decision.InScope || decision.Reason != ReasonExcluded {
@@ -239,16 +240,90 @@ func TestDecide_MapsACwdSpelledInAnotherCaseToItsMappedRoot(t *testing.T) {
 
 func TestDecide_KeepsDistinctCaseFoldersDistinctOnACaseSensitiveVolume(t *testing.T) {
 	f := newFixture(t)
-	requireCaseInsensitiveVolume(t, f.root)
-	withVolumeCaseSensitivity(t, true)
-	repo := f.repo(t, "shop", "")
-	respelled := respell(f.root, repo)
-	f.cached.Policy.Mappings = []policy.Mapping{{ID: "m1", WorkspaceID: "w", RootPath: respelled, Enabled: true}}
-	input := f.input(repo)
-	input.IgnoredPaths = []string{respelled}
-	if decision := Decide(input); decision.Reason == ReasonIgnored || decision.MappingID == "m1" {
-		t.Fatalf("a case-sensitive volume matched a differently-cased entry: %+v", decision)
+	parent := filepath.Join(f.home, "sensitive")
+	mkdir(t, parent)
+	upper, lower := filepath.Join(parent, "Repo"), filepath.Join(parent, "repo")
+	if err := os.Mkdir(upper, 0o700); err != nil {
+		t.Fatal(err)
 	}
+	if err := os.Mkdir(lower, 0o700); err != nil && !os.IsExist(err) {
+		t.Fatal(err)
+	}
+	upperInfo, lowerInfo := openDirectoryInfo(t, upper), openDirectoryInfo(t, lower)
+	if os.SameFile(upperInfo, lowerInfo) {
+		t.Skip("UNQUALIFIED case-sensitive directory gate: owned fixture resolves Repo and repo to one handle identity")
+	}
+	for _, entry := range []struct {
+		path string
+		info os.FileInfo
+	}{{upper, upperInfo}, {lower, lowerInfo}} {
+		if !os.SameFile(entry.info, entry.info) || !os.SameFile(entry.info, openDirectoryInfo(t, entry.path)) {
+			t.Fatalf("fixture identity changed while reopening %q", entry.path)
+		}
+		if got, ok := CanonicalDir(entry.path); !ok || got != entry.path {
+			t.Fatalf("distinct physical directory lost its canonical spelling: %q = %q, %v", entry.path, got, ok)
+		}
+	}
+	upperChild, lowerChild := filepath.Join(upper, "child"), filepath.Join(lower, "child")
+	mkdir(t, upperChild)
+	mkdir(t, lowerChild)
+	f.cached.Policy.Installation.AutoMatchRepos = false
+	a := policy.Mapping{ID: "upper", WorkspaceID: "w", RootPath: upper, Enabled: true}
+	b := policy.Mapping{ID: "lower", WorkspaceID: "w", RootPath: lower, Enabled: true}
+	f.cached.Policy.Mappings = []policy.Mapping{a}
+	for _, cwd := range []string{upper, upperChild} {
+		if got := Decide(f.input(cwd)); !got.InScope || got.MappingID != a.ID || got.Reason != ReasonMapped {
+			t.Errorf("exact mapped root or descendant %q: %+v", cwd, got)
+		}
+	}
+	for _, cwd := range []string{lower, lowerChild} {
+		if got := Decide(f.input(cwd)); got.InScope || got.MappingID != "" || got.PendingAutoMatch != nil || got.Reason != ReasonUnmapped {
+			t.Errorf("unmapped case-distinct sibling %q was admitted: %+v", cwd, got)
+		}
+	}
+	for _, mappings := range [][]policy.Mapping{{a, b}, {b, a}} {
+		f.cached.Policy.Mappings = mappings
+		for _, entry := range []struct{ cwd, id string }{{upper, a.ID}, {upperChild, a.ID}, {lower, b.ID}, {lowerChild, b.ID}} {
+			if got := Decide(f.input(entry.cwd)); !got.InScope || got.MappingID != entry.id || got.Reason != ReasonMapped {
+				t.Errorf("mapping order %s first, cwd %q: %+v", mappings[0].ID, entry.cwd, got)
+			}
+		}
+		for _, cwd := range []string{lower, lowerChild} {
+			input := f.input(cwd)
+			input.IgnoredPaths = []string{upper}
+			if got := Decide(input); !got.InScope || got.MappingID != b.ID || got.Reason != ReasonMapped {
+				t.Errorf("ignoring distinct sibling suppressed %q: %+v", cwd, got)
+			}
+			input.IgnoredPaths = []string{lower}
+			if got := Decide(input); got.InScope || got.MappingID != "" || got.PendingAutoMatch != nil || got.Reason != ReasonIgnored {
+				t.Errorf("exact ignored root or descendant %q was admitted: %+v", cwd, got)
+			}
+		}
+	}
+}
+
+func openDirectoryInfo(t *testing.T, path string) os.FileInfo {
+	t.Helper()
+	entry, err := os.Lstat(path)
+	if err != nil || !entry.IsDir() || entry.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("fixture is not a physical directory %q: %v", path, err)
+	}
+	directory, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := directory.Close(); err != nil {
+			t.Errorf("close fixture directory: %v", err)
+		}
+	})
+	// Stat through the still-open handle: Windows pathname Stat can defer its
+	// file identity lookup until SameFile, after the path has changed.
+	info, err := directory.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info
 }
 
 func TestDecide_RefusesAMissingCwdInAnyCase(t *testing.T) {
@@ -288,10 +363,31 @@ func lockedParent(t *testing.T, root string) (parent, child string) {
 	parent = filepath.Join(root, "locked")
 	child = filepath.Join(parent, "Child")
 	mkdir(t, child)
+	original, err := os.Stat(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chmod(parent, original.Mode().Perm()); err != nil {
+			t.Errorf("restore owned permission fixture: %v", err)
+		}
+	})
 	if err := os.Chmod(parent, 0o100); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(parent, 0o700) })
+	directory, err := os.Open(parent)
+	if err == nil {
+		_, err = directory.Readdirnames(-1)
+		if closeErr := directory.Close(); closeErr != nil {
+			t.Fatal(closeErr)
+		}
+	}
+	if err == nil {
+		t.Skip("UNQUALIFIED permission-denial gate: chmod did not deny listing the owned parent; a native ACL fixture is still required")
+	}
+	if !os.IsPermission(err) {
+		t.Fatalf("fixture must deny listing with a permission error: %v", err)
+	}
 	return parent, child
 }
 
