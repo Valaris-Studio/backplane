@@ -39,6 +39,15 @@ func (d *Daemon) pollInitialPrompt(ctx context.Context, threadID string, thread 
 	if err != nil {
 		return err
 	}
+	if result.Done {
+		session.InitialPromptDone = true
+		// Checked before any effect: a mark the state could not load back
+		// with would forget its cursor, first sighting and usage source.
+		if !usageStateFits(session, session.Cursor) {
+			d.noteUsageRead(ctx, agent.UsageResult{CapacityLimitedFiles: 1})
+			return nil
+		}
+	}
 	if len(result.Event) > 0 {
 		decision, err = d.decide(ctx, result.Harness, thread.Cwd)
 		if err != nil || !decision.InScope {
@@ -56,9 +65,7 @@ func (d *Daemon) pollInitialPrompt(ctx context.Context, threadID string, thread 
 		item := observed{
 			captureID: captureID(adapter.ID(), "initial_prompt\x00"+threadID), adapter: adapter, harness: result.Harness, ingress: agent.IngressPoll,
 			observation: agent.Observation{NativeSessionID: threadID, Cwd: thread.Cwd}, receivedAt: result.ObservedAt,
-		}
-		if thread.SessionID != "" && thread.SessionID != threadID {
-			item.parentSessionID = thread.SessionID
+			parentSessionID: d.threadParent(adapter, threadID, thread),
 		}
 		known, err := d.queue.Has(item.captureID)
 		if err != nil {
@@ -71,7 +78,6 @@ func (d *Daemon) pollInitialPrompt(ctx context.Context, threadID string, thread 
 		}
 	}
 	if result.Done {
-		session.InitialPromptDone = true
 		return saveUsageState(d.config.Layout, path, session)
 	}
 	return nil
