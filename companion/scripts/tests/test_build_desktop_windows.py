@@ -95,7 +95,7 @@ class WindowsPayloadTest(unittest.TestCase):
         self.payload = self.root / "payload"
 
     def stage(self):
-        payload = desktop_payload.stage_payload(self.payload, self.binaries, SPEC, "go1.26.2", "windows", "amd64")
+        payload = desktop_payload.stage_payload(self.payload, self.binaries, SPEC, "go1.26.9", "windows", "amd64", otelcol_overrides={})
         write_fake_notices(payload, desktop_payload.WINDOWS_LAYOUT, self.root)
         return payload
 

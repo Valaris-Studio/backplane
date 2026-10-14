@@ -44,8 +44,8 @@ import build_bundle
 import bundle
 import licenses
 import macos_signing
-from build_beacon import download_source, run
-from build_beacon_otelcol import BUILDER_VERSION
+from build_beacon import BeaconBuildError, download_source, require_go_toolchain, run
+from build_beacon_otelcol import BUILDER_CONFIG, BUILDER_VERSION, linked_overrides
 
 COMPANION = build_bundle.COMPANION
 DESKTOP = COMPANION / "desktop"
@@ -139,7 +139,7 @@ def beacon_manifest(binary, spec, go_version, **extra):
     return manifest
 
 
-def stage_contents(contents, binaries, spec, go_version, sign):
+def stage_contents(contents, binaries, spec, go_version, sign, *, otelcol_overrides):
     """Lay out the prebuilt part of the app's Contents; sign runs on the staged
     binaries before any checksum is taken."""
     missing = [name for name in ("backplane-companion", "beacon-hooks", "beacon-otelcol") if name not in binaries]
@@ -156,7 +156,8 @@ def stage_contents(contents, binaries, spec, go_version, sign):
     sign([companion, hooks, otelcol])
     (beacon / "artifact.json").write_text(json.dumps(beacon_manifest(hooks, spec, go_version), indent=2) + "\n", encoding="utf-8")
     (beacon / "otelcol.json").write_text(json.dumps(beacon_manifest(
-        otelcol, spec, go_version, builder_version=BUILDER_VERSION, builder_config="collector-builder/builder.yaml"), indent=2) + "\n", encoding="utf-8")
+        otelcol, spec, go_version, builder_version=BUILDER_VERSION, builder_config=BUILDER_CONFIG,
+        generated_module_overrides=otelcol_overrides), indent=2) + "\n", encoding="utf-8")
     return contents
 
 
@@ -479,14 +480,19 @@ def build(arguments):
                 info = licenses.read_build_info(binary)
                 if build_bundle.links_beacon_updater(info):
                     raise BuildError(f"{name} links Beacon's self-updater ({build_bundle.BEACON_UPDATER_MODULE})")
+                require_go_toolchain(info.go_version, built=name)
                 thin[name][architecture] = binary
                 infos[name].append(info)
         universal = temporary / "universal"
         universal.mkdir()
         binaries = {name: lipo(thin[name], universal / (COMPANION_UNIVERSAL if name == "backplane-companion" else name)) for name in thin}
         go_version = infos["backplane-companion"][0].go_version
+        otelcol_overrides = [linked_overrides(info) for info in infos["beacon-otelcol"]]
+        if any(overrides != otelcol_overrides[0] for overrides in otelcol_overrides):
+            raise BuildError("the arm64 and amd64 beacon-otelcol slices link different overridden modules")
         contents = stage_contents(temporary / "app" / "Contents", binaries, spec, go_version,
-                                  lambda paths: macos_signing.sign(paths, signing or macos_signing.Signing(AD_HOC)))
+                                  lambda paths: macos_signing.sign(paths, signing or macos_signing.Signing(AD_HOC)),
+                                  otelcol_overrides=otelcol_overrides[0])
         go_entries = licenses.inventory({name: merged_build_info(found) for name, found in infos.items()}, Path(host["GOMODCACHE"]),
                                         beacon_license=source / "LICENSE")
         run("pnpm", "install", "--frozen-lockfile", "--offline", cwd=DESKTOP)
@@ -528,5 +534,5 @@ if __name__ == "__main__":
     build_bundle.exit_on_termination()
     try:
         main()
-    except (BuildError, build_bundle.BuildError, licenses.LicenseError, macos_signing.SigningError, subprocess.CalledProcessError) as error:
+    except (BuildError, build_bundle.BuildError, BeaconBuildError, licenses.LicenseError, macos_signing.SigningError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build_desktop: {error}")

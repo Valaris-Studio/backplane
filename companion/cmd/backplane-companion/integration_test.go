@@ -427,6 +427,10 @@ func codexLogs(threads map[string]string) string {
 		{"thread-root", "codex.tool_result", attribute("tool_name", "exec_command") + "," + attribute("call_id", "call_4") + "," + attribute("arguments", `{"cmd":`+quoted(codexShellPatch)+`}`) + "," + attribute("success", "true") + "," + attribute("output", "Success.")},
 		{"thread-root", "codex.tool_result", attribute("tool_name", "exec_command") + "," + attribute("call_id", "call_5") + "," + attribute("arguments", `{"cmd":`+quoted(codexHeredocWrite)+`}`) + "," + attribute("success", "true") + "," + attribute("output", "")},
 		{"thread-child", "codex.user_prompt", attribute("prompt", "subagent prompt")},
+		{"thread-orphan", "codex.user_prompt", attribute("prompt", "orphan prompt")},
+		{"thread-rootonly", "codex.user_prompt", attribute("prompt", "root-only prompt")},
+		{"thread-malformed", "codex.user_prompt", attribute("prompt", "malformed prompt")},
+		{"thread-foreign", "codex.user_prompt", attribute("prompt", "foreign prompt")},
 		{"thread-out", "codex.user_prompt", attribute("prompt", "OTHER_REPO_PROMPT")},
 		{"thread-late", "codex.user_prompt", attribute("prompt", "late hook prompt")},
 	} {
@@ -520,7 +524,7 @@ func runCodexThroughCollector(t *testing.T, contentLevel string) []map[string]an
 	h.server.Policy.Installation.EnabledAgents = []string{"claude_code", "codex_cli"}
 	h.server.Policy.Mappings[0].ContentLevel = contentLevel
 	h.connect(t)
-	h.codexHome(t)
+	codexHome := h.codexHome(t)
 	if err := h.run(t, "agents", "install", "codex"); err != nil {
 		t.Fatal(err)
 	}
@@ -535,8 +539,28 @@ func runCodexThroughCollector(t *testing.T, contentLevel string) []map[string]an
 	}
 	sessionStart("thread-root", h.repo)
 	sessionStart("thread-out", other)
-	h.app.stdin = strings.NewReader(`{"session_id":"thread-root","turn_id":"t1","transcript_path":null,"cwd":` + quoted(h.repo) + `,"hook_event_name":"SubagentStart","model":"gpt-5","permission_mode":"default","agent_id":"thread-child","agent_type":"worker"}`)
-	h.app.runHook([]string{"codex"})
+	// Only a subagent's own rollout header proves its parent; the hook's
+	// session_id is the tree's root, which the server would keep for good.
+	sessions := filepath.Join(codexHome, "sessions", "2026", "09", "21")
+	mustMkdir(t, sessions)
+	rollout := func(thread, header string) string {
+		path := filepath.Join(sessions, "rollout-2026-09-21T14-13-20-"+thread+".jsonl")
+		if err := os.WriteFile(path, []byte(header+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	subagentStart := func(thread string, transcript any) {
+		hook, _ := json.Marshal(map[string]any{"session_id": "thread-root", "turn_id": "t1", "transcript_path": transcript, "cwd": h.repo, "hook_event_name": "SubagentStart", "model": "gpt-5", "permission_mode": "default", "agent_id": thread, "agent_type": "worker"})
+		h.app.stdin = strings.NewReader(string(hook))
+		h.app.runHook([]string{"codex"})
+	}
+	// Synthetic positive case for the own-header lineage contract.
+	subagentStart("thread-child", rollout("thread-child", codexSessionMeta("thread-child", "thread-root", h.repo)))
+	subagentStart("thread-orphan", nil)
+	subagentStart("thread-rootonly", rollout("thread-rootonly", codexSessionMeta("thread-rootonly", "", h.repo)))
+	subagentStart("thread-malformed", rollout("thread-malformed", `{"type":"session_meta","payload":{"id":"thread-malformed","session_id":"thread-root","parent_thread_id":"thread-root"`))
+	subagentStart("thread-foreign", rollout("thread-other", codexSessionMeta("thread-other", "thread-root", h.repo)))
 
 	logPath := filepath.Join(h.data, "logs", "companion.log")
 	cancel, done := h.runDaemonAsync(t, "--log", logPath)
@@ -561,14 +585,14 @@ func runCodexThroughCollector(t *testing.T, contentLevel string) []map[string]an
 		for _, record := range h.server.Records() {
 			bySession[record["native_session_id"].(string)]++
 		}
-		if bySession["thread-root"] >= 8 && bySession["thread-late"] >= 1 && bySession["thread-child"] >= 1 {
+		if bySession["thread-root"] >= 8 && bySession["thread-late"] >= 1 && bySession["thread-child"] >= 1 && allUploaded(bySession, codexLineageNegatives) {
 			break
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
 	records := h.server.Records()
 	uploaded, _ := json.Marshal(records)
-	if bySession["thread-root"] < 8 || bySession["thread-late"] < 1 || bySession["thread-child"] < 1 {
+	if bySession["thread-root"] < 8 || bySession["thread-late"] < 1 || bySession["thread-child"] < 1 || !allUploaded(bySession, codexLineageNegatives) {
 		collectorLog, _ := os.ReadFile(filepath.Join(h.data, "otel", "collector.log"))
 		t.Fatalf("records by session %v\nuploaded: %s\ncollector: %s", bySession, uploaded, collectorLog)
 	}
@@ -591,6 +615,35 @@ func runCodexThroughCollector(t *testing.T, contentLevel string) []map[string]an
 	}
 	assertEventContract(t, records)
 	return records
+}
+
+// codexLineageNegatives are subagents whose parent is not proven: no
+// rollout, a header naming only the tree's root, a truncated header, and
+// another thread's rollout. Each must upload with no parent.
+var codexLineageNegatives = []string{"thread-orphan", "thread-rootonly", "thread-malformed", "thread-foreign"}
+
+func allUploaded(bySession map[string]int, threads []string) bool {
+	for _, thread := range threads {
+		if bySession[thread] < 1 {
+			return false
+		}
+	}
+	return true
+}
+
+// codexSessionMeta builds a synthetic session_meta line in the lineage shape
+// recorded for a Codex Desktop 0.160 subagent, not a captured CLI child
+// header: session_id names the tree's root, parent_thread_id (when set) the
+// thread that spawned it.
+func codexSessionMeta(thread, spawner, cwd string) string {
+	payload := map[string]any{"id": thread, "session_id": "thread-root", "timestamp": "2026-09-21T14:13:20.000Z", "cwd": cwd, "originator": "codex_exec", "cli_version": "0.161.0"}
+	if spawner != "" {
+		payload["parent_thread_id"] = spawner
+		payload["source"] = map[string]any{"subagent": map[string]any{"thread_spawn": map[string]any{"parent_thread_id": spawner, "depth": 1}}}
+		payload["thread_source"] = "subagent"
+	}
+	line, _ := json.Marshal(map[string]any{"timestamp": "2026-09-21T14:13:20.000Z", "type": "session_meta", "payload": payload})
+	return string(line)
 }
 
 var timestampWithOffset = regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)$`)

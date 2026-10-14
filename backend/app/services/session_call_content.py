@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from app.core.codex_tool_result import MAX_DURATION_MS, codex_tool_result
 from app.schemas.beacon import REDACTIONS_KEY, canonical_json
 
 ARGS_PREVIEW_CHARS = 300
@@ -169,5 +170,6 @@ def exit_code(data: dict) -> int | None:
 def reported_duration_ms(data: dict) -> int | None:
     duration = _at(data, "command.duration_ms")
     if isinstance(duration, (int, float)) and not isinstance(duration, bool):
-        return int(duration) if duration >= 0 else None
-    return None
+        return int(duration) if 0 <= duration <= MAX_DURATION_MS else None
+    native = codex_tool_result(data)
+    return native.duration_ms if native else None

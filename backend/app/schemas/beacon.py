@@ -19,6 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.codex_tool_result import CodexToolResult, codex_tool_result
 from app.core.command_content import without_command_content
 from app.core.harness import COLLECTION_METHODS, native_call_key
 
@@ -176,14 +177,19 @@ class PromotedEvent:
     cost_usd: Decimal | None
 
 
-def _outcome(parsed: BeaconEvent) -> str | None:
+def _outcome(parsed: BeaconEvent, native: CodexToolResult | None) -> str | None:
     action = parsed.event.action
     exit_code = parsed.command.exit_code if parsed.command else None
-    if action.endswith(".failed") or parsed.error or (exit_code or 0) != 0:
+    if (
+        action.endswith(".failed")
+        or parsed.error
+        or (exit_code or 0) != 0
+        or (native and native.outcome == "failed")
+    ):
         return "failed"
     if action.endswith(".completed") or exit_code == 0:
         return "succeeded"
-    return None
+    return native.outcome if native else None
 
 
 def _tool_call_id(parsed: BeaconEvent, gen_ai: GenAIInfo) -> str | None:
@@ -196,6 +202,7 @@ def _tool_call_id(parsed: BeaconEvent, gen_ai: GenAIInfo) -> str | None:
 
 
 def promote(raw: dict, parsed: BeaconEvent, record_collection_method: str):
+    native = codex_tool_result(raw)
     gen_ai = parsed.gen_ai or GenAIInfo()
     usage = gen_ai.usage or UsageInfo()
     harness = parsed.harness or HarnessInfo()
@@ -227,9 +234,17 @@ def promote(raw: dict, parsed: BeaconEvent, record_collection_method: str):
             200,
         ),
         native_tool_call_id=_call_key(_tool_call_id(parsed, gen_ai)),
-        mcp_server=_bounded(parsed.mcp.server if parsed.mcp else None, 200),
-        mcp_tool=_bounded(parsed.mcp.tool if parsed.mcp else None, 200),
-        outcome=_outcome(parsed),
+        mcp_server=_bounded(
+            (parsed.mcp.server if parsed.mcp else None)
+            or (native.mcp_server if native else None),
+            200,
+        ),
+        mcp_tool=_bounded(
+            (parsed.mcp.tool if parsed.mcp else None)
+            or (native.mcp_tool if native else None),
+            200,
+        ),
+        outcome=_outcome(parsed, native),
         harness_version=_bounded(harness.version, 64),
         cwd=_bounded(
             parsed.session.working_directory if parsed.session else None, 1024

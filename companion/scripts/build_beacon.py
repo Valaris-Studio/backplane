@@ -9,12 +9,38 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
 import urllib.request
+
+
+# The oldest release with the 2026-10-08 security fixes to net/http, crypto/tls,
+# net/textproto, html/template and os; every shipped Go binary links its stdlib.
+MINIMUM_GO_VERSION = (1, 26, 9)
+
+
+class BeaconBuildError(RuntimeError):
+    pass
+
+
+class ToolchainError(BeaconBuildError):
+    pass
+
+
+def require_go_toolchain(go_version, built=None):
+    """built names the binary whose build info carried go_version; without it
+    the version is the toolchain about to build. Devel and unparsable versions
+    are refused."""
+    match = re.fullmatch(r"go(\d+)\.(\d+)(?:\.(\d+)|(?:rc|beta)\d+)", go_version)
+    minimum = "go{}.{}.{}".format(*MINIMUM_GO_VERSION)
+    subject = f"{built} was built with" if built else "the Go toolchain is"
+    patch = -1 if match and match.group(3) is None else int(match.group(3)) if match else None
+    if not match or (int(match.group(1)), int(match.group(2)), patch) < MINIMUM_GO_VERSION:
+        raise ToolchainError(f"{subject} {go_version or 'unknown'}; release builds need {minimum} or later")
 
 
 def run(*command, cwd=None, env=None):
@@ -77,6 +103,7 @@ def build(output):
     output.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ, CGO_ENABLED="0", GOTOOLCHAIN="local")
     platform = json.loads(run("go", "env", "-json", "GOOS", "GOARCH", "GOVERSION", "GOROOT", env=environment))
+    require_go_toolchain(platform["GOVERSION"])
     binary_name = "beacon-hooks.exe" if platform["GOOS"] == "windows" else "beacon-hooks"
     with tempfile.TemporaryDirectory(prefix="backplane-beacon-build-") as directory:
         temporary = Path(directory)

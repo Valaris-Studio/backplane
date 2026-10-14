@@ -9637,7 +9637,7 @@
       },
       "linked": {
         "title": "Linked work",
-        "none": "This session didn't change or consult any card or note.",
+        "none": "No card or note links have been recorded for this session.",
         "calls_one": "{{count}} call",
         "calls_other": "{{count}} calls",
         "card": "card",

@@ -48,6 +48,9 @@ type rolloutMark struct {
 type polledThread struct {
 	id     string
 	thread state.Thread
+	// hooked: a hook named the thread, so its first sighting is when that
+	// hook arrived; a hookless thread's is its header's own creation stamp.
+	hooked bool
 }
 
 func (d *Daemon) pollTranscripts(ctx context.Context) error {
@@ -63,7 +66,7 @@ func (d *Daemon) pollTranscripts(ctx context.Context) error {
 	var due []polledThread
 	for id, thread := range threads.Threads {
 		if thread.Transcript != "" && now.Sub(thread.SeenAt) < rolloutPollWindow {
-			due = append(due, polledThread{id: id, thread: thread})
+			due = append(due, polledThread{id: id, thread: thread, hooked: true})
 		}
 	}
 	for _, found := range d.discoverSessions() {
@@ -90,7 +93,15 @@ func (d *Daemon) pollTranscripts(ctx context.Context) error {
 		if index >= maxRolloutPolls || ctx.Err() != nil {
 			break
 		}
-		err := d.pollTranscript(ctx, candidate.id, candidate.thread)
+		var err error
+		if candidate.hooked {
+			// Only a first hook within a minute of creation admits an initial
+			// prompt; a hookless sighting proves no time and imports no history.
+			err = d.pollInitialPrompt(ctx, candidate.id, candidate.thread)
+		}
+		if err == nil {
+			err = d.pollTranscript(ctx, candidate.id, candidate.thread)
+		}
 		if errors.Is(err, errStopDrain) {
 			// The queue is full: the rest waits, unread, for a later pass.
 			return nil

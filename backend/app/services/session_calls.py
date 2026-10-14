@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.codex_tool_result import codex_tool_result
 from app.core.time import as_utc
 from app.exceptions import ResourceNotFoundError, ValidationError
 from app.models.agent_session import AgentSession, AgentSessionEvent
@@ -81,7 +82,11 @@ def _outcome(events: list[AgentSessionEvent], session_open: bool) -> str:
     """Only a completion signal (a .completed/.failed action, an exit code, an
     error) settles a call; more events of it are not one, since several hooks
     can fire before a call returns."""
-    outcomes = {event.outcome for event in events}
+    outcomes = {
+        event.outcome
+        or (native.outcome if (native := codex_tool_result(event.event)) else None)
+        for event in events
+    }
     if "failed" in outcomes:
         return "failed"
     if "succeeded" in outcomes:
@@ -98,10 +103,19 @@ def _call_item(
 ) -> SessionCallItem:
     first, last = events[0], events[-1]
     is_prompt = any(event.action == PROMPT_ACTION for event in events)
-    is_mcp = any(event.mcp_server or event.mcp_tool for event in events)
+    native_results = [codex_tool_result(event.event) for event in events]
     names = [event.tool_name for event in events if event.tool_name]
-    mcp_tools = [event.mcp_tool for event in events if event.mcp_tool]
-    mcp_servers = [event.mcp_server for event in events if event.mcp_server]
+    mcp_tools = [
+        name
+        for event, native in zip(events, native_results)
+        if (name := event.mcp_tool or (native.mcp_tool if native else None))
+    ]
+    mcp_servers = [
+        name
+        for event, native in zip(events, native_results)
+        if (name := event.mcp_server or (native.mcp_server if native else None))
+    ]
+    is_mcp = bool(mcp_tools or mcp_servers)
     withheld = withheld_content(event.event for event in events)
     if len(events) > 1:
         duration_ms = round(

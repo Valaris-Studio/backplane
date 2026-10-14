@@ -94,8 +94,9 @@ func (d *Daemon) drainUsage(ctx context.Context, adapter agent.Agent, item inbox
 // state reads from the start; the stable event ids keep that from counting
 // a request twice.
 type usageState struct {
-	FirstSeen time.Time       `json:"first_seen"`
-	Cursor    json.RawMessage `json:"cursor,omitempty"`
+	FirstSeen         time.Time       `json:"first_seen"`
+	Cursor            json.RawMessage `json:"cursor,omitempty"`
+	InitialPromptDone bool            `json:"initial_prompt_done,omitempty"`
 	// Source is what counts the session's usage when two could: its
 	// telemetry or its transcript. The first to deliver keeps it, so the
 	// same responses are never counted twice.
