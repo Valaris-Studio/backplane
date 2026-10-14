@@ -88,7 +88,7 @@ retains embedded binary.
 
 ## Use
 
-Requires Go 1.25+. Build the pinned Beacon artifact once (Python 3.12+); it
+Requires Go 1.26+. Build the pinned Beacon artifact once (Python 3.12+); it
 downloads the exact archive in `beacon-source.json`, verifies it, builds
 `beacon-hooks` without patches and writes `artifact.json` with its checksum and
 license notices. No compiled executable belongs in git.
