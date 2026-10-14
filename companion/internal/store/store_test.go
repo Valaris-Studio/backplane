@@ -14,33 +14,36 @@ import (
 )
 
 func TestDefaultRootHonorsOverrideAndPlatformDefaults(t *testing.T) {
-	env := map[string]string{"HOME": "/home/u", EnvHome: "/custom/root"}
+	fixtureRoot := t.TempDir()
+	home := filepath.Join(fixtureRoot, "home", "u")
+	override := filepath.Join(fixtureRoot, "custom", "root")
+	env := map[string]string{"HOME": home, EnvHome: override}
 	getenv := func(key string) string { return env[key] }
-	root, err := DefaultRoot(getenv, "linux", "/home/u")
-	if err != nil || root != "/custom/root" {
+	root, err := DefaultRoot(getenv, "linux", home)
+	if err != nil || root != override {
 		t.Fatalf("override ignored: %q %v", root, err)
 	}
 	delete(env, EnvHome)
 	cases := []struct{ goos, want string }{
-		{"darwin", "/home/u/Library/Application Support/Backplane Companion"},
-		{"linux", "/home/u/.local/state/backplane-companion"},
+		{"darwin", filepath.Join(home, "Library", "Application Support", "Backplane Companion")},
+		{"linux", filepath.Join(home, ".local", "state", "backplane-companion")},
 	}
 	for _, c := range cases {
-		root, err := DefaultRoot(getenv, c.goos, "/home/u")
+		root, err := DefaultRoot(getenv, c.goos, home)
 		if err != nil || root != c.want {
 			t.Fatalf("%s: %q %v", c.goos, root, err)
 		}
 	}
-	env["XDG_STATE_HOME"] = "/xdg"
-	if root, _ := DefaultRoot(getenv, "linux", "/home/u"); root != "/xdg/backplane-companion" {
+	env["XDG_STATE_HOME"] = filepath.Join(fixtureRoot, "xdg")
+	if root, _ := DefaultRoot(getenv, "linux", home); root != filepath.Join(env["XDG_STATE_HOME"], "backplane-companion") {
 		t.Fatalf("XDG_STATE_HOME ignored: %s", root)
 	}
-	env["LOCALAPPDATA"] = `C:\Users\u\AppData\Local`
-	if root, _ := DefaultRoot(getenv, "windows", `C:\Users\u`); root != filepath.Join(`C:\Users\u\AppData\Local`, "Backplane", "Companion") {
+	env["LOCALAPPDATA"] = filepath.Join(home, "AppData", "Local")
+	if root, _ := DefaultRoot(getenv, "windows", home); root != filepath.Join(env["LOCALAPPDATA"], "Backplane", "Companion") {
 		t.Fatalf("windows default: %s", root)
 	}
 	env[EnvHome] = "relative"
-	if _, err := DefaultRoot(getenv, "linux", "/home/u"); err == nil {
+	if _, err := DefaultRoot(getenv, "linux", home); err == nil {
 		t.Fatal("relative override accepted")
 	}
 }
