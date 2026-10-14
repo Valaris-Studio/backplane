@@ -93,7 +93,7 @@ class StageContentsTest(unittest.TestCase):
             path.write_bytes(path.read_bytes() + b"-signed")
 
     def stage(self):
-        return build_desktop.stage_contents(self.root / "Contents", self.binaries, SPEC, "go1.26.2", self.sign)
+        return build_desktop.stage_contents(self.root / "Contents", self.binaries, SPEC, "go1.26.9", self.sign, otelcol_overrides={})
 
     def test_stage_contents_puts_the_companion_in_macos_and_beacon_in_resources(self):
         contents = self.stage()

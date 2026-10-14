@@ -77,7 +77,7 @@ class BuildTargetSigningTest(unittest.TestCase):
 
         def read_build_info(binary):
             self.seen_by_build_info[binary.name] = binary.read_bytes()
-            return licenses.BuildInfo("go1.26.2", "example.com/" + binary.name)
+            return licenses.BuildInfo("go1.26.9", "example.com/" + binary.name)
 
         patches = [
             mock.patch.object(build_bundle, "build_companion", lambda stage, goos, *_: [built(stage / build_bundle.exe(goos, "backplane-companion"), "companion").name]),

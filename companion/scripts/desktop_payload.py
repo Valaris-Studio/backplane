@@ -15,7 +15,8 @@ import build_bundle
 import build_desktop
 import bundle
 import licenses
-from build_beacon_otelcol import BUILDER_VERSION
+from build_beacon import require_go_toolchain
+from build_beacon_otelcol import BUILDER_CONFIG, BUILDER_VERSION
 
 BuildError = build_desktop.BuildError
 BEACON = "beacon"
@@ -67,10 +68,11 @@ def build_go_binaries(stage, goos, goarch, version, commit, source, builder):
     for name, info in infos.items():
         if build_bundle.links_beacon_updater(info):
             raise BuildError(f"{name} links Beacon's self-updater ({build_bundle.BEACON_UPDATER_MODULE})")
+        require_go_toolchain(info.go_version, built=name)
     return binaries, infos
 
 
-def stage_payload(payload, binaries, spec, go_version, goos, goarch):
+def stage_payload(payload, binaries, spec, go_version, goos, goarch, *, otelcol_overrides):
     layout = LAYOUTS[goos]
     placements = {Path(path).name: path for path in (*layout.companions, layout.beacon_hooks, layout.beacon_otelcol)}
     missing = sorted(set(placements) - set(binaries))
@@ -85,8 +87,8 @@ def stage_payload(payload, binaries, spec, go_version, goos, goarch):
     (payload / BEACON / "artifact.json").write_text(json.dumps(
         build_bundle.artifact_manifest(hooks, spec, goos, goarch, go_version), indent=2) + "\n", encoding="utf-8")
     (payload / BEACON / "otelcol.json").write_text(json.dumps(build_bundle.artifact_manifest(
-        otelcol, spec, goos, goarch, go_version, builder_version=BUILDER_VERSION, builder_config="collector-builder/builder.yaml"),
-        indent=2) + "\n", encoding="utf-8")
+        otelcol, spec, goos, goarch, go_version, builder_version=BUILDER_VERSION, builder_config=BUILDER_CONFIG,
+        generated_module_overrides=otelcol_overrides), indent=2) + "\n", encoding="utf-8")
     if goos == "linux":
         companion = payload / layout.companions[0]
         (payload / COMPANION_DIGEST).write_text(f"{bundle.sha256(companion)}  {companion.name}\n", encoding="utf-8")

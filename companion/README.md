@@ -88,10 +88,14 @@ retains embedded binary.
 
 ## Use
 
-Requires Go 1.26+. Build the pinned Beacon artifact once (Python 3.12+); it
-downloads the exact archive in `beacon-source.json`, verifies it, builds
-`beacon-hooks` without patches and writes `artifact.json` with its checksum and
-license notices. No compiled executable belongs in git.
+Requires Go 1.26+; the Beacon and release builds refuse a toolchain older than
+go1.26.9. Build the pinned Beacon artifact once (Python 3.12+); it downloads the
+exact archive in `beacon-source.json`, verifies it, builds `beacon-hooks`
+without patches and writes `artifact.json` with its checksum and license
+notices. `beacon-otelcol` is generated from the unmodified `builder.yaml`, then
+its module is lifted to the dependency floors declared in
+`build_beacon_otelcol.py`; `otelcol.json` records them as linked under
+`generated_module_overrides`. No compiled executable belongs in git.
 
 ```sh
 python3 scripts/build_beacon.py --output /tmp/beacon-artifact

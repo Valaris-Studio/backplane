@@ -127,7 +127,7 @@ class LinuxPayloadTest(unittest.TestCase):
         self.payload = self.root / "payload"
 
     def stage(self):
-        return desktop_payload.stage_payload(self.payload, self.binaries, SPEC, "go1.26.2", "linux", "amd64")
+        return desktop_payload.stage_payload(self.payload, self.binaries, SPEC, "go1.26.9", "linux", "amd64", otelcol_overrides={})
 
     def test_stage_payload_puts_the_companion_beside_the_gui_and_beacon_under_it(self):
         payload = self.stage()

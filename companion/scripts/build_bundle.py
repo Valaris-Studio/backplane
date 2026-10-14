@@ -32,8 +32,8 @@ from pathlib import Path
 import bundle
 import licenses
 import macos_signing
-from build_beacon import download_source, run
-from build_beacon_otelcol import BUILDER_VERSION
+from build_beacon import BeaconBuildError, download_source, require_go_toolchain, run
+from build_beacon_otelcol import BUILDER_CONFIG, BUILDER_VERSION, apply_generated_module_overrides, linked_overrides
 
 COMPANION = Path(__file__).resolve().parents[1]
 TARGETS = ["darwin/arm64", "darwin/amd64", "linux/amd64", "linux/arm64", "windows/amd64"]
@@ -107,6 +107,7 @@ def build_otelcol(source, stage, goos, goarch, builder):
     run(str(builder), "--config", "builder.yaml", "--skip-compilation", cwd=builder_root,
         env=go_environment(goos, goarch, GOFLAGS=""))
     relative_local_replacements(distribution / "go.mod", distribution)
+    apply_generated_module_overrides(distribution, go_environment(goos, goarch, GOFLAGS=""))
     target = stage / "beacon" / exe(goos, "beacon-otelcol")
     run("go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-s -w -buildid=", "-o", str(target), ".",
         cwd=distribution, env=go_environment(goos, goarch))
@@ -160,10 +161,12 @@ def build_target(target, output, source, builder, spec, version, commit, dirty, 
     for name, info in infos.items():
         if links_beacon_updater(info):
             raise BuildError(f"{name} links Beacon's self-updater ({BEACON_UPDATER_MODULE})")
+        require_go_toolchain(info.go_version, built=name)
     go_version = infos["backplane-companion"].go_version
     (stage / "beacon" / "artifact.json").write_text(json.dumps(artifact_manifest(hooks, spec, goos, goarch, go_version), indent=2) + "\n", encoding="utf-8")
     (stage / "beacon" / "otelcol.json").write_text(json.dumps(artifact_manifest(
-        otelcol, spec, goos, goarch, go_version, builder_version=BUILDER_VERSION, builder_config="collector-builder/builder.yaml"), indent=2) + "\n", encoding="utf-8")
+        otelcol, spec, goos, goarch, go_version, builder_version=BUILDER_VERSION, builder_config=BUILDER_CONFIG,
+        generated_module_overrides=linked_overrides(infos["beacon-otelcol"])), indent=2) + "\n", encoding="utf-8")
 
     notices_dir = stage / "LICENSES"
     notices_dir.mkdir()
@@ -257,5 +260,5 @@ if __name__ == "__main__":
     exit_on_termination()
     try:
         main()
-    except (BuildError, licenses.LicenseError, macos_signing.SigningError, subprocess.CalledProcessError) as error:
+    except (BuildError, BeaconBuildError, licenses.LicenseError, macos_signing.SigningError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build_bundle: {error}")

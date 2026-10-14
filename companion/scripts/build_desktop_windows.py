@@ -28,8 +28,8 @@ import build_bundle
 import build_desktop
 import desktop_payload
 import licenses
-from build_beacon import download_source, run
-from build_beacon_otelcol import BUILDER_VERSION
+from build_beacon import BeaconBuildError, download_source, run
+from build_beacon_otelcol import BUILDER_VERSION, linked_overrides
 
 BuildError = build_desktop.BuildError
 GOOS, GOARCH = "windows", "amd64"
@@ -122,7 +122,8 @@ def build(arguments):
             env=dict(os.environ, CGO_ENABLED="0", GOTOOLCHAIN="local", GOBIN=str(temporary / "bin")))
         binaries, infos = desktop_payload.build_go_binaries(temporary / "go", GOOS, GOARCH, version, commit, source, temporary / "bin" / "builder")
         go_version = infos["backplane-companion"].go_version
-        payload = desktop_payload.stage_payload(temporary / "payload", binaries, spec, go_version, GOOS, GOARCH)
+        payload = desktop_payload.stage_payload(temporary / "payload", binaries, spec, go_version, GOOS, GOARCH,
+                                                otelcol_overrides=linked_overrides(infos["beacon-otelcol"]))
         go_entries = licenses.inventory(infos, Path(host["GOMODCACHE"]), beacon_license=source / "LICENSE")
         run("pnpm", "install", "--frozen-lockfile", "--offline", cwd=build_desktop.DESKTOP)
         rust = build_desktop.rust_entries([build_desktop.cargo_metadata(TARGET)])
@@ -154,5 +155,5 @@ if __name__ == "__main__":
     build_bundle.exit_on_termination()
     try:
         main()
-    except (BuildError, build_bundle.BuildError, licenses.LicenseError, subprocess.CalledProcessError) as error:
+    except (BuildError, build_bundle.BuildError, BeaconBuildError, licenses.LicenseError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build_desktop_windows: {error}")
