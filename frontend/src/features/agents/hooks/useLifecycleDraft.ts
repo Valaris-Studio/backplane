@@ -76,10 +76,16 @@ export function serializePipeline(
     });
     return { ...rest, lifecycle: cleanLifecycle };
   });
+  // Every other top-level key (context policy, lock_roles, operator
+  // extensions) is server-owned: a stage edit must round-trip it untouched.
+  const preserved = remote
+    ? (JSON.parse(JSON.stringify(remote)) as PipelineConfig)
+    : null;
   return {
-    version: remote?.version ?? 1,
+    ...preserved,
+    version: preserved?.version ?? 1,
     stages,
-    scheduling: remote?.scheduling ?? { priority_order: [], mode: "priority" },
+    scheduling: preserved?.scheduling ?? { priority_order: [], mode: "priority" },
   };
 }
 

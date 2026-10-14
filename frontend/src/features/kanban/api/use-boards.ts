@@ -37,11 +37,12 @@ function actionOf(event: WebSocketEvent): string | null {
   return parts[parts.length - 1] ?? null;
 }
 
-export function useBoards(slug: string) {
+export function useBoards(slug: string, options?: { enabled?: boolean }) {
   useDomainSync("activity.board", boardKeys.byWorkspace(slug));
 
   return useQuery({
     queryKey: boardKeys.byWorkspace(slug),
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const { data } = await api.get<Board[]>(
         `/workspaces/${slug}/boards`,

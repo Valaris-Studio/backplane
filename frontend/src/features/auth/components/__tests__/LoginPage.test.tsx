@@ -10,6 +10,7 @@ import {
   waitFor,
 } from "@/test/test-utils";
 import { LoginPage } from "../LoginPage";
+import { returnedFromSignInTo } from "../../redirect-to-login";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api-error";
 
@@ -34,6 +35,7 @@ function renderLoginRoute(initialEntry = "/login") {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<div>app-home</div>} />
+      <Route path="/companion/pair" element={<div>pairing-page</div>} />
     </Routes>,
     { routerProps: { initialEntries: [initialEntry] } },
   );
@@ -183,6 +185,26 @@ describe("LoginPage", () => {
       });
     });
     expect(await screen.findByText("app-home")).toBeInTheDocument();
+  });
+
+  it("returns to the page that asked for sign-in, with its code", async () => {
+    mockModes(PASSWORD_ONLY_MODES);
+    vi.spyOn(api, "post").mockResolvedValue({
+      data: { id: "u1", email: "admin@example.com" },
+    } as never);
+    window.sessionStorage.setItem(
+      "backplane.returnAfterSignIn",
+      JSON.stringify({ path: "/companion/pair?code=BCDF-GHJK", savedAt: Date.now() }),
+    );
+
+    renderLoginRoute();
+
+    await screen.findByLabelText(/email/i);
+    await fillCredentials("admin@example.com", "correct horse battery staple");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByText("pairing-page")).toBeInTheDocument();
+    expect(returnedFromSignInTo("/companion/pair")).toBe(true);
   });
 
   it("shows the uniform invalid-credentials error and stays on the page", async () => {

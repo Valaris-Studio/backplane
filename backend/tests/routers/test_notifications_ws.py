@@ -57,6 +57,21 @@ def ws_app():
 
 
 @pytest.fixture(autouse=True)
+def _grant_delivery_authority(monkeypatch):
+    """Existing-test adaptation: these principals are SimpleNamespace mocks with
+    no database rows, so the delivery-time authority read (which the frozen
+    real-socket suite covers unmocked) is injected at its service boundary as
+    a current owner. Every visibility/filter assertion below still applies."""
+    from app.services.events.authority import DeliveryAuthority
+    from app.services.events.connection_manager import connection_manager
+
+    async def current_owner(principal):
+        return DeliveryAuthority(role=WorkspaceRole.owner, observer=True)
+
+    monkeypatch.setattr(connection_manager, "_authority", current_owner)
+
+
+@pytest.fixture(autouse=True)
 def _clear_event_bus_subscribers():
     event_bus._subscribers.clear()
     yield

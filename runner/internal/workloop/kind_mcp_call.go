@@ -102,7 +102,7 @@ var mcpToolDispatch = map[string]mcpToolHandler{
 		return nil, l.client.RemoveCardParticipant(ctx, l.cfg.Valaris.WorkspaceSlug, card.BoardID, card.CardID, userID)
 	},
 	// Deprecated alias of remove_card_participant(pipeline_role=...); the
-	// server drops it in backplane-mcp 0.8.0 and the doctor warns on it.
+	// server drops it in backplane-mcp 0.10.0 and the doctor warns on it.
 	"remove_card_participants_by_role": func(ctx context.Context, l *Loop, ws *lifecycle.WalkState, args map[string]any) (any, error) {
 		card, err := requireCard(ws, "mcp_call", "remove_card_participants_by_role")
 		if err != nil {

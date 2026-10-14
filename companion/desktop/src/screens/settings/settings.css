@@ -1,0 +1,42 @@
+/* Settings-only layout; everything else comes from the kit (components.css). */
+
+.settings-rename-row { display: block; }
+.settings-rename-controls { display: flex; gap: 6px; }
+
+.settings-mono { font-family: var(--font-mono); font-size: 11.5px; }
+
+.settings-update-slot { flex: none; display: inline-flex; align-items: center; }
+.settings-update-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.settings-update-state[data-tone="success"] { color: var(--color-success-foreground); }
+
+.settings-inline-error { display: block; color: var(--color-error-foreground); }
+
+.settings-banner-copy { margin: 0; }
+.settings-banner-error { margin: 6px 0 0; color: var(--color-error-foreground); font-weight: var(--weight-medium); }
+
+/* Tailwind's preflight strips list markers; the dialog lists consequences. */
+.settings-consequences { list-style: disc; }
+
+/* The server is the section's subject, so it reads at full strength. */
+.settings-host { color: var(--color-foreground); font-weight: var(--weight-medium); }
+
+.settings-sheet-lede { margin: 0 0 12px; color: var(--color-muted-foreground); text-wrap: pretty; }
+.settings-sheet-lede b { color: var(--color-foreground); font-weight: var(--weight-medium); }
+.settings-sheet-note { margin: 0 2px 4px; font-size: var(--text-footnote); line-height: var(--leading-footnote); color: var(--color-muted-foreground); text-wrap: pretty; }
+.settings-switch-waiting { margin-top: 12px; }
+.settings-switch-body .bp-banner { margin-bottom: 12px; }
+
+.settings-switch-done { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 12px; }
+.settings-switch-done > svg { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--color-success-foreground); }
+.settings-switch-done p { margin: 0; text-wrap: pretty; }
+.settings-switch-done b { font-weight: var(--weight-semibold); }
+
+.settings-switch-progress { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 12px; }
+.settings-switch-progress > :first-child { flex: none; margin-top: 3px; }
+.settings-switch-progress p { margin: 0; text-wrap: pretty; }

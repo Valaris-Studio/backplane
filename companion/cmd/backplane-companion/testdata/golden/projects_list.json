@@ -1,0 +1,19 @@
+{
+  "discovered": [
+    {
+      "root": "<HOME>/code/other",
+      "repo_url": "github.com/acme/other",
+      "first_seen": "2026-09-28T10:00:00Z"
+    }
+  ],
+  "ignored": [],
+  "mappings": [
+    {
+      "id": "m1",
+      "workspace_id": "w",
+      "root_path": "<HOME>/code/app",
+      "enabled": true,
+      "content_level": "standard"
+    }
+  ]
+}

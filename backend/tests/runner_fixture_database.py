@@ -15,12 +15,11 @@ def sealed_database(monkeypatch, engine):
     from app import database
     from app.config import settings
     from app.routers import events
-    from app.services import api_key
 
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     monkeypatch.setattr(settings, "DATABASE_URL", str(engine.url))
     monkeypatch.setattr(database, "engine", engine)
-    for module in (database, events, api_key):
+    for module in (database, events):
         monkeypatch.setattr(module, "async_session", factory)
 
     def reject_foreign_connect(dialect, record, args, kwargs):

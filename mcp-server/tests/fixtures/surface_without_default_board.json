@@ -935,10 +935,32 @@
           ],
           "description": "Card to link; needs board_id and a card on this board."
         },
+        "client_request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Excerpt save retry key (UUID); pairs with excerpt_source."
+        },
         "content": {
           "default": "",
           "description": "Markdown (HTML, plain text or ProseMirror JSON accepted).",
           "type": "string"
+        },
+        "excerpt_source": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Your session's {workspace_id, session_id, items:[{content_id, sha256}]}."
         },
         "kind": {
           "default": "user_note",

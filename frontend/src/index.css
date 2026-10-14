@@ -55,6 +55,9 @@ html { font-size: 87.5%; }
   --color-warning-foreground: oklch(0.288 0.041 68.2);
   --color-error: oklch(0.638 0.218 27.7);
   --color-error-foreground: oklch(0.982 0.01 28.4);
+  /* Error as TEXT on a page surface. error-foreground is ink ON an error fill
+     (near-white in light mode), so it vanishes on the canvas. */
+  --color-error-ink: oklch(0.5 0.19 27.7);
   --color-info: oklch(0.707 0.136 232.1);
   --color-info-foreground: oklch(0.214 0.032 232.5);
 
@@ -66,6 +69,19 @@ html { font-size: 87.5%; }
   --color-data-6: oklch(0.726 0.153 255.6);
   --color-data-7: oklch(0.77 0.128 38.8);
   --color-data-8: oklch(0.62 0.124 134.6);
+
+  /* Coding agents keep the hue the Companion desktop app gives them. */
+  --color-agent-claude: var(--color-data-7);
+  --color-agent-codex: var(--color-data-6);
+  --color-agent-pi: var(--color-data-5);
+  --color-agent-other: var(--color-data-8);
+  /* Session timeline kinds: ink for the agent's own work, brand green only
+     where a session touched Backplane work, red only for failures. */
+  --color-kind-prompt: var(--color-foreground);
+  --color-kind-tool: color-mix(in oklab, var(--color-muted-foreground) 70%, var(--color-background));
+  --color-kind-file: var(--color-data-3);
+  --color-kind-work: var(--color-primary);
+  --color-kind-error: var(--color-error);
 
   --color-background: oklch(0.985 0.008 145);
   --color-foreground: oklch(0.236 0.026 145);
@@ -316,6 +332,7 @@ html { font-size: 87.5%; }
     --color-success-foreground: oklch(0.86 0.18 154.9);
     --color-warning-foreground: oklch(0.9 0.16 82.6);
     --color-error-foreground: oklch(0.85 0.18 27.7);
+    --color-error-ink: var(--color-error-foreground);
     --color-info-foreground: oklch(0.85 0.16 232.1);
     --color-destructive-foreground: var(--color-error-foreground);
     /* Riding dot reads luminous on the dark ground. */
@@ -370,6 +387,7 @@ html { font-size: 87.5%; }
       --color-success-foreground: oklch(0.86 0.18 154.9);
       --color-warning-foreground: oklch(0.9 0.16 82.6);
       --color-error-foreground: oklch(0.85 0.18 27.7);
+      --color-error-ink: var(--color-error-foreground);
       --color-info-foreground: oklch(0.85 0.16 232.1);
       --color-destructive-foreground: var(--color-error-foreground);
       --wave-dot-core-in: 0.99;
@@ -676,6 +694,99 @@ html { font-size: 87.5%; }
 
   li > p {
     margin-bottom: 0.15rem;
+  }
+
+  /* Checklists: the box sits in a fixed lane so wrapped text and nested items
+     align under the text, not under the box. */
+  ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0.125rem;
+  }
+
+  ul[data-type="taskList"] > li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+
+    > label {
+      flex: none;
+      display: flex;
+      align-items: center;
+      /* one line box of the item text, so the box centres on its first line */
+      height: 1.6em;
+      user-select: none;
+    }
+
+    > div {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    /* same density as a bullet list (`li > p`), not paragraph spacing */
+    > div > p {
+      margin-bottom: 0.15rem;
+    }
+
+    ul[data-type="taskList"] {
+      margin-top: 0.15rem;
+      margin-bottom: 0;
+    }
+  }
+
+  ul[data-type="taskList"] > li > label > input[type="checkbox"] {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    width: 0.95rem;
+    height: 0.95rem;
+    margin: 0;
+    border: 1.5px solid var(--color-muted-foreground);
+    border-radius: var(--radius-cap);
+    background-color: var(--color-background);
+    cursor: pointer;
+    transition:
+      background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+
+    &::before {
+      content: "";
+      width: 0.6rem;
+      height: 0.6rem;
+      background-color: var(--color-primary-foreground);
+      clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+      transform: scale(0);
+      transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    &:checked {
+      border-color: var(--color-primary);
+      background-color: var(--color-primary);
+
+      &::before {
+        transform: scale(1);
+      }
+    }
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-ring);
+      outline-offset: 2px;
+    }
+
+    /* Read-only surfaces disable the box; it still reports the stored state,
+       so it keeps full contrast instead of the greyed "unavailable" look. */
+    &:disabled {
+      cursor: default;
+    }
+  }
+
+  ul[data-type="taskList"] > li[data-checked="true"] > div > p {
+    color: var(--color-muted-foreground);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);
   }
 
   blockquote {

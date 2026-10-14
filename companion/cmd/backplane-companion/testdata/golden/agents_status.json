@@ -1,0 +1,23 @@
+[
+  {
+    "id": "claude_code",
+    "integration": {
+      "state": "not_installed",
+      "config_path": "<HOME>/.claude/settings.json"
+    }
+  },
+  {
+    "id": "codex_cli",
+    "integration": {
+      "state": "not_installed",
+      "config_path": "<HOME>/.codex/hooks.json"
+    }
+  },
+  {
+    "id": "pi_cli",
+    "integration": {
+      "state": "not_installed",
+      "config_path": "<HOME>/.pi/agent/extensions/backplane-companion.ts"
+    }
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "model": "ChunkUploadHeaders",
+  "why": "a chunk holds at most CHUNK_BYTES",
+  "body": {
+    "content_type": "application/octet-stream",
+    "content_length": 4194305,
+    "backplane_chunk_sha256": "1a83823ca674652aa3fda3cd5b33fc2fb8bbba3fb99b9fed6c647834bc0bf8d8"
+  }
+}

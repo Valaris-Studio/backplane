@@ -1,0 +1,164 @@
+{
+  "id": "8f0e8a54-5d4b-4c55-9d0e-00000000c001",
+  "execution_id": "8f0e8a54-5d4b-4c55-9d0e-0000000000e1",
+  "ordinal": 6,
+  "client_request_id": "request-c1",
+  "context_revision": "ee638d6b56215938f2153d475c02a32918fd686892da92180903fa386316f92a",
+  "prompt_sha256": "ac1e24159b9ce7937b2d975b35066da983a2fd4fac5d47a97a6d6280563ef9d5",
+  "prompt_bytes": 125,
+  "system_prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "system_prompt_bytes": 0,
+  "provider": "operator-provider",
+  "model": "operator-model",
+  "status": "prepared",
+  "use_verification": "not_verified",
+  "created_at": "2026-10-13T14:06:00+00:00",
+  "dispatch_summary": {
+    "protocol_version": 1,
+    "dispatch_revision": "626dd47d5d248ecec4524788cebe0cc8e5e8abd6b95212d73049e63f0b97e5cb",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "review",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "required_blocks_exact",
+    "injected_bytes": {
+      "input": 72,
+      "system": 0,
+      "total": 72
+    }
+  },
+  "context_manifest": {
+    "schema_version": 1,
+    "renderer_version": "context-v1",
+    "sources": [
+      {
+        "source_index": 0,
+        "kind": "card_notes",
+        "alias": "HandoffNotes",
+        "filter": {},
+        "coverage": "record_traced",
+        "rendered_sha256": "ac05110ace62a68c94dbd6664b5e51a720f0f91f97f24734f1ca77859f34c320",
+        "rendered_bytes": 36,
+        "records": [
+          {
+            "record_index": 0,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000601",
+            "title": "Schema-one handoff",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "4bb28b7883d28564ac19571bcdf66848799ecb010a8a32a2d27f06d7bccc2a37",
+            "rendered_sha256": "f089f94d1ff04c5ca2298283b1b0ba1abf2bab62e6ab5a81342e973646ca7566",
+            "rendered_bytes": 20
+          }
+        ]
+      },
+      {
+        "source_index": 1,
+        "kind": "card_notes",
+        "alias": "BriefingNotes",
+        "filter": {
+          "kind": "briefing"
+        },
+        "coverage": "record_traced",
+        "rendered_sha256": "ef571c425bb07b8d425a168945d619dc6f461e51c8d4409c332b39049c041071",
+        "rendered_bytes": 36,
+        "records": [
+          {
+            "record_index": 0,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000602",
+            "title": "Optional briefing",
+            "kind": "briefing",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "f4b55b1e8eda2046441ed6217cc908677bf14e6c62da83ce6f1d64949e930383",
+            "rendered_sha256": "fdad53d62e2339de9b0fde368e534a285367bb7bf808844a8278a54103954cbe",
+            "rendered_bytes": 19
+          }
+        ]
+      },
+      {
+        "source_index": 2,
+        "kind": "pipeline_expectations",
+        "alias": "StageRules",
+        "filter": {},
+        "coverage": "source_only",
+        "rendered_sha256": "65ddd134b3d34306a801bd8915c822159d4b33b2099aa4fb4b1f0a813b6d0b1a",
+        "rendered_bytes": 39,
+        "records": []
+      }
+    ]
+  },
+  "input_prompt": "Review card 52.\n## HandoffNotes\n- Schema-one handoff\n\n## BriefingNotes\n- Optional briefing\n\nRules (summarised): review only.\n",
+  "system_prompt": "",
+  "dispatch": {
+    "protocol_version": 1,
+    "dispatch_revision": "626dd47d5d248ecec4524788cebe0cc8e5e8abd6b95212d73049e63f0b97e5cb",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "review",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "required_blocks_exact",
+    "injected_bytes": {
+      "input": 72,
+      "system": 0,
+      "total": 72
+    },
+    "adapter": "operator-adapter",
+    "resolution_kind": "tier",
+    "resume_session_id": null,
+    "channel_contract": {
+      "version": 1,
+      "input": "verbatim",
+      "system": "empty",
+      "resume": false
+    },
+    "required_source_indices": [
+      0
+    ],
+    "source_inclusions": [
+      {
+        "source_index": 2,
+        "alias": "StageRules",
+        "required": false,
+        "outcome": "exact_block_not_observed",
+        "spans": [],
+        "contribution_bytes": null
+      },
+      {
+        "source_index": 1,
+        "alias": "BriefingNotes",
+        "required": false,
+        "outcome": "exact",
+        "spans": [
+          {
+            "channel": "input",
+            "start": 54,
+            "end": 90
+          }
+        ],
+        "contribution_bytes": 36
+      },
+      {
+        "source_index": 0,
+        "alias": "HandoffNotes",
+        "required": true,
+        "outcome": "exact",
+        "spans": [
+          {
+            "channel": "input",
+            "start": 16,
+            "end": 52
+          }
+        ],
+        "contribution_bytes": 36
+      }
+    ]
+  }
+}

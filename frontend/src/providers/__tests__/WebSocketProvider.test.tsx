@@ -30,6 +30,9 @@ vi.mock("@/lib/websocket", () => {
     onStatusChange = vi.fn((_handler: (s: string) => void) => {
       return () => {};
     });
+    onSubscriptionDenied = vi.fn((_handler: (denial: unknown) => void) => {
+      return () => {};
+    });
     get status() {
       return "disconnected";
     }

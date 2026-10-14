@@ -46,6 +46,51 @@ class ExecutionRepository(BaseRepository[AgentExecution]):
         )
         return result.scalar_one_or_none()
 
+    async def get_for_update(self, id: uuid.UUID) -> AgentExecution | None:
+        """Re-reads the row under a lock, so a status checked after this call
+        cannot be changed by a concurrent update before the caller commits."""
+        return await self.db.scalar(
+            select(AgentExecution)
+            .where(AgentExecution.id == id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+    async def active_card_work_below_required_floor(
+        self, workspace_id: uuid.UUID, agent_ids: set[uuid.UUID] | None
+    ) -> list[uuid.UUID]:
+        """Active card-bound executions in the workspace whose binding does not
+        carry a `required` context-dispatch floor (unbound or legacy-bound).
+        `agent_ids=None` means every agent. Loop iterations and other
+        card-less rows are outside scheduled dispatch and never count."""
+        from app.models.agents.context_receipt import ExecutionContextBinding
+
+        stmt = (
+            select(AgentExecution.id, AgentExecution.cards_affected)
+            .outerjoin(
+                ExecutionContextBinding,
+                ExecutionContextBinding.execution_id == AgentExecution.id,
+            )
+            .where(
+                AgentExecution.workspace_id == workspace_id,
+                AgentExecution.status.in_(
+                    (ExecutionStatus.started, ExecutionStatus.running)
+                ),
+                AgentExecution.completed_at.is_(None),
+                or_(
+                    ExecutionContextBinding.id.is_(None),
+                    ExecutionContextBinding.context_dispatch_mode.is_(None),
+                    ExecutionContextBinding.context_dispatch_mode != "required",
+                ),
+            )
+        )
+        if agent_ids is not None:
+            if not agent_ids:
+                return []
+            stmt = stmt.where(AgentExecution.agent_id.in_(agent_ids))
+        rows = (await self.db.execute(stmt)).all()
+        return [row.id for row in rows if row.cards_affected]
+
     async def list_inflight_by_agent(self, agent_id: uuid.UUID) -> list[AgentExecution]:
         result = await self.db.execute(
             select(AgentExecution)

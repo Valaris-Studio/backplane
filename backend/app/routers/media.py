@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.convertors import PathConvertor, register_url_convertor
 
+from app.core import path_convertors  # noqa: F401  registers `nonempty_path`
 from app.core.workspace import WorkspaceContext, get_workspace
 from app.database import get_db
 from app.schemas.resources.resource import validate_storage_filename
@@ -14,15 +14,6 @@ from app.services.media.service import MediaService, StoredFileTarget
 from app.services.media.signed_url_cache import REDIRECT_MAX_AGE_SECONDS
 from app.services.storage.local import hardened_file_response
 
-
-class NonEmptyPathConvertor(PathConvertor):
-    # Starlette's `path` also matches "", so `…/media/<id>` (no filename) was
-    # redirect_slashes-307'd to `…/media/<id>/` before auth ran; requiring a
-    # character makes it an unknown route (plain 404) instead.
-    regex = ".+"
-
-
-register_url_convertor("nonempty_path", NonEmptyPathConvertor())
 
 router = APIRouter(
     prefix="/api/workspaces/{slug}/media",

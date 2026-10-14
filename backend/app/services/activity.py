@@ -7,9 +7,11 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.mcp_invocation import current_mcp_invocation_id
 from app.core.event_bus import event_bus
 from app.models.activity import ActivityAction, ActivityEntityType
 from app.repositories.activity import ActivityRepository
+from app.services.committed_events import queue_until_commit
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +62,16 @@ class ActivityService:
         changes: dict | None = None,
         before_state: dict | None = None,
         after_state: dict | None = None,
+        via: str | None = None,
+        publish_after_commit: bool = False,
     ) -> None:
+        """`via` names the credential for callers that authenticate without an
+        API key (a companion device token); API-key calls are named for their key.
+        `publish_after_commit` holds the bus events until the caller's outer
+        commit instead of publishing them before the activity row is visible."""
         from app.core.auth import current_agent_id, current_api_key_name
 
+        agent_id = current_agent_id.get()
         activity = await self.repo.record(
             workspace_id=workspace_id,
             actor_id=actor_id,
@@ -76,8 +85,10 @@ class ActivityService:
             changes=changes,
             before_state=before_state,
             after_state=after_state,
-            via_api_key=current_api_key_name.get(),
-            agent_id=current_agent_id.get(),
+            via_api_key=via or current_api_key_name.get(),
+            agent_id=agent_id,
+            principal_key=str(agent_id) if agent_id else "",
+            mcp_invocation_id=current_mcp_invocation_id.get(),
         )
 
         await self._generate_notifications(activity, params=changes)
@@ -97,13 +108,17 @@ class ActivityService:
         # Primary fan-out: always publish the generic activity.{entity}.{action}
         # event. Subscribers use fnmatch patterns (e.g. "activity.note.*",
         # "activity.*.deleted", "activity.*") to filter.
-        activity_event = _activity_event_type(entity_type, action)
-        await self._publish(activity_event, payload, workspace_id)
-
+        event_types = [_activity_event_type(entity_type, action)]
         # Bridge fan-out: deprecated legacy events emitted in parallel.
         bridge_event = _BRIDGE_EVENTS.get((entity_type, action))
         if bridge_event:
-            await self._publish(bridge_event, payload, workspace_id)
+            event_types.append(bridge_event)
+
+        for event_type in event_types:
+            if publish_after_commit:
+                queue_until_commit(self.db, event_type, payload, workspace_id)
+            else:
+                await self._publish(event_type, payload, workspace_id)
 
     async def _generate_notifications(self, activity, params: dict | None) -> None:
         """Fan the freshly-written activity into durable notifications (INV-2

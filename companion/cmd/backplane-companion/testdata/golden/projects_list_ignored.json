@@ -1,0 +1,15 @@
+{
+  "discovered": [],
+  "ignored": [
+    "<HOME>/code/other"
+  ],
+  "mappings": [
+    {
+      "id": "m1",
+      "workspace_id": "w",
+      "root_path": "<HOME>/code/app",
+      "enabled": true,
+      "content_level": "standard"
+    }
+  ]
+}

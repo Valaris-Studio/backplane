@@ -16,6 +16,12 @@ export function useWebSocket() {
   return ctx;
 }
 
+/** Whether the server refused `eventPattern` on the current connection. */
+export function useSubscriptionDenied(eventPattern: string): boolean {
+  const ctx = useWebSocketContext();
+  return ctx?.deniedPatterns?.has(eventPattern) ?? false;
+}
+
 export function useWebSocketEvent(
   eventPattern: string,
   callback: (event: WebSocketEvent) => void,

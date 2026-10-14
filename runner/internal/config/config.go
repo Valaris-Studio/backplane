@@ -16,15 +16,26 @@ import (
 )
 
 type Config struct {
-	Valaris   ValarisConfig   `yaml:"valaris"`
-	LLM       LLMConfig       `yaml:"llm"`
-	Git       GitConfig       `yaml:"git"`
-	WorkLoop  WorkLoopConfig  `yaml:"work_loop"`
-	LoopMode  LoopModeConfig  `yaml:"loop_mode"`
-	Daemon    DaemonConfig    `yaml:"daemon"`
-	WebSocket WebSocketConfig `yaml:"websocket"`
-	Telemetry TelemetryConfig `yaml:"telemetry"`
-	LogLevel  string          `yaml:"log_level"`
+	Valaris         ValarisConfig         `yaml:"valaris"`
+	LLM             LLMConfig             `yaml:"llm"`
+	Git             GitConfig             `yaml:"git"`
+	WorkLoop        WorkLoopConfig        `yaml:"work_loop"`
+	LoopMode        LoopModeConfig        `yaml:"loop_mode"`
+	Daemon          DaemonConfig          `yaml:"daemon"`
+	WebSocket       WebSocketConfig       `yaml:"websocket"`
+	Telemetry       TelemetryConfig       `yaml:"telemetry"`
+	ContextDispatch ContextDispatchConfig `yaml:"context_dispatch"`
+	LogLevel        string                `yaml:"log_level"`
+}
+
+// ContextDispatchConfig is how the runner takes scheduled work: by default it
+// negotiates the server's dispatch policy and refuses work whenever that
+// fails. AllowLegacyServer lets a server without the negotiation route (an
+// old backend's 404) run the legacy path; Require refuses legacy outright,
+// even then.
+type ContextDispatchConfig struct {
+	Require           bool `yaml:"require"`
+	AllowLegacyServer bool `yaml:"allow_legacy_server"`
 }
 
 type TelemetryConfig struct {

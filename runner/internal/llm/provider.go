@@ -5,6 +5,8 @@ package llm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -43,6 +45,11 @@ type Options struct {
 	// SourceExecutionID binds source-completion MCP calls to the execution
 	// created by the harness. Empty for independent review and other launches.
 	SourceExecutionID string
+	// ContextDispatchVersion is the context dispatch protocol the launch
+	// requires: 0 is the legacy launch, unchanged; 1 requires every prompt
+	// channel to reach the process exactly. Any other version is refused
+	// before a process starts. Unrelated to SourceExecutionID.
+	ContextDispatchVersion int
 
 	// Universal options — all providers must support these
 	SystemPrompt string
@@ -173,6 +180,49 @@ type Capabilities struct {
 	// limitation: `bash -lc "gh pr merge 1"` escapes a literal prefix match.
 	EnforcesShellDeny  bool
 	ShellDenyMechanism string
+	// PromptChannels declares which prompt channels the adapter delivers
+	// exactly at each entry point; its zero value declares none.
+	PromptChannels PromptChannels
+}
+
+// PromptChannels is an adapter's declaration of the prompt channels it
+// passes to its process unchanged. Version 0 declares nothing; version 1
+// declares, per entry point (a fresh launch or a resumed session), whether
+// the input and the system prompt are delivered exactly.
+type PromptChannels struct {
+	Version      int
+	FreshInput   bool
+	FreshSystem  bool
+	ResumeInput  bool
+	ResumeSystem bool
+}
+
+// CheckPromptChannels refuses a launch whose required context dispatch the
+// declared channels cannot carry, so an adapter calls it before starting a
+// process: an unknown version, an undeclared adapter, an input channel it
+// lacks, or a non-empty system prompt it would drop.
+func CheckPromptChannels(channels PromptChannels, resume bool, opts Options) error {
+	switch opts.ContextDispatchVersion {
+	case 0:
+		return nil
+	case 1:
+	default:
+		return fmt.Errorf("context dispatch version %d is not supported", opts.ContextDispatchVersion)
+	}
+	if channels.Version != 1 {
+		return errors.New("context dispatch: the adapter declares no exact prompt channels")
+	}
+	entry, input, system := "fresh launch", channels.FreshInput, channels.FreshSystem
+	if resume {
+		entry, input, system = "resumed session", channels.ResumeInput, channels.ResumeSystem
+	}
+	if !input {
+		return fmt.Errorf("context dispatch: the adapter cannot deliver the input on a %s", entry)
+	}
+	if opts.SystemPrompt != "" && !system {
+		return fmt.Errorf("context dispatch: the adapter cannot deliver a system prompt on a %s", entry)
+	}
+	return nil
 }
 
 // ShellDenyReporter lets the workloop ask a provider, BEFORE launch, which

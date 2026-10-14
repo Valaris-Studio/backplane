@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import path_convertors  # noqa: F401  registers `nonempty_path`
 from app.core.auth import current_agent_id, get_current_user
 from app.core.workspace import enforce_agent_scope
 from app.database import get_db
@@ -95,7 +96,7 @@ async def _enforce_tenancy(file_path: str, user: User, db: AsyncSession) -> None
     await enforce_agent_scope(current_agent_id.get(), slug, db)
 
 
-@router.put("/upload/{file_path:path}")
+@router.put("/upload/{file_path:nonempty_path}")
 async def upload_file(
     file_path: str,
     request: Request,
@@ -110,7 +111,7 @@ async def upload_file(
     return {"status": "ok"}
 
 
-@router.get("/download/{file_path:path}")
+@router.get("/download/{file_path:nonempty_path}")
 async def download_file(
     file_path: str,
     user: User = Depends(get_current_user),

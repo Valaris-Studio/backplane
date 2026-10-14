@@ -14,6 +14,12 @@ const (
 	ConfigErrNoRoles          = "no_roles"
 	ConfigErrMissingPrompts   = "missing_prompts"
 	ConfigErrEmptyPromptCache = "empty_prompt_cache"
+	// A role paused after a dispatch configuration change, until its release
+	// and refresh are recorded.
+	ConfigErrRolePaused = "role_paused"
+	// A released role its refresh found outside this runner's scope or the
+	// pipeline; only a restart re-admits it.
+	ConfigErrRoleExcluded = "role_excluded"
 
 	// Referential-integrity error codes (Phase I.1.b). These mirror the codes
 	// reported by the backend validator in app/services/pipeline_config_validation.py.
@@ -172,7 +178,7 @@ func (l *Loop) validateConfig() []valaris.ConfigError {
 		errs = append(errs, validatePipelineConfig(pipelineCfg, catalog)...)
 	}
 
-	return errs
+	return append(errs, l.pausedRoleErrors()...)
 }
 
 // ownedRoleSet returns the roles this runner owns — the canonical set built

@@ -157,8 +157,8 @@ class NotificationService:
 
         # Live-push ordering (INV-1): channels STAGE their push intents here while
         # we sit inside the triggering txn's begin_nested savepoint. Reset staging
-        # first so a prior partial generation never bleeds in, then promote to the
-        # pending buffer ONLY after the loop exits cleanly — so a savepoint that
+        # first so a prior partial generation never bleeds in, then promote into
+        # committed_events ONLY after the loop exits cleanly — so a savepoint that
         # rolls back (an exception below) never reaches promotion and emits NO
         # push for a row that won't survive (the phantom-push guard).
         reset_staged(self.db)

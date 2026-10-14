@@ -1,0 +1,42 @@
+[
+ {
+  "line": 1,
+  "captured_at_ns": 1791512474253652000,
+  "event": "session_start",
+  "session_id": "01a11e76-f249-72d0-bdf8-46b61e857c42",
+  "raw_bytes": 178,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 2,
+  "captured_at_ns": 1791512474253871000,
+  "event": "message_end",
+  "session_id": "01a11e76-f249-72d0-bdf8-46b61e857c42",
+  "raw_bytes": 669,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 3,
+  "captured_at_ns": 1791512474253883000,
+  "event": "input",
+  "session_id": "01a11e76-f249-72d0-bdf8-46b61e857c42",
+  "raw_bytes": 606,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 4,
+  "captured_at_ns": 1791512474599772000,
+  "event": "message_end",
+  "session_id": "01a11e76-f249-72d0-bdf8-46b61e857c42",
+  "raw_bytes": 1314,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 5,
+  "captured_at_ns": 1791512474601753000,
+  "event": "session_shutdown",
+  "session_id": "01a11e76-f249-72d0-bdf8-46b61e857c42",
+  "raw_bytes": 178,
+  "raw_trailing_newline": false
+ }
+]

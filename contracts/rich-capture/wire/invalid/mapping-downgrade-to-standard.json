@@ -1,0 +1,9 @@
+{
+  "model": "MappingEffectiveCapture",
+  "why": "rich never falls back below full",
+  "body": {
+    "content_level": "rich",
+    "effective_content_level": "standard",
+    "reason": "device_unsupported"
+  }
+}

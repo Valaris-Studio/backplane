@@ -22,10 +22,8 @@ def snapshot_card(card) -> dict:
         "position": float(card.position) if card.position is not None else None,
         "status": card.status,
         "labels": list(card.labels) if card.labels else None,
-        # Lets the timeline engine withhold cards born INSIDE the logged window
-        # even when no per-card create event exists (bulk_create_cards records
-        # ONE activity for N cards) — "no time travel" keyed on data, not on
-        # the creation path.
+        # Older timeline clients use this to withhold cards born inside a
+        # partially captured historical window.
         "created_at": card.created_at.isoformat() if card.created_at else None,
         "participants": [_snapshot_participant(p) for p in (card.participants or [])],
     }

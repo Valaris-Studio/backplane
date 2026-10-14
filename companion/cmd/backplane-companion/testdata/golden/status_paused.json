@@ -1,0 +1,129 @@
+{
+  "companion": {
+    "version": "dev",
+    "commit": "",
+    "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+    "go_version": "<GO>",
+    "platform": "testos/testarch"
+  },
+  "connected": true,
+  "revoked": false,
+  "installation_id": "<INSTALLATION>",
+  "endpoint": "<SERVER>",
+  "connections": [
+    {
+      "installation_id": "<INSTALLATION>",
+      "endpoint": "<SERVER>",
+      "connected": true,
+      "revoked": false,
+      "capture_state": "paused_locally",
+      "rich_capture": {
+        "offer": "unknown"
+      }
+    }
+  ],
+  "agent_api": {
+    "url": "<SERVER>",
+    "source": "absent"
+  },
+  "data_dir": "<DATA>",
+  "daemon_running": false,
+  "service": null,
+  "capture": {
+    "state": "paused_locally",
+    "local_paused": true,
+    "unauthorized": false,
+    "policy_cached": true,
+    "policy_refreshed_at": "2026-09-28T10:00:00Z",
+    "policy_age_seconds": 0,
+    "policy_stale": false,
+    "server_paused": false,
+    "enabled_agents": [
+      "claude_code"
+    ],
+    "retention_days": null,
+    "mappings": 1
+  },
+  "agents": [
+    {
+      "id": "claude_code",
+      "state": "not_installed",
+      "installed": false,
+      "configured": false,
+      "receiving": false,
+      "uploading": false,
+      "paused": true,
+      "broken": false,
+      "last_observation_at": null,
+      "last_upload_at": null,
+      "integration": {
+        "state": "not_installed",
+        "config_path": "<HOME>/.claude/settings.json"
+      }
+    },
+    {
+      "id": "codex_cli",
+      "state": "not_installed",
+      "installed": false,
+      "configured": false,
+      "receiving": false,
+      "uploading": false,
+      "paused": true,
+      "broken": false,
+      "last_observation_at": null,
+      "last_upload_at": null,
+      "integration": {
+        "state": "not_installed",
+        "config_path": "<HOME>/.codex/hooks.json"
+      }
+    },
+    {
+      "id": "pi_cli",
+      "state": "not_installed",
+      "installed": false,
+      "configured": false,
+      "receiving": false,
+      "uploading": false,
+      "paused": true,
+      "broken": false,
+      "last_observation_at": null,
+      "last_upload_at": null,
+      "integration": {
+        "state": "not_installed",
+        "config_path": "<HOME>/.pi/agent/extensions/backplane-companion.ts"
+      }
+    }
+  ],
+  "queue": {
+    "records": 0,
+    "bytes": 0,
+    "failures": 0,
+    "next_attempt": "0001-01-01T00:00:00Z",
+    "acknowledged": 0,
+    "rejected": 0,
+    "dropped": 0,
+    "oldest_pending_at": null,
+    "inbox_items": 0,
+    "capacity_records": 1024,
+    "capacity_bytes": 134217728,
+    "backing_off": false
+  },
+  "pending_projects": [
+    {
+      "root": "<HOME>/code/other",
+      "repo_url": "github.com/acme/other",
+      "first_seen": "2026-09-28T10:00:00Z"
+    }
+  ],
+  "health": {
+    "hook_errors": 0,
+    "hook_last_error_at": "0001-01-01T00:00:00Z",
+    "inbox_dropped": 0,
+    "normalize_failures": 0,
+    "beacon_empty": 0,
+    "dropped_items": 0,
+    "suppressed_deleted": 0,
+    "last_policy_refresh": "0001-01-01T00:00:00Z",
+    "last_upload_at": "0001-01-01T00:00:00Z"
+  }
+}

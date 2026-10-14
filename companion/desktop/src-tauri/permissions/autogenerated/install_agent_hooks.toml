@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-agent-hooks"
+description = "Enables the install_agent_hooks command without any pre-configured scope."
+commands.allow = ["install_agent_hooks"]
+
+[[permission]]
+identifier = "deny-install-agent-hooks"
+description = "Denies the install_agent_hooks command without any pre-configured scope."
+commands.deny = ["install_agent_hooks"]

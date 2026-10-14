@@ -18,6 +18,7 @@ from app.core.workspace import (
 from app.database import get_db
 from app.models.kanban.board import Board
 from app.schemas.notes.note import (
+    ExcerptNoteCreate,
     NoteAppend,
     NoteCreate,
     NoteFormat,
@@ -102,15 +103,44 @@ async def list_board_notes(
     return notes
 
 
-@router.post("", response_model=NoteRead, status_code=201)
+@router.post(
+    "", response_model=NoteRead, status_code=201,
+    responses={200: {"model": NoteRead}},
+)
 async def create_board_note(
     data: NoteCreate,
+    response: Response,
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace_member),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
-    return await service.create_note(ctx.workspace.id, data, ctx.user.id, board_id)
+    note, created = await service.save_note(
+        ctx.workspace.id, data, ctx.user.id, board_id
+    )
+    if not created:
+        response.status_code = 200
+    return note
+
+
+@router.post(
+    "/from-excerpt", response_model=NoteRead, status_code=201,
+    responses={200: {"model": NoteRead}},
+)
+async def publish_excerpt_note(
+    data: ExcerptNoteCreate,
+    response: Response,
+    board_id: uuid.UUID = Depends(resolve_board_id),
+    ctx: WorkspaceContext = Depends(get_workspace_member),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    service = NoteService(db)
+    note, created = await service.save_note(
+        ctx.workspace.id, data, ctx.user.id, board_id
+    )
+    if not created:
+        response.status_code = 200
+    return note
 
 
 @router.get("/export")
@@ -165,6 +195,7 @@ async def get_board_note(
         note_id,
         ctx.workspace.id,
         as_markdown=format == NoteFormat.markdown,
+        reader_id=ctx.user.id,
     )
 
 

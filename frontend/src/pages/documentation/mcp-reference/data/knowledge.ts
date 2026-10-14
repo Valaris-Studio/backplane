@@ -210,6 +210,18 @@ export const KNOWLEDGE_TOOL_DOCS: ToolDoc[] = [
         description:
           "Pass true to get the stored body (ProseMirror JSON) back in the receipt. Default false: the receipt carries content_chars instead.",
       },
+      {
+        name: "client_request_id",
+        required: false,
+        description:
+          "UUID retry key for an excerpt save; required with excerpt_source. Repeating the same save returns the same note; reusing it for a different save is a 409.",
+      },
+      {
+        name: "excerpt_source",
+        required: false,
+        description:
+          "Publish reviewed text from your own captured session: {workspace_id, session_id, items: [{content_id, sha256}]}. Needs board_id, a non-empty ProseMirror doc as content, and a personal key (agent and Companion launch keys are refused).",
+      },
     ],
     gotchas: [
       "The receipt omits the note body by default and reports its stored size as content_chars, so a long note never floods the reply. Read the body with get_note(format=\"markdown\"), or pass return_content=true.",

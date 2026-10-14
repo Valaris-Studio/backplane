@@ -1,0 +1,29 @@
+{
+  "model": "ContentDeclaration",
+  "why": "text channels carry text media types; HTML is not one",
+  "body": {
+    "role": "assistant",
+    "channel": "reply",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "a7b6c5d4-e3f2-4a1b-9c8d-7e6f5a4b3c2d",
+      "order": 44
+    },
+    "occurred_at": "2026-10-08T14:03:52.900Z",
+    "observed_at": "2026-10-08T14:03:54Z",
+    "media_type": "text/html",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 2
+    },
+    "content_key": "c41aa34e627a20884622298fde5e70f9087cc852ea7a4cb26900f023ec70e614",
+    "turn_id": "turn-7",
+    "coverage": "partially_redacted",
+    "coverage_reason": "secret_filter",
+    "delivery": "upload",
+    "byte_count": 48213,
+    "sha256": "964f268b6cbc702d9b2ea7dcfe543caca4e6f8c6753ae4d6cb80ac81172c37e2"
+  }
+}

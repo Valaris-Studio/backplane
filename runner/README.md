@@ -40,12 +40,18 @@ thing that runs on your machines without the platform's copyleft following it.
 
 ## Release compatibility
 
-The current release pair is **runner 0.8.5** with **platform 0.1.3-preview.1**;
-the current MCP server is **0.9.0**, and runner 0.8.5's generated configs pin
-0.8.0. Upgrade the backend before upgrading the runner.
-Earlier runner artifacts remain available for reproducibility, but do not
-include the current completion-review recovery and dependency fixes.
-Use the versioned downloads linked from the platform rather than an older tag.
+The current release pair is **runner 0.8.5** with **platform 0.1.3-preview.1**.
+Released runner 0.8.5 generates MCP configs pinned to `backplane-mcp==0.8.0`.
+The latest separately published MCP package is **0.9.2**. These published
+artifacts do not include every capability in the current source tree.
+
+This unreleased runner source generates MCP configs pinned to
+`backplane-mcp==0.9.1`; that runtime pin is independent of the latest MCP package
+release. Its prepared-context protocol and context budgets require matching
+backend and runner source. Keep policies in legacy mode with no budgets until
+all workers and runners, including the rollback runtime, support the enabled
+policies. Drain incompatible processes before opting in. Upgrade the backend
+before upgrading the runner. See the [source upgrade notes](../CHANGELOG.md#unreleased).
 
 ## Prerequisites
 
@@ -189,7 +195,7 @@ switch to another project's configuration. Creating a config at an occupied
 path requires a different destination or explicitly selecting the existing
 file. The shipped example and an explicit Skip cannot launch a loop.
 
-Generated `uvx` configs pin `backplane-mcp==0.8.0`. For a board with an explicit
+Generated `uvx` configs pin `backplane-mcp==0.9.1`. For a board with an explicit
 completion policy, the loop checks the actual MCP launch environment, all five
 completion tools, and `get_board_loop` before dispatching work. Missing packages,
 tools, or incompatible policy responses stop setup before the next model call.

@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import hashlib
 import json
 import re
 import uuid
@@ -12,9 +13,12 @@ if TYPE_CHECKING:
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import current_agent_id, current_api_key_installation_id
 from app.exceptions import (
     ConflictError,
     ForbiddenError,
+    GoneError,
+    PayloadTooLargeError,
     ResourceNotFoundError,
     ValidationError,
 )
@@ -23,9 +27,16 @@ from app.models.kanban.board import Board
 from app.models.kanban.card import Card
 from app.models.notes.finding import FindingSeverity
 from app.models.notes.kinds import IMMUTABLE_KINDS, REVIEW_VERDICT
+from app.models.notes.note import Note
+from app.models.workspace import WorkspaceRole
 from app.repositories.kanban.card import CardRepository
 from app.repositories.notes.note import NoteOrderBy, NoteRepository, SortDirection
+from app.repositories.notes.save_receipt import NoteSaveReceiptRepository
+from app.repositories.workspace import WorkspaceMemberRepository
 from app.schemas.notes.note import (
+    EXCERPT_SOURCE_BYTES_LIMIT,
+    REVIEWED_DOCUMENT_BYTES_LIMIT,
+    ExcerptSource,
     Finding,
     NoteAppend,
     NoteCreate,
@@ -41,6 +52,8 @@ from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.services.kanban.snapshots import snapshot_card
 from app.services.mentions.notify import notify_new_mentions
 from app.services.reviews.stuck_loop import record_review_iteration
+from app.services.session_content import AgentSessionContentService
+from app.services.work_consultation import WorkConsultationService
 
 # Title produced by the Go reviewer client: "Review: {card_id} — {decision}".
 # Decision is the trailing token after the em-dash; \S+ is intentional — the
@@ -98,6 +111,34 @@ def derive_approved(
         if severity == blocking_value or severity == FindingSeverity.BLOCKING:
             return False
     return True
+
+
+def compact_json(value) -> bytes:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+def excerpt_fingerprint(
+    workspace_id: uuid.UUID,
+    board_id: uuid.UUID,
+    data: NoteCreate,
+    source: ExcerptSource,
+    reviewed: dict,
+) -> str:
+    """Same save, same fingerprint, whatever the JSON key order; items keep
+    their order, which is the order the owner reviewed them in."""
+    canonical = {
+        "workspace_id": str(workspace_id),
+        "board_id": str(board_id),
+        "card_id": str(data.card_id) if data.card_id else None,
+        "title": data.title,
+        "content": reviewed,
+        "excerpt_source": source.model_dump(mode="json"),
+    }
+    return hashlib.sha256(
+        json.dumps(
+            canonical, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        ).encode()
+    ).hexdigest()
 
 
 def _heading_text(block: dict) -> str:
@@ -175,6 +216,57 @@ class NoteService:
         user_id: uuid.UUID,
         board_id: uuid.UUID | None = None,
     ):
+        note, _ = await self.save_note(workspace_id, data, user_id, board_id)
+        return note
+
+    async def save_note(
+        self,
+        workspace_id: uuid.UUID,
+        data: NoteCreate,
+        user_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
+    ) -> tuple[Note, bool]:
+        """(note, created): False when an excerpt save replays its receipt."""
+        if data.excerpt_source is not None or data.client_request_id is not None:
+            await self._authorize_excerpt_publisher(workspace_id, user_id)
+        await self._check_destination(workspace_id, board_id, data.card_id)
+        if data.excerpt_source is None or data.client_request_id is None:
+            return await self._insert_note(workspace_id, data, user_id, board_id), True
+        return await self._save_excerpt(
+            workspace_id,
+            data,
+            user_id,
+            board_id,
+            data.excerpt_source,
+            data.client_request_id,
+        )
+
+    async def _authorize_excerpt_publisher(
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+    ) -> None:
+        """Before any receipt can answer: only the person themselves, still a
+        writing member of the destination, publishes or replays an excerpt."""
+        # Both keys resolve to the owner, so a receipt keyed by user alone
+        # would hand them the owner's saved excerpt.
+        if (
+            current_agent_id.get() is not None
+            or current_api_key_installation_id.get() is not None
+        ):
+            raise ForbiddenError("Only the session's owner can publish its content")
+        membership = await WorkspaceMemberRepository(self.db).get_membership(
+            workspace_id, user_id
+        )
+        if membership is None:
+            raise ForbiddenError("Not a member of this workspace")
+        if membership.role == WorkspaceRole.viewer:
+            raise ForbiddenError("Insufficient permissions")
+
+    async def _check_destination(
+        self,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID | None,
+        card_id: uuid.UUID | None,
+    ) -> None:
         if board_id is not None:
             board_workspace = await self.db.scalar(
                 select(Board.workspace_id).where(Board.id == board_id)
@@ -182,6 +274,85 @@ class NoteService:
             if board_workspace != workspace_id:
                 raise ResourceNotFoundError("Board not found")
         await assert_board_not_frozen(self.db, board_id)
+        if card_id:
+            await self._validate_card_link(workspace_id, board_id, card_id)
+
+    async def _save_excerpt(
+        self,
+        workspace_id: uuid.UUID,
+        data: NoteCreate,
+        user_id: uuid.UUID,
+        board_id: uuid.UUID | None,
+        source: ExcerptSource,
+        client_request_id: uuid.UUID,
+    ) -> tuple[Note, bool]:
+        """Publish an owner-reviewed excerpt of their captured session once
+        per client_request_id. The publisher and destination are already
+        checked."""
+        if board_id is None:
+            raise ValidationError("An excerpt note needs a board")
+        reviewed = json.loads(data.content)
+        if len(compact_json(reviewed)) > REVIEWED_DOCUMENT_BYTES_LIMIT:
+            raise PayloadTooLargeError(
+                f"The reviewed document exceeds {REVIEWED_DOCUMENT_BYTES_LIMIT} bytes"
+            )
+        receipts = NoteSaveReceiptRepository(self.db)
+        fingerprint = excerpt_fingerprint(
+            workspace_id, board_id, data, source, reviewed
+        )
+        receipt_id = await receipts.claim(
+            user_id=user_id,
+            client_request_id=client_request_id,
+            workspace_id=workspace_id,
+            board_id=board_id,
+            card_id=data.card_id,
+            fingerprint=fingerprint,
+        )
+        if receipt_id is None:
+            replayed = await self._replay(
+                receipts, user_id, client_request_id, fingerprint
+            )
+            return replayed, False
+        await AgentSessionContentService(self.db).verify_excerpt_source(
+            source.workspace_id,
+            user_id,
+            source.session_id,
+            {item.content_id: item.sha256 for item in source.items},
+            max_total_bytes=EXCERPT_SOURCE_BYTES_LIMIT,
+        )
+        note = await self._insert_note(workspace_id, data, user_id, board_id)
+        await receipts.complete(receipt_id, note.id)
+        return note, True
+
+    async def _replay(
+        self,
+        receipts: NoteSaveReceiptRepository,
+        user_id: uuid.UUID,
+        client_request_id: uuid.UUID,
+        fingerprint: str,
+    ) -> Note:
+        receipt = await receipts.get(user_id, client_request_id)
+        if receipt is None or receipt.fingerprint != fingerprint:
+            raise ConflictError(
+                "This client_request_id was already used for a different save",
+                error_code="client_request_conflict",
+            )
+        note = (
+            await self.note_repo.get_by_id(receipt.note_id)
+            if receipt.note_id is not None
+            else None
+        )
+        if note is None:
+            raise GoneError("The note saved by this request was deleted")
+        return note
+
+    async def _insert_note(
+        self,
+        workspace_id: uuid.UUID,
+        data: NoteCreate,
+        user_id: uuid.UUID,
+        board_id: uuid.UUID | None,
+    ) -> Note:
         content = await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, data.content)
         create_kwargs = dict(
             workspace_id=workspace_id,
@@ -200,7 +371,6 @@ class NoteService:
             created_by=user_id,
         )
         if data.card_id:
-            await self._validate_card_link(workspace_id, board_id, data.card_id)
             create_kwargs["card_id"] = data.card_id
         # Plumbing for the "link a note to its source execution" rule: we accept
         # and persist it whenever a caller sends it. No backend path sets it yet;
@@ -231,6 +401,7 @@ class NoteService:
             message_key="activity.note.created",
             message_params={"note_title": data.title},
             changes=changes,
+            publish_after_commit=True,
         )
         # @mention producer (before='' — all mentions in a new note are new).
         # card_id == the note's card for a card-scoped note so the deep-link
@@ -398,6 +569,7 @@ class NoteService:
         workspace_id: uuid.UUID,
         *,
         as_markdown: bool = False,
+        reader_id: uuid.UUID | None = None,
     ) -> "NoteRead":
         """Return the note as a NoteRead schema, optionally with `content`
         serialized to markdown (the reverse of the stored PM JSON).
@@ -409,6 +581,10 @@ class NoteService:
         from app.schemas.notes.note import NoteRead
 
         note = await self.get_note(note_id, workspace_id)
+        if reader_id is not None:
+            await WorkConsultationService(self.db).record(
+                workspace_id, reader_id, "note", note.id
+            )
         read = NoteRead.model_validate(note)
         if as_markdown:
             read = read.model_copy(
@@ -467,6 +643,7 @@ class NoteService:
                     "fields": changed_fields,
                 },
                 changes={"fields": changed_fields},
+                publish_after_commit=True,
             )
             # @mention producer — only newly-added mentions fire (MEN-2).
             await notify_new_mentions(
@@ -535,6 +712,7 @@ class NoteService:
                 message_key="activity.note.appended",
                 message_params={"note_title": updated.title},
                 changes={"fields": ["content"], "mode": "append"},
+                publish_after_commit=True,
             )
             # Only mentions inside the appended blocks are new — the prefix is
             # unchanged by construction, so the diff naturally yields just those.
@@ -616,6 +794,7 @@ class NoteService:
                     "mode": "replace_section",
                     "anchor_heading": data.anchor_heading.strip(),
                 },
+                publish_after_commit=True,
             )
             await notify_new_mentions(
                 self.db,
@@ -722,5 +901,6 @@ class NoteService:
                 summary=f"deleted note '{note.title}'",
                 message_key="activity.note.deleted",
                 message_params={"note_title": note.title},
+                publish_after_commit=True,
             )
         await self.note_repo.delete(note)

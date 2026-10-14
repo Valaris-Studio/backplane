@@ -52,6 +52,8 @@ func TestDiscoverWithConfig_NextAssignment_PassesSingleConfiguredBoardID(t *test
 			WorkspaceSlug: "test-workspace",
 			BoardIDs:      []string{"smoke-board-id"},
 		},
+		// A backend from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
 	}
 	client := valaris.NewClient(server.URL, "vlr_test")
 	client.UserID = "user-1"
@@ -116,6 +118,8 @@ func TestDiscoverWithConfig_NextAssignment_NoBoardIDWhenMultipleConfigured(t *te
 			WorkspaceSlug: "test-workspace",
 			BoardIDs:      []string{"board-a", "board-b"},
 		},
+		// A backend from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
 	}
 	client := valaris.NewClient(server.URL, "vlr_test")
 	client.UserID = "user-1"

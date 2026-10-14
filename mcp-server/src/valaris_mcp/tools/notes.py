@@ -160,6 +160,8 @@ async def create_note(
     card_id: str | None = None,
     kind: str = "user_note",
     return_content: bool = False,
+    client_request_id: str | None = None,
+    excerpt_source: dict | None = None,
     ctx: Context = None,
 ) -> str:
     """Create a note in a workspace or board, optionally linked to a card. See docs.
@@ -172,6 +174,8 @@ async def create_note(
         card_id: Card to link; needs board_id and a card on this board.
         kind: user_note or a structural kind (plan, review_verdict, ...).
         return_content: Echo the stored body in the receipt.
+        client_request_id: Excerpt save retry key (UUID); pairs with excerpt_source.
+        excerpt_source: Your session's {workspace_id, session_id, items:[{content_id, sha256}]}.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -180,7 +184,16 @@ async def create_note(
     body = {"title": title, "content": content, "pinned": pinned, "kind": kind}
     if card_id:
         body["card_id"] = card_id
-    result = await client.post(_notes_path(client, workspace_slug, board_id), body)
+    path = _notes_path(client, workspace_slug, board_id)
+    if client_request_id is not None or excerpt_source is not None:
+        if not board_id:
+            return _note_error("An excerpt save needs board_id")
+        body["client_request_id"] = client_request_id
+        body["excerpt_source"] = excerpt_source
+        # A backend without this route answers 404 instead of saving the
+        # request as an ordinary, non-retryable note.
+        path = f"{path}/from-excerpt"
+    result = await client.post(path, body)
     return _note_receipt(result, return_content)
 
 

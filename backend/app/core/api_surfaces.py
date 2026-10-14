@@ -58,6 +58,7 @@ _RULES: tuple[tuple[str | None, str, str], ...] = (
     (None, "/api/workspaces/{slug}/sensors", "internal"),
     (None, "/api/workspaces/{slug}/metrics", "internal"),
     (None, "/api/notifications", "internal"),
+    (None, "/api/me/mcp-invocations", "internal"),
     (None, "/api/integrations", "internal"),
     (None, "/api/media", "internal"),
     (None, "/api/local-storage", "internal"),
@@ -67,6 +68,15 @@ _RULES: tuple[tuple[str | None, str, str], ...] = (
     (None, "/api/workspaces/{slug}/config/bundle", "internal"),
     (None, "/api/workspaces/{slug}/members/{user_id}/temporary-password", "internal"),
     (None, "/api/workspaces/{slug}/executions", "internal"),
+    (None, "/api/workspaces/{slug}/sessions", "internal"),
+    (
+        None,
+        "/api/workspaces/{slug}/boards/{board_id}/cards/{card_id}/sessions",
+        "internal",
+    ),
+    (None, "/api/workspaces/{slug}/notes/{note_id}/sessions", "internal"),
+    (None, "/api/me/companion", "internal"),
+    (None, "/api/companion", "internal"),
     # --- public: MCP-parity CRUD, auth basics, health ---
     # Templates were promoted out of `internal` on 2026-08-17 (spec f52328b3):
     # they gained a full MCP twin surface, so adopters can build on them. Loop

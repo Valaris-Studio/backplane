@@ -19,6 +19,7 @@ import { ConnectionStatusIndicator } from "@/components/layout/ConnectionStatusI
 import { NotificationBell } from "@/features/notifications";
 import { useResolvedWorkspaceSlug } from "@/features/workspaces/hooks/use-workspace-resolved";
 import { ObserverPanel } from "@/features/observer";
+import { useSessionCrumb } from "@/features/sessions/hooks/use-session-crumb";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { boardKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ function formatSegment(segment: string) {
 // board ids, execution uuids) is user data and passes through verbatim.
 const ROUTE_SEGMENT_LABEL_KEYS: Record<string, string> = {
   boards: "nav.boards",
+  sessions: "nav.sessions",
   notes: "nav.notes",
   resources: "nav.resources",
   channels: "nav.channels",
@@ -65,7 +67,7 @@ export function TopBar({
   sidebarCollapsed,
   onToggleSidebar,
 }: TopBarProps) {
-  const { slug: routeSlug, boardId } = useParams();
+  const { slug: routeSlug, boardId, sessionId } = useParams();
   // Breadcrumbs read the ROUTE slug (they label the URL even when it is
   // wrong); the workspace-scoped widgets read the RESOLVED one, so a bad
   // slug costs no badge traffic.
@@ -84,16 +86,22 @@ export function TopBar({
     ? queryClient.getQueryData<BoardDetail>(boardKeys.detail(slug, boardId))?.name
     : undefined;
 
+  const sessionCrumb = useSessionCrumb(slug, sessionId);
+
   const segments = location.pathname.split("/").filter(Boolean);
   const crumbs = segments.map((segment, index) => {
     const labelKey = index > 0 ? ROUTE_SEGMENT_LABEL_KEYS[segment] : undefined;
     const label =
       segment === boardId && boardName
         ? boardName
-        : labelKey
+        : segment === sessionId && sessionCrumb
+          ? sessionCrumb
+          : labelKey
           ? t(labelKey)
           : formatSegment(segment);
-    return { label, path: "/" + segments.slice(0, index + 1).join("/") };
+    // A session title is a captured prompt: shown as typed, never title-cased.
+    const verbatim = segment === sessionId;
+    return { label, verbatim, path: "/" + segments.slice(0, index + 1).join("/") };
   });
 
   // Compact the bar once the user has scrolled past the initial landing.
@@ -232,6 +240,7 @@ export function TopBar({
                   to={crumb.path}
                   className={cn(
                     "rounded-full px-2 py-1 capitalize transition-colors hover:text-foreground",
+                    crumb.verbatim && "max-w-[22rem] truncate normal-case",
                     index === crumbs.slice(1).length - 1 && "text-foreground",
                   )}
                 >

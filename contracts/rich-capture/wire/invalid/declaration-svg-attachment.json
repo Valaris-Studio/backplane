@@ -1,0 +1,27 @@
+{
+  "model": "ContentDeclaration",
+  "why": "SVG is a document format, never a permitted attachment",
+  "body": {
+    "role": "user",
+    "channel": "attachment",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "c9d8e7f6-a5b4-4c3d-9e2f-1a0b9c8d7e6f",
+      "order": 39
+    },
+    "occurred_at": "2026-10-08T14:02:58Z",
+    "observed_at": "2026-10-08T14:03:00Z",
+    "media_type": "image/svg+xml",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "96ca3929e2280657b1e47a28b724e5e6dc96cfda02364e72299592e7c38f4f20",
+    "coverage": "captured",
+    "delivery": "upload",
+    "byte_count": 284211,
+    "sha256": "6a09bfb6492050ab65118bf80f308c59214326e806938d3e8d7a73b01c31ff5f"
+  }
+}

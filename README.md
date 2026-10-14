@@ -28,6 +28,16 @@ your team works, ready to reuse across projects.
 > APIs and workflows may evolve. **Runners are experimental**; review the
 > [known limitations](#known-limitations) before planning a deployment.
 
+The latest source also includes the [Companion](companion/README.md), private
+session readers, excerpt handoff and prepared runner context. These are
+**unreleased source features**; the published versions in the
+[changelog](CHANGELOG.md) and their download links remain unchanged. Companion
+and rich capture are disabled by default. Device scope and capture level decide
+what is retained; sharing a selected excerpt does not share the raw session.
+Build matching backend and runner source before enabling required-context
+policies. Existing runner downloads do not implement that protocol. See the
+[upgrade notes](CHANGELOG.md#unreleased) before migrating an existing installation.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">
   <img src=".github/assets/readme/board-light.png" alt="Backplane's Tidewatch demo board, with tasks across Backlog, In Progress, In Review, Done, and Blocked" width="1200">
@@ -316,8 +326,12 @@ docker compose -f docker-compose.prod.yml up -d
 <summary>Upgrading without breaking open browser tabs</summary>
 
 The production Compose stack retains retired frontend assets in the `frontend-assets`
-volume for seven days after replacement. Cleanup runs when the frontend starts;
-current assets are always available. Preserve this volume during upgrades. HTML
+volume for seven days after replacement, up to the last five releases. A volume
+mounted at `/var/lib/backplane/frontend` is detected automatically (a tmpfs there is
+skipped, since it is memory); `RETAIN_ASSETS_TO_VOLUME` forces it on (`true`/`1`/`yes`)
+or off (`false`/`0`/`no`). Cleanup runs when the frontend starts;
+current assets are always available. Without the volume (e.g. Cloud Run), nginx
+serves the same retired assets straight from the image's baked history. Preserve this volume during upgrades. HTML
 revalidates on reload, while hashed assets remain immutable.
 
 For the first upgrade from a version without this volume, preserve the running
@@ -331,8 +345,8 @@ docker compose -f docker-compose.prod.yml up -d --no-build frontend
 ```
 
 Image-based deployments can supply the same `PREVIOUS_FRONTEND_IMAGE` build argument
-with the previously serving image's digest. They carry seven days of retired assets
-from the replacement build; deploy the built image promptly. Later builds preserve
+with the previously serving image's digest. They carry retired assets from the last
+five releases (at most seven days old) in the replacement build; deploy the built image promptly. Later builds preserve
 existing expiry dates. Serialize frontend deployments so each build uses the
 currently serving predecessor. For a rollback, rebuild the selected source with
 that same predecessor instead of switching traffic directly to an old image.

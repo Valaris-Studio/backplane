@@ -5,7 +5,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   shouldRedirectToLogin,
   redirectToLogin,
+  takeReturnPath,
   LOGIN_PATH,
+  markReturnedFromSignIn,
+  returnedFromSignInTo,
+  forgetReturnedFromSignIn,
 } from "../redirect-to-login";
 
 describe("shouldRedirectToLogin", () => {
@@ -36,8 +40,9 @@ describe("redirectToLogin", () => {
   beforeEach(() => {
     Object.defineProperty(window, "location", {
       configurable: true,
-      value: { assign: vi.fn(), pathname: "/acme/boards", href: "" },
+      value: { assign: vi.fn(), pathname: "/acme/boards", search: "", href: "" },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -59,5 +64,83 @@ describe("redirectToLogin", () => {
     });
     redirectToLogin();
     expect(window.location.assign).not.toHaveBeenCalled();
+  });
+});
+
+describe("return after sign-in", () => {
+  const original = window.location;
+
+  function visit(pathname: string, search = "") {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { assign: vi.fn(), pathname, search, href: "" },
+    });
+  }
+
+  beforeEach(() => window.sessionStorage.clear());
+  afterEach(() => {
+    Object.defineProperty(window, "location", { configurable: true, value: original });
+    vi.useRealTimers();
+  });
+
+  it("returns to the page, query included, that sent the person to sign in", () => {
+    visit("/acme/boards", "?view=list");
+    redirectToLogin();
+    expect(takeReturnPath()).toBe("/acme/boards?view=list");
+  });
+
+  it("never carries a pairing code in the return URL", () => {
+    visit("/companion/pair", "?code=BCDF-GHJK&x=1");
+    redirectToLogin();
+    expect(takeReturnPath()).toBe("/companion/pair?x=1");
+  });
+
+  it("returns only once", () => {
+    visit("/companion/pair", "?code=BCDF-GHJK");
+    redirectToLogin();
+    takeReturnPath();
+    expect(takeReturnPath()).toBeNull();
+  });
+
+  it("forgets a return path older than a pairing code lives", () => {
+    vi.useFakeTimers();
+    visit("/companion/pair", "?code=BCDF-GHJK");
+    redirectToLogin();
+    vi.advanceTimersByTime(16 * 60 * 1000);
+    expect(takeReturnPath()).toBeNull();
+  });
+
+  it("never returns off-site", () => {
+    window.sessionStorage.setItem(
+      "backplane.returnAfterSignIn",
+      JSON.stringify({ path: "//evil.example/steal", savedAt: Date.now() }),
+    );
+    expect(takeReturnPath()).toBeNull();
+    window.sessionStorage.setItem(
+      "backplane.returnAfterSignIn",
+      JSON.stringify({ path: "https://evil.example/", savedAt: Date.now() }),
+    );
+    expect(takeReturnPath()).toBeNull();
+  });
+
+  it("has nothing to return to without a redirect", () => {
+    expect(takeReturnPath()).toBeNull();
+  });
+});
+
+describe("the returned-from-sign-in marker", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("names only the page sign-in returned to, until it is forgotten", () => {
+    markReturnedFromSignIn("/companion/pair?x=1");
+    expect(returnedFromSignInTo("/companion/pair")).toBe(true);
+    expect(returnedFromSignInTo("/companion/pair")).toBe(true);
+    expect(returnedFromSignInTo("/acme/boards")).toBe(false);
+    forgetReturnedFromSignIn();
+    expect(returnedFromSignInTo("/companion/pair")).toBe(false);
+  });
+
+  it("is absent when nothing returned from sign-in", () => {
+    expect(returnedFromSignInTo("/companion/pair")).toBe(false);
   });
 });

@@ -1,0 +1,9 @@
+{
+  "model": "ContentUploadState",
+  "why": "a deleted row answers 404; there is no dropped upload state",
+  "body": {
+    "content_id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+    "state": "dropped",
+    "coverage": "captured"
+  }
+}

@@ -15,12 +15,14 @@ RED today (editor P0-4): the backend's unknown-node fallback serializes
 mention, image and fileAttachment to nothing, so those entries (plus
 kitchen-sink) fail until the serializer gains the matching rules.
 """
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
 import pytest
+from markdown_it import MarkdownIt
 
 from app.services.notes.content_serializer import prosemirror_to_markdown
 
@@ -31,3 +33,16 @@ _CORPUS = json.loads(_CORPUS_PATH.read_text())
 @pytest.mark.parametrize("entry", _CORPUS, ids=[e["name"] for e in _CORPUS])
 def test_serialize_corpus_entry_matches_contract(entry: dict) -> None:
     assert prosemirror_to_markdown(entry["doc"]) == entry["expected_markdown"]
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [entry for entry in _CORPUS if "literal_code" in entry],
+    ids=[entry["name"] for entry in _CORPUS if "literal_code" in entry],
+)
+def test_captured_code_remains_one_literal_block(entry: dict) -> None:
+    tokens = MarkdownIt("commonmark").parse(prosemirror_to_markdown(entry["doc"]))
+
+    assert [token.type for token in tokens] == ["fence"]
+    assert tokens[0].content == entry["literal_code"]["text"]
+    assert tokens[0].info == entry["literal_code"]["language"]

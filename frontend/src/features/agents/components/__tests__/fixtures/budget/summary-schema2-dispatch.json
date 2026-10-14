@@ -1,0 +1,31 @@
+{
+  "id": "8f0e8a54-5d4b-4c55-9d0e-00000000a003",
+  "execution_id": "8f0e8a54-5d4b-4c55-9d0e-0000000000e1",
+  "ordinal": 3,
+  "client_request_id": "request-3",
+  "context_revision": "617e91cf61bb67c897a840c7416fa011e3a02d91358bdde62a33d1b576f7a4d3",
+  "prompt_sha256": "8900dc91699a2acb676d3190bb6653d40d492c84d335e671ce7c90ff3b7d41f1",
+  "prompt_bytes": 169,
+  "system_prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "system_prompt_bytes": 0,
+  "provider": "operator-provider",
+  "model": "operator-model",
+  "status": "prepared",
+  "use_verification": "not_verified",
+  "created_at": "2026-10-13T12:03:00+00:00",
+  "dispatch_summary": {
+    "protocol_version": 1,
+    "dispatch_revision": "0b42e2586b33f00222220d1d512cf48c79ca60018d70eb56ca186c2c5aefbef1",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "review",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "required_blocks_exact",
+    "injected_bytes": {
+      "input": 103,
+      "system": 0,
+      "total": 103
+    }
+  }
+}

@@ -221,6 +221,20 @@ class TestThroughTheRealSocket:
     """
 
     @pytest.fixture(autouse=True)
+    def _grant_current_member_authority(self, monkeypatch):
+        """Existing-test adaptation: these principals are mocks with no
+        database rows, and admission now reads the current role through the
+        connection manager's authority reader. It is injected at that service
+        boundary as the same member role the patched resolve returns."""
+        from app.services.events.authority import DeliveryAuthority
+        from app.services.events.connection_manager import connection_manager
+
+        async def current_member(principal):
+            return DeliveryAuthority(role=WorkspaceRole.member)
+
+        monkeypatch.setattr(connection_manager, "_authority", current_member)
+
+    @pytest.fixture(autouse=True)
     def _clear_event_bus_subscribers(self):
         from app.core.event_bus import event_bus
 

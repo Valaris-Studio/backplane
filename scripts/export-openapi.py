@@ -28,6 +28,9 @@ def main() -> None:
     # Settings reads `.env` relative to CWD; only backend/.env matches its
     # schema (the repo-root .env carries runner credentials it must not load).
     os.chdir(REPO_ROOT / "backend")
+    # Companion routes are only mounted when enabled; the snapshot documents
+    # the full surface whatever the local .env says.
+    os.environ["COMPANION_ENABLED"] = "true"
     from app.main import app
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

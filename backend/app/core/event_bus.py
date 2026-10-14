@@ -44,6 +44,11 @@ _THIN_ID_KEYS = (
     # api_key.first_used is filtered per-user on this field; dropping it would
     # make the thin form undeliverable rather than merely thin.
     "user_id",
+    # agent_session.* / companion_installation.* are filtered per-user on it.
+    "owner_id",
+    "session_id",
+    "installation_id",
+    "reason",
     "entity_id",
     "actor_id",
     "target_agent_id",

@@ -34,13 +34,13 @@ HTTP_TRANSPORT_RELEASE = "0.7.3"
 # Changelog dates are PyPI publish dates, which the root CHANGELOG.md also uses.
 NOTES_PAGING_RELEASE = "0.8.0"
 NOTES_PAGING_RELEASE_DATE = "2026-09-15"
-# Default board context + create_workspace slug refusal.
+# Optional default board + card 8a318692 create_workspace slug refusal.
 DEFAULT_BOARD_RELEASE = "0.8.1"
 DEFAULT_BOARD_RELEASE_DATE = "2026-09-30"
 # Queued invocation recording with agent-neutral native context.
 INVOCATION_RECORDING_RELEASE = "0.9.0"
 INVOCATION_RECORDING_RELEASE_DATE = "2026-10-04"
-# String params keep JSON text, slim note receipts, card column labels.
+# Obstacles WP1: string params keep JSON text, slim note receipts, card column labels.
 WP1_RELEASE = "0.9.1"
 # Wire-budget headroom: usage guidance moved off tools/list into the docs.
 CURRENT_RELEASE = "0.9.2"

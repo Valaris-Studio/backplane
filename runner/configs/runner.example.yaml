@@ -237,4 +237,23 @@ telemetry:
   service_name: "backplane-runner"
   sample_rate: 1.0             # 0.0-1.0
 
+# Context dispatch negotiation for scheduled work. By default the runner
+# negotiates the server's dispatch policy before each assignment and start,
+# and refuses work when that fails: an outage, a malformed or unacknowledged
+# answer never falls back to the legacy scans.
+context_dispatch:
+  # Refuse anything but required dispatch, even from a server that allows
+  # legacy, even with allow_legacy_server, and even without an agent identity
+  # to negotiate with. Without require, a runner whose API key is not linked
+  # to an agent cannot negotiate and discovers through the legacy scans; its
+  # execution start, with no agent ID, is refused before it is sent.
+  require: false
+  # Let a server without the negotiation route run the legacy path. Only the
+  # route's own 404 counts: a typed 404 from a server that has the route (an
+  # unknown agent or workspace) never does, nor does any other failure. A 404
+  # without the server's error envelope (an HTML or plain-text 404 from a proxy
+  # or misrouted host) reads as that route-missing 404; the server still
+  # refuses an unbound start under a required policy.
+  allow_legacy_server: false
+
 log_level: "info"

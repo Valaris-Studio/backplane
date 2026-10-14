@@ -34,6 +34,10 @@ pnpm brand:assets   # regenerates frontend/public/brand/* from brand/source/*
 Outputs: `favicon-{16,32,48}.png`, `favicon.ico`, `apple-touch-icon.png`,
 `icon-{192,512}.png`, `icon-maskable-{192,512}.png`, `logo-{light,dark}.{png,webp}`,
 `og-image.png`, `brand.json` (dominant color → PWA `theme_color`).
+It also writes the Companion desktop app's
+`companion/desktop/src-tauri/icons/app-icon-source.png` (macOS-grid tile) and the
+same tile as `companion/desktop/src/assets/brand/app-tile-{48,96,256}.png` for the in-app icon;
+`companion/desktop/scripts/generate-app-icons.sh` derives the bundle icons from it.
 
 Frontend usage: `frontend/src/components/brand/BrandLogo.tsx` renders the
 logo — the light variant on both themes (decided 2026-07-23: the dark

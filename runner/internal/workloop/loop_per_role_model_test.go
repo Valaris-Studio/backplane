@@ -33,6 +33,8 @@ func newModelTestLoop(t *testing.T, yamlModel string) *Loop {
 
 	cfg := &config.Config{
 		Valaris: config.ValarisConfig{WorkspaceSlug: "ws"},
+		// A backend from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
 		LLM: config.LLMConfig{
 			Model: yamlModel,
 			ModelOverrides: map[string]string{
@@ -218,7 +220,9 @@ func TestModel_LifecycleDiscover_StashesBackendModel(t *testing.T) {
 
 	cfg := &config.Config{
 		Valaris: config.ValarisConfig{WorkspaceSlug: "ws", BoardIDs: []string{"board-1"}},
-		LLM:     config.LLMConfig{Model: "sonnet"},
+		// A backend from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
+		LLM:             config.LLMConfig{Model: "sonnet"},
 	}
 	client := valaris.NewClient(server.URL, "vlr_test")
 	client.UserID = "user-1"

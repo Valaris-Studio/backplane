@@ -303,6 +303,10 @@ func (m *LoopMode) Run(ctx context.Context) error {
 		consecutiveIdle = 0
 		m.completionRework = nil
 		delete(m.completionNotices, "idle")
+		if err := m.refuseRequiredDispatch(ctx); err != nil {
+			recap(cfg.BudgetUSD)
+			return err
+		}
 
 		if cfg.CompletionPolicy != nil {
 			if err := m.preflightCompletionWorkflow(ctx, cfg); err != nil {
@@ -794,6 +798,11 @@ func parseLoopOutcome(result *llm.Result) *loopOutcome {
 // (min of board-remaining and yaml, computed by Run); spentBefore is the
 // cumulative spend entering this iteration, for the 80% budget warning.
 func (m *LoopMode) runIteration(ctx context.Context, cfg *valaris.BoardLoopConfig, iteration int, executionID string, provider llm.Provider, model string, sessionCap, spentBefore float64, reworkContext ...string) (failed bool, cost float64, outcome *loopOutcome) {
+	if err := m.refuseRequiredDispatch(ctx); err != nil {
+		slog.Warn("loop mode: context dispatch refuses this iteration", "board_id", m.boardID, "error", err)
+		m.completeExecution(ctx, executionID, "failed", err.Error())
+		return true, 0, nil
+	}
 	pctx := PromptContext{
 		Workspace:   m.workspaceSlug,
 		BoardID:     m.boardID,

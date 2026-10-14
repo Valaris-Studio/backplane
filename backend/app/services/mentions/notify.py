@@ -87,15 +87,11 @@ async def notify_new_mentions(
     # asyncpg abort), leaving the outer
     # card/note write durable (MEN-4).
     #
-    # Per-id (not whole-loop) is load-bearing for the live-push contract:
-    # generate_for_event promotes that id's staged push into the NON-transactional
-    # _PENDING buffer as its LAST step. A whole-loop savepoint would let id-A's
-    # push reach _PENDING and then, on a LATER id's DB error, roll id-A's ROW back
-    # while its push survives — a phantom notification.created for a row that no
-    # longer exists. Scoping a savepoint per id keeps row-durability and
-    # push-emission in lockstep: a failed id rolls back BEFORE its promotion, so
-    # no push leaks; a clean id's row and push both survive. The per-id except
-    # also stops one bad id from unwinding its siblings.
+    # Per-id (not whole-loop) keeps one bad id from unwinding its siblings.
+    # generate_for_event promotes that id's staged push as its LAST step, into
+    # committed_events, which owns it by this savepoint: a failed id rolls back
+    # BEFORE promotion, so no push leaks; a clean id's row and push survive
+    # together, and both are dropped if an enclosing savepoint later rolls back.
     service = NotificationService(db)
     for mentioned_user_id in new_ids:
         params = {"mentioned_user_id": str(mentioned_user_id), **display_params}

@@ -1,0 +1,24 @@
+# Makes companion/desktop a standalone workspace root so its frozen lockfile
+# never resolves through the repository-root workspace.
+packages:
+  - "."
+# esbuild ships prebuilt binaries via optional deps; the wdio edge/gecko driver
+# downloads are for browsers this app never targets.
+allowBuilds:
+  edgedriver: false
+  esbuild: false
+  geckodriver: false
+# typescript-eslint 8.71.0 was younger than pnpm 11's minimum release age when
+# pinned on 2026-09-28.
+minimumReleaseAgeExclude:
+  - '@typescript-eslint/eslint-plugin@8.71.0'
+  - '@typescript-eslint/parser@8.71.0'
+  - '@typescript-eslint/project-service@8.71.0'
+  - '@typescript-eslint/scope-manager@8.71.0'
+  - '@typescript-eslint/tsconfig-utils@8.71.0'
+  - '@typescript-eslint/type-utils@8.71.0'
+  - '@typescript-eslint/types@8.71.0'
+  - '@typescript-eslint/typescript-estree@8.71.0'
+  - '@typescript-eslint/utils@8.71.0'
+  - '@typescript-eslint/visitor-keys@8.71.0'
+  - typescript-eslint@8.71.0

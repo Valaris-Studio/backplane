@@ -1,0 +1,11 @@
+{
+  "model": "FinalizeRequest",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/contents/4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f/finalize"
+  },
+  "body": {
+    "byte_count": 284211,
+    "sha256": "6a09bfb6492050ab65118bf80f308c59214326e806938d3e8d7a73b01c31ff5f"
+  }
+}

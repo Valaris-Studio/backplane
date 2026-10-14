@@ -1,0 +1,187 @@
+{
+  "id": "8f0e8a54-5d4b-4c55-9d0e-00000000b005",
+  "execution_id": "8f0e8a54-5d4b-4c55-9d0e-0000000000e1",
+  "ordinal": 5,
+  "client_request_id": "request-b5",
+  "context_revision": "4489d5af9114ec669ecbfaef2fb09cf0c80e42c74602c2de00cbdc22b886e3fe",
+  "prompt_sha256": "b40da6492af770d1526f7f23f654a050a0289cb707bf10858c1ece58d1912564",
+  "prompt_bytes": 63,
+  "system_prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "system_prompt_bytes": 0,
+  "provider": "operator-provider",
+  "model": "operator-model",
+  "status": "prepared",
+  "use_verification": "not_verified",
+  "created_at": "2026-10-13T13:05:00+00:00",
+  "dispatch_summary": {
+    "protocol_version": 1,
+    "dispatch_revision": "678187494c97477eda946f9c7c625115610799612168b0cf501c271875c5427b",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "release",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "no_required_sources",
+    "injected_bytes": {
+      "input": 41,
+      "system": 0,
+      "total": 41
+    }
+  },
+  "context_manifest": {
+    "schema_version": 2,
+    "renderer_version": "context-v2",
+    "sources": [
+      {
+        "source_index": 0,
+        "kind": "board_definition",
+        "alias": "BoardGuide",
+        "filter": {},
+        "coverage": "source_only",
+        "rendered_sha256": "c30d0d85395a7e2de747354727ddfbc3457ccbb2096d7efdaeb960f01b3295b1",
+        "rendered_bytes": 41,
+        "records": [],
+        "admission": {
+          "required": false,
+          "outcome": "partial",
+          "candidate_limit": 50,
+          "candidate_count": 3,
+          "has_more_candidates": false,
+          "admitted_count": 1,
+          "excluded_count": 2,
+          "max_rendered_bytes": 24576
+        }
+      },
+      {
+        "source_index": 1,
+        "kind": "pipeline_expectations",
+        "alias": "StageExpectations",
+        "filter": {},
+        "coverage": "source_only",
+        "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rendered_bytes": 0,
+        "records": [],
+        "admission": {
+          "required": false,
+          "outcome": "excluded",
+          "candidate_limit": null,
+          "candidate_count": 1,
+          "has_more_candidates": false,
+          "admitted_count": 0,
+          "excluded_count": 1,
+          "max_rendered_bytes": 24576
+        }
+      }
+    ],
+    "budget": {
+      "policy": {
+        "version": 1,
+        "max_note_body_bytes": 16384,
+        "max_note_fetch_bytes": 65536,
+        "max_optional_note_bytes": 4096,
+        "max_managed_context_bytes": 24576,
+        "max_invocation_bytes": 131072
+      },
+      "policy_sha256": "72993b6cb83904d39a8c73bd0651aa6251288ede5dbc2c7bcbdc54cc5bbf5d77",
+      "raw_note_bytes_fetched": 4096,
+      "managed_context_bytes": 41,
+      "raw_note_fetch_coverage": "complete",
+      "non_note_fetch_coverage": "not_bounded"
+    },
+    "diagnostics": {
+      "entries": [
+        {
+          "source_index": 0,
+          "candidate_index": null,
+          "note_id": null,
+          "title": null,
+          "kind": "board_definition",
+          "raw_body_bytes": null,
+          "rendered_bytes": 30000,
+          "revision_sha256": null,
+          "reason": "source_budget"
+        },
+        {
+          "source_index": 0,
+          "candidate_index": 1,
+          "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000501",
+          "title": "Release checklist",
+          "kind": "user_note",
+          "raw_body_bytes": 5200,
+          "rendered_bytes": 5100,
+          "revision_sha256": "094fa1831184ed8eed010f77bfc7a56aa9e5f54fc317a1a145710152a542d598",
+          "reason": "record_too_large"
+        },
+        {
+          "source_index": 1,
+          "candidate_index": null,
+          "note_id": null,
+          "title": null,
+          "kind": "pipeline_expectations",
+          "raw_body_bytes": null,
+          "rendered_bytes": 2048,
+          "revision_sha256": null,
+          "reason": "total_budget"
+        }
+      ],
+      "excluded_count": 3,
+      "reason_counts": {
+        "source_budget": 1,
+        "record_too_large": 1,
+        "total_budget": 1
+      },
+      "truncated": false
+    }
+  },
+  "input_prompt": "Prepare the release.\n## BoardGuide\n- Release checklist summary\n",
+  "system_prompt": "",
+  "dispatch": {
+    "protocol_version": 1,
+    "dispatch_revision": "678187494c97477eda946f9c7c625115610799612168b0cf501c271875c5427b",
+    "invocation": {
+      "kind": "stage",
+      "step_name": "release",
+      "prompt_slot": "main"
+    },
+    "inclusion_verification": "no_required_sources",
+    "injected_bytes": {
+      "input": 41,
+      "system": 0,
+      "total": 41
+    },
+    "adapter": "operator-adapter",
+    "resolution_kind": "pinned",
+    "resume_session_id": null,
+    "channel_contract": {
+      "version": 1,
+      "input": "verbatim",
+      "system": "empty",
+      "resume": false
+    },
+    "required_source_indices": [],
+    "source_inclusions": [
+      {
+        "source_index": 0,
+        "alias": "BoardGuide",
+        "required": false,
+        "outcome": "exact",
+        "spans": [
+          {
+            "channel": "input",
+            "start": 21,
+            "end": 62
+          }
+        ],
+        "contribution_bytes": 41
+      },
+      {
+        "source_index": 1,
+        "alias": "StageExpectations",
+        "required": false,
+        "outcome": "empty",
+        "spans": [],
+        "contribution_bytes": 0
+      }
+    ]
+  }
+}

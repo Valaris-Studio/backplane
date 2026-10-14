@@ -42,7 +42,7 @@ func PreflightCompletionMCP(ctx context.Context, template, workspace, board stri
 	}
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("MCP compatibility check failed before model invocation (config %s; executable %s; server %s %s): %w. Verify the MCP tool grants and credentials; select a compatible backplane-mcp 0.8.0 artifact/config or regenerate once that package is available", report.ConfigPath, report.Executable, report.ServerName, report.Version, err)
+			err = fmt.Errorf("MCP compatibility check failed before model invocation (config %s; executable %s; server %s %s): %w. Verify the MCP tool grants and credentials; select a compatible backplane-mcp 0.9.1 artifact/config or regenerate once that package is available", report.ConfigPath, report.Executable, report.ServerName, report.Version, err)
 		}
 	}()
 	prepared, cleanup, err := llm.PrepareMCPConfig(template, expected.Tools)

@@ -9,14 +9,24 @@ rather than maintained by hand:
 
 ```bash
 # Frontend (pnpm)
-cd frontend && pnpm licenses list
+(cd frontend && pnpm licenses list)
 
 # Backend / MCP server (Python)
 pip install pip-licenses && pip-licenses --format=markdown
 
 # Runner (Go)
 go install github.com/google/go-licenses@latest && go-licenses report ./runner/...
+
+# Companion (Go module, from companion/)
+(cd companion && go-licenses report ./...)
+
+# Companion desktop webview (pnpm) and Rust shell (each crate's declared `license`)
+(cd companion/desktop && pnpm licenses list --prod)
+(cd companion/desktop/src-tauri && cargo metadata --format-version 1)
 ```
+
+Built companion artifacts do not rely on these commands: their builders write
+the notices themselves (see "Companion and Beacon" below).
 
 ## ⚠ Non-OSI dependency: GSAP
 
@@ -80,9 +90,47 @@ All other dependencies are under standard permissive or weak-copyleft licenses
 | Frontend | React, React Router, TanStack Query, Radix UI, dnd-kit, TipTap, XYFlow, Recharts, Tailwind CSS, lucide-react, i18next, axios, motion | MIT |
 | Syntax / markdown | highlight.js, markdown-it, react-markdown, remark-gfm, mermaid | BSD-3-Clause / MIT |
 | Runner (Go) | OpenTelemetry SDK + OTLP exporters, `gopkg.in/yaml.v3`, `nhooyr.io/websocket` | Apache-2.0 / MIT |
+| Companion (Go) | Beacon `pkg/asymptoteobserve`, OpenTelemetry Collector `pdata`, `go-keyring`, `go-toml`, `flock`, `golang.org/x/*` | MIT / Apache-2.0 / BSD-3-Clause |
+| Companion desktop | Tauri and its plugins, tokio, hyper, serde (Rust); React, motion, `@tauri-apps/api` (webview) | MIT / Apache-2.0 |
 
 Run the generator commands above for exact, version-pinned results; treat this
 table as orientation, not as a legal inventory.
+
+## Companion and Beacon
+
+[Beacon](https://github.com/Asymptote-Labs/agent-beacon) is MIT-licensed,
+Copyright (c) 2026 Asymptote Labs. Its license text is in
+[`companion/third_party/beacon-LICENSE`](companion/third_party/beacon-LICENSE).
+
+- **Source tree.** No Beacon source is vendored. `companion/go.mod` pins
+  Beacon's `pkg/asymptoteobserve` module, and `companion/beacon-source.json`
+  pins the Beacon archive (commit and SHA-256) that the builders download,
+  verify and compile without patches.
+- **Built bundles** (`companion/scripts/build_bundle.py`) ship `LICENSES/`
+  (the companion's and Beacon's MIT texts and every other license or notice
+  file), `THIRD_PARTY_NOTICES.txt` (every Go module linked into each binary,
+  with its license text) and `manifest.json` (versions, checksums, licenses).
+- **The desktop app** (`companion/scripts/build_desktop.py`) ships the same
+  notices, and its `THIRD_PARTY_NOTICES.txt` also covers the Rust crates and
+  production npm packages it is built from.
+
+Both builders fail closed when a license is missing, unrecognized or outside
+the allowlist. `companion/README.md` ("Bundles") documents the layout and the
+checks. This source tree does not contain a built artifact.
+
+## Vendored model price tables
+
+Agent-session cost estimates are computed from two pinned price snapshots in
+`backend/app/pricing/data/`, trimmed to token rates for the providers the
+supported agents use. Both are MIT-licensed; each license text sits next to its
+data, and `manifest.json` records the upstream commit or fetch date and a
+SHA-256 of the trimmed file. Refresh them with
+`python -m scripts.refresh_price_tables` from `backend/`.
+
+| Data | Upstream | License |
+|---|---|---|
+| `litellm_prices.json` | [BerriAI/litellm](https://github.com/BerriAI/litellm) `model_prices_and_context_window.json` | MIT, Copyright (c) 2023 Berri AI (`LICENSE-litellm`) |
+| `models_dev_prices.json` | [models.dev](https://models.dev) `api.json` | MIT, Copyright (c) 2025 models.dev (`LICENSE-models.dev`) |
 
 ## Office document previews
 

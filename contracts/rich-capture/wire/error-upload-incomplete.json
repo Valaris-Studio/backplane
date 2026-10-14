@@ -1,0 +1,18 @@
+{
+  "model": "ContentError",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d/finalize",
+    "status": 409
+  },
+  "body": {
+    "detail": "Chunks are missing",
+    "error_code": "upload_incomplete",
+    "error_params": {
+      "missing_chunks": [
+        1
+      ]
+    },
+    "context": null
+  }
+}

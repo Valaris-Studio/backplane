@@ -1,0 +1,978 @@
+[
+ {
+  "line": 1,
+  "captured_at_ns": 1791512496531403000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 2,
+  "captured_at_ns": 1791512496531555000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 608,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 3,
+  "captured_at_ns": 1791512496531570000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 671,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 4,
+  "captured_at_ns": 1791512498862956000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2574,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 5,
+  "captured_at_ns": 1791512498864509000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 352,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 6,
+  "captured_at_ns": 1791512499086610000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 990,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 7,
+  "captured_at_ns": 1791512499086613000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 978,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 8,
+  "captured_at_ns": 1791512500962042000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 368,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 9,
+  "captured_at_ns": 1791512500962053000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2834,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 10,
+  "captured_at_ns": 1791512500963646000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 548,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 11,
+  "captured_at_ns": 1791512500964012000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 520,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 12,
+  "captured_at_ns": 1791512503458947000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 371,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 13,
+  "captured_at_ns": 1791512503459344000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 3038,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 14,
+  "captured_at_ns": 1791512503461584000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 682,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 15,
+  "captured_at_ns": 1791512503461827000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 651,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 16,
+  "captured_at_ns": 1791512504823794000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2407,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 17,
+  "captured_at_ns": 1791512504824393000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 352,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 18,
+  "captured_at_ns": 1791512504977040000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 508,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 19,
+  "captured_at_ns": 1791512504977041000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 496,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 20,
+  "captured_at_ns": 1791512505875697000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 864,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 21,
+  "captured_at_ns": 1791512505875710000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 350,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 22,
+  "captured_at_ns": 1791512505898418000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 20408,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 23,
+  "captured_at_ns": 1791512505898829000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 20398,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 24,
+  "captured_at_ns": 1791512507355348000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 371,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 25,
+  "captured_at_ns": 1791512507355540000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2410,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 26,
+  "captured_at_ns": 1791512507375066000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 103298,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 27,
+  "captured_at_ns": 1791512507375688000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 103267,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 28,
+  "captured_at_ns": 1791512508780895000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2331,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 29,
+  "captured_at_ns": 1791512508781605000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 311,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 30,
+  "captured_at_ns": 1791512508782939000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 415,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 31,
+  "captured_at_ns": 1791512508783388000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 444,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 32,
+  "captured_at_ns": 1791512510388942000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 33,
+  "captured_at_ns": 1791512510388959000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2855,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 34,
+  "captured_at_ns": 1791512543672754000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 35,
+  "captured_at_ns": 1791512543672882000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 486,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 36,
+  "captured_at_ns": 1791512543672906000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 549,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 37,
+  "captured_at_ns": 1791512546530473000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2692,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 38,
+  "captured_at_ns": 1791512546533838000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 445,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 39,
+  "captured_at_ns": 1791512546536154000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 683,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 40,
+  "captured_at_ns": 1791512546536169000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 788,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 41,
+  "captured_at_ns": 1791512547450170000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 352,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 42,
+  "captured_at_ns": 1791512547450179000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 868,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 43,
+  "captured_at_ns": 1791512547649796000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 496,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 44,
+  "captured_at_ns": 1791512547649798000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 508,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 45,
+  "captured_at_ns": 1791512548490415000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 46,
+  "captured_at_ns": 1791512548490444000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 878,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 47,
+  "captured_at_ns": 1791512551849330000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 48,
+  "captured_at_ns": 1791512551849459000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 540,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 49,
+  "captured_at_ns": 1791512551849476000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 592,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 50,
+  "captured_at_ns": 1791512555022050000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 790,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 51,
+  "captured_at_ns": 1791512555022287000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 52,
+  "captured_at_ns": 1791512558362988000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 53,
+  "captured_at_ns": 1791512558363124000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 188,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 54,
+  "captured_at_ns": 1791512558363126000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 251,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 55,
+  "captured_at_ns": 1791512560372704000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 56,
+  "captured_at_ns": 1791512560372716000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 782,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 57,
+  "captured_at_ns": 1791512563743181000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 58,
+  "captured_at_ns": 1791512563743306000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 188,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 59,
+  "captured_at_ns": 1791512563743323000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 251,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 60,
+  "captured_at_ns": 1791512565436528000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 805,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 61,
+  "captured_at_ns": 1791512565436830000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 62,
+  "captured_at_ns": 1791512568912281000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 63,
+  "captured_at_ns": 1791512568912408000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 194,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 64,
+  "captured_at_ns": 1791512568912439000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 257,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 65,
+  "captured_at_ns": 1791512571489276000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 66,
+  "captured_at_ns": 1791512571489288000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2574,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 67,
+  "captured_at_ns": 1791512574792739000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 68,
+  "captured_at_ns": 1791512574792933000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 236,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 69,
+  "captured_at_ns": 1791512574792940000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 299,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 70,
+  "captured_at_ns": 1791512576288791000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 71,
+  "captured_at_ns": 1791512576288858000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 786,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 72,
+  "captured_at_ns": 1791512620920640000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 179,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 73,
+  "captured_at_ns": 1791512620920928000,
+  "event": "user_bash",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 282,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 74,
+  "captured_at_ns": 1791512620937714000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 235,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 75,
+  "captured_at_ns": 1791512620937793000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 306,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 76,
+  "captured_at_ns": 1791512622623575000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 227,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 77,
+  "captured_at_ns": 1791512622623602000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 789,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 78,
+  "captured_at_ns": 1791512622624442000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 298,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 79,
+  "captured_at_ns": 1791512624170010000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 2501,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 80,
+  "captured_at_ns": 1791512624171552000,
+  "event": "tool_call",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 336,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 81,
+  "captured_at_ns": 1791512626192958000,
+  "event": "tool_result",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 419,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 82,
+  "captured_at_ns": 1791512626192981000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 422,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 83,
+  "captured_at_ns": 1791512626194425000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 518,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 84,
+  "captured_at_ns": 1791512626201739000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 179,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 85,
+  "captured_at_ns": 1791512637671433000,
+  "event": "session_start",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 179,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 86,
+  "captured_at_ns": 1791512640665568000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 299,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 87,
+  "captured_at_ns": 1791512640665568000,
+  "event": "input",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 228,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 88,
+  "captured_at_ns": 1791512642219099000,
+  "event": "message_end",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 797,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 89,
+  "captured_at_ns": 1791512642222845000,
+  "event": "session_shutdown",
+  "session_id": "01a11e77-495e-7096-9830-f863d293518b",
+  "raw_bytes": 299,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 90,
+  "captured_at_ns": 1791512642258771000,
+  "event": "session_start",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 298,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 91,
+  "captured_at_ns": 1791512642258771000,
+  "event": "session_start",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 298,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 92,
+  "captured_at_ns": 1791512642258968000,
+  "event": "input",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 208,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 93,
+  "captured_at_ns": 1791512642259035000,
+  "event": "message_end",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 279,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 94,
+  "captured_at_ns": 1791512643678456000,
+  "event": "message_end",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 792,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 95,
+  "captured_at_ns": 1791512643678566000,
+  "event": "session_shutdown",
+  "session_id": "01a11e79-8293-78ea-895f-cf661f71cc8b",
+  "raw_bytes": 179,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 96,
+  "captured_at_ns": 1791513091594454000,
+  "event": "session_start",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 97,
+  "captured_at_ns": 1791513091594534000,
+  "event": "input",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 252,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 98,
+  "captured_at_ns": 1791513091594578000,
+  "event": "message_end",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 315,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 99,
+  "captured_at_ns": 1791513093364289000,
+  "event": "message_end",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 2511,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 100,
+  "captured_at_ns": 1791513093365497000,
+  "event": "tool_call",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 358,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 101,
+  "captured_at_ns": 1791513093387818000,
+  "event": "tool_result",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 30420,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 102,
+  "captured_at_ns": 1791513093388692000,
+  "event": "message_end",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 30402,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 103,
+  "captured_at_ns": 1791513094185621000,
+  "event": "session_shutdown",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 104,
+  "captured_at_ns": 1791513094185629000,
+  "event": "message_end",
+  "session_id": "01a11e7d-250f-7ef0-9b80-a4ef65e5ff62",
+  "raw_bytes": 766,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 105,
+  "captured_at_ns": 1791513096548032000,
+  "event": "session_start",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 106,
+  "captured_at_ns": 1791513096548213000,
+  "event": "input",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 214,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 107,
+  "captured_at_ns": 1791513096548269000,
+  "event": "message_end",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 277,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 108,
+  "captured_at_ns": 1791513098236132000,
+  "event": "message_end",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 813,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 109,
+  "captured_at_ns": 1791513098239090000,
+  "event": "tool_call",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 312,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 110,
+  "captured_at_ns": 1791513098241949000,
+  "event": "tool_result",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 372,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 111,
+  "captured_at_ns": 1791513098242287000,
+  "event": "message_end",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 400,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 112,
+  "captured_at_ns": 1791513099301042000,
+  "event": "session_shutdown",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 113,
+  "captured_at_ns": 1791513099301049000,
+  "event": "message_end",
+  "session_id": "01a11e80-712a-7ad9-8e06-439ede4bac3f",
+  "raw_bytes": 764,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 114,
+  "captured_at_ns": 1791513108887363000,
+  "event": "session_start",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 115,
+  "captured_at_ns": 1791513108887539000,
+  "event": "input",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 252,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 116,
+  "captured_at_ns": 1791513108887561000,
+  "event": "message_end",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 315,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 117,
+  "captured_at_ns": 1791513111046179000,
+  "event": "message_end",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 2495,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 118,
+  "captured_at_ns": 1791513111047319000,
+  "event": "tool_call",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 358,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 119,
+  "captured_at_ns": 1791513111068620000,
+  "event": "tool_result",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 30420,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 120,
+  "captured_at_ns": 1791513111068709000,
+  "event": "message_end",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 30402,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 121,
+  "captured_at_ns": 1791513111908049000,
+  "event": "message_end",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 766,
+  "raw_trailing_newline": false
+ },
+ {
+  "line": 122,
+  "captured_at_ns": 1791513111908051000,
+  "event": "session_shutdown",
+  "session_id": "01a11e80-a160-7433-8120-b6dfd04c2134",
+  "raw_bytes": 180,
+  "raw_trailing_newline": false
+ }
+]

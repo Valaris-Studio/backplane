@@ -1,0 +1,23 @@
+{
+  "model": "ContentUploadState",
+  "http": {
+    "method": "GET",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+    "status": 200
+  },
+  "body": {
+    "content_id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+    "state": "pending",
+    "coverage": "not_yet_uploaded",
+    "coverage_reason": "upload_pending",
+    "upload": {
+      "chunk_bytes": 4194304,
+      "chunk_count": 3,
+      "received_chunks": [
+        0,
+        2
+      ],
+      "expires_at": "2026-10-15T14:03:12Z"
+    }
+  }
+}

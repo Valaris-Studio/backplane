@@ -8,72 +8,18 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.config import settings
+from app.core.auth import current_api_key_id
 from app.core.workspace import enforce_agent_scope
 from app.database import async_session
 from app.exceptions import ForbiddenError
-from app.models.workspace import WorkspaceRole
+from app.services.events.authority import (  # noqa: F401 (re-exported)
+    PRIVILEGED_SUBSCRIPTION_PATTERNS,
+    partition_subscriptions,
+)
 from app.services.events.connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["events"])
-
-# Subscription patterns that expose the observer-grade firehose rather than the
-# board-sync slice. `*` is what the observer panel asks for; the three agentic
-# namespaces carry runner internals (executions, approvals, agent lifecycle)
-# that a workspace member has no view onto elsewhere in the UI.
-#
-# `card.*`/`column.*`/`activity.*` are deliberately ABSENT: useDomainSync drives
-# live kanban updates off them for every member, so gating them would trade a
-# cosmetic leak for a broken board.
-PRIVILEGED_SUBSCRIPTION_PATTERNS = frozenset(
-    {"*", "agent.*", "execution.*", "approval.*"}
-)
-
-_ROLE_RANK = {
-    WorkspaceRole.owner: 0,
-    WorkspaceRole.admin: 1,
-    WorkspaceRole.member: 2,
-    WorkspaceRole.viewer: 3,
-}
-
-
-def _may_observe(conn) -> bool:
-    """Whether this connection may subscribe to observer-grade patterns.
-
-    Agent connections are exempt from the human role hierarchy by design. An
-    agent API key resolves to its CREATING USER, whose workspace role is
-    incidental — a member-role human routinely owns a runner key — while the
-    runner subscribes to `agent.*`/`execution.*`/`approval.*` as its normal
-    control channel. Agents are bounded by `enforce_agent_scope` at connect
-    time instead, which is the boundary that actually describes them.
-    """
-    if conn.agent_id is not None:
-        return True
-    role = getattr(conn, "workspace_role", None)
-    if role is None:
-        return False
-    return _ROLE_RANK.get(role, 99) <= _ROLE_RANK[WorkspaceRole.admin]
-
-
-def partition_subscriptions(conn, patterns: list[str]) -> tuple[list[str], list[str]]:
-    """Split requested patterns into (allowed, denied), preserving order.
-
-    Denial is per-pattern rather than per-frame: the browser client sends every
-    registered pattern as one merged `{"subscribe": [...]}` list, so rejecting
-    the whole frame because it contains `*` would silently take board sync down
-    with the observer.
-    """
-    if _may_observe(conn):
-        return list(patterns), []
-
-    allowed: list[str] = []
-    denied: list[str] = []
-    for pattern in patterns:
-        (denied if pattern in PRIVILEGED_SUBSCRIPTION_PATTERNS else allowed).append(
-            pattern
-        )
-    return allowed, denied
-
 
 @router.websocket("/ws/workspaces/{slug}/events")
 async def workspace_events(websocket: WebSocket, slug: str):
@@ -89,7 +35,12 @@ async def workspace_events(websocket: WebSocket, slug: str):
 
     await websocket.accept()
     conn = await connection_manager.connect(
-        websocket, workspace.id, user.id, agent_id, workspace_role=workspace_role
+        websocket,
+        workspace.id,
+        user.id,
+        agent_id,
+        workspace_role=workspace_role,
+        api_key_id=current_api_key_id.get(),
     )
     logger.info(
         "WebSocket connected: user=%s workspace=%s agent=%s",
@@ -110,7 +61,13 @@ async def workspace_events(websocket: WebSocket, slug: str):
 
 
 async def _authenticate_ws(websocket: WebSocket):
-    """Authenticate WebSocket via query param token or headers."""
+    """Authenticate WebSocket via query param token or headers.
+
+    Returns `(user, agent_id)`, both None on failure. An API-key principal also
+    sets `current_api_key_id` (the key's id, never the raw bearer) so delivery
+    can re-check that the key still exists; cookie/IAP/dev principals leave it
+    None, as HTTP authentication does."""
+    current_api_key_id.set(None)
     async with async_session() as session:
         # Authorization header takes precedence over the query param — the
         # header never lands in proxy/access logs, unlike `?token=vlr_...`
@@ -123,6 +80,10 @@ async def _authenticate_ws(websocket: WebSocket):
         if not token:
             token = websocket.query_params.get("token", "")
 
+        from app.core.auth import companion_bearer_present
+
+        if companion_bearer_present(auth_header) or token.startswith("bpc_"):
+            return None, None
         if token.startswith("vlr_"):
             from app.models.agents.agent import Agent
             from app.services.api_key import ApiKeyService
@@ -132,7 +93,12 @@ async def _authenticate_ws(websocket: WebSocket):
                 api_key = await service.verify_key(token)
                 if not api_key:
                     return None, None
-                await service.touch(api_key)
+                stamp = await service.touch(api_key)
+                if stamp is not None:
+                    # The handshake session holds nothing else; commit the stamp
+                    # on it rather than on a second pooled connection.
+                    await session.commit()
+                    await service.announce(stamp)
 
                 from app.repositories.user import UserRepository
 
@@ -143,14 +109,17 @@ async def _authenticate_ws(websocket: WebSocket):
                 # Check for linked agent
                 from sqlalchemy import select
 
+                # As in HTTP auth: bind the agent whatever its state, and deny
+                # a deactivated one. Filtering on is_active here would let its
+                # key connect as its creator, with the creator's private events.
                 result = await session.execute(
-                    select(Agent).where(
-                        Agent.api_key_id == api_key.id,
-                        Agent.is_active.is_(True),
-                    )
+                    select(Agent).where(Agent.api_key_id == api_key.id)
                 )
                 agent = result.scalar_one_or_none()
+                if agent is not None and not agent.is_active:
+                    return None, None
                 agent_id = agent.id if agent else None
+                current_api_key_id.set(api_key.id)
                 return user, agent_id
             except Exception:
                 return None, None
@@ -158,19 +127,15 @@ async def _authenticate_ws(websocket: WebSocket):
         # Header-based auth (IAP or dev mode)
         from app.core.auth import (
             email_domain_allowed,
-            forwarded_for_is_trusted,
             log_auth_rejected,
             normalize_email,
             proxy_secret_valid,
+            resolve_client_ip,
             session_user_id,
         )
         from app.exceptions import ForbiddenError
 
-        client = getattr(websocket, "client", None)
-        client_ip = client.host if client else "unknown"
-        if forwarded_for_is_trusted(websocket.headers.get):
-            forwarded = websocket.headers.get("x-forwarded-for", "")
-            client_ip = forwarded.split(",")[0].strip() or client_ip
+        client_ip = resolve_client_ip(websocket)
 
         # OIDC session cookie — browsers send cookies on the WS handshake, so
         # this needs no query-param token (which would leak into access logs).
@@ -273,9 +238,10 @@ async def _authenticate_ws(websocket: WebSocket):
 async def _resolve_workspace(slug: str, user, agent_id=None):
     """Resolve the workspace, verify membership, and hold an agent to its scope.
 
-    Returns `(workspace, role)`. The role rides along because subscription
-    authorization needs it on every frame, and re-reading the membership per
-    frame would put a database round-trip in the hot path of a chatty socket.
+    Returns `(workspace, role)`. The role is only the handshake-time value:
+    subscription admission and every delivered event re-read current authority
+    through services.events.authority (bounded, one short session each), so a
+    later demotion, promotion or revocation is never decided from this value.
 
     Returning None for a scoped-out agent rather than raising keeps the caller's
     single close path: this handler authenticates outside the HTTP dependency
@@ -325,6 +291,10 @@ async def _apply_subscribe_frame(
     would leave an earlier subscription silently in place.
     """
     manager = manager or connection_manager
+    # Admission feedback uses the CURRENT role, never one cached at connect
+    # or by the last delivery; a revoked principal is closed instead.
+    if not await manager.refresh_authority(conn):
+        return
     allowed, denied = partition_subscriptions(conn, patterns)
 
     await manager.update_subscriptions(conn, allowed)

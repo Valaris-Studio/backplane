@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-location"
+description = "Enables the app_location command without any pre-configured scope."
+commands.allow = ["app_location"]
+
+[[permission]]
+identifier = "deny-app-location"
+description = "Denies the app_location command without any pre-configured scope."
+commands.deny = ["app_location"]

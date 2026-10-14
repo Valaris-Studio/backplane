@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import forbid_agent_callers, get_current_user
+from app.core.auth import forbid_credential_management, get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyRead
@@ -21,7 +21,11 @@ async def get_me(user: User = Depends(get_current_user)):
     return user
 
 
-@router.get("/api-keys", response_model=list[ApiKeyRead])
+@router.get(
+    "/api-keys",
+    response_model=list[ApiKeyRead],
+    dependencies=[Depends(forbid_credential_management)],
+)
 async def list_api_keys(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -34,7 +38,7 @@ async def list_api_keys(
     "/api-keys",
     response_model=ApiKeyCreated,
     status_code=201,
-    dependencies=[Depends(forbid_agent_callers)],
+    dependencies=[Depends(forbid_credential_management)],
 )
 async def create_api_key(
     data: ApiKeyCreate,
@@ -53,7 +57,7 @@ async def create_api_key(
 @router.delete(
     "/api-keys/{key_id}",
     status_code=204,
-    dependencies=[Depends(forbid_agent_callers)],
+    dependencies=[Depends(forbid_credential_management)],
 )
 async def delete_api_key(
     key_id: uuid.UUID,

@@ -1,0 +1,274 @@
+{
+  "surface": "codex_desktop",
+  "evidence_status": "app-server protocol, not Desktop GUI",
+  "agent": {
+    "name": "Codex Desktop (ChatGPT.app 26.930.31730, bundle id com.openai.codex)",
+    "app_server": "bundled codex-cli 0.160.0 at Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+    "originator": "Codex Desktop",
+    "client_info": {
+      "name": "codex_desktop",
+      "title": "Codex Desktop"
+    },
+    "otlp_service_name": "codex-app-server"
+  },
+  "os": "macOS 14.4 (23E214) arm64",
+  "captured_on": "2026-10-09",
+  "produced": "live-captured-then-sanitized",
+  "session": {
+    "how": "The installed Desktop bundle's own app-server binary launched the way the bundle launches it (env CODEX_INTERNAL_ORIGINATOR_OVERRIDE=\"Codex Desktop\", LOG_FORMAT=json, -c features.code_mode_host=true, then app-server over stdio) and driven over JSON-RPC with Desktop's clientInfo, in a disposable CODEX_HOME with auth.json copied and otel exporters pointed at a local sink. The running Desktop GUI and its data were not touched.",
+    "launch_recipe_source": "ChatGPT.app Contents/Resources/app.asar: spawn env CODEX_INTERNAL_ORIGINATOR_OVERRIDE defaults to `Codex Desktop`; initialize clientInfo {name: codex_desktop, title: Codex Desktop}; running GUI process: codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins...",
+    "turns": [
+      {
+        "turn_id": "01a11e78-5a41-7123-8044-d4fccd07a577",
+        "what": "localImage + 1.2 MB command + apply_patch add, effort medium, summary detailed",
+        "rollout_lines": "2-29"
+      },
+      {
+        "turn_id": "01a11e78-7d07-70c3-bfe6-92cf1f73eca9",
+        "what": "two escalated commands: first approval accepted, second declined",
+        "rollout_lines": "30-55"
+      },
+      {
+        "turn_id": "01a11e78-9a13-7423-9caa-8f571a6b3251",
+        "what": "turn/interrupt 3 s into a running command",
+        "rollout_lines": "56-69 and 121 (late item)"
+      },
+      {
+        "turn_id": "01a11e78-b30a-7dc0-8196-24511f2360ab",
+        "what": "thread/compact/start",
+        "rollout_lines": "70-76"
+      },
+      {
+        "turn_id": "01a11e78-bc94-74e0-91c9-61576ad94235",
+        "what": "first turn after compaction",
+        "rollout_lines": "77-90"
+      },
+      {
+        "turn_id": "01a11e78-c368-7d33-8b40-c0aaaaac5f78",
+        "what": "spawn_agent + wait_agent subagent",
+        "rollout_lines": "91-120",
+        "child": "rollout-subagent.jsonl"
+      },
+      {
+        "turn_id": "01a11e78-e44f-7322-a41e-f7b4a877a6ae",
+        "what": "thread/fork then a turn on the fork (the fork's turn was reported interrupted after 885 ms; cause not determined)",
+        "file": "rollout-fork.jsonl"
+      }
+    ]
+  },
+  "not_proven": [
+    "Anything the GUI adds or changes: GUI attachments (drag-dropped files, pasted images, thread/attachment/* methods), GUI-only items, the plugin set and -c plugin flags the GUI passes",
+    "Whether the GUI's app-server exports traces with the managed config.toml block (this protocol run exported 5532 spans as codex-app-server)",
+    "Hooks under Desktop: hooks.json needs persisted trust; the -c bypass_hook_trust override is ignored by app-server 0.160 (stderr: `bypass_hook_trust` is ignored), so no Desktop hook payload was captured",
+    "The GUI's real rollout rotation, archive and delete behaviour",
+    "Rollouts written by a Desktop on other versions than 0.160.0",
+    "hooks under Desktop (trust cannot be bypassed in app-server 0.160)"
+  ],
+  "sanitization": {
+    "paths": {
+      "CODEX_HOME (and its /private spelling)": "/home/fixture/.codex",
+      "scratch repo": "/tmp/fixture-desktop-repo (native /tmp vs /private/tmp spelling kept)",
+      "ChatGPT.app": "/Applications/Codex-Desktop.app"
+    },
+    "identities": "creator_user_id, creator_account_id, host name and emails re-mapped consistently; OTLP user.email, user.account_id, host.name attributes removed; the app-server remoteControl installationId -> 00000000-0000-4000-8000-0000000000d1",
+    "vendor_text": "Codex-authored bodies (base_instructions.text, developer-role input_text over 200 chars, world_state host_skills body) replaced by same-length filler keeping the first line",
+    "opaque": "encrypted reasoning and spawn_agent message payloads (gAAAAA...) replaced by same-length filler",
+    "kept": "record order, ordinal, timestamps, every id, record types, image data URL, the 1 MiB elided command output, unicode text",
+    "compression": "rollout-main.jsonl.gz and appserver-transcript.jsonl.gz are gzip of the JSONL (2560338 and 2256875 bytes uncompressed) so the corpus stays under 2 MiB without shrinking the 2173661-byte line; written deterministically (level 9, mtime 0, original member name)",
+    "account": "account fingerprints normalized without changing record shapes: rate_limits plan_type/planType -> plus, primary used_percent/usedPercent -> 0, credits balance -> 1000.0000000000, resets_at/resetsAt -> 1792108800; timezone (turn_context and <timezone> in environment context) -> UTC, current_date kept as captured; terminal.type and the user-agent terminal token -> xterm-256color",
+    "revised": "2026-10-13: installationId re-mapped and account normalization; files sizes and sha256 recomputed from the committed bytes"
+  },
+  "files": {
+    "rollout-main.jsonl.gz": {
+      "native": "$CODEX_HOME/sessions/2026/10/08/rollout-2026-10-08T22-22-46-<thread>.jsonl",
+      "lines": 121,
+      "bytes_uncompressed": 2560338,
+      "largest_line": 2173661,
+      "bytes": 232658,
+      "sha256": "09b1be1edb07a0c0d8965557760d2e9cf9358ec13d281b1fc805ddc5938ce88a",
+      "sha256_uncompressed": "e79c8fb1dad70f471832d8f9f3f4f56834d5d90a18c7b099c5b12ff434422aba"
+    },
+    "rollout-subagent.jsonl": {
+      "native": "separate rollout per subagent thread; session_meta.session_id is the parent's, id is the child's",
+      "lines": 22,
+      "bytes": 72011,
+      "sha256": "2294ccb9d9f0d9d9ed8cf46ae5f73b57153e3b5da3106bc30d55c5cf83bcd970",
+      "largest_line": 19213
+    },
+    "rollout-fork.jsonl": {
+      "native": "new rollout per fork; parent history referenced by session_meta.history_base and the ordinals continue from it",
+      "lines": 10,
+      "bytes": 25231,
+      "sha256": "ae4eb1cd19381d6f02c615eeed7f68892d55fe33928f1b53aab9ee4e71840c6b",
+      "largest_line": 19135
+    },
+    "appserver-transcript.jsonl.gz": {
+      "native": "every JSON-RPC message between the driver and the app-server, {t, dir, msg}; the live stream Desktop's GUI consumes",
+      "lines": 329,
+      "bytes": 106638,
+      "sha256": "3713f9cebc612831a7315e2645baced3137eaf4b65ec2f41c2b463b3036f8c7c",
+      "bytes_uncompressed": 2256875,
+      "sha256_uncompressed": "efd00ba6e56fc373c1fc0c4b022c8c5cad6582e38817188d129089148f9c8149",
+      "largest_line": 1074364
+    },
+    "otlp.jsonl": {
+      "native": "OTLP/HTTP JSON from the app-server, every log record kept, spans reduced as in codex-cli",
+      "lines": 31,
+      "bytes": 175810,
+      "sha256": "6d38691f7cdcfd4593eac6dc83d5b7953579b4ee16855a00b51ce66bac05c212",
+      "largest_line": 15341
+    },
+    "swatch.png": {
+      "native": "the attached local image (synthetic, 59188 bytes)",
+      "bytes": 59188,
+      "sha256": "fc506cc85d09f24b9350c756df4b7c857d5d1d4821e0d1cf24783e06e73cdea8"
+    }
+  },
+  "cases": {
+    "text_over_16KiB": "rollout-main.jsonl.gz:15",
+    "text_over_64KiB": "rollout-main.jsonl.gz:15",
+    "truncated_at_source": "rollout-main.jsonl.gz:15 (1200017 bytes of output kept as 1048606 with `... 151441 bytes omitted ...` in the middle, in both stdout and aggregated_output; formatted_output 40109)",
+    "unicode": "rollout-main.jsonl.gz:22 (notes.txt content desktop ✓ 完了)",
+    "streaming_revisions": "appserver-transcript.jsonl.gz: item/agentMessage/delta, item/reasoning/summaryTextDelta, item/started before item/completed; the rollout keeps completed items only",
+    "failed_then_fixed_tool_call": "not here; see codex-cli",
+    "edit": "rollout-main.jsonl.gz:20 (apply_patch in the code-mode script), :22 (FileChange type add with content)",
+    "turn_diff": "appserver-transcript.jsonl.gz turn/diff/updated (not in the rollout)",
+    "final_answer": "rollout-main.jsonl.gz:25-26, :29",
+    "attachment": "rollout-main.jsonl.gz:9 (input_image data URL 78942 chars) and :10 (UserMessage localImage path)",
+    "approval": "appserver-transcript.jsonl.gz item/commandExecution/requestApproval + response accept/decline; otlp.jsonl codex.tool_decision decision approved/denied source User; the rollout only shows the declined call's custom_tool_call_output `Script failed` (line 49)",
+    "interruption": "rollout-main.jsonl.gz:66 (custom_tool_call_output `aborted by user after 3.2s`), :68 (developer <turn_aborted> message), :69 (turn_aborted reason interrupted), :121 (the interrupted CommandExecution, exit -1, written after later turns)",
+    "compaction": "rollout-main.jsonl.gz:72 (compacted: replacement_history re-copies retained user messages under their original ids, including the image), :75 (ContextCompaction item)",
+    "pause_resume": "see codex-cli (resume appends to the same file)",
+    "child_sessions": "rollout-main.jsonl.gz:100-115 (spawn_agent, SubAgentActivity started/completed, wait_agent, inter-agent agent_message) and rollout-subagent.jsonl; fork in rollout-fork.jsonl",
+    "reasoning": "rollout-main.jsonl.gz:18-19 (summary_text `**Applying exact patch**` + encrypted_content)",
+    "source_overlap": "item_completed vs response_item in the rollout; item/completed in the app-server stream carries the same item ids"
+  },
+  "expected_coverage": {
+    "prompt": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "attachment_image": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured (data URL in the rollout; GUI attachment paths not proven)"
+    },
+    "reply": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "reasoning_summary": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "reasoning_raw": {
+      "as": "content",
+      "expected_state": "source_unavailable",
+      "reason": "encrypted_at_source",
+      "note": "source_unavailable (encrypted_content only)"
+    },
+    "command": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "interrupted command written turns later (exit_code -1, empty output); grouped by turn_id, parent_call_id null",
+          "as": "content",
+          "expected_state": "captured",
+          "reason": null
+        }
+      ],
+      "note": "captured (late item, exit_code -1, empty output)"
+    },
+    "command_output": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "Codex stored the output cut at 1 MiB (head + '... N bytes omitted ...' + tail)",
+          "as": "content",
+          "expected_state": "truncated",
+          "reason": "source_limit"
+        }
+      ],
+      "note": "truncated (by Codex at source)"
+    },
+    "approval": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "source_unavailable in the rollout"
+    },
+    "turn_diff": {
+      "as": "absent",
+      "expected_state": null,
+      "reason": "source_not_supported",
+      "note": "source_unavailable in the rollout"
+    },
+    "compaction_summary": {
+      "as": "content",
+      "expected_state": "source_unavailable",
+      "reason": "encrypted_at_source",
+      "parts": [
+        {
+          "when": "compacted.replacement_history entries (copies under original ids)",
+          "as": "absent",
+          "expected_state": null,
+          "reason": null
+        }
+      ],
+      "note": "source_unavailable (compacted.message empty; the summary is an encrypted compaction item)"
+    },
+    "subagent": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured (separate rollout file)"
+    },
+    "usage": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured (token_usage_record per response; child records carry the child thread_id)"
+    },
+    "native_records": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null
+    },
+    "correction": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "no follow-up correction prompt in the Desktop fixtures; the CLI's evidence does not qualify Desktop"
+    },
+    "mcp_call": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "no MCP call in the Desktop fixtures; the CLI's evidence does not qualify Desktop"
+    },
+    "error": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "no MCP error in the Desktop fixtures (its failures are a declined escalation, rollout-main.jsonl.gz:47-49, and an interrupted command, :64-69, :121); the CLI's evidence does not qualify Desktop"
+    },
+    "file_edit": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured (FileChange add with content, rollout-main.jsonl.gz:22); an update diff and a path outside the mapped root are not in the Desktop fixtures"
+    }
+  },
+  "coverage_vocabulary": "contracts/rich-capture contract §8-§9 (as = content | event | absent | not_exercised); one core with codex-cli: rows here override codex-cli's, missing rows are codex-cli's"
+}

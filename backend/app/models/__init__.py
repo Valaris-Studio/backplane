@@ -1,8 +1,24 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from app.models.agent_session import (
+    AgentSession,
+    AgentSessionCapture,
+    AgentSessionCaptureGeneration,
+    AgentSessionContent,
+    AgentSessionContentDeletion,
+    AgentSessionEvent,
+    AgentSessionInvocation,
+    AgentSessionTombstone,
+    AgentSessionUsage,
+    SessionWorkLink,
+)
+from app.models.companion import CompanionInstallation, CompanionProjectMapping
+from app.models.companion_pairing import CompanionPairing, CompanionPairingLookupFailure
+from app.models.mcp_invocation import MCPConsultation, MCPInvocation
 from app.models.activity import Activity, ActivityAction, ActivityEntityType
 from app.models.agents.agent import Agent, AgentType
+from app.models.agents.context_receipt import ExecutionContextBinding, ExecutionContextReceipt
 from app.models.agents.execution import AgentExecution, ExecutionStatus
 from app.models.agents.prompt_config import AgentPromptConfig
 from app.models.agents.tool_invocation import ToolInvocation
@@ -20,7 +36,7 @@ from app.models.definitions import Definition
 from app.models.git import GitConnection, GitProvider, GitRepo
 from app.models.kanban import BoardLoopTransition, Board, Card, CardParticipant, CardType, Column, ParticipantRole, Priority
 from app.models.kanban.completion import CompletionCandidate, CompletionAttempt
-from app.models.notes import Note
+from app.models.notes import Note, NoteSaveReceipt
 from app.models.notifications import Notification, NotificationPreference
 from app.models.resources import Resource, ResourceType
 from app.models.skills.skill import BoardSkill, Skill, SkillAuditEvent, SkillVersion, SkillVersionStatus
@@ -30,12 +46,31 @@ from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.models.workspace_config import WorkspaceConfig
 
 __all__ = [
+    "TimelineGeneration", "TimelineCheckpoint", "TimelinePreparation",
+    "AgentSession",
+    "AgentSessionCapture",
+    "AgentSessionCaptureGeneration",
+    "AgentSessionContent",
+    "AgentSessionContentDeletion",
+    "AgentSessionEvent",
+    "AgentSessionInvocation",
+    "AgentSessionTombstone",
+    "AgentSessionUsage",
+    "SessionWorkLink",
+    "CompanionInstallation",
+    "CompanionPairing",
+    "CompanionPairingLookupFailure",
+    "CompanionProjectMapping",
+    "MCPInvocation",
+    "MCPConsultation",
     "Agent",
     "AgentType",
     "AgentExecution",
     "ExecutionStatus",
     "AgentPromptConfig",
     "ToolInvocation",
+    "ExecutionContextBinding",
+    "ExecutionContextReceipt",
     "AgentTeam",
     "AgentTeamMember",
     "ApprovalRequest",
@@ -61,6 +96,7 @@ __all__ = [
     "ActivityAction",
     "ActivityEntityType",
     "Note",
+    "NoteSaveReceipt",
     "Notification",
     "NotificationPreference",
     "Resource",
@@ -83,3 +119,5 @@ __all__ = [
     "WebhookEvent",
     "WorkspaceConfig",
 ]
+
+from app.models.timeline import TimelineGeneration, TimelineCheckpoint, TimelinePreparation

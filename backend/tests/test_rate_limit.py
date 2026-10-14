@@ -111,18 +111,18 @@ async def test_rate_limit_ignores_spoofed_email_in_untrusted_prod(
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_trusts_email_when_iap_configured(
+async def test_rate_limit_ignores_unverified_email_when_iap_configured(
     rate_limited_app, test_user, monkeypatch
 ):
-    """With IAP_AUDIENCE set, IAP verifies the header upstream — trust it for
-    the authenticated tier."""
+    """IAP_AUDIENCE alone proves nothing: run.app is reachable without IAP, so
+    the authed tier needs a verified IAP JWT (tests/core/test_rate_limit_iap_identity.py)."""
     monkeypatch.setattr(rate_limit_module.settings, "ENV", "production")
     monkeypatch.setattr(rate_limit_module.settings, "IAP_AUDIENCE", "some-audience")
 
     transport = ASGITransport(app=rate_limited_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         resp = await ac.get("/api/health", headers={"X-User-Email": "a@valaris.dev"})
-        assert int(resp.headers["x-ratelimit-limit"]) == 300
+        assert int(resp.headers["x-ratelimit-limit"]) == 60
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,7 @@ import {
 } from "@tiptap/extension-table";
 import { StarterKit } from "@tiptap/starter-kit";
 
+import { Checklist, ChecklistItem } from "@/extensions/checklist";
 import { FileAttachment } from "@/extensions/file-attachment";
 import { Mention } from "@/components/shared/editor/mention-extension";
 import { attachmentMarkdown, imageMarkdown } from "@/lib/media-markdown";
@@ -23,9 +24,10 @@ import { attachmentMarkdown, imageMarkdown } from "@/lib/media-markdown";
 // lists: those carry node views, suggestion plugins and placeholders that a
 // headless MarkdownManager neither needs nor can construct.
 //
-// Six extensions carry a `renderMarkdown` override: heading, codeBlock, table
-// and image because upstream's built-in emission diverges from the shared
-// parity corpus (backend/tests/services/notes/fixtures/pm_markdown_corpus.json),
+// Eight extensions carry a `renderMarkdown` override: heading, codeBlock,
+// blockquote, table, image and taskItem because upstream's built-in emission
+// diverges from the shared parity corpus
+// (backend/tests/services/notes/fixtures/pm_markdown_corpus.json),
 // mention and fileAttachment because upstream renders an unrecognised atom as
 // the empty string. That corpus is the contract the backend serializer must
 // match byte-for-byte.
@@ -73,18 +75,58 @@ const ClampedHeading = renderOverride("heading", (node, helpers) => {
   return `${"#".repeat(level)} ${helpers.renderChildren(node.content ?? [])}`;
 });
 
+const MIN_FENCE_LENGTH = 3;
+// A backtick in a backtick fence's info string invalidates the fence, and a
+// line break ends it early — either lets a language attr forge markdown.
+// eslint-disable-next-line no-control-regex
+const FENCE_INFO_BREAKOUT = /[`\x00-\x1f\x7f]/;
+
+/** A backtick fence no line of `code` can close: longer than its longest run. */
+function codeFenceFor(code: string): string {
+  // A reduce, not Math.max(...runs): spreading one argument per run overflows
+  // the call stack on large captured bodies.
+  const longestRun = (code.match(/`+/g) ?? []).reduce(
+    (longest, run) => Math.max(longest, run.length),
+    0,
+  );
+  return "`".repeat(Math.max(MIN_FENCE_LENGTH, longestRun + 1));
+}
+
+function safeFenceInfo(language: unknown): string {
+  if (typeof language !== "string") return "";
+  const trimmed = language.replace(/^ +| +$/g, "");
+  return FENCE_INFO_BREAKOUT.test(trimmed) ? "" : trimmed;
+}
+
 /**
  * Code block: strip the ONE trailing newline markdown-it's fence content
- * carries, so no blank line precedes the closing fence. Named `codeBlock`, so
- * it also covers a mermaid diagram — which persists as an ordinary
- * ```mermaid fence (see MermaidCodeBlock) and needs no rule of its own.
+ * carries, so no blank line precedes the closing fence. The fence outgrows any
+ * backtick run in the body, so captured text stays one literal block. Named
+ * `codeBlock`, so it also covers a mermaid diagram — which persists as an
+ * ordinary ```mermaid fence (see MermaidCodeBlock) and needs no rule of its own.
  */
 const ExportableCodeBlock = renderOverride("codeBlock", (node) => {
-  const language = (node.attrs?.language as string) || "";
+  const language = safeFenceInfo(node.attrs?.language);
   let code = (node.content ?? []).map((child) => child.text ?? "").join("");
   if (code.endsWith("\n")) code = code.slice(0, -1);
-  return `\`\`\`${language}\n${code}\n\`\`\``;
+  const fence = codeFenceFor(code);
+  return `${fence}${language}\n${code}\n${fence}`;
 });
+
+/**
+ * Blockquote: only an empty line gets a bare `>` — upstream also collapses
+ * whitespace-only lines, which drops the whitespace of a quoted code line.
+ */
+const LiteralBlockquote = renderOverride("blockquote", (node, helpers) =>
+  (node.content ?? [])
+    .map((child, index) =>
+      (helpers.renderChild?.(child, index) ?? helpers.renderChildren([child]))
+        .split("\n")
+        .map((line) => (line === "" ? ">" : `> ${line}`))
+        .join("\n"),
+    )
+    .join("\n>\n"),
+);
 
 /** GFM cells are single-line: blocks join with a space and a literal '|' must be escaped. */
 function renderTableCell(
@@ -146,11 +188,41 @@ const ExportableImage = renderOverride("image", (node) =>
   imageMarkdown(node.attrs ?? {}),
 );
 
+const NESTED_LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
+// Continuation lines indent to the `- ` bullet, not past the box: four or more
+// spaces beyond it would turn a nested list into paragraph text on re-parse.
+const TASK_ITEM_INDENT = "  ";
+
+/**
+ * Task item: `- [ ]`/`- [x]` with nested blocks indented by the bullet width
+ * (upstream indents by the whole prefix). An item whose lead paragraph was
+ * dropped as empty keeps an empty first line, so its sub-list is not hoisted
+ * onto the box's line — the backend's `_serialize_task_item`, line for line.
+ */
+const ExportableChecklistItem = ChecklistItem.extend({
+  renderMarkdown(node: JSONContent, helpers: MarkdownRendererHelpers) {
+    const box = node.attrs?.checked === true ? "- [x]" : "- [ ]";
+    const blocks = node.content ?? [];
+    const lead = blocks[0]?.type === "paragraph" ? blocks[0] : undefined;
+    const rest = lead ? blocks.slice(1) : blocks;
+    let body = lead ? helpers.renderChildren([lead]) : "";
+    let previousType = "paragraph";
+    for (const block of rest) {
+      const tight = NESTED_LIST_TYPES.has(block.type ?? "") && previousType === "paragraph";
+      body += (tight ? "\n" : "\n\n") + helpers.renderChildren([block]);
+      previousType = block.type ?? "";
+    }
+    const [first = "", ...continuation] = body.split("\n");
+    return [first ? `${box} ${first}` : box, ...continuation.map((line) => `${TASK_ITEM_INDENT}${line}`)].join("\n");
+  },
+});
+
 // Array order is NOT what resolves the overrides — OVERRIDE_PRIORITY is (see
 // above). They are listed first only so the file reads in precedence order.
 export const MARKDOWN_EXPORT_EXTENSIONS = [
   ClampedHeading,
   ExportableCodeBlock,
+  LiteralBlockquote,
   CompactTable,
   ExportableImage,
   StarterKit,
@@ -162,4 +234,6 @@ export const MARKDOWN_EXPORT_EXTENSIONS = [
   TableHeader,
   ExportableMention,
   ExportableFileAttachment,
+  Checklist,
+  ExportableChecklistItem,
 ];

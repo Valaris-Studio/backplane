@@ -7,6 +7,7 @@ import { MediaImage } from "@/extensions/media-image";
 import Link from "@tiptap/extension-link";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import { FileAttachment } from "@/extensions/file-attachment";
+import { Checklist, ChecklistItem } from "@/extensions/checklist";
 import { MermaidCodeBlock } from "@/extensions/mermaid-code-block";
 import { Mention } from "@/components/shared/editor/mention-extension";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ export function RichTextRenderer({ content, className }: RichTextRendererProps) 
       TableRow,
       TableCell,
       TableHeader,
+      // Boxes render disabled here (see ChecklistItem's node view): viewers
+      // see the state, only an editor can change it.
+      Checklist,
+      ChecklistItem,
       // Display-only: renders mention chips identically; no buildRenderer ⇒ no
       // suggestion plugin (read-only view never opens the picker).
       Mention,

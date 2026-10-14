@@ -124,6 +124,18 @@
   "activity.channel.updated": {
     "params": { "channel_name": "string", "fields": "string_array" }
   },
+  "activity.companion.mapping_created": {
+    "params": {}
+  },
+  "activity.companion.mapping_deleted": {
+    "params": {}
+  },
+  "activity.companion.mapping_updated": {
+    "params": {}
+  },
+  "activity.companion.settings_updated": {
+    "params": {}
+  },
   "activity.column.created": {
     "params": { "column_name": "string" }
   },

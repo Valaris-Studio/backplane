@@ -116,3 +116,62 @@ export interface CardAnalytics {
   // over time. Sorted by ms DESC, then key for determinism.
   holders: CardHolder[];
 }
+
+export interface HistoryCoverage {
+  quality: "reconstructed" | "partial";
+  unknown_origin: boolean;
+  missing_structural_snapshots: string;
+  reasons: Array<"unknown_origin" | "missing_structural_snapshot" | "conflicting_snapshot">;
+}
+export interface HistoryAnchor {
+  through_seq: string | null;
+  state: BoardBaseline;
+  coverage: HistoryCoverage;
+}
+export interface HistoryGeneration {
+  id: string;
+  board_id: string;
+  created_at: string;
+  expires_at: string;
+  first_seq: string | null;
+  head_seq: string | null;
+  event_count: string;
+}
+export interface HistoryOverview {
+  generation_id: string;
+  first_seq: string | null;
+  head_seq: string | null;
+  first_at: string | null;
+  last_at: string | null;
+  event_count: string;
+  buckets: Array<{ start_at: string; end_at: string; count: string; first_seq: string | null; last_seq: string | null }>;
+}
+export interface HistoryWindow {
+  status: "ready";
+  generation_id: string;
+  anchor: HistoryAnchor;
+  events: Array<TimelineEvent & { seq: string }>;
+  window: { first_seq: string | null; last_seq: string | null; previous_cursor: string | null; next_cursor: string | null };
+  coverage: HistoryCoverage;
+}
+export interface HistoryPreparation {
+  status: "preparing" | "failed";
+  generation_id: string;
+  preparation_id: string;
+  progress: { through_seq: string | null; target_seq: string | null; processed_events: string };
+  retryable: boolean;
+  error: { code: string; message: string } | null;
+}
+export type HistorySelector = { at_seq: string } | { at_time: string } | { cursor: string } | Record<string, never>;
+export interface HistorySearchPage {
+  generation_id: string;
+  scope: "generation";
+  matches: Array<{ id: string; seq: string; created_at: string; summary: string }>;
+  next_cursor: string | null;
+}
+export interface HistoryLiveHead {
+  generation_id: string;
+  observed_at: string;
+  head_seq: string | null;
+  state: BoardBaseline;
+}

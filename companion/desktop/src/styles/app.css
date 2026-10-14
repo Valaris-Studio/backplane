@@ -1,0 +1,108 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./components.css";
+
+/*
+ * tokens.css is DK-0's production token set, copied verbatim; its variables
+ * already use Tailwind's namespaces. Tailwind's defaults are cleared so only
+ * design tokens exist, and each is registered `inline reference`: utilities
+ * resolve to var(--token) and Tailwind never re-declares (and so never
+ * shadows) the values tokens.css owns.
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+}
+
+@theme inline reference {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-popover: var(--color-popover);
+  --color-popover-foreground: var(--color-popover-foreground);
+  --color-card: var(--color-card);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-border: var(--color-border);
+  --color-ring: var(--color-ring);
+  --color-surface-1: var(--color-surface-1);
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-3: var(--color-surface-3);
+  --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+  --color-error: var(--color-error);
+  --color-error-foreground: var(--color-error-foreground);
+  --color-hairline: var(--color-hairline);
+  --color-row-hover: var(--color-row-hover);
+  --color-row-press: var(--color-row-press);
+  --color-material-popover: var(--material-popover);
+  --color-agent-claude: var(--color-agent-claude);
+  --color-agent-codex: var(--color-agent-codex);
+  --color-agent-pi: var(--color-agent-pi);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --text-caption: var(--text-caption);
+  --text-caption--line-height: var(--leading-caption);
+  --text-footnote: var(--text-footnote);
+  --text-footnote--line-height: var(--leading-footnote);
+  --text-body: var(--text-body);
+  --text-body--line-height: var(--leading-body);
+  --text-title: var(--text-title);
+  --text-title--line-height: var(--leading-title);
+
+  --radius-chip: var(--radius-chip);
+  --radius-control: var(--radius-control);
+  --radius-sheet: var(--radius-sheet);
+  --radius-window: var(--radius-window);
+
+  --shadow-control: var(--shadow-control);
+  --shadow-popover: var(--shadow-popover);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* The window is transparent over the native vibrancy view; only the root
+   paints, with the translucent --material-popover tint. */
+html,
+body {
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  color: var(--color-popover-foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-primary) 30%, transparent);
+}

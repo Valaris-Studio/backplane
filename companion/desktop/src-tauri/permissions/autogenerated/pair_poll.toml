@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pair-poll"
+description = "Enables the pair_poll command without any pre-configured scope."
+commands.allow = ["pair_poll"]
+
+[[permission]]
+identifier = "deny-pair-poll"
+description = "Denies the pair_poll command without any pre-configured scope."
+commands.deny = ["pair_poll"]

@@ -175,6 +175,7 @@ class BoardService:
             summary=f"created board '{data.name}'",
             message_key="activity.board.created",
             message_params={"board_name": data.name},
+            changes={"timeline_genesis": {"version": 1, "known_empty": True}},
             after_state=_snapshot_board(board),
         )
         return board

@@ -1,0 +1,33 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "user",
+    "channel": "instruction",
+    "source": {
+      "kind": "codex_rollout",
+      "parser": "companion-codex-rollout/1",
+      "schema_version": "codex-rollout/0.161",
+      "native_ref": "msg_01a11e74-9b10-7d3e-8c2f-1a2b3c4d5e6f",
+      "order": 6
+    },
+    "occurred_at": "2026-10-09T02:18:50.912Z",
+    "observed_at": "2026-10-09T02:18:52Z",
+    "media_type": "text/markdown",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "coverage": "captured",
+    "delivery": "inline",
+    "byte_count": 75,
+    "sha256": "b8bff09d9bcf4f1241749ca01a832d1e4a5d4b52b08348b0c19d7cf308b59cd3",
+    "inline_text": "# AGENTS.md instructions for fixture-repo\n\nRun the tests before committing.",
+    "content_key": "7d102b169384de035763b07a085a607c969dc2aa23625e7988cfdc08e56dc6d1",
+    "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983"
+  }
+}

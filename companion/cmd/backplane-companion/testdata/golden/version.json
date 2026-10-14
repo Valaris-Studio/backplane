@@ -1,0 +1,21 @@
+{
+  "version": "dev",
+  "commit": "",
+  "beacon_commit": "b17031414618cf86f7aad2b485935e548e8a8e63",
+  "go_version": "<GO>",
+  "platform": "testos/testarch",
+  "artifacts": {
+    "beacon_hooks": {
+      "manifest": "<BIN>/beacon/artifact.json",
+      "verified": false,
+      "error": "beacon_artifact_unverified",
+      "reason": "cannot read manifest"
+    },
+    "beacon_otelcol": {
+      "manifest": "<BIN>/beacon/otelcol.json",
+      "verified": false,
+      "error": "beacon_artifact_unverified",
+      "reason": "cannot read manifest"
+    }
+  }
+}

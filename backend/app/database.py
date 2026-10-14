@@ -27,7 +27,8 @@ def build_engine(url: str) -> AsyncEngine:
     These kwargs are invalid for sqlite+aiosqlite (StaticPool, used by tests and
     local dev), so they're applied only for postgresql URLs.
     """
-    kwargs = {"echo": settings.is_development}
+    # Captured session content and credentials must not enter SQL diagnostics.
+    kwargs = {"echo": settings.is_development, "hide_parameters": True}
     if url.startswith("postgresql"):
         kwargs.update(
             pool_size=3,

@@ -117,6 +117,12 @@ def create_app() -> FastAPI:
         # Schema is public in every env so self-hosters can generate clients;
         # only the interactive docs UI stays dev-only.
         openapi_url="/api/openapi.json",
+        # Off, `/boards/` is the unknown-route 404. On, Starlette 307'd every
+        # slashed path to its canonical form BEFORE auth ran — a route-existence
+        # oracle across the whole API. No route is declared with a trailing
+        # slash and no first-party client (frontend, MCP, runner, companion)
+        # sends one, so nothing relies on the redirect.
+        redirect_slashes=False,
     )
 
     # Compress large JSON (board detail, activity timeline — multi-MB raw,
@@ -148,6 +154,13 @@ def create_app() -> FastAPI:
     )
 
     application.add_middleware(SecurityHeadersMiddleware)
+    from app.core.mcp_invocation import MCPInvocationContextMiddleware
+
+    application.add_middleware(MCPInvocationContextMiddleware)
+    from app.core.forwarded_proto import ForwardedProtoMiddleware
+
+    # Outermost, so every layer and route sees the edge's scheme.
+    application.add_middleware(ForwardedProtoMiddleware)
 
     @application.exception_handler(ValarisError)
     async def valaris_error_handler(_request: Request, exc: ValarisError):
@@ -205,6 +218,7 @@ def create_app() -> FastAPI:
     from app.routers import product_documentation
     from app.routers import (
         activity,
+        timeline,
         health,
         loop_templates as loop_templates_router,
         me,
@@ -217,6 +231,7 @@ def create_app() -> FastAPI:
     from app.routers.agents import (
         agents as agents_router,
         assignments as assignments_router,
+        execution_context as execution_context_router,
         executions as executions_router,
         prompt_configs as prompt_configs_router,
         teams as teams_router,
@@ -256,6 +271,25 @@ def create_app() -> FastAPI:
     from app.routers import workspace_config as workspace_config_router
     from app.routers import config as config_router
 
+    from app.routers import agent_session, companion, mcp_invocation, session_content
+
+    # Unmounted, not just refused: a mounted route answers a wrong method with
+    # 405 (and is listed in /api/openapi.json) before any dependency runs, which
+    # confirms the feature exists. COMPANION_ENABLED is deploy-time env, read
+    # once here; require_companion_enabled still guards a runtime flip.
+    if settings.COMPANION_ENABLED:
+        from app.routers import companion_pairing
+
+        application.include_router(agent_session.router)
+        application.include_router(agent_session.card_router)
+        application.include_router(agent_session.note_router)
+        application.include_router(session_content.router)
+        application.include_router(companion.router)
+        application.include_router(companion.device_router)
+        application.include_router(companion_pairing.router)
+        application.include_router(companion_pairing.device_router)
+
+    application.include_router(mcp_invocation.router)
     application.include_router(health.router)
     application.include_router(product_documentation.router)
     application.include_router(oidc_auth_router.router)
@@ -268,6 +302,7 @@ def create_app() -> FastAPI:
     application.include_router(assignments_router.router)
     application.include_router(executions_router.router)
     application.include_router(workspace_executions.router)
+    application.include_router(execution_context_router.router)
     application.include_router(teams_router.router)
     application.include_router(prompt_configs_router.router)
     application.include_router(approvals_router.router)
@@ -283,6 +318,7 @@ def create_app() -> FastAPI:
     application.include_router(board_dependencies.router)
     application.include_router(board_health.router)
     application.include_router(activity.router)
+    application.include_router(timeline.router)
     application.include_router(board_resources.router)
     application.include_router(workspace_resources.router)
     application.include_router(workspace_skills_router.router)
@@ -416,6 +452,45 @@ def create_app() -> FastAPI:
                 logger.exception("merged-PR reconciler pass failed")
             await asyncio.sleep(RECONCILER_TICK_SECONDS)
 
+    # Captured-session retention: deletes sessions past their device's
+    # retention_days (with tombstones). Each batch owns its transaction; a
+    # pass on several replicas is harmless (SKIP LOCKED, idempotent deletes).
+    from app.services.session_retention import SessionRetentionService
+
+    session_retention = SessionRetentionService(async_session)
+    session_retention_task: list = []
+    SESSION_RETENTION_TICK_SECONDS = int(
+        os.environ.get("SESSION_RETENTION_TICK_SECONDS", "3600")
+    )
+
+    async def _session_retention_loop():
+        import asyncio
+
+        while True:
+            try:
+                await session_retention.run_purge()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logging.getLogger(__name__).exception("session retention pass failed")
+            await asyncio.sleep(SESSION_RETENTION_TICK_SECONDS)
+
+    from app.services.timeline import process_pending_timeline_preparations
+
+    timeline_preparation_tasks: list = []
+
+    async def _timeline_preparation_loop():
+        import asyncio
+
+        while True:
+            try:
+                await process_pending_timeline_preparations()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logging.getLogger(__name__).exception("timeline preparation pass failed")
+            await asyncio.sleep(1)
+
     @application.on_event("startup")
     async def startup_event_bus():
         import asyncio
@@ -431,9 +506,17 @@ def create_app() -> FastAPI:
         liveness_task.append(asyncio.create_task(_liveness_loop()))
         merge_queue_task.append(asyncio.create_task(_merge_queue_loop()))
         reconciler_task.append(asyncio.create_task(_reconciler_loop()))
+        session_retention_task.append(asyncio.create_task(_session_retention_loop()))
+        timeline_preparation_tasks.append(asyncio.create_task(_timeline_preparation_loop()))
 
     @application.on_event("shutdown")
     async def shutdown_event_bus():
+        import asyncio
+
+        for task in timeline_preparation_tasks:
+            task.cancel()
+        await asyncio.gather(*timeline_preparation_tasks, return_exceptions=True)
+        timeline_preparation_tasks.clear()
         webhook_subscriber.stop()
         reconciler.stop()
         for task in liveness_task:
@@ -441,6 +524,8 @@ def create_app() -> FastAPI:
         for task in merge_queue_task:
             task.cancel()
         for task in reconciler_task:
+            task.cancel()
+        for task in session_retention_task:
             task.cancel()
         for unsubscribe in restart_probe_unsubscribe:
             unsubscribe()

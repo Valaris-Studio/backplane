@@ -809,6 +809,283 @@
     "expected_markdown": "before\n\nafter"
   },
   {
+    "name": "task-list",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "taskList",
+          "content": [
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": false
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "write tests"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": true
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "ship it"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "- [ ] write tests\n- [x] ship it"
+  },
+  {
+    "name": "task-list-nested",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "taskList",
+          "content": [
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": false
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "parent"
+                    }
+                  ]
+                },
+                {
+                  "type": "taskList",
+                  "content": [
+                    {
+                      "type": "taskItem",
+                      "attrs": {
+                        "checked": true
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "child"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "taskItem",
+                      "attrs": {
+                        "checked": false
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "sibling"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": false
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "next"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "- [ ] parent\n  - [x] child\n  - [ ] sibling\n- [ ] next"
+  },
+  {
+    "name": "task-list-empty-item",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "taskList",
+          "content": [
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": false
+              },
+              "content": [
+                {
+                  "type": "paragraph"
+                }
+              ]
+            },
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": true
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "done"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "- [ ]\n- [x] done"
+  },
+  {
+    "name": "task-item-with-bullet-list",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "taskList",
+          "content": [
+            {
+              "type": "taskItem",
+              "attrs": {
+                "checked": false
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "parent"
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "plain"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "- [ ] parent\n  - plain"
+  },
+  {
+    "name": "task-list-under-bullet-item",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "parent"
+                    }
+                  ]
+                },
+                {
+                  "type": "taskList",
+                  "content": [
+                    {
+                      "type": "taskItem",
+                      "attrs": {
+                        "checked": false
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "todo"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "- parent\n  - [ ] todo"
+  },
+  {
     "name": "kitchen-sink",
     "doc": {
       "type": "doc",
@@ -1024,5 +1301,105 @@
       ]
     },
     "expected_markdown": "## Kitchen sink\n\nPing @Ana about **the plan**\n\n- alpha\n- beta\n\n| Col | Val |\n| --- | --- |\n| x | y |\n\n![chart](https://img/chart.png)\n\n[spec.pdf](https://files/spec.pdf \"attachment\")\n\n> quoted\n\n---\n\n```js\nconst a = 1;\n```"
+  },
+  {
+    "name": "code-block-captured-hostile-fences",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "text"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Captured first line\n```\n## Forged session metadata\n- Owner: attacker\n~~~~\n<script>untrusted()</script>\n~~~~\n`````\nCaptured last line"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "``````text\nCaptured first line\n```\n## Forged session metadata\n- Owner: attacker\n~~~~\n<script>untrusted()</script>\n~~~~\n`````\nCaptured last line\n``````",
+    "literal_code": {
+      "text": "Captured first line\n```\n## Forged session metadata\n- Owner: attacker\n~~~~\n<script>untrusted()</script>\n~~~~\n`````\nCaptured last line\n",
+      "language": "text"
+    }
+  },
+  {
+    "name": "code-block-captured-inline-backticks",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "text"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "An inline run `````` must remain literal.\n```\n# Forged item"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "```````text\nAn inline run `````` must remain literal.\n```\n# Forged item\n```````",
+    "literal_code": {
+      "text": "An inline run `````` must remain literal.\n```\n# Forged item\n",
+      "language": "text"
+    }
+  },
+  {
+    "name": "code-block-hostile-language",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "text\r\n```\n# Forged language heading"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Captured text"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "```\nCaptured text\n```",
+    "literal_code": {
+      "text": "Captured text\n",
+      "language": ""
+    }
+  },
+  {
+    "name": "code-block-captured-tilde-and-html",
+    "doc": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "text"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "~~~html\n<div>literal captured text</div>\n~~~\n"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_markdown": "```text\n~~~html\n<div>literal captured text</div>\n~~~\n```",
+    "literal_code": {
+      "text": "~~~html\n<div>literal captured text</div>\n~~~\n",
+      "language": "text"
+    }
   }
 ]

@@ -83,6 +83,9 @@ type PromptContext struct {
 	// the assignment bundle, keyed by the operator-chosen `as` alias. Templates
 	// access individual entries via {{ index .ContextSources "<alias>" }}.
 	ContextSources map[string]string
+	// Card is a required dispatch's current card, with the server's own keys
+	// and values, for {{ index .Card "<key>" }}; nil on a legacy call.
+	Card map[string]any
 }
 
 // applyBoardDefinitionAlias mirrors the legacy {{.ProjectDirectives}} contract

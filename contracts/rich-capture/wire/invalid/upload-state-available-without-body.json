@@ -1,0 +1,10 @@
+{
+  "model": "ContentUploadState",
+  "why": "an available body has body coverage",
+  "body": {
+    "content_id": "4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f",
+    "state": "available",
+    "coverage": "withheld_by_policy",
+    "coverage_reason": "quota_exceeded"
+  }
+}

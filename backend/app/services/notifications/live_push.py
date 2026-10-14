@@ -19,45 +19,32 @@ Mechanism — three hops keyed off the AsyncSession's `info` dict:
      own — which is exactly why staged entries are never published directly.
 
   2. PROMOTE (promote_staged, after generate_for_event's per-event work exits
-     the savepoint cleanly): move `_STAGING` -> `_PENDING`. Promotion happens
-     only on a clean generation; a savepoint that rolled back (an exception in
-     the nested block) never reaches promotion, so its staged intents are
-     dropped (cleared on the next generation / never promoted) => NO push.
+     cleanly): hand each staged intent to `committed_events.queue_until_commit`.
+     Promotion happens only on a clean generation; a generation that raised never
+     reaches promotion, so its staged intents are dropped (cleared on the next
+     generation / never promoted) => NO push.
 
-  3. FLUSH (an `after_commit` SQLAlchemy listener on the sync Session): once the
-     OUTER transaction commits, drain `_PENDING` and schedule each
-     `event_bus.publish`. The listener is sync; `event_bus.publish` is async, so
-     it bridges via `asyncio.ensure_future`. Verified: AsyncSession.commit()
-     awaits via greenlet_spawn, yielding to the loop, so the scheduled publish
-     runs within that await — observable immediately after `await session.commit()`.
+  3. FLUSH (committed_events): a promoted push is owned by the transaction open
+     at promotion, so it publishes only once the OUTER transaction commits, and
+     is dropped if that transaction — or any caller SAVEPOINT enclosing it —
+     rolls back. A plain session-wide buffer outlived such a rollback and pushed
+     a phantom notification on the next unrelated commit.
 """
 
 from __future__ import annotations
 
-import asyncio
-import logging
 import uuid
 
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
-from app.core.event_bus import event_bus
-
-logger = logging.getLogger(__name__)
+from app.services.committed_events import queue_until_commit
 
 NOTIFICATION_CREATED_EVENT = "notification.created"
 
 _STAGING = "_notification_push_staging"
-_PENDING = "pending_notification_pushes"
-
-# A staged/pending push intent: the workspace to publish under + the payload.
-PushIntent = tuple[uuid.UUID, dict]
 
 
 def _info(db: AsyncSession) -> dict:
-    # AsyncSession.info proxies the underlying sync Session.info — the same dict
-    # the after_commit listener (which only sees the sync Session) reads.
     return db.info
 
 
@@ -74,39 +61,7 @@ def reset_staged(db: AsyncSession) -> None:
 
 
 def promote_staged(db: AsyncSession) -> None:
-    """Hop 2: a generation that exited its savepoint cleanly promotes its staged
-    intents to the pending (will-publish-after-commit) buffer."""
-    info = _info(db)
-    staged = info.pop(_STAGING, [])
-    if staged:
-        info.setdefault(_PENDING, []).extend(staged)
-
-
-@event.listens_for(Session, "after_commit")
-def _flush_pending_pushes(session: Session) -> None:
-    """Hop 3: after the OUTER transaction commits, publish each pending intent.
-
-    Sync listener -> async publish bridge via asyncio.ensure_future. Guarded so
-    a session with no running loop (rare; non-request contexts) degrades to a
-    no-op rather than raising inside SQLAlchemy's commit path."""
-    # after_commit ALSO fires on SAVEPOINT release in this SQLAlchemy version
-    # (SessionTransaction.commit dispatches when `self.nested`), so the
-    # activity generator's begin_nested() exit would flush mid-mutation —
-    # exactly the visibility race this module exists to prevent (the rows are
-    # not outer-committed yet). At nested-dispatch time the savepoint is still
-    # the session's current nested transaction; the real outermost commit
-    # dispatches with no nested transaction in play.
-    if session.in_nested_transaction():
-        return
-    pending: list[PushIntent] = session.info.pop(_PENDING, [])
-    if not pending:
-        return
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        logger.warning("no event loop to flush %d notification push(es)", len(pending))
-        return
-    for workspace_id, payload in pending:
-        loop.create_task(
-            event_bus.publish(NOTIFICATION_CREATED_EVENT, payload, workspace_id)
-        )
+    """Hop 2: a generation that finished cleanly queues its staged intents to
+    publish after the outer commit of the transaction it ran in."""
+    for workspace_id, payload in _info(db).pop(_STAGING, []):
+        queue_until_commit(db, NOTIFICATION_CREATED_EVENT, payload, workspace_id)

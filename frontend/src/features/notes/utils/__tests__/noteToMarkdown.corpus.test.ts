@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import MarkdownIt from "markdown-it";
 import { noteToMarkdown } from "../noteToMarkdown";
 import type { Note } from "@/types/note";
 
@@ -28,6 +29,7 @@ interface CorpusEntry {
   name: string;
   doc: unknown;
   expected_markdown: string;
+  literal_code?: { text: string; language: string };
 }
 
 const corpus = JSON.parse(readFileSync(corpusPath, "utf-8")) as CorpusEntry[];
@@ -75,5 +77,15 @@ describe("noteToMarkdown corpus parity", () => {
     it(`serializes ${entry.name} to the contract markdown`, () => {
       expect(serializeBody(entry.doc)).toBe(entry.expected_markdown);
     });
+    if (entry.literal_code) {
+      it(`keeps ${entry.name} as one literal code block`, () => {
+        const tokens = new MarkdownIt("commonmark").parse(serializeBody(entry.doc), {});
+        expect(tokens.map((token) => token.type)).toEqual(["fence"]);
+        const fence = tokens[0];
+        if (!fence) throw new Error("Expected one literal code fence");
+        expect(fence.content).toBe(entry.literal_code!.text);
+        expect(fence.info).toBe(entry.literal_code!.language);
+      });
+    }
   }
 });

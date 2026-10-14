@@ -74,22 +74,9 @@ class DispatchResolver:
             lifecycle_llm_params.get("provider") or stage_llm.get("provider") or ""
         )
         raw_model = lifecycle_llm_params.get("model") or stage_llm.get("model") or ""
-        # Forward the raw tier name (premium/mid/low) so a provider-agnostic runner
-        # can remap it to a locally-available coding agent; empty for concrete or
-        # literal models, which leave the runner nothing to remap.
-        stage_tier = raw_model if is_tier(raw_model) else ""
-        resolved_provider, resolved_model = raw_provider, raw_model
-        if raw_model:
-            try:
-                resolved_provider, resolved_model = resolve_tier(
-                    raw_model, workspace_id=workspace_id
-                )
-            except ValueError:
-                logger.warning(
-                    "next_assignment: stage llm.model %r is neither a known tier "
-                    "nor a literal — passing through verbatim",
-                    raw_model,
-                )
+        resolved_provider, resolved_model, stage_tier = resolve_model_intent(
+            raw_provider, raw_model, workspace_id=workspace_id
+        )
         # Fail loud rather than silent: an enabled LLM stage with no model anywhere
         # is a config bug. Emitting an empty model lets the runner fall back to its
         # yaml default (the bug that ran sonnet against a premium-configured planner
@@ -171,6 +158,28 @@ class DispatchResolver:
         )
         slug = await self.db.scalar(stmt)
         return slug or stage_name
+
+
+def resolve_model_intent(
+    raw_provider: str, raw_model: str, *, workspace_id: uuid.UUID
+) -> tuple[str, str, str]:
+    """(provider, model, tier) the backend intends for one llm call.
+
+    `tier` is the raw tier name (premium/mid/low) so a provider-agnostic
+    runner can remap it to a locally-available coding agent; empty for
+    concrete or literal models, which leave the runner nothing to remap."""
+    tier = raw_model if is_tier(raw_model) else ""
+    provider, model = raw_provider, raw_model
+    if raw_model:
+        try:
+            provider, model = resolve_tier(raw_model, workspace_id=workspace_id)
+        except ValueError:
+            logger.warning(
+                "next_assignment: stage llm.model %r is neither a known tier "
+                "nor a literal — passing through verbatim",
+                raw_model,
+            )
+    return provider, model, tier
 
 
 def _lifecycle_llm_params(stage: dict) -> dict:

@@ -141,7 +141,7 @@
       "replacement": "update_note(mode='section')"
     }
   },
-  "listing_bytes": 95919,
+  "listing_bytes": 96211,
   "tool_count": 143,
   "tools": {
     "activate_catalog_skill": {
@@ -491,7 +491,9 @@
       "params": {
         "board_id": "Board UUID if board-scoped.",
         "card_id": "Card to link; needs board_id and a card on this board.",
+        "client_request_id": "Excerpt save retry key (UUID); pairs with excerpt_source.",
         "content": "Markdown (HTML, plain text or ProseMirror JSON accepted).",
+        "excerpt_source": "Your session's {workspace_id, session_id, items:[{content_id, sha256}]}.",
         "kind": "user_note or a structural kind (plan, review_verdict, ...).",
         "pinned": "Pin the note to the top.",
         "return_content": "Echo the stored body in the receipt.",

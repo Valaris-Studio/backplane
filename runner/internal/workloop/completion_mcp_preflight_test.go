@@ -50,7 +50,7 @@ func TestGeneratedMCPCompletionPreflight(t *testing.T) {
 					t.Fatalf("compatible generated config must reach BOOTSTRAP: calls=%d err=%v", provider.CallCount(), err)
 				}
 				data, _ := os.ReadFile(requests)
-				for _, want := range []string{"backplane-mcp==0.8.0", "get_board_loop", "board-1", "acme"} {
+				for _, want := range []string{"backplane-mcp==0.9.1", "get_board_loop", "board-1", "acme"} {
 					if !strings.Contains(string(data), want) {
 						t.Errorf("actual generated process did not receive %q: %s", want, data)
 					}
@@ -81,7 +81,7 @@ func generatedCompletionMCP(t *testing.T, scenario, policy string) (string, stri
 	dir := t.TempDir()
 	requests := filepath.Join(dir, "requests")
 	tools := []string{"get_board_loop", "set_board_loop", "get_completion_policy", "get_completion_status", "submit_completion_candidate", "request_landing", "retry_completion"}
-	version := "0.8.0"
+	version := "0.9.1"
 	if scenario == "old_catalog" {
 		tools = tools[:2]
 		version = "0.7.3"

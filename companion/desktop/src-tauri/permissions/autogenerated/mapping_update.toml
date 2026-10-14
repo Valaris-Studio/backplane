@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mapping-update"
+description = "Enables the mapping_update command without any pre-configured scope."
+commands.allow = ["mapping_update"]
+
+[[permission]]
+identifier = "deny-mapping-update"
+description = "Denies the mapping_update command without any pre-configured scope."
+commands.deny = ["mapping_update"]

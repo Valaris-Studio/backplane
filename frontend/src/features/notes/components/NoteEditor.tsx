@@ -19,6 +19,7 @@ import { UnsavedChangesPrompt } from "@/components/ui/unsaved-changes-prompt";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { Note } from "@/types/note";
+import { NoteSessionsSection } from "@/features/sessions/components/LinkedSessionsSection";
 
 interface NoteEditorProps {
   /** Must carry the note's FULL body — see `isBodyAuthoritative`. */
@@ -251,6 +252,7 @@ export function NoteEditor({
         workspaceSlug={slug}
         className="min-h-[240px]"
       />
+      <NoteSessionsSection slug={slug} noteId={note.id} boardId={note.board_id} />
     </EditorSheet>
     <UnsavedChangesPrompt
       open={guard.guardOpen}

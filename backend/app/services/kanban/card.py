@@ -42,6 +42,7 @@ from app.services.media.canonicalize import MediaLinkCanonicalizer
 from app.services.notes.content_serializer import prosemirror_to_markdown
 from app.services.kanban.snapshots import snapshot_card
 from app.services.mentions.notify import notify_new_mentions
+from app.services.work_consultation import WorkConsultationService
 
 logger = logging.getLogger(__name__)
 
@@ -665,18 +666,19 @@ class CardService:
 
         if workspace_id:
             activity = ActivityService(self.db)
-            # Use the first card's ID as the entity_id for the activity record
-            await activity.record(
-                workspace_id=workspace_id,
-                actor_id=user_id,
-                entity_type=ActivityEntityType.card,
-                entity_id=created_cards[0].id,
-                action=ActivityAction.created,
-                board_id=board_id,
-                summary=f"bulk created {len(created_cards)} cards",
-                message_key="activity.card.bulk_created",
-                message_params={"card_count": len(created_cards)},
-            )
+            for card in created_cards:
+                await activity.record(
+                    workspace_id=workspace_id,
+                    actor_id=user_id,
+                    entity_type=ActivityEntityType.card,
+                    entity_id=card.id,
+                    action=ActivityAction.created,
+                    board_id=board_id,
+                    summary=f"created card '{card.title}'",
+                    message_key="activity.card.created",
+                    message_params={"card_title": card.title},
+                    after_state=snapshot_card(card),
+                )
 
         await self._enrich(created_cards, workspace_id=workspace_id)
         return created_cards
@@ -699,10 +701,16 @@ class CardService:
         board_id: uuid.UUID,
         *,
         as_markdown: bool = False,
+        workspace_id: uuid.UUID | None = None,
+        reader_id: uuid.UUID | None = None,
     ):
         card = await self.card_repo.get_by_id(card_id)
         if not card or card.board_id != board_id:
             raise ResourceNotFoundError("Card not found", error_code="card_not_found")
+        if workspace_id is not None and reader_id is not None:
+            await WorkConsultationService(self.db).record(
+                workspace_id, reader_id, "card", card.id
+            )
         await attach_pending_approvals(self.db, [card])
         await attach_agent_presence(self.db, [card])
         await attach_dependency_counts(self.db, [card])

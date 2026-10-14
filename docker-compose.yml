@@ -41,6 +41,7 @@ services:
       # backend/.env inside the container, so without this passthrough a key
       # in the root .env never reaches the backend and every "Add token" 503s.
       INTEGRATIONS_TOKEN_KEY: ${INTEGRATIONS_TOKEN_KEY:-}
+      RICH_CAPTURE_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy

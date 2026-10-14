@@ -1,0 +1,36 @@
+{
+  "model": "ContentDeclaration",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/ingest",
+    "member": "records[].contents[]"
+  },
+  "body": {
+    "role": "tool",
+    "channel": "command_output",
+    "source": {
+      "kind": "codex_rollout",
+      "parser": "companion-codex-rollout/1",
+      "schema_version": "codex-rollout/0.160",
+      "native_ref": "exec-01a11e75-0c4e-7b21-9a3f-5d6e7f809a1b",
+      "order": 15
+    },
+    "occurred_at": "2026-10-09T02:21:07.412Z",
+    "observed_at": "2026-10-09T02:21:08Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "7ef3145ca84980db747a42a178b261f05ec0abd83c3b50d03cb0437079ac3118",
+    "call_id": "exec-01a11e75-0c4e-7b21-9a3f-5d6e7f809a1b",
+    "parent_call_id": "call_Qm8xYp2LrT5vWn3K",
+    "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983",
+    "coverage": "truncated",
+    "coverage_reason": "source_limit",
+    "delivery": "upload",
+    "byte_count": 1048606,
+    "original_byte_count": 1200017,
+    "sha256": "2083d1e56e26da850fd5e0ba8fca30c151d06f5f0b0a07e24db6fdc1b7251f7d"
+  }
+}

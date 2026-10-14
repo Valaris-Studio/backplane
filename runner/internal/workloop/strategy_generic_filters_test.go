@@ -27,6 +27,8 @@ func buildFilterScanLoop(t *testing.T, serverURL string, stage valaris.StageConf
 		Valaris: config.ValarisConfig{
 			WorkspaceSlug: "test-workspace",
 		},
+		// A backend from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
 	}
 	client := valaris.NewClient(serverURL, "vlr_test")
 	client.UserID = "user-1"

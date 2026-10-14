@@ -56,6 +56,7 @@ export const activityKeys = {
 };
 
 export const timelineKeys = {
+  history: (slug: string, boardId: string) => ["timeline-history", slug, boardId] as const,
   byBoard: (slug: string, boardId: string) =>
     ["timeline", slug, boardId] as const,
 };
@@ -249,6 +250,19 @@ export const agentKeys = {
   ) => ["agents", slug, "executions", filters ?? {}] as const,
   executionDetail: (slug: string, executionId: string) =>
     ["agents", slug, "execution", executionId] as const,
+  // Receipt summaries and bodies sit under DISJOINT roots: a new-receipt event
+  // invalidates every summary page without refetching any historical body.
+  executionContextReceipts: (slug: string, executionId: string) =>
+    ["agents", slug, "execution-context-receipts", executionId] as const,
+  executionContextReceiptsPage: (
+    slug: string,
+    executionId: string,
+    page: { limit: number; offset: number },
+  ) => [...agentKeys.executionContextReceipts(slug, executionId), "page", page] as const,
+  executionContextReceiptDetails: (slug: string, executionId: string) =>
+    ["agents", slug, "execution-context-receipt", executionId] as const,
+  executionContextReceipt: (slug: string, executionId: string, receiptId: string) =>
+    [...agentKeys.executionContextReceiptDetails(slug, executionId), receiptId] as const,
   // Board-scoped loop-iteration feed (card ea43b848). Deliberately its OWN
   // key, not a variant of `executions(slug, filters)` — boardLoopKeys.detail's
   // precedent: keeping it out from under a shared prefix means invalidating
@@ -339,6 +353,35 @@ export const apiKeyKeys = {
 
 export const meKeys = {
   me: () => ["me"] as const,
+};
+
+// `all(slug)` is the invalidation root: an owner's session event refreshes
+// every list variant and the open detail at once.
+export const sessionKeys = {
+  all: (slug: string) => ["sessions", slug] as const,
+  list: (slug: string, filters: object) => ["sessions", slug, "list", filters] as const,
+  detail: (slug: string, id: string) => ["sessions", slug, "detail", id] as const,
+  calls: (slug: string, id: string, filter: string) => ["sessions", slug, "detail", id, "calls", filter] as const,
+  call: (slug: string, id: string, key: string) => ["sessions", slug, "detail", id, "call", key] as const,
+  usage: (slug: string, id: string) => ["sessions", slug, "detail", id, "usage"] as const,
+  links: (slug: string, id: string) => ["sessions", slug, "detail", id, "links"] as const,
+  children: (slug: string, id: string) => ["sessions", slug, "detail", id, "children"] as const,
+  onCard: (slug: string, boardId: string, cardId: string) => ["sessions", slug, "card", boardId, cardId] as const,
+  onNote: (slug: string, noteId: string) => ["sessions", slug, "note", noteId] as const,
+  summary: (slug: string, query: object) => ["sessions", slug, "summary", query] as const,
+  rhythm: (slug: string, id: string, buckets: number) => ["sessions", slug, "detail", id, "rhythm", buckets] as const,
+  contents: (slug: string, id: string, filters: object) => ["sessions", slug, "detail", id, "contents", filters] as const,
+  // A body never changes under its digest, so these are cached for good.
+  contentBody: (slug: string, id: string, contentId: string, sha256: string, offset: number) =>
+    ["sessions", slug, "detail", id, "content-body", contentId, sha256, offset] as const,
+  contentFile: (slug: string, id: string, contentId: string, sha256: string) =>
+    ["sessions", slug, "detail", id, "content-file", contentId, sha256] as const,
+};
+
+// Devices are the viewer's own, across workspaces.
+export const companionKeys = {
+  installations: () => ["companion", "installations"] as const,
+  mappings: (installationId: string) => ["companion", "installations", installationId, "mappings"] as const,
 };
 
 export const authKeys = {

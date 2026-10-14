@@ -1,0 +1,27 @@
+{
+  "model": "ContentDeclaration",
+  "why": "source_limit explains truncated content, not unavailable content",
+  "body": {
+    "role": "assistant",
+    "channel": "reasoning",
+    "source": {
+      "kind": "codex_rollout",
+      "parser": "companion-codex-rollout/1",
+      "schema_version": "codex-rollout/0.161",
+      "native_ref": "rs_01a11e76-3d2c-7e10-8b4a-0f1e2d3c4b5a",
+      "order": 70
+    },
+    "occurred_at": "2026-10-09T02:23:40Z",
+    "observed_at": "2026-10-09T02:23:41Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "content_key": "b32e1edb6060f58bca67746f3eefcc96fd46e2bc777c7f145620de0c32c4def4",
+    "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983",
+    "coverage": "source_unavailable",
+    "coverage_reason": "source_limit",
+    "delivery": "none"
+  }
+}

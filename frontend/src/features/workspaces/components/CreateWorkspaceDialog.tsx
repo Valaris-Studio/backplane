@@ -15,19 +15,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RichTooltip } from "@/components/ui/rich-tooltip";
+import { isApiError } from "@/lib/api-error";
+import { resolveApiErrorMessage } from "@/lib/localized-errors";
+import { isValidWorkspaceSlug, toWorkspaceSlug } from "../lib/workspace-slug";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (slug: string) => void;
-}
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 export function CreateWorkspaceDialog({
@@ -38,24 +33,42 @@ export function CreateWorkspaceDialog({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
+  const [submitError, setSubmitError] = useState<unknown>(null);
   const createWorkspace = useCreateWorkspace();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const trimmedSlug = slug.trim();
+  const slugIsInvalid = trimmedSlug !== "" && !isValidWorkspaceSlug(trimmedSlug);
+  const nameYieldsNoSlug = !slugTouched && name.trim() !== "" && trimmedSlug === "";
+  const submitErrorMessage =
+    submitError === null
+      ? null
+      : isApiError(submitError) && submitError.status === 409
+        ? t("createWorkspace.slugTaken")
+        : resolveApiErrorMessage(submitError, t, i18n);
 
   function handleNameChange(value: string) {
     setName(value);
     if (!slugTouched) {
-      setSlug(toSlug(value));
+      setSlug(toWorkspaceSlug(value));
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !slug.trim()) return;
+    if (!name.trim() || !trimmedSlug || slugIsInvalid) return;
 
-    const workspace = await createWorkspace.mutateAsync({
-      name: name.trim(),
-      slug: slug.trim(),
-    });
+    setSubmitError(null);
+    let workspace;
+    try {
+      workspace = await createWorkspace.mutateAsync({
+        name: name.trim(),
+        slug: trimmedSlug,
+      });
+    } catch (error) {
+      setSubmitError(error);
+      return;
+    }
 
     setName("");
     setSlug("");
@@ -94,15 +107,41 @@ export function CreateWorkspaceDialog({
               <Input
                 placeholder={t("createWorkspace.slugPlaceholder")}
                 value={slug}
+                aria-invalid={slugIsInvalid}
+                aria-describedby="create-workspace-slug-hint"
                 onChange={(e) => {
                   setSlugTouched(true);
                   setSlug(e.target.value);
                 }}
               />
-              <p className="text-xs text-muted-foreground">
-                {t("createWorkspace.slugHelper", { slug: slug || "..." })}
-              </p>
+              {slugIsInvalid ? (
+                <p
+                  id="create-workspace-slug-hint"
+                  className="text-xs text-destructive"
+                >
+                  {t("createWorkspace.slugInvalid")}
+                </p>
+              ) : nameYieldsNoSlug ? (
+                <p
+                  id="create-workspace-slug-hint"
+                  className="text-xs text-destructive"
+                >
+                  {t("createWorkspace.slugUnderivable")}
+                </p>
+              ) : (
+                <p
+                  id="create-workspace-slug-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("createWorkspace.slugHelper", { slug: slug || "..." })}
+                </p>
+              )}
             </div>
+            {submitErrorMessage && (
+              <p role="alert" className="text-sm text-destructive">
+                {submitErrorMessage}
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -115,7 +154,10 @@ export function CreateWorkspaceDialog({
             <Button
               type="submit"
               disabled={
-                createWorkspace.isPending || !name.trim() || !slug.trim()
+                createWorkspace.isPending ||
+                !name.trim() ||
+                !trimmedSlug ||
+                slugIsInvalid
               }
             >
               {createWorkspace.isPending ? t("common.creating") : t("common.create")}

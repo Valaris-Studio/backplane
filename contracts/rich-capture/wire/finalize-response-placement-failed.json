@@ -1,0 +1,14 @@
+{
+  "model": "ContentUploadState",
+  "http": {
+    "method": "POST",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d/finalize",
+    "status": 200
+  },
+  "body": {
+    "content_id": "2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d",
+    "state": "recorded",
+    "coverage": "collection_failed",
+    "coverage_reason": "placement_failed"
+  }
+}

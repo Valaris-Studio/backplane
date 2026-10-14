@@ -221,6 +221,10 @@ func (s *DataDrivenStrategy) tickCard(ctx, tickCtx context.Context, l *Loop, car
 	var llmResult *llmStageResult
 	if cfg.LLM.Enabled {
 		llmResult, err = s.executeLLM(ctx, tickCtx, l, card, execID, repoDir)
+		if errors.Is(err, ErrDispatchSemanticsChanged) {
+			cleanup()
+			return s.releaseForSemanticsChange(ctx, l, card, execID, err)
+		}
 		if err != nil {
 			// Cluster I: mirror the lifecycle path's SUSPEND handling on the legacy
 			// Tick path too, so a budget cutoff checkpoints + resumes instead of
@@ -359,15 +363,52 @@ func (s *DataDrivenStrategy) tickRework(ctx, tickCtx context.Context, l *Loop, c
 	reworkAttempt := l.CardReworkCount(card.CardID) + 1
 	logger.Info("reworking rejected card", "attempt", reworkAttempt)
 
-	// Mediate
-	mediation, err := l.mediateRework(tickCtx, card, reworkAttempt)
+	// A required dispatch floor binds the execution through the retained hold
+	// before any inference, so mediation and implementation are both prepared
+	// invocations of it. Legacy rework mediates first and claims only once
+	// there is a plan.
+	required, err := l.requiresPreparedDispatch(card)
 	if err != nil {
+		l.recordFailure(fmt.Sprintf("rework %s: %v", card.CardID, err), card.CardID)
+		return fmt.Errorf("rework %s: %w", card.CardID, err)
+	}
+	execID := ""
+	claim := func() error {
+		execID, err = l.reworkClaim(tickCtx, card, s.config.Role)
+		if err != nil {
+			l.recordFailure(fmt.Sprintf("rework claim %s: %v", card.CardID, err), card.CardID)
+			return fmt.Errorf("rework claim %s: %w", card.CardID, err)
+		}
+		logger = logger.With("execution_id", execID)
+		logger.Info("rework execution started")
+		return nil
+	}
+	if required {
+		if err := claim(); err != nil {
+			return err
+		}
+	}
+	defer func() {
+		if execID != "" {
+			l.reportCost(ctx, execID)
+		}
+	}()
+
+	// Mediate
+	mediation, err := l.mediateReworkIn(tickCtx, card, execID, reworkAttempt)
+	if err != nil {
+		if execID != "" {
+			l.failExecution(ctx, card, execID, fmt.Sprintf("mediate rework failed: %v", err))
+		}
 		l.recordFailure(fmt.Sprintf("mediate rework %s: %v", card.CardID, err), card.CardID)
 		return fmt.Errorf("mediate rework: %w", err)
 	}
 
 	if mediation.Escalate {
 		logger.Warn("mediator escalated — blocking card", "card_id", card.CardID, "attempt", reworkAttempt)
+		if execID != "" {
+			l.closeEscalatedExecution(card, execID, reworkAttempt)
+		}
 		l.recordFailure(fmt.Sprintf("escalated after %d rework attempts", reworkAttempt), card.CardID)
 		wsCfg := l.WorkspaceConfig()
 		for i := l.CardFailureCount(card.CardID); i < wsCfg.MaxReworkAttempts; i++ {
@@ -378,16 +419,11 @@ func (s *DataDrivenStrategy) tickRework(ctx, tickCtx context.Context, l *Loop, c
 
 	logger.Info("mediation complete", "action_plan_len", len(mediation.ActionPlan))
 
-	// Rework claim
-	execID, err := l.reworkClaim(tickCtx, card, s.config.Role)
-	if err != nil {
-		l.recordFailure(fmt.Sprintf("rework claim %s: %v", card.CardID, err), card.CardID)
-		return fmt.Errorf("rework claim %s: %w", card.CardID, err)
+	if !required {
+		if err := claim(); err != nil {
+			return err
+		}
 	}
-	logger = logger.With("execution_id", execID)
-	logger.Info("rework execution started")
-
-	defer l.reportCost(ctx, execID)
 
 	// Git setup — checkout existing branch, fallback to create
 	repoDir, err := l.git.CloneOrOpen(tickCtx, card.GitRepoURL, card.GitRepoName)
@@ -706,10 +742,21 @@ func (s *DataDrivenStrategy) discoverWithConfig(ctx context.Context, l *Loop) (*
 	// Prefer the backend-owned scheduler. /next-assignment applies all
 	// role filters, untyped-column exclusion, and role-scoped
 	// preconditions (e.g. repo_has_no_open_pr) server-side so the runner
-	// stops re-deriving semantics. Falls back to the legacy client-side
-	// scan only when the endpoint is missing (404, older backend) — any
-	// other error propagates so we don't silently mask outages.
+	// stops re-deriving semantics. It is asked under the negotiated context
+	// dispatch policy, and then nothing falls back to the legacy scans; only
+	// an old server the configuration explicitly allows keeps the legacy
+	// fallback below.
+	if l.cfg.ContextDispatch.Require && (l.client == nil || l.client.Agent == nil) {
+		return nil, errors.New("context dispatch: required, and this runner has no agent identity to negotiate with")
+	}
 	if l.client != nil && l.client.Agent != nil {
+		dispatch, err := l.negotiateDispatch(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if dispatch != nil {
+			return s.discoverNegotiated(ctx, l, dispatch)
+		}
 		// FOLLOWUP-7: when the runner is pinned to a single board, scope
 		// the backend scheduler to it. Multi-board runners pass empty
 		// board_id and let the scheduler choose across the workspace, which
@@ -756,6 +803,41 @@ func (s *DataDrivenStrategy) discoverWithConfig(ctx context.Context, l *Loop) (*
 	}
 
 	return s.legacyDiscoverWithGates(ctx, l)
+}
+
+// discoverNegotiated asks the scheduler under the negotiated policy. Its
+// failures are errors, never a legacy scan; an assignment keeps its hold and
+// floor for the claim.
+func (s *DataDrivenStrategy) discoverNegotiated(ctx context.Context, l *Loop, dispatch *negotiatedDispatch) (*discoverResult, error) {
+	req := valaris.NextAssignmentRequest{
+		RoleOverride:                  s.config.Role,
+		ContextDispatchVersion:        valaris.ContextDispatchVersion,
+		ContextDispatchPolicyRevision: dispatch.contract.PolicyRevision,
+	}
+	if len(l.cfg.Valaris.BoardIDs) == 1 {
+		req.BoardID = l.cfg.Valaris.BoardIDs[0]
+	}
+	assignment, err := l.client.NextAssignment(ctx, l.cfg.Valaris.WorkspaceSlug, l.client.Agent.ID, req)
+	if err != nil {
+		return nil, fmt.Errorf("next-assignment under context dispatch: %w", err)
+	}
+	if assignment == nil {
+		return &discoverResult{}, nil
+	}
+	if *assignment.ContextDispatch != dispatch.contract.Stamp() {
+		return nil, fmt.Errorf("next-assignment: stamp %+v, negotiated %+v", *assignment.ContextDispatch, dispatch.contract.Stamp())
+	}
+	if cardIntrinsicallyParked(assignment.Card) {
+		slog.Warn("next-assignment returned an intrinsically parked card — skipping tick (backend exclude_label config likely stale)",
+			"card_id", assignment.Card.ID, "labels", assignment.Card.Labels, "role", s.config.Role)
+		return &discoverResult{}, nil
+	}
+	result := discoverResultFromAssignment(assignment)
+	result.Dispatch = &dispatchHold{
+		workspaceID: dispatch.workspaceID, reservationID: assignment.Reservation.ID,
+		role: assignment.Role, stamp: *assignment.ContextDispatch,
+	}
+	return result, nil
 }
 
 // legacyDiscoverWithGates runs the legacy client-side scans — the resilience
@@ -1156,6 +1238,11 @@ func cardIntrinsicallyParked(c valaris.Card) bool {
 // --- Claim dispatch ---
 
 func (s *DataDrivenStrategy) claimWithConfig(ctx context.Context, l *Loop, card *discoverResult) (string, error) {
+	if card.Dispatch != nil {
+		if err := l.recheckDispatch(ctx, card.Dispatch); err != nil {
+			return "", err
+		}
+	}
 	switch s.config.Claim.ParticipantRole {
 	case "hero":
 		return l.claim(ctx, card, s.config)
@@ -1177,7 +1264,10 @@ func (s *DataDrivenStrategy) claimHelper(ctx context.Context, l *Loop, card *dis
 		slog.Warn("claim helper: add_participant failed (may already exist)", "role", s.config.Role, "error", err)
 	}
 
-	execID, err := l.client.LogExecutionStart(ctx, agentID, ws, s.config.Claim.ExecutionAction, card.BoardID, card.CardID, fmt.Sprintf("%s: %s", executionLogDescription(s.config), card.CardID), s.config.Role)
+	execID, err := l.startExecution(ctx, card, valaris.ExecutionStart{
+		WorkspaceSlug: ws, Action: s.config.Claim.ExecutionAction, BoardID: card.BoardID, CardID: card.CardID,
+		InputSummary: fmt.Sprintf("%s: %s", executionLogDescription(s.config), card.CardID), Role: s.config.Role,
+	})
 	if err != nil {
 		return "", fmt.Errorf("log_execution_start: %w", err)
 	}
@@ -1341,6 +1431,9 @@ type llmStageResult struct {
 // runLLMStage and is dispatched by LLMDef.PostProcessKind.
 func (s *DataDrivenStrategy) executeLLM(ctx, tickCtx context.Context, l *Loop, card *discoverResult, execID, repoDir string) (*llmStageResult, error) {
 	stage := s.config.LLM.Stage
+	// What this stage's call consumes of its configuration, captured now; a
+	// required call compares it with the server's flags after its rate wait.
+	tickCtx = withCallSemantics(tickCtx, captureSemantics(s.config.LLM))
 
 	switch stage {
 	case "implement":
@@ -1417,6 +1510,23 @@ func (s *DataDrivenStrategy) runLLMStage(ctx, tickCtx context.Context, l *Loop, 
 		directivesText = l.fetchDirectives(tickCtx, card.BoardID)
 	}
 
+	required, err := l.requiresPreparedDispatch(card)
+	if err != nil {
+		return nil, err
+	}
+	if required {
+		call := preparedCall{card: card, executionID: execID, repoDir: repoDir, local: PromptContext{ProjectDirectives: directivesText}}
+		if kind == "produces_decision" {
+			call.defaultSchema = decisionOutputSchema
+		}
+		result, prompt, err := l.invokePrepared(tickCtx, call)
+		l.persistPrompt(tickCtx, execID, prompt)
+		if err != nil {
+			return nil, err
+		}
+		return stageOutcome(kind, result), nil
+	}
+
 	pctx := PromptContext{
 		Workspace:         l.cfg.Valaris.WorkspaceSlug,
 		AgentID:           agentID,
@@ -1470,7 +1580,11 @@ func (s *DataDrivenStrategy) runLLMStage(ctx, tickCtx context.Context, l *Loop, 
 	if err != nil {
 		return nil, err
 	}
+	return stageOutcome(kind, result), nil
+}
 
+// stageOutcome wraps a custom stage's LLM result per its post-process kind.
+func stageOutcome(kind string, result *llm.Result) *llmStageResult {
 	// produces_decision shares the reviewer's decode+fail-safe seam: a blank/
 	// unparseable decision coerces to request_changes (never silently approve),
 	// for the reviewer AND every custom decision role (ui_validator, etc.).
@@ -1480,14 +1594,14 @@ func (s *DataDrivenStrategy) runLLMStage(ctx, tickCtx context.Context, l *Loop, 
 			reviewResult: &review,
 			decision:     review.Decision,
 			rawOutput:    result.Output,
-		}, nil
+		}
 	}
 
 	out := parseLLMResultGeneric(result)
 
 	res := wrapGenericOutput(kind, out)
 	res.rawOutput = result.Output
-	return res, nil
+	return res
 }
 
 // parseLLMResultGeneric decodes the standard {status,decision,summary,findings}
@@ -3202,6 +3316,21 @@ func (s *DataDrivenStrategy) tickViaLifecycle(ctx context.Context, l *Loop) erro
 			l.health.RecordSkip()
 		}
 		return nil
+	}
+	// A call refused for a changed configuration stopped the walk cleanly: the
+	// card is released for a fresh assignment, never failed or routed on.
+	var change *semanticsChange
+	if errors.As(err, &change) {
+		if v, ok := ws.Get("git_cleanup"); ok {
+			if cleanup, ok := v.(func()); ok && cleanup != nil {
+				cleanup()
+			}
+		}
+		card := cardFromWalk(ws)
+		if card == nil {
+			return change
+		}
+		return s.releaseForSemanticsChange(ctx, l, card, ws.ExecutionID, change)
 	}
 	// A budget-suspended card is a clean stop: its WIP was checkpointed and the
 	// card parked for resume. NOT a failure — skip failWithConfig/git_cleanup/

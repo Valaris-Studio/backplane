@@ -1,0 +1,37 @@
+{
+  "model": "ContentPage",
+  "why": "SVG never renders inline",
+  "body": {
+    "items": [
+      {
+        "id": "4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f",
+        "session_id": "6f1c2d0e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "event_id": null,
+        "call_id": null,
+        "parent_call_id": null,
+        "turn_id": null,
+        "role": "user",
+        "channel": "attachment",
+        "display_path": null,
+        "media_type": "image/svg+xml",
+        "coverage": "captured",
+        "coverage_reason": null,
+        "byte_count": 284211,
+        "original_byte_count": null,
+        "sha256": "6a09bfb6492050ab65118bf80f308c59214326e806938d3e8d7a73b01c31ff5f",
+        "redaction": {
+          "filter_version": "asymptoteobserve-redact/1",
+          "replacements": 0
+        },
+        "source": {
+          "kind": "claude_transcript",
+          "order": 39
+        },
+        "occurred_at": "2026-10-08T14:02:58Z",
+        "render": "image",
+        "preview": null
+      }
+    ],
+    "next_cursor": null
+  }
+}

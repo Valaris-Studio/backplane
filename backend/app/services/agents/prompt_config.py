@@ -71,6 +71,11 @@ def _build_post_process_index(
     return index
 
 
+def post_process_kind_for(pipeline_config: dict | None, team_role: str, stage: str) -> str:
+    """The kind the prompt API pairs with a (role, stage) row."""
+    return _build_post_process_index(pipeline_config).get((team_role, stage), "")
+
+
 def _resolve_content(
     config: AgentPromptConfig,
     post_process_index: dict[tuple[str, str], str],
@@ -116,6 +121,25 @@ class PromptConfigService:
                     "Only a human workspace admin may change prompts while explicit completion policy is configured",
                     error_code="admin_required",
                 ) from exc
+
+    async def effective_prompt(
+        self,
+        workspace_id: uuid.UUID,
+        *,
+        team_role: str,
+        stage: str,
+        post_process_kind: str,
+    ) -> AgentPromptConfig | None:
+        """The row that renders (team_role, stage) here, carrying the same
+        `resolved_content` the prompt API shows — content plus the
+        post-processing imperative for the invoking call's kind. None when
+        nothing is authored: callers must not substitute a built-in."""
+        config = await self.repo.effective_for_target(workspace_id, team_role, stage)
+        if config is None:
+            return None
+        index = {(team_role, stage): post_process_kind} if post_process_kind else {}
+        config.resolved_content = _resolve_content(config, index)
+        return config
 
     async def _authorize_shared_mutation(self):
         policies = await self.repo.completion_policy_values(None)

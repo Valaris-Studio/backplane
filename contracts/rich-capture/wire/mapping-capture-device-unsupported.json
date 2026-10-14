@@ -1,0 +1,13 @@
+{
+  "model": "MappingEffectiveCapture",
+  "http": {
+    "method": "GET",
+    "path": "/api/me/companion/installations/{installation_id}/mappings",
+    "member": "[].capture"
+  },
+  "body": {
+    "content_level": "rich",
+    "effective_content_level": "full",
+    "reason": "device_unsupported"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "model": "ContentError",
+  "http": {
+    "method": "PUT",
+    "path": "/api/companion/contents/2dab8c74-3e5f-4071-8c1d-2e3f4a5b6c7d/chunks/1",
+    "status": 413
+  },
+  "body": {
+    "detail": "A chunk holds at most chunk_bytes",
+    "error_code": "chunk_too_large",
+    "error_params": {
+      "chunk_bytes": 4194304
+    },
+    "context": null
+  }
+}

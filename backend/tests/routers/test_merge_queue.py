@@ -580,6 +580,46 @@ async def test_enqueue_agent_on_loop_board_without_optin_403(
 
 
 @pytest.mark.asyncio
+async def test_enqueue_installation_key_on_loop_board_without_optin_allowed(
+    installation_key_client: AsyncClient,
+    db_session: AsyncSession,
+    test_workspace: Workspace,
+    test_board: Board,
+    test_column: Column,
+    test_user: User,
+):
+    test_board.loop_config = _loop_config("human")
+    repo = await _make_repo(db_session, test_board, test_user)
+    card = await _make_card(db_session, test_board, test_column, test_user)
+
+    resp = await installation_key_client.post(
+        f"{URL_BASE.format(slug=test_workspace.slug)}/enqueue",
+        json=_enqueue_body(card, repo),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
+async def test_enqueue_plain_user_key_on_loop_board_without_optin_allowed(
+    plain_key_client: AsyncClient,
+    db_session: AsyncSession,
+    test_workspace: Workspace,
+    test_board: Board,
+    test_column: Column,
+    test_user: User,
+):
+    test_board.loop_config = _loop_config("human")
+    repo = await _make_repo(db_session, test_board, test_user)
+    card = await _make_card(db_session, test_board, test_column, test_user)
+
+    resp = await plain_key_client.post(
+        f"{URL_BASE.format(slug=test_workspace.slug)}/enqueue",
+        json=_enqueue_body(card, repo),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
 async def test_enqueue_agent_on_loop_board_with_optin_succeeds(
     raw_client: AsyncClient,
     db_session: AsyncSession,

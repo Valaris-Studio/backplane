@@ -1,15 +1,13 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  Copy,
   DollarSign,
   Coins,
   XCircle,
@@ -31,13 +29,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ToolInvocationList } from "@/features/agents/components/ToolInvocationList";
 import { ExecutionInsights } from "@/features/agents/components/ExecutionInsights";
+import { ExecutionPromptPanel } from "@/features/agents/components/ExecutionPromptPanel";
 import { EntityLink } from "@/components/shared/EntityLink";
 import { useExecution, useAgentMetrics } from "@/features/agents/hooks/useAgentMetrics";
 import { useRunnerBasePath } from "@/features/agents/hooks/useRunnerBasePath";
+import { useReceiptHistoryState } from "@/features/agents/hooks/useExecutionContextReceipts";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 import { formatAbsolute } from "@/lib/date-format";
-import { copyTextToClipboard } from "@/lib/clipboard";
 
 type DetailTab = "overview" | "prompt";
 
@@ -59,6 +58,8 @@ export function ExecutionDetailPage() {
   const { data: execution, isLoading, isError } = useExecution(slug, executionId);
   const { data: agents } = useAgentMetrics(slug);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const receiptHistory = useReceiptHistoryState(`${slug}/${executionId}`);
+  const tabIdPrefix = useId();
 
   const agentName =
     agents?.find((a) => a.agent_id === execution?.agent_id)?.name ??
@@ -93,15 +94,6 @@ export function ExecutionDetailPage() {
 
   const config = STATUS_CONFIG[execution.status];
   const StatusIcon = config.icon;
-  const promptBody = execution.input_prompt ?? "";
-  const hasPrompt = promptBody.length > 0;
-
-  async function handleCopyPrompt() {
-    const copiedSuccessfully = await copyTextToClipboard(promptBody);
-    if (!copiedSuccessfully) return;
-    toast.success(t("executions.prompt.copied"));
-  }
-
   const tabs: { id: DetailTab; label: string }[] = [
     { id: "overview", label: t("executions.tabs.overview") },
     { id: "prompt", label: t("executions.tabs.prompt") },
@@ -133,9 +125,11 @@ export function ExecutionDetailPage() {
           return (
             <button
               key={tab.id}
+              id={`${tabIdPrefix}-tab-${tab.id}`}
               role="tab"
               type="button"
               aria-selected={isActive}
+              aria-controls={`${tabIdPrefix}-panel-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "relative z-10 flex items-center gap-2 rounded-[min(var(--radius-cap),calc(var(--radius-lg)-0.1rem))] px-4 py-2 text-sm font-medium transition-colors duration-200",
@@ -153,7 +147,8 @@ export function ExecutionDetailPage() {
       {activeTab === "overview" && (
         <div
           role="tabpanel"
-          aria-label={t("executions.tabs.overview")}
+          id={`${tabIdPrefix}-panel-overview`}
+          aria-labelledby={`${tabIdPrefix}-tab-overview`}
           className="space-y-[var(--page-section-gap)]"
         >
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -305,45 +300,11 @@ export function ExecutionDetailPage() {
       {activeTab === "prompt" && (
         <div
           role="tabpanel"
-          aria-label={t("executions.tabs.prompt")}
+          id={`${tabIdPrefix}-panel-prompt`}
+          aria-labelledby={`${tabIdPrefix}-tab-prompt`}
           className="space-y-4"
         >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                {t("executions.renderedPrompt")}
-                {hasPrompt && (
-                  <Badge variant="secondary">
-                    {t("executions.prompt.captured")}
-                  </Badge>
-                )}
-              </CardTitle>
-              {hasPrompt && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyPrompt}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  {t("executions.prompt.copy")}
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {hasPrompt ? (
-                <pre
-                  data-testid="execution-prompt-body"
-                  className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded bg-muted p-3 font-mono text-xs"
-                >
-                  {promptBody}
-                </pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t("executions.prompt.empty")}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <ExecutionPromptPanel slug={slug} execution={execution} history={receiptHistory} />
         </div>
       )}
     </div>

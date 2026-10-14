@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "dev.backplane.companion.desktop.e2e",
+  "build": {
+    "beforeBuildCommand": "pnpm build:e2e-frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        "popover",
+        {
+          "identifier": "e2e-wdio",
+          "description": "Smoke-test builds only (tauri.e2e.conf.json overlay): the wdio bridge.",
+          "windows": ["popover"],
+          "permissions": ["wdio:default"]
+        }
+      ]
+    }
+  }
+}

@@ -12,6 +12,9 @@ export interface AuthModes {
   dev_mode: boolean;
   login_path: string;
   logout_path: string;
+  companion_enabled: boolean;
+  // Absent from servers that predate rich capture.
+  rich_capture_enabled?: boolean;
 }
 
 // The only auth endpoint a signed-out browser may read — it tells the SPA

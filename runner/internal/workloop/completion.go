@@ -121,6 +121,9 @@ func (m *LoopMode) executeCompletionWork(ctx context.Context, cfg *valaris.Board
 	if work.AttemptID == "" || work.LeaseToken == "" || work.CandidateID == "" || work.CardID == "" || work.Role == "" || work.Context == "" || work.PolicyHash == "" || work.ContractHash == "" {
 		return fail("completion claim is missing required identity or mandatory context")
 	}
+	if err := m.refuseRequiredDispatch(ctx); err != nil {
+		return fail(err.Error())
+	}
 	if work.PolicyHash != cfg.CompletionPolicyHash {
 		return fail("completion claim policy changed; request a current candidate")
 	}

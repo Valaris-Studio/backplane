@@ -233,6 +233,19 @@ export function ReferenceEventTaxonomy() {
             </tr>
             <tr className="border-b border-border align-top">
               <td className="py-3 pr-4">
+                <code>execution.context_receipt_created</code>
+              </td>
+              <td className="py-3 pr-4">
+                <code>ExecutionContextService.prepare</code> after the
+                preparing transaction commits
+              </td>
+              <td className="py-3 pr-4">
+                <code>execution_id, workspace_id, receipt_id, ordinal</code>;
+                never sent for an exact replay
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4">
                 <code>agent.status_changed</code>
               </td>
               <td className="py-3 pr-4">
@@ -461,7 +474,8 @@ export function ReferenceEventTaxonomy() {
         through <code>activity.member.*</code>, and the original approval,
         execution, agent-status, config, and cost events. It does not expose{" "}
         <code>activity.agent.*</code> or the newer direct events such as{" "}
-        <code>execution.warning</code>, <code>agent.paused</code>,{" "}
+        <code>execution.warning</code>,{" "}
+        <code>execution.context_receipt_created</code>, <code>agent.paused</code>,{" "}
         <code>agent.resumed</code>, <code>agent.restart_requested</code>,{" "}
         <code>agent.hard_deleted</code>, <code>board.loop_updated</code>,{" "}
         <code>api_key.first_used</code>, <code>notification.created</code>, or{" "}

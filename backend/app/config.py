@@ -1,10 +1,62 @@
 # Copyright (c) 2026 Valaris Studio
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from pydantic import SecretStr, model_validator
-from pydantic_settings import BaseSettings
+import json
+from typing import Annotated
+
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
+from pydantic_settings import BaseSettings, NoDecode
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
+
+
+class ContextBudgetCeilings(BaseModel):
+    """Instance maxima for opted-in context budgets. Operators may raise or lower
+    them; workspace defaults never rise with them, and an inherited workspace
+    value above a lowered ceiling is refused, not clamped."""
+
+    model_config = {"extra": "forbid"}
+
+    version: StrictInt = 1
+    max_note_body_bytes: StrictInt = Field(1_048_576, gt=0)
+    max_note_fetch_bytes: StrictInt = Field(2_097_152, gt=0)
+    max_optional_note_bytes: StrictInt = Field(65_536, gt=0)
+    max_managed_context_bytes: StrictInt = Field(131_072, gt=0)
+    max_invocation_bytes: StrictInt = Field(262_144, gt=0)
+    max_sources: StrictInt = Field(32, gt=0)
+    max_diagnostic_entries: StrictInt = Field(64, gt=0)
+    # Room for the complete fixed reason-count envelope with no entries.
+    max_diagnostic_bytes: StrictInt = Field(65_536, ge=512)
+    max_json_depth: StrictInt = Field(128, gt=0)
+    max_json_nodes: StrictInt = Field(100_000, gt=0)
+
+    @field_validator("version")
+    @classmethod
+    def _supported_version(cls, version: int) -> int:
+        if version != 1:
+            raise ValueError("version must be 1")
+        return version
+
+    @model_validator(mode="after")
+    def _consistent_byte_maxima(self):
+        if self.max_note_body_bytes > self.max_note_fetch_bytes:
+            raise ValueError("max_note_body_bytes must not exceed max_note_fetch_bytes")
+        if not (
+            self.max_optional_note_bytes
+            <= self.max_managed_context_bytes
+            <= self.max_invocation_bytes
+        ):
+            raise ValueError(
+                "max_optional_note_bytes <= max_managed_context_bytes <= max_invocation_bytes"
+            )
+        return self
 
 
 class Settings(BaseSettings):
@@ -32,6 +84,18 @@ class Settings(BaseSettings):
     # it). Defends the identity header against clients that can reach the
     # backend port directly. Empty = handshake off.
     TRUSTED_PROXY_SECRET: str = ""
+    # Our own proxies' addresses (comma-separated IPs/CIDRs), peeled off the
+    # right of X-Forwarded-For to find the client — e.g. the load balancer's
+    # forwarding-rule IP when it fronts Cloud Run through a serverless NEG.
+    # Empty is safe: the client resolves to the nearest hop, which an extra
+    # unlisted proxy can only collapse into one shared IP, never let a caller
+    # choose. See app/core/client_ip.py.
+    FORWARDED_TRUSTED_PROXIES: str = ""
+    # Shared with an edge proxy (the frontend nginx) that forwards the chain it
+    # observed in X-Backplane-Edge-Forwarded-For. Needed where the backend URL
+    # is also public: the header alone is forgeable, the secret is what proves
+    # the hop. Empty = edge chain ignored.
+    EDGE_PROXY_SECRET: str = ""
     # Comma-separated email domains allowed to sign in via IAP / trusted-proxy
     # (API keys and dev mode are exempt). Verifiers prove identity, not
     # membership — this is the tenant boundary. Empty = allow all domains.
@@ -67,6 +131,17 @@ class Settings(BaseSettings):
     # shipping a URL that 404s would be dishonest. Until one is stood up,
     # enabling telemetry without also setting this is a no-op by construction.
     BACKPLANE_TELEMETRY_ENDPOINT: str = ""
+    # Backplane Companion: device pairing (an UNAUTHENTICATED start endpoint),
+    # session capture and its retention sweep. Off, every companion, pairing
+    # and captured-session route answers 404 as if it never existed, and the
+    # retention loop leaves companion data alone. Off by default so an existing
+    # deployment only exposes it once an operator opts in.
+    COMPANION_ENABLED: bool = False
+    # Rich session capture (content bodies beside events). Off, devices get
+    # no offer, contents are recorded withheld and new mappings keep the
+    # standard default. Flipped in production by commit only: cloudbuild's
+    # --set-env-vars wipes out-of-band values.
+    RICH_CAPTURE_ENABLED: bool = False
     # EventBus backend selection (memory | postgres). The bus factory reads the
     # raw env var at module import (the singleton exists before Settings is
     # guaranteed constructed) — this field mirrors it so the knob is documented
@@ -135,6 +210,35 @@ class Settings(BaseSettings):
     # persisted. Defaults to the dev Vite origin; production overrides via env
     # to the IAP-fronted Cloud Run host.
     FRONTEND_URL: str = "http://localhost:5173"
+    # One JSON object of instance context-budget maxima (see ContextBudgetCeilings);
+    # partial objects inherit the rest. Malformed or inconsistent values fail startup.
+    # NoDecode: the environment string is decoded below, so an explicit JSON
+    # `null` fails instead of being silently dropped; init may pass an object.
+    CONTEXT_BUDGET_CEILINGS: Annotated[ContextBudgetCeilings, NoDecode] = Field(
+        default_factory=ContextBudgetCeilings
+    )
+
+    @field_validator("CONTEXT_BUDGET_CEILINGS", mode="before")
+    @classmethod
+    def _decode_ceilings(cls, value):
+        if isinstance(value, (str, bytes)):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                raise ValueError("CONTEXT_BUDGET_CEILINGS must be a JSON object") from None
+        if value is None:
+            raise ValueError("CONTEXT_BUDGET_CEILINGS must be a JSON object")
+        return value
+
+    @model_validator(mode="after")
+    def validate_forwarded_trusted_proxies(self):
+        from app.core.client_ip import parse_trusted_proxies
+
+        try:
+            parse_trusted_proxies(self.FORWARDED_TRUSTED_PROXIES)
+        except ValueError as exc:
+            raise ValueError(f"FORWARDED_TRUSTED_PROXIES: {exc}") from None
+        return self
 
     @model_validator(mode="after")
     def apply_database_password(self):

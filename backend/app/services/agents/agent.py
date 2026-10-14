@@ -152,8 +152,8 @@ class AgentService:
 
     async def rotate_api_key(self, agent_id: uuid.UUID, user_id: uuid.UUID):
         # No verify_caller_owns_agent: POST /{id}/rotate-key carries
-        # forbid_agent_callers, so an agent key never reaches this code and the
-        # only caller shape left is the creating human.
+        # forbid_credential_management, so an agent key never reaches this code
+        # and the only caller shape left is the creating human.
         agent = await self.repo.get_by_id(agent_id)
         if not agent or agent.created_by_id != user_id:
             raise ResourceNotFoundError("Agent not found")

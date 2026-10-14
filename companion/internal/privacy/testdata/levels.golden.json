@@ -1,0 +1,118 @@
+{
+  "levels": ["metadata", "standard", "full", "rich"],
+  "treatments": {
+    "sent": "leaves the device as written, after masking and the per-string bound",
+    "withheld": "only its size and a fingerprint leave the device",
+    "removed": "nothing of it leaves the device",
+    "name_only": "only the folder's own name leaves the device",
+    "project_relative": "the path inside the project leaves the device"
+  },
+  "categories": [
+    {
+      "id": "activity_counts",
+      "label": "Counts, timing, tokens and cost",
+      "sends": {"metadata": "sent", "standard": "sent", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "pi_cli", "event": "message_end", "path": "message.usage.output", "payload": {"type": "message_end", "sessionId": "s1", "cwd": "/repo", "message": {"role": "assistant", "model": "claude-x", "content": [], "usage": {"input": 10, "output": 4242, "cost": {"total": 0.001}}}}}
+      ]
+    },
+    {
+      "id": "tool_names",
+      "label": "Agent, model, tool and MCP tool names",
+      "sends": {"metadata": "sent", "standard": "sent", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "PreToolUse", "path": "tool_name", "payload": {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "mcp__sentinel_tools__lookup", "tool_input": {}}},
+        {"agent": "pi_cli", "event": "message_end", "path": "message.model", "payload": {"type": "message_end", "sessionId": "s1", "cwd": "/repo", "message": {"role": "assistant", "model": "sentinel-model-7", "content": []}}}
+      ]
+    },
+    {
+      "id": "working_folder",
+      "label": "The working folder",
+      "sends": {"metadata": "name_only", "standard": "project_relative", "full": "project_relative", "rich": "project_relative"},
+      "probes": [
+        {"kind": "working_directory", "root": "/home/dev/code/storefront-api", "working_directory": "/home/dev/code/storefront-api/packages/api", "name_only": "api", "project_relative": "packages/api"},
+        {"kind": "working_directory", "root": "/home/dev/code/storefront-api", "working_directory": "/home/dev/code/storefront-api", "name_only": "storefront-api", "project_relative": "."}
+      ]
+    },
+    {
+      "id": "prompts",
+      "label": "Your prompts",
+      "sends": {"metadata": "withheld", "standard": "sent", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "UserPromptSubmit", "path": "prompt", "payload": {"hook_event_name": "UserPromptSubmit", "session_id": "s1", "cwd": "/repo", "prompt": "SENTINEL_PROMPT rename the billing module"}},
+        {"agent": "pi_cli", "event": "input", "path": "text", "payload": {"type": "input", "sessionId": "s1", "cwd": "/repo", "text": "SENTINEL_PI_PROMPT rename the billing module"}}
+      ]
+    },
+    {
+      "id": "tool_arguments",
+      "label": "Commands and tool arguments, including file paths",
+      "sends": {"metadata": "withheld", "standard": "sent", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "PreToolUse", "path": "tool_input.command", "payload": {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "Bash", "tool_input": {"command": "grep SENTINEL_COMMAND src/billing.py"}}},
+        {"agent": "claude_code", "event": "PreToolUse", "path": "tool_input.file_path", "payload": {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "Read", "tool_input": {"file_path": "src/SENTINEL_FILE_PATH.py"}}}
+      ]
+    },
+    {
+      "id": "error_messages",
+      "label": "Error messages",
+      "sends": {"metadata": "withheld", "standard": "sent", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "PostToolUseFailure", "path": "error", "payload": {"hook_event_name": "PostToolUseFailure", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "Bash", "tool_input": {"command": "make"}, "error": "SENTINEL_ERROR target not found"}}
+      ]
+    },
+    {
+      "id": "tool_output",
+      "label": "Tool and command output",
+      "sends": {"metadata": "withheld", "standard": "withheld", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "PostToolUse", "path": "tool_response.stdout", "payload": {"hook_event_name": "PostToolUse", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "Bash", "tool_input": {"command": "ls"}, "tool_response": {"stdout": "SENTINEL_STDOUT billing.py"}}},
+        {"agent": "pi_cli", "event": "tool_result", "path": "content.0.text", "payload": {"type": "tool_result", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "read", "content": [{"type": "text", "text": "SENTINEL_PI_OUTPUT def charge():"}]}}
+      ]
+    },
+    {
+      "id": "agent_replies",
+      "label": "The agent's replies",
+      "sends": {"metadata": "withheld", "standard": "withheld", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "Stop", "path": "last_assistant_message", "payload": {"hook_event_name": "Stop", "session_id": "s1", "cwd": "/repo", "last_assistant_message": "SENTINEL_CLAUDE_REPLY the module is renamed"}},
+        {"agent": "pi_cli", "event": "message_end", "path": "message.content.1.text", "payload": {"type": "message_end", "sessionId": "s1", "cwd": "/repo", "message": {"role": "assistant", "model": "claude-x", "content": [{"type": "thinking", "thinking": "SENTINEL_PI_THINKING plan the rename"}, {"type": "text", "text": "SENTINEL_PI_REPLY the module is renamed"}]}}},
+        {"agent": "pi_cli", "event": "message_end", "path": "message.content.0.thinking", "payload": {"type": "message_end", "sessionId": "s1", "cwd": "/repo", "message": {"role": "assistant", "model": "claude-x", "content": [{"type": "thinking", "thinking": "SENTINEL_PI_THINKING plan the rename"}, {"type": "text", "text": "SENTINEL_PI_REPLY the module is renamed"}]}}},
+        {"kind": "normalized", "path": "gen_ai.output.messages.0.parts.0.content", "normalized": {"event": {"action": "agent.reasoning"}, "gen_ai": {"output": {"messages": [{"role": "assistant", "parts": [{"type": "reasoning", "content": "SENTINEL_EVENT_REASONING"}]}]}}, "session": {"id": "s1"}}},
+        {"kind": "normalized", "path": "raw.pi.message.content.0.text", "normalized": {"event": {"action": "agent.reasoning"}, "raw": {"pi": {"type": "message_end", "message": {"role": "assistant", "model": "claude-x", "content": [{"type": "text", "text": "SENTINEL_EVENT_REPLY"}]}}}, "session": {"id": "s1"}}}
+      ]
+    },
+    {
+      "id": "file_diffs",
+      "label": "File diffs",
+      "sends": {"metadata": "withheld", "standard": "withheld", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "pi_cli", "event": "tool_result", "path": "details.diff", "payload": {"type": "tool_result", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "edit", "content": [], "details": {"diff": "-old\n+SENTINEL_DIFF new"}}},
+        {"agent": "pi_cli", "event": "tool_call", "path": "input.newText", "payload": {"type": "tool_call", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "edit", "input": {"path": "src/billing.py", "oldText": "old_charge", "newText": "SENTINEL_PI_EDIT_NEW"}}},
+        {"agent": "pi_cli", "event": "tool_call", "path": "input.edits.0.oldText", "payload": {"type": "tool_call", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "edit", "input": {"path": "src/billing.py", "edits": [{"oldText": "SENTINEL_PI_EDIT_OLD", "newText": "new_charge"}]}}},
+        {"agent": "pi_cli", "event": "tool_call", "path": "input.content", "payload": {"type": "tool_call", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "write", "input": {"path": "src/billing.py", "content": "SENTINEL_PI_WRITE"}}},
+        {"kind": "normalized", "path": "tool.command", "normalized": {"event": {"action": "tool.invoked"}, "harness": {"name": "codex_cli"}, "gen_ai": {"tool": {"name": "exec", "call": {"id": "call_3", "arguments": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: cli/existing.txt\\n@@\\n+SENTINEL_CODEX_EXEC_PATCH\\n*** End Patch\"));"}}}, "tool": {"name": "exec", "command": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: cli/existing.txt\\n@@\\n+SENTINEL_CODEX_EXEC_PATCH\\n*** End Patch\"));"}, "raw": {"attributes": {"tool_name": "exec", "tool_namespace": "functions", "arguments": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: cli/existing.txt\\n@@\\n+SENTINEL_CODEX_EXEC_PATCH\\n*** End Patch\"));"}}, "session": {"id": "s1"}}},
+        {"kind": "normalized", "path": "gen_ai.tool.call.arguments", "normalized": {"event": {"action": "tool.invoked"}, "harness": {"name": "codex_cli"}, "gen_ai": {"tool": {"name": "apply_patch", "call": {"id": "call_2", "arguments": "*** Begin Patch\n*** Update File: billing.py\n+SENTINEL_CODEX_PATCH\n*** End Patch"}}}, "tool": {"name": "apply_patch", "command": "*** Begin Patch\n*** Update File: billing.py\n+SENTINEL_CODEX_PATCH\n*** End Patch"}, "raw": {"attributes": {"tool_name": "apply_patch", "arguments": "*** Begin Patch\n*** Update File: billing.py\n+SENTINEL_CODEX_PATCH\n*** End Patch"}}, "session": {"id": "s1"}}},
+        {"kind": "normalized", "path": "file.diff", "normalized": {"event": {"action": "file.modified", "category": "file"}, "file": {"diff": "--- a/billing.py\n+++ b/billing.py\n@@ -1,1 +1,1 @@\n-old_charge\n+SENTINEL_CLAUDE_DIFF", "diff_bytes": 72, "language": "py", "operation": "modify", "path": "billing.py"}, "tool": {"name": "Edit", "path": "billing.py"}, "session": {"id": "s1"}}}
+      ]
+    },
+    {
+      "id": "command_file_content",
+      "label": "File contents that commands write",
+      "sends": {"metadata": "withheld", "standard": "withheld", "full": "sent", "rich": "sent"},
+      "probes": [
+        {"agent": "claude_code", "event": "PreToolUse", "path": "tool_input.command", "payload": {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": "/repo", "tool_use_id": "t1", "tool_name": "Bash", "tool_input": {"command": "cat > src/billing.py <<'EOF'\nSENTINEL_HEREDOC_BODY = 1\nEOF"}}},
+        {"agent": "pi_cli", "event": "tool_call", "path": "input.command", "payload": {"type": "tool_call", "sessionId": "s1", "cwd": "/repo", "toolCallId": "c1", "toolName": "bash", "input": {"command": "echo 'SENTINEL_ECHO_BODY' > .env"}}},
+        {"agent": "pi_cli", "event": "user_bash", "path": "command", "payload": {"type": "user_bash", "sessionId": "s1", "cwd": "/repo", "command": "git apply <<'D'\n--- a/billing.py\n+++ b/billing.py\n@@ -1 +1 @@\n-old\n+SENTINEL_USER_DIFF\nD"}},
+        {"kind": "normalized", "path": "command.command", "normalized": {"event": {"action": "command.executed"}, "harness": {"name": "codex_cli"}, "tool": {"name": "exec_command", "command": "cat > src/billing.py <<'EOF'\nSENTINEL_HEREDOC_BODY = 1\nEOF"}, "command": {"command": "cat > src/billing.py <<'EOF'\nSENTINEL_HEREDOC_BODY = 1\nEOF"}, "session": {"id": "s1"}}}
+      ]
+    },
+    {
+      "id": "transcript_path",
+      "label": "The agent's transcript file location",
+      "sends": {"metadata": "removed", "standard": "removed", "full": "removed", "rich": "removed"},
+      "probes": [
+        {"agent": "claude_code", "event": "Stop", "path": "transcript_path", "payload": {"hook_event_name": "Stop", "session_id": "s1", "cwd": "/repo", "transcript_path": "/home/dev/.claude/projects/SENTINEL_TRANSCRIPT.jsonl"}}
+      ]
+    }
+  ]
+}

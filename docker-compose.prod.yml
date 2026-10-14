@@ -70,6 +70,10 @@ services:
       GIT_USER_NAME: ${GIT_USER_NAME:-Backplane Merge Bot}
       GIT_USER_EMAIL: ${GIT_USER_EMAIL:-merge-bot@valaris.studio}
       MERGE_QUEUE_STALE_THRESHOLD_SECONDS: ${MERGE_QUEUE_STALE_THRESHOLD_SECONDS:-300}
+      # Null mapping on purpose: forwarded only when set in .env/the shell, so an
+      # unset value keeps the built-in JSON default (a `${VAR:-{...}}` default
+      # cannot hold a JSON object, and an empty value is invalid).
+      CONTEXT_BUDGET_CEILINGS:
       INTEGRATIONS_TOKEN_KEY: ${INTEGRATIONS_TOKEN_KEY:-}
       GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
@@ -88,11 +92,18 @@ services:
       AUTH_ALLOWED_EMAIL_DOMAINS: ${AUTH_ALLOWED_EMAIL_DOMAINS:-}
       AUTH_AUTO_PROVISION: ${AUTH_AUTO_PROVISION:-true}
       TRUSTED_PROXY_SECRET: ${TRUSTED_PROXY_SECRET:-}
+      FORWARDED_TRUSTED_PROXIES: ${FORWARDED_TRUSTED_PROXIES:-}
+      EDGE_PROXY_SECRET: ${EDGE_PROXY_SECRET:-}
 
       # Anonymous instance telemetry — off unless both are set (see
       # .env.example's Telemetry section).
       BACKPLANE_TELEMETRY_ENABLED: ${BACKPLANE_TELEMETRY_ENABLED:-false}
       BACKPLANE_TELEMETRY_ENDPOINT: ${BACKPLANE_TELEMETRY_ENDPOINT:-}
+
+      # Backplane Companion (pairing + session capture) — hidden unless true.
+      COMPANION_ENABLED: ${COMPANION_ENABLED:-false}
+      # Rich session capture (content bodies); needs COMPANION_ENABLED.
+      RICH_CAPTURE_ENABLED: ${RICH_CAPTURE_ENABLED:-false}
 
       # GCS service-account email, only relevant when GCS_BUCKET is set above.
       GCS_SA_EMAIL: ${GCS_SA_EMAIL:-}
@@ -128,6 +139,9 @@ services:
       - "${BACKPLANE_HTTP_PORT:-8080}:8080"
     environment:
       BACKEND_URL: http://backend:8000
+      EDGE_PROXY_SECRET: ${EDGE_PROXY_SECRET:-}
+      # Persist retired assets across upgrades into the volume below.
+      RETAIN_ASSETS_TO_VOLUME: "true"
     volumes:
       - frontend-assets:/var/lib/backplane/frontend
     depends_on:

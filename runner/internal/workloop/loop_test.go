@@ -30,6 +30,8 @@ func testConfig() *config.Config {
 		Valaris: config.ValarisConfig{
 			WorkspaceSlug: "test-workspace",
 		},
+		// These stubs are backends from before context dispatch negotiation.
+		ContextDispatch: config.ContextDispatchConfig{AllowLegacyServer: true},
 		LLM: config.LLMConfig{
 			Model:                      "sonnet",
 			MCPConfigPath:              "/tmp/mcp.json",
@@ -57,6 +59,9 @@ func testConfig() *config.Config {
 func testClientStubbed(t *testing.T) *valaris.Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		if r.URL.Path == "/api/agents/me/config" {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"agent_id": "agent-1",
@@ -413,6 +418,9 @@ func TestTick_NeedsApproval_Rejected(t *testing.T) {
 	reason := "too risky"
 	// Custom server that overrides approval endpoint with "rejected".
 	rejServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 
@@ -667,6 +675,10 @@ func testAPIServer(t *testing.T, opts testServerOptions) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		method := r.Method
+
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 
 		// Heartbeat
 		if strings.HasSuffix(path, "/heartbeat") {
@@ -2745,6 +2757,9 @@ func TestReviewerStrategy_RecordFailure_BlocksCard(t *testing.T) {
 
 	// Server that returns a card in review with PR URL, but LogExecutionStart fails.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 
@@ -3096,6 +3111,9 @@ func TestReviewerStrategy_ClaimFailure_IncreasesCardFailureCount(t *testing.T) {
 
 	// Server that returns a card in review, but LogExecutionStart fails (causes claim failure).
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 
@@ -3180,6 +3198,9 @@ func TestDocumentatorFailure_LeavesCardInDoneColumn(t *testing.T) {
 	removeParticipantCalled := false
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 
@@ -3329,6 +3350,9 @@ func TestDocumentatorFailure_CircuitBreakerStillTracks(t *testing.T) {
 	boardID := "board-doc-cb"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if servePreNegotiationBackend(w, r) {
+			return
+		}
 		path := r.URL.Path
 		method := r.Method
 

@@ -20,6 +20,7 @@ import {
   Heading3,
   List,
   ListOrdered,
+  ListChecks,
   Quote,
   Minus,
   Workflow,
@@ -33,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { FileAttachment } from "@/extensions/file-attachment";
+import { Checklist, ChecklistItem } from "@/extensions/checklist";
 import { MermaidCodeBlock } from "@/extensions/mermaid-code-block";
 import { Mention } from "@/components/shared/editor/mention-extension";
 import { htmlWinsClipboard, cleanPastedHtml } from "@/components/shared/editor/paste-rules";
@@ -59,6 +61,7 @@ export interface RichTextEditorProps {
   onChange: (json: string) => void;
   placeholder?: string;
   editable?: boolean;
+  allowMediaUpload?: boolean;
   workspaceSlug?: string;
   className?: string;
   toolbarClassName?: string;
@@ -106,6 +109,7 @@ export function RichTextEditor({
   onChange,
   placeholder,
   editable = true,
+  allowMediaUpload = true,
   workspaceSlug,
   className,
   toolbarClassName,
@@ -144,6 +148,8 @@ export function RichTextEditor({
       TableRow,
       TableCell,
       TableHeader,
+      Checklist,
+      ChecklistItem,
     ],
     content: parseContent(content),
     editable,
@@ -157,6 +163,10 @@ export function RichTextEditor({
       },
       transformPastedHTML: (html) => cleanPastedHtml(html),
       handlePaste: (view, event) => {
+        if (!allowMediaUpload && event.clipboardData?.files.length) {
+          event.preventDefault();
+          return true;
+        }
         // Word/GDocs ship a PNG rendition alongside the real text/html —
         // returning false lets ProseMirror parse the html instead of uploading it.
         if (event.clipboardData && htmlWinsClipboard(event.clipboardData)) return false;
@@ -185,6 +195,10 @@ export function RichTextEditor({
         return false;
       },
       handleDrop: (_view, event) => {
+        if (!allowMediaUpload && event.dataTransfer?.files.length) {
+          event.preventDefault();
+          return true;
+        }
         // Decision on types only — the html payload is unreadable pre-drop in
         // some browsers, so an html-carrying drop always goes to ProseMirror.
         if (event.dataTransfer?.types.includes("text/html")) return false;
@@ -212,6 +226,7 @@ export function RichTextEditor({
 
   // Sync external content changes (e.g. when switching between notes)
   const lastContentRef = useRef(content);
+  useEffect(() => { editor?.setEditable(editable, false); }, [editor, editable]);
   useEffect(() => {
     if (!editor || content === lastContentRef.current) return;
     lastContentRef.current = content;
@@ -241,7 +256,7 @@ export function RichTextEditor({
 
   const handleImageFile = useCallback(
     async (file: File) => {
-      if (!editor || !workspaceSlug) return;
+      if (!editor || !workspaceSlug || !allowMediaUpload) return;
       try {
         const src = await uploadImage(file);
         editor.chain().focus().setImage({ src, alt: file.name }).run();
@@ -249,12 +264,12 @@ export function RichTextEditor({
         reportUploadFailure(file, error, () => void handleImageFile(file));
       }
     },
-    [editor, uploadImage, workspaceSlug, reportUploadFailure],
+    [editor, uploadImage, workspaceSlug, reportUploadFailure, allowMediaUpload],
   );
 
   const handleAttachmentFile = useCallback(
     async (file: File) => {
-      if (!editor || !workspaceSlug) return;
+      if (!editor || !workspaceSlug || !allowMediaUpload) return;
 
       // Insert placeholder node
       editor
@@ -297,7 +312,7 @@ export function RichTextEditor({
         reportUploadFailure(file, error, () => void handleAttachmentFile(file));
       }
     },
-    [editor, uploadFile, workspaceSlug, reportUploadFailure],
+    [editor, uploadFile, workspaceSlug, reportUploadFailure, allowMediaUpload],
   );
 
   function handleImageButton() {
@@ -454,6 +469,15 @@ export function RichTextEditor({
           </Toggle>
           <Toggle
             size="sm"
+            pressed={editor.isActive("taskList")}
+            onPressedChange={() => editor.chain().focus().toggleTaskList().run()}
+            aria-label={t("editor.taskList")}
+            title={t("editor.taskList")}
+          >
+            <ListChecks className="h-4 w-4" />
+          </Toggle>
+          <Toggle
+            size="sm"
             pressed={editor.isActive("blockquote")}
             onPressedChange={() => editor.chain().focus().toggleBlockquote().run()}
             aria-label={t("editor.blockquote")}
@@ -492,7 +516,7 @@ export function RichTextEditor({
             <LinkIcon className="h-4 w-4" />
           </Toggle>
 
-          {workspaceSlug && (
+          {workspaceSlug && allowMediaUpload && (
             <>
               <Toggle
                 size="sm"

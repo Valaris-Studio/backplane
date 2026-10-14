@@ -1,0 +1,8 @@
+{
+  "model": "MappingEffectiveCapture",
+  "why": "a downgrade is always explained",
+  "body": {
+    "content_level": "rich",
+    "effective_content_level": "full"
+  }
+}

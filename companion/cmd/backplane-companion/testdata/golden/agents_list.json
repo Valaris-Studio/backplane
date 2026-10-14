@@ -1,0 +1,23 @@
+[
+  {
+    "id": "claude_code",
+    "presence": {
+      "installed": false,
+      "config_path": "<HOME>/.claude/settings.json"
+    }
+  },
+  {
+    "id": "codex_cli",
+    "presence": {
+      "installed": false,
+      "config_path": "<HOME>/.codex/hooks.json"
+    }
+  },
+  {
+    "id": "pi_cli",
+    "presence": {
+      "installed": false,
+      "config_path": "<HOME>/.pi/agent/extensions/backplane-companion.ts"
+    }
+  }
+]

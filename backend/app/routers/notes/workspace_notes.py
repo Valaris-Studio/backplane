@@ -92,16 +92,23 @@ async def list_workspace_notes(
     return notes
 
 
-@router.post("", response_model=NoteRead, status_code=201)
+@router.post(
+    "", response_model=NoteRead, status_code=201,
+    responses={200: {"model": NoteRead}},
+)
 async def create_workspace_note(
     data: NoteCreate,
+    response: Response,
     ctx: WorkspaceContext = Depends(get_workspace_member),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = NoteService(db)
-    return await service.create_note(
+    note, created = await service.save_note(
         ctx.workspace.id, data, ctx.user.id, data.board_id
     )
+    if not created:
+        response.status_code = 200
+    return note
 
 
 @router.get("/resolve", response_model=NoteRead)
@@ -131,6 +138,7 @@ async def get_workspace_note(
         note_id,
         ctx.workspace.id,
         as_markdown=format == NoteFormat.markdown,
+        reader_id=ctx.user.id,
     )
 
 

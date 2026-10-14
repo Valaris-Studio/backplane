@@ -1,0 +1,916 @@
+{
+  "description": "File content a command carries, as the Standard level must withhold it (apply_patch envelopes, unified diffs, heredoc bodies and echo/printf text that write a file or feed a patch tool), and look-alikes it must send unchanged. Run by companion/internal/privacy (Go) and backend/tests/test_companion_ingest.py (Python), so both detectors stay the same.",
+  "cases": [
+    {
+      "name": "codex exec JavaScript, escaped newlines",
+      "input": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: cli/existing.txt\\n@@\\n+MARK-EDIT\\n*** Add File: cli/new.txt\\n+MARK-NEW\\n*** End Patch\"));",
+      "withheld": true,
+      "kept": [
+        "text(await tools.apply_patch(\"",
+        "\"));"
+      ],
+      "gone": [
+        "MARK-EDIT",
+        "MARK-NEW"
+      ]
+    },
+    {
+      "name": "shell heredoc, raw newlines",
+      "input": "cd cli && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.txt\n+MARK-EDIT\n*** End Patch\nPATCH",
+      "withheld": true,
+      "kept": [
+        "cd cli && apply_patch <<'PATCH'\n",
+        "\nPATCH"
+      ],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "JavaScript inside JSON, doubly escaped",
+      "input": "{\"code\":\"tools.apply_patch(\\\"*** Begin Patch\\\\n*** Add File: b.txt\\\\n+MARK-NEW\\\\n*** End Patch\\\")\"}",
+      "withheld": true,
+      "kept": [
+        "{\"code\":\"tools.apply_patch(\\\""
+      ],
+      "gone": [
+        "MARK-NEW"
+      ]
+    },
+    {
+      "name": "CRLF line endings",
+      "input": "apply_patch '*** Begin Patch\r\n*** Update File: a.txt\r\n+MARK-EDIT\r\n*** End Patch'",
+      "withheld": true,
+      "kept": [
+        "apply_patch '"
+      ],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "two envelopes",
+      "input": "*** Begin Patch\n*** Delete File: c.txt\n*** End Patch && *** Begin Patch\n*** Add File: d.txt\n+MARK-NEW\n*** End Patch",
+      "withheld": true,
+      "kept": [
+        " && "
+      ],
+      "gone": [
+        "MARK-NEW",
+        "c.txt",
+        "d.txt"
+      ]
+    },
+    {
+      "name": "cut short after a file header",
+      "input": "apply_patch \"*** Begin Patch\n*** Update File: a.txt\n+MARK-EDIT",
+      "withheld": true,
+      "kept": [
+        "apply_patch \""
+      ],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "lowercase markers",
+      "input": "*** begin patch\n*** update file: a.txt\n+MARK-EDIT\n*** end patch",
+      "withheld": true,
+      "kept": [],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "mixed-case markers",
+      "input": "*** BEGIN Patch\n*** add FILE: a.txt\n+MARK-NEW\n*** End PATCH",
+      "withheld": true,
+      "kept": [],
+      "gone": [
+        "MARK-NEW"
+      ]
+    },
+    {
+      "name": "indented file header",
+      "input": "apply_patch <<'P'\n*** Begin Patch\n    *** Update File: a.txt\n+MARK-EDIT\n*** End Patch\nP",
+      "withheld": true,
+      "kept": [
+        "apply_patch <<'P'\n"
+      ],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "tab-indented header after an escaped newline",
+      "input": "tools.apply_patch(\"*** Begin Patch\\n\\t*** Add File: a.txt\\n+MARK-NEW\\n*** End Patch\")",
+      "withheld": true,
+      "kept": [
+        "tools.apply_patch(\""
+      ],
+      "gone": [
+        "MARK-NEW"
+      ]
+    },
+    {
+      "name": "move header right after the begin marker",
+      "input": "*** Begin Patch\n*** Move to: b.txt\n+MARK-EDIT\n*** End Patch",
+      "withheld": true,
+      "kept": [],
+      "gone": [
+        "MARK-EDIT"
+      ]
+    },
+    {
+      "name": "heredoc to a file, redirect before the heredoc",
+      "input": "cat > src/app.py <<'EOF'\nprint('BODY-1')\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat > src/app.py <<'EOF'\n",
+        "\nEOF"
+      ],
+      "gone": [
+        "BODY-1"
+      ]
+    },
+    {
+      "name": "heredoc to a file, redirect after the heredoc",
+      "input": "cat <<EOF > notes.md\nBODY-2 line\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat <<EOF > notes.md\n",
+        "\nEOF"
+      ],
+      "gone": [
+        "BODY-2"
+      ]
+    },
+    {
+      "name": "heredoc appended to a file",
+      "input": "cat <<\"EOF\" >> CHANGELOG.md\n- BODY-3\nEOF\ngit add CHANGELOG.md",
+      "withheld": true,
+      "kept": [
+        "cat <<\"EOF\" >> CHANGELOG.md\n",
+        "\nEOF\ngit add CHANGELOG.md"
+      ],
+      "gone": [
+        "BODY-3"
+      ]
+    },
+    {
+      "name": "heredoc through tee",
+      "input": "cat <<'EOF' | tee config.yaml\nkey: BODY-4\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat <<'EOF' | tee config.yaml\n",
+        "\nEOF"
+      ],
+      "gone": [
+        "BODY-4"
+      ]
+    },
+    {
+      "name": "heredoc into sudo tee",
+      "input": "sudo tee /etc/app.conf > /dev/null <<EOF\nsecret=BODY-5\nEOF",
+      "withheld": true,
+      "kept": [
+        "sudo tee /etc/app.conf > /dev/null <<EOF\n"
+      ],
+      "gone": [
+        "BODY-5"
+      ]
+    },
+    {
+      "name": "heredoc with tab-stripping operator",
+      "input": "cat > a.txt <<-EOF\n\tBODY-6\n\tEOF\necho done",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<-EOF\n",
+        "echo done"
+      ],
+      "gone": [
+        "BODY-6"
+      ]
+    },
+    {
+      "name": "heredoc after mkdir in one command line",
+      "input": "mkdir -p src && cat > src/b.go <<'GO'\npackage BODY7\nGO",
+      "withheld": true,
+      "kept": [
+        "mkdir -p src && cat > src/b.go <<'GO'\n",
+        "\nGO"
+      ],
+      "gone": [
+        "BODY7"
+      ]
+    },
+    {
+      "name": "heredoc to a file with escaped newlines (JavaScript string)",
+      "input": "tools.exec_command({cmd: \"cat > a.txt <<'EOF'\\nBODY-8\\nEOF\"})",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<'EOF'\\n"
+      ],
+      "gone": [
+        "BODY-8"
+      ]
+    },
+    {
+      "name": "heredoc to a file inside Codex JSON arguments",
+      "input": "{\"cmd\":\"cat > a.txt <<'EOF'\\nBODY-9\\nEOF\",\"workdir\":\"/home/dev/app\"}",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<'EOF'",
+        "\"workdir\""
+      ],
+      "gone": [
+        "BODY-9"
+      ]
+    },
+    {
+      "name": "heredoc to a file inside a Codex argv array",
+      "input": "[\"bash\",\"-lc\",\"cat > a.txt <<EOF\\nBODY-10\\nEOF\"]",
+      "withheld": true,
+      "kept": [
+        "\"bash\"",
+        "cat > a.txt <<EOF"
+      ],
+      "gone": [
+        "BODY-10"
+      ]
+    },
+    {
+      "name": "heredoc to a file with CRLF line endings",
+      "input": "cat > a.txt <<EOF\r\nBODY-11\r\nEOF\r\n",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<EOF\r\n"
+      ],
+      "gone": [
+        "BODY-11"
+      ]
+    },
+    {
+      "name": "heredoc to a file without its terminator",
+      "input": "cat > a.txt <<EOF\nBODY-12 first\nBODY-12 second",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<EOF\n"
+      ],
+      "gone": [
+        "BODY-12"
+      ]
+    },
+    {
+      "name": "two heredocs to two files",
+      "input": "cat > a.txt <<A\nBODY-13a\nA\ncat > b.txt <<B\nBODY-13b\nB",
+      "withheld": true,
+      "kept": [
+        "cat > a.txt <<A\n",
+        "cat > b.txt <<B\n"
+      ],
+      "gone": [
+        "BODY-13a",
+        "BODY-13b"
+      ]
+    },
+    {
+      "name": "heredoc fed to git apply",
+      "input": "git apply <<'PATCH'\nany content BODY-14\nPATCH",
+      "withheld": true,
+      "kept": [
+        "git apply <<'PATCH'\n",
+        "\nPATCH"
+      ],
+      "gone": [
+        "BODY-14"
+      ]
+    },
+    {
+      "name": "heredoc fed to patch",
+      "input": "patch -p1 <<EOF\nBODY-15\nEOF",
+      "withheld": true,
+      "kept": [
+        "patch -p1 <<EOF\n"
+      ],
+      "gone": [
+        "BODY-15"
+      ]
+    },
+    {
+      "name": "python script from stdin that writes a file",
+      "input": "python3 - <<'PY'\nopen('out.txt', 'w').write('BODY-16')\nPY",
+      "withheld": true,
+      "kept": [
+        "python3 - <<'PY'\n",
+        "\nPY"
+      ],
+      "gone": [
+        "BODY-16"
+      ]
+    },
+    {
+      "name": "python script writing through pathlib",
+      "input": "python <<PY\nfrom pathlib import Path\nPath('x').write_text('BODY-17')\nPY",
+      "withheld": true,
+      "kept": [
+        "python <<PY\n"
+      ],
+      "gone": [
+        "BODY-17"
+      ]
+    },
+    {
+      "name": "node script from stdin that writes a file",
+      "input": "node - <<'JS'\nrequire('fs').writeFileSync('a.json', 'BODY-18')\nJS",
+      "withheld": true,
+      "kept": [
+        "node - <<'JS'\n"
+      ],
+      "gone": [
+        "BODY-18"
+      ]
+    },
+    {
+      "name": "bash script from stdin that redirects to a file",
+      "input": "bash -s <<'SH'\necho BODY-19 > generated.txt\nSH",
+      "withheld": true,
+      "kept": [
+        "bash -s <<'SH'\n"
+      ],
+      "gone": [
+        "BODY-19"
+      ]
+    },
+    {
+      "name": "unified diff fed to git apply",
+      "input": "git apply <<'D'\ndiff --git a/a.txt b/a.txt\nindex 1..2 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1,2 +1,2 @@\n context\n-old BODY-20\n+new BODY-20\nD",
+      "withheld": true,
+      "kept": [
+        "git apply <<'D'\n",
+        "\nD"
+      ],
+      "gone": [
+        "BODY-20",
+        "a/a.txt"
+      ]
+    },
+    {
+      "name": "unified diff piped from echo",
+      "input": "echo '--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+BODY-21' | git apply",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        " | git apply"
+      ],
+      "gone": [
+        "BODY-21"
+      ]
+    },
+    {
+      "name": "unified diff inside a JavaScript string",
+      "input": "tools.exec_command({cmd: \"git apply <<EOF\\n--- a/x\\n+++ b/x\\n@@ -1 +1 @@\\n-a\\n+BODY-22\\nEOF\"})",
+      "withheld": true,
+      "kept": [
+        "tools.exec_command({cmd: \"git apply <<EOF"
+      ],
+      "gone": [
+        "BODY-22"
+      ]
+    },
+    {
+      "name": "unified diff with two hunks",
+      "input": "patch -p0 <<EOF\n--- x.txt\n+++ x.txt\n@@ -1,1 +1,1 @@\n-a\n+BODY-23a\n@@ -10,1 +10,1 @@\n-b\n+BODY-23b\nEOF",
+      "withheld": true,
+      "kept": [
+        "patch -p0 <<EOF\n"
+      ],
+      "gone": [
+        "BODY-23a",
+        "BODY-23b"
+      ]
+    },
+    {
+      "name": "unified diff with no newline marker",
+      "input": "git apply <<EOF\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+BODY-24\nEOF",
+      "withheld": true,
+      "kept": [
+        "git apply <<EOF\n"
+      ],
+      "gone": [
+        "BODY-24"
+      ]
+    },
+    {
+      "name": "echo redirected to a file",
+      "input": "echo 'API_URL=BODY-25' > .env",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        "> .env"
+      ],
+      "gone": [
+        "BODY-25"
+      ]
+    },
+    {
+      "name": "echo appended to a file",
+      "input": "echo \"- BODY-26\" >> notes.md && git add notes.md",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        ">> notes.md && git add notes.md"
+      ],
+      "gone": [
+        "BODY-26"
+      ]
+    },
+    {
+      "name": "printf redirected to a file",
+      "input": "printf '%s\\n' 'BODY-27' > out.txt",
+      "withheld": true,
+      "kept": [
+        "printf ",
+        "> out.txt"
+      ],
+      "gone": [
+        "BODY-27"
+      ]
+    },
+    {
+      "name": "echo piped to tee",
+      "input": "echo 'BODY-28' | tee -a log.txt",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        "| tee -a log.txt"
+      ],
+      "gone": [
+        "BODY-28"
+      ]
+    },
+    {
+      "name": "here-string redirected to a file",
+      "input": "cat <<< 'BODY-29' > b.txt",
+      "withheld": true,
+      "kept": [
+        "cat <<< ",
+        "> b.txt"
+      ],
+      "gone": [
+        "BODY-29"
+      ]
+    },
+    {
+      "name": "echo with a separator inside quotes",
+      "input": "echo \"a; BODY-30 && b\" > f.txt",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        "> f.txt"
+      ],
+      "gone": [
+        "BODY-30"
+      ]
+    },
+    {
+      "name": "unified diff in a heredoc to stdout",
+      "input": "cat <<EOF\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+BODY-31\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat <<EOF\n",
+        "\nEOF"
+      ],
+      "gone": [
+        "BODY-31"
+      ]
+    },
+    {
+      "name": "heredoc fed to dd of=",
+      "input": "dd of=src/app.py status=none <<'EOF'\nBODY-40\nEOF",
+      "withheld": true,
+      "kept": [
+        "dd of=src/app.py status=none <<'EOF'\n",
+        "\nEOF"
+      ],
+      "gone": [
+        "BODY-40"
+      ]
+    },
+    {
+      "name": "heredoc installed from stdin",
+      "input": "install -m 644 /dev/stdin /home/dev/.config/app.toml <<EOF\ntoken = BODY-41\nEOF",
+      "withheld": true,
+      "kept": [
+        "install -m 644 /dev/stdin /home/dev/.config/app.toml <<EOF\n"
+      ],
+      "gone": [
+        "BODY-41"
+      ]
+    },
+    {
+      "name": "heredoc copied from stdin",
+      "input": "cp /dev/stdin notes.md <<'EOF'\nBODY-42\nEOF",
+      "withheld": true,
+      "kept": [
+        "cp /dev/stdin notes.md <<'EOF'\n"
+      ],
+      "gone": [
+        "BODY-42"
+      ]
+    },
+    {
+      "name": "heredoc soaked into a file",
+      "input": "cat <<EOF | sponge config.yaml\nkey: BODY-43\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat <<EOF | sponge config.yaml\n"
+      ],
+      "gone": [
+        "BODY-43"
+      ]
+    },
+    {
+      "name": "heredoc to a process substitution that writes",
+      "input": "cat > >(tee out.txt) <<EOF\nBODY-44\nEOF",
+      "withheld": true,
+      "kept": [
+        "cat > >(tee out.txt) <<EOF\n"
+      ],
+      "gone": [
+        "BODY-44"
+      ]
+    },
+    {
+      "name": "heredoc to tee inside docker exec",
+      "input": "docker exec -i web tee /app/.env <<EOF\nSECRET=BODY-45\nEOF",
+      "withheld": true,
+      "kept": [
+        "docker exec -i web tee /app/.env <<EOF\n"
+      ],
+      "gone": [
+        "BODY-45"
+      ]
+    },
+    {
+      "name": "heredoc to tee under sudo with options",
+      "input": "sudo -E tee -a /etc/hosts <<EOF\n10.0.0.1 BODY-46\nEOF",
+      "withheld": true,
+      "kept": [
+        "sudo -E tee -a /etc/hosts <<EOF\n"
+      ],
+      "gone": [
+        "BODY-46"
+      ]
+    },
+    {
+      "name": "heredoc to tee under env assignments",
+      "input": "env LANG=C tee out.txt <<EOF\nBODY-47\nEOF",
+      "withheld": true,
+      "kept": [
+        "env LANG=C tee out.txt <<EOF\n"
+      ],
+      "gone": [
+        "BODY-47"
+      ]
+    },
+    {
+      "name": "heredoc to tee under nice",
+      "input": "nice -n 10 tee out.txt <<EOF\nBODY-48\nEOF",
+      "withheld": true,
+      "kept": [
+        "nice -n 10 tee out.txt <<EOF\n"
+      ],
+      "gone": [
+        "BODY-48"
+      ]
+    },
+    {
+      "name": "heredoc to tee under timeout",
+      "input": "timeout 5 tee out.txt <<EOF\nBODY-49\nEOF",
+      "withheld": true,
+      "kept": [
+        "timeout 5 tee out.txt <<EOF\n"
+      ],
+      "gone": [
+        "BODY-49"
+      ]
+    },
+    {
+      "name": "echo piped to dd of=",
+      "input": "echo 'BODY-50' | dd of=out.txt",
+      "withheld": true,
+      "kept": [
+        "echo ",
+        "| dd of=out.txt"
+      ],
+      "gone": [
+        "BODY-50"
+      ]
+    },
+    {
+      "name": "bare diff whose hunk header understates its lines",
+      "input": "--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+BODY-51a\n+BODY-51b\n+BODY-51c",
+      "withheld": true,
+      "kept": [],
+      "gone": [
+        "BODY-51a",
+        "BODY-51b",
+        "BODY-51c"
+      ]
+    },
+    {
+      "name": "echoed diff whose hunk header understates its lines",
+      "input": "echo '--- a/x.py\n+++ b/x.py\n@@ -1,1 +1,1 @@\n-a\n+BODY-52a\n BODY-52b\n+BODY-52c'",
+      "withheld": true,
+      "kept": [
+        "echo '"
+      ],
+      "gone": [
+        "BODY-52a",
+        "BODY-52b",
+        "BODY-52c"
+      ]
+    },
+    {
+      "name": "understated diff with a blank line inside",
+      "input": "--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+BODY-60a\n\n+BODY-60b\n+BODY-60c",
+      "withheld": true,
+      "kept": [],
+      "gone": [
+        "BODY-60a",
+        "BODY-60b",
+        "BODY-60c"
+      ]
+    },
+    {
+      "name": "diff followed by a blank line and prose",
+      "input": "--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+BODY-61\n\nThanks, kept-61 prose follows.",
+      "withheld": true,
+      "kept": [
+        "\n\nThanks, kept-61 prose follows."
+      ],
+      "gone": [
+        "BODY-61"
+      ]
+    },
+    {
+      "name": "diff followed by blank lines and a command",
+      "input": "git apply <<'D' && echo kept-62\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+BODY-62\n\n\nD",
+      "withheld": true,
+      "kept": [
+        "git apply <<'D' && echo kept-62\n"
+      ],
+      "gone": [
+        "BODY-62"
+      ]
+    },
+    {
+      "name": "an ordinary command",
+      "input": "make test",
+      "withheld": false
+    },
+    {
+      "name": "a grep for both markers",
+      "input": "grep -rn \"*** Begin Patch\" docs/ && echo \"*** End Patch\"",
+      "withheld": false
+    },
+    {
+      "name": "markers in reverse order",
+      "input": "echo \"*** End Patch\" && echo \"*** Begin Patch\"",
+      "withheld": false
+    },
+    {
+      "name": "apply_patch help",
+      "input": "apply_patch --help",
+      "withheld": false
+    },
+    {
+      "name": "a search for a header",
+      "input": "rg \"Update File:\" src/",
+      "withheld": false
+    },
+    {
+      "name": "no file operation after the begin marker",
+      "input": "*** Begin Patch\n+not a file operation\n*** End Patch",
+      "withheld": false
+    },
+    {
+      "name": "a header on the same line as the begin marker",
+      "input": "echo \"*** Begin Patch *** Update File: a.txt\"",
+      "withheld": false
+    },
+    {
+      "name": "ordinary unified diff fed to git apply",
+      "input": "git apply <<'D'\n--- a/a.txt\n+++ b/a.txt\n@@\n+BODY-32\nD",
+      "withheld": true,
+      "kept": [
+        "git apply <<'D'\n",
+        "\nD"
+      ],
+      "gone": [
+        "BODY-32"
+      ]
+    },
+    {
+      "name": "heredoc to psql",
+      "input": "psql \"$DATABASE_URL\" <<'SQL'\nSELECT id FROM cards WHERE title = 'kept-1';\nSQL",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to grep",
+      "input": "grep -f - src/*.py <<EOF\nkept-2\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "commit message heredoc",
+      "input": "git commit -F - <<'EOF'\nfix: kept-3\n\nBody of the message.\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "commit message through command substitution",
+      "input": "git commit -m \"$(cat <<'EOF'\nfeat: kept-4\nEOF\n)\"",
+      "withheld": false
+    },
+    {
+      "name": "pull request body heredoc",
+      "input": "gh pr create --title t --body-file - <<'EOF'\n## Summary\nkept-5\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to ssh",
+      "input": "ssh host <<'EOF'\nuptime && echo kept-6\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to kubectl apply",
+      "input": "kubectl apply -f - <<EOF\nkind: ConfigMap\nname: kept-7\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to curl",
+      "input": "curl -X POST --data @- https://example.com <<EOF\n{\"kept\": 8}\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "python script from stdin that only prints",
+      "input": "python3 - <<'PY'\nimport json\nprint(json.dumps({'kept': 9}))\nPY",
+      "withheld": false
+    },
+    {
+      "name": "python script that reads a file",
+      "input": "python - <<PY\nprint(open('a.txt').read())  # kept-10\nPY",
+      "withheld": false
+    },
+    {
+      "name": "node script that only logs",
+      "input": "node - <<'JS'\nconsole.log('kept-11')\nJS",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to stdout",
+      "input": "cat <<EOF\nkept-12\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to stdout discarded",
+      "input": "cat > /dev/null <<EOF\nkept-13\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "stderr redirected to a file",
+      "input": "cat <<EOF 2> err.log\nkept-14\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "echo to stdout",
+      "input": "echo kept-15",
+      "withheld": false
+    },
+    {
+      "name": "echo with stderr folded in",
+      "input": "echo kept-16 2>&1",
+      "withheld": false
+    },
+    {
+      "name": "echo to dev null",
+      "input": "echo kept-17 > /dev/null",
+      "withheld": false
+    },
+    {
+      "name": "in-place sed",
+      "input": "sed -i 's/kept-18/new/' src/app.py",
+      "withheld": false
+    },
+    {
+      "name": "perl one-liner in place",
+      "input": "perl -pi -e 's/kept-19/x/' a.txt",
+      "withheld": false
+    },
+    {
+      "name": "python one-liner that writes a file",
+      "input": "python -c \"open('f','w').write('kept-20')\"",
+      "withheld": false
+    },
+    {
+      "name": "git diff --stat",
+      "input": "git diff --stat HEAD~1",
+      "withheld": false
+    },
+    {
+      "name": "grep for a diff header",
+      "input": "grep -rn -- '--- a/' docs/",
+      "withheld": false
+    },
+    {
+      "name": "diff headers without a hunk",
+      "input": "echo '--- a/x' && echo '+++ b/x'",
+      "withheld": false
+    },
+    {
+      "name": "markdown horizontal rule",
+      "input": "printf 'title\\n---\\nbody'",
+      "withheld": false
+    },
+    {
+      "name": "YAML front matter to stdout",
+      "input": "cat <<EOF\n---\ntitle: kept-21\n---\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "cat a file through head",
+      "input": "cat src/app.py | head -n 20",
+      "withheld": false
+    },
+    {
+      "name": "redirect from a file",
+      "input": "sort < input.txt > sorted.txt",
+      "withheld": false
+    },
+    {
+      "name": "copy a file",
+      "input": "cp a.txt b.txt && mv b.txt c.txt",
+      "withheld": false
+    },
+    {
+      "name": "download to a file",
+      "input": "curl -o out.bin https://example.com/kept-22",
+      "withheld": false
+    },
+    {
+      "name": "echo of a variable to a file",
+      "input": "echo \"$BODY\" > out.txt",
+      "withheld": false
+    },
+    {
+      "name": "here-string to grep",
+      "input": "grep kept <<< 'kept-23'",
+      "withheld": false
+    },
+    {
+      "name": "dd to dev null",
+      "input": "dd if=/dev/zero of=/dev/null bs=1M count=1",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to psql inside docker exec",
+      "input": "docker exec -i db psql -U postgres <<SQL\nSELECT 'kept-30';\nSQL",
+      "withheld": false
+    },
+    {
+      "name": "install between two files",
+      "input": "install -m 755 build/app /usr/local/bin/app",
+      "withheld": false
+    },
+    {
+      "name": "copy between two files",
+      "input": "cp a.txt b.txt",
+      "withheld": false
+    },
+    {
+      "name": "heredoc to a process substitution that only filters",
+      "input": "cat > >(grep kept) <<EOF\nkept-31\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "sponge without a file",
+      "input": "sort <<EOF | sponge\nkept-32\nEOF",
+      "withheld": false
+    },
+    {
+      "name": "nice around a build",
+      "input": "nice -n 10 make test",
+      "withheld": false
+    },
+    {
+      "name": "timeout around a test run",
+      "input": "timeout 60 go test ./...",
+      "withheld": false
+    },
+    {
+      "name": "prose with a blank line and a dashed list",
+      "input": "Notes:\n\n- kept-63 first\n- kept-63 second\n\n+ kept-63 plus",
+      "withheld": false
+    }
+  ]
+}

@@ -130,6 +130,41 @@ export function ReferenceEnvironmentVariables() {
             </tr>
             <tr className="border-b border-border align-top">
               <td className="py-3 pr-4">
+                <code>FORWARDED_TRUSTED_PROXIES</code>
+              </td>
+              <td className="py-3 pr-4">
+                <code>""</code>
+              </td>
+              <td className="py-3 pr-4">
+                Comma-separated IPs or CIDRs of your own proxies. The client IP
+                used for rate limits and audit logs is the rightmost{" "}
+                <code>X-Forwarded-For</code> entry that is not in this list,
+                never the leftmost (the caller writes that). List every proxy
+                between the client and the hop nearest the backend, e.g. a load
+                balancer's address.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4">
+                <code>EDGE_PROXY_SECRET</code>
+              </td>
+              <td className="py-3 pr-4">
+                <code>""</code>
+              </td>
+              <td className="py-3 pr-4">
+                Shared secret between the bundled frontend nginx and the
+                backend. Set it on both: nginx then forwards the chain it saw
+                in <code>X-Backplane-Edge-Forwarded-For</code>, and the backend
+                trusts that header only when{" "}
+                <code>X-Backplane-Edge-Secret</code> matches. It is pasted raw
+                into the nginx config, so generate it as hex with{" "}
+                <code>openssl rand -hex 32</code>; the frontend refuses to
+                start if it contains anything outside{" "}
+                <code>A-Za-z0-9_-</code>.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4">
                 <code>AUTH_ALLOWED_EMAIL_DOMAINS</code>
               </td>
               <td className="py-3 pr-4">
@@ -258,6 +293,27 @@ export function ReferenceEnvironmentVariables() {
               </td>
             </tr>
             <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4"><code>COMPANION_ENABLED</code></td>
+              <td className="py-3 pr-4"><code>false</code></td>
+              <td className="py-3 pr-4">
+                Enables the Backplane Companion: device pairing, session
+                capture and its retention sweep. Off, every companion, pairing
+                and captured-session endpoint answers 404 and the pairing page
+                reports the feature unavailable.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4"><code>RICH_CAPTURE_ENABLED</code></td>
+              <td className="py-3 pr-4"><code>false</code></td>
+              <td className="py-3 pr-4">
+                Enables rich session capture: devices may upload prompt, reply
+                and tool bodies beside the events, stored like other uploads
+                (the bucket, or the local storage directory). Off, devices are
+                offered no rich capture and new project mappings default to
+                the standard level. Needs the Companion enabled.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
               <td className="py-3 pr-4">
                 <code>API_URL</code>
               </td>
@@ -364,6 +420,17 @@ export function ReferenceEnvironmentVariables() {
               <td className="py-3 pr-4">
                 Age after which board health reports a non-terminal merge-queue
                 entry as stale.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4"><code>CONTEXT_BUDGET_CEILINGS</code></td>
+              <td className="py-3 pr-4"><code>{"{}"}</code></td>
+              <td className="py-3 pr-4">
+                JSON object of instance maxima for opted-in context budgets
+                (note body, fetch, record, managed and invocation bytes; source
+                count; diagnostic entries and bytes; JSON depth and node
+                count). Omitted fields keep their defaults; invalid values fail
+                startup. Raising a maximum does not raise workspace defaults.
               </td>
             </tr>
             <tr className="border-b border-border align-top">

@@ -1,0 +1,29 @@
+{
+  "model": "ContentDeclaration",
+  "why": "captured content has a body to deliver",
+  "body": {
+    "role": "user",
+    "channel": "prompt",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "d1f0a9e2-0b1c-4d2e-8f3a-4b5c6d7e8f90",
+      "order": 41
+    },
+    "occurred_at": "2026-10-08T14:03:10.120Z",
+    "observed_at": "2026-10-08T14:03:11Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "coverage": "captured",
+    "delivery": "none",
+    "byte_count": 78,
+    "sha256": "51a5647886991fe0e4806854318187194d92a0dafc9e767f667de80fd13ac928",
+    "inline_text": null,
+    "content_key": "31cd5d842d6b4a38beb9d020f846ce1c9b9b7cce603bf796b57325bc680437c6",
+    "turn_id": "turn-7"
+  }
+}

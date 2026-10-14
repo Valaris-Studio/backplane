@@ -341,10 +341,20 @@ export interface SchedulingDef {
   min_failure_backoff_seconds?: number;
 }
 
+export interface ContextDispatchPolicy {
+  version: 1;
+  required_agent_ids: string[];
+}
+
 export interface PipelineConfig {
   version: number;
   stages: StageConfig[];
   scheduling: SchedulingDef;
+  // Server-owned policy blocks: editors never author them, but every save
+  // must send them back unchanged.
+  context_dispatch?: ContextDispatchPolicy;
+  context_budget?: Record<string, unknown>;
+  lock_roles?: boolean;
 }
 
 export interface WorkspaceConfig {

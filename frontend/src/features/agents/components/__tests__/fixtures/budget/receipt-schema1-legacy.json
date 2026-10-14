@@ -1,0 +1,63 @@
+{
+  "id": "8f0e8a54-5d4b-4c55-9d0e-00000000a001",
+  "execution_id": "8f0e8a54-5d4b-4c55-9d0e-0000000000e1",
+  "ordinal": 1,
+  "client_request_id": "request-1",
+  "context_revision": "9bf558cf47fd57b0ad02a89e8b135c1ef619ddf5b842ac1746bc8a8a271cd460",
+  "prompt_sha256": "8900dc91699a2acb676d3190bb6653d40d492c84d335e671ce7c90ff3b7d41f1",
+  "prompt_bytes": 169,
+  "system_prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "system_prompt_bytes": 0,
+  "provider": "operator-provider",
+  "model": "operator-model",
+  "status": "prepared",
+  "use_verification": "not_verified",
+  "created_at": "2026-10-13T12:01:00+00:00",
+  "dispatch_summary": null,
+  "context_manifest": {
+    "schema_version": 1,
+    "renderer_version": "context-v1",
+    "sources": [
+      {
+        "source_index": 0,
+        "kind": "card_notes",
+        "alias": "HandoffNotes",
+        "filter": {},
+        "coverage": "record_traced",
+        "rendered_sha256": "0813fe69a5c48b84d8f58694e95ca7bd3157ef3d53bb8ebf82295944a9348c87",
+        "rendered_bytes": 66,
+        "records": [
+          {
+            "record_index": 0,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000101",
+            "title": "Retained handoff — café 🧭",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "a6d1d4ea8e5a4fa08e8438c91ab01e2055faf19e5134fddd3a61efc0c133aa46",
+            "rendered_sha256": "cd9cd864976a5923484048be5f1bd83a26aa8677d62007bf6735b69fabdbca60",
+            "rendered_bytes": 33
+          },
+          {
+            "record_index": 1,
+            "note_id": "8f0e8a54-5d4b-4c55-9d0e-000000000102",
+            "title": "Second handoff",
+            "kind": "handoff",
+            "workspace_id": "8f0e8a54-5d4b-4c55-9d0e-000000000001",
+            "board_id": "8f0e8a54-5d4b-4c55-9d0e-000000000002",
+            "card_id": "8f0e8a54-5d4b-4c55-9d0e-000000000003",
+            "updated_at": "2026-10-12T09:00:00+00:00",
+            "revision_sha256": "c64a4543ce76fcbcade5797b53bedc08e6d81e9e031a72380c03a07cb788efce",
+            "rendered_sha256": "c98c65bd45f9548d94d411e1f995e331d923d882f9eaa0eda871cde049253eb7",
+            "rendered_bytes": 16
+          }
+        ]
+      }
+    ]
+  },
+  "input_prompt": "You are reviewing card 47.\r\n## HandoffNotes\n- Retained handoff — café 🧭\n- Second handoff\n\n## ReviewerNotes\n- Kept reviewer note\n\nPolicy (summarised): review only.\n",
+  "system_prompt": "",
+  "dispatch": null
+}

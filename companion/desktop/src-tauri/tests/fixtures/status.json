@@ -1,0 +1,33 @@
+{
+  "companion": {"version": "0.9.0", "commit": "4b9a5847", "beacon_commit": "b1e2c3d4", "go_version": "go1.26.1", "platform": "darwin/arm64"},
+  "account": {"email": "owner@example.dev", "display_name": null, "web_origin": "https://app.bp.example.dev"},
+  "connected": true,
+  "revoked": false,
+  "installation_id": "inst_7f3a",
+  "endpoint": "https://bp.example.dev",
+  "data_dir": "/home/tester/Library/Application Support/Backplane Companion",
+  "daemon_running": true,
+  "service": {"backend": "launchd", "definition": "/home/tester/Library/LaunchAgents/dev.backplane.companion.plist", "installed": true, "current": true, "enabled": true, "running": true},
+  "capture": {
+    "state": "active",
+    "local_paused": false,
+    "unauthorized": false,
+    "policy_cached": true,
+    "policy_refreshed_at": "2026-09-28T09:59:30Z",
+    "policy_age_seconds": 30,
+    "policy_stale": false,
+    "server_paused": false,
+    "enabled_agents": null,
+    "retention_days": null,
+    "mappings": 2,
+    "auto_match_repos": true,
+    "exclude_globs": ["**/secrets/**"]
+  },
+  "agents": [
+    {"id": "claude_code", "state": "receiving", "installed": true, "configured": true, "receiving": true, "uploading": false, "paused": false, "broken": false, "last_observation_at": "2026-09-28T09:58:00Z", "last_upload_at": null, "integration": {"state": "installed", "config_path": "/home/tester/.claude/settings.json", "trust": "trusted"}},
+    {"id": "codex_cli", "state": "idle", "installed": true, "configured": true, "receiving": false, "uploading": false, "paused": false, "broken": false, "last_observation_at": null, "last_upload_at": null, "integration": {"state": "installed", "config_path": "/home/tester/.codex/config.toml", "problems": ["hooks disabled"]}}
+  ],
+  "queue": {"records": 4, "bytes": 2048, "failures": 0, "next_attempt": "0001-01-01T00:00:00Z", "acknowledged": 120, "rejected": 1, "reject_reasons": {"too_large": 1}, "dropped": 0, "oldest_pending_at": "2026-09-28T09:57:00Z", "inbox_items": 0, "capacity_records": 10000, "capacity_bytes": 104857600, "backing_off": false},
+  "pending_projects": [{"root": "/home/tester/src/app", "repo_url": "github.com/acme/app", "first_seen": "2026-09-27T12:00:00Z"}],
+  "health": {"hook_errors": 0, "inbox_dropped": 0, "normalize_failures": 0, "beacon_empty": 0, "dropped_items": 0, "suppressed_deleted": 0}
+}

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,13 @@ describe("cold restore procedure", () => {
     expect(restore.indexOf("--wait-timeout")).toBeLessThan(restore.indexOf("pg_restore"));
   });
 
+  it("normalizes restored timeline visibility before restarting the application", () => {
+    expect(restore).toContain("backend/scripts/normalize_timeline_restore.sql");
+    expect(restore).toContain("ON_ERROR_STOP=1");
+    expect(restore.indexOf("pg_restore")).toBeLessThan(restore.indexOf("psql"));
+    expect(restore.indexOf("psql")).toBeLessThan(restore.indexOf("volume create"));
+  });
+
   it("creates the explicitly named resource volume before extracting the archive", () => {
     expect(restore).toContain("export COMPOSE_PROJECT_NAME=backplane-restore");
     expect(restore).toContain('docker volume create "$BACKPLANE_RESOURCE_VOLUME"');
@@ -29,10 +36,12 @@ describe("cold restore procedure", () => {
     expect(restore).toContain("COMPOSE_PROJECT_NAME}_backplane-storage");
   });
 
-  it.each(["--wait-timeout", "pg_restore"])("aborts the copied script when %s fails", (failedCommand) => {
+  it.each(["--wait-timeout", "pg_restore", "psql"])("aborts the copied script when %s fails", (failedCommand) => {
     const directory = mkdtempSync(join(tmpdir(), "backplane-restore-"));
     try {
       writeFileSync(join(directory, "backplane-2026-07-25.dump"), "test dump");
+      mkdirSync(join(directory, "backend/scripts"), { recursive: true });
+      writeFileSync(join(directory, "backend/scripts/normalize_timeline_restore.sql"), "SELECT 1;");
       const result = spawnSync("bash", ["-c", `
         git() { return 0; }
         cp() { return 0; }

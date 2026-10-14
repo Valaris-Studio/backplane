@@ -1708,6 +1708,36 @@ async def test_put_loop_agent_self_merge_save_never_auto_relaxes(
     assert test_board.enforce_done_merge_gate is None
 
 
+async def test_put_loop_installation_key_self_merge_save_auto_relaxes(
+    installation_key_client: AsyncClient,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    response = await installation_key_client.put(
+        _loop_url(test_board),
+        json={"loop_prompt": "x", "loop_landing": "self_merge", "enabled": False},
+    )
+    assert response.status_code in (200, 201), response.text
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is False
+
+
+async def test_put_loop_plain_user_key_self_merge_save_auto_relaxes(
+    plain_key_client: AsyncClient,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    response = await plain_key_client.put(
+        _loop_url(test_board),
+        json={"loop_prompt": "x", "loop_landing": "self_merge", "enabled": False},
+    )
+    assert response.status_code in (200, 201), response.text
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is False
+
+
 async def test_put_loop_landing_move_off_self_merge_rearms_the_gate(
     client: AsyncClient,
     test_workspace: Workspace,
@@ -2010,6 +2040,44 @@ async def test_put_loop_relax_is_refused_for_agent_callers(
     await db_session.refresh(test_board)
     assert test_board.enforce_done_merge_gate is not False
     assert not test_board.loop_config, "a refused relax must not save the loop"
+
+
+async def test_put_loop_relax_is_honoured_for_installation_keys(
+    installation_key_client: AsyncClient,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    response = await installation_key_client.put(
+        _loop_url(test_board),
+        json={
+            "loop_prompt": "x",
+            "loop_landing": "self_merge",
+            "relax_done_merge_gate": True,
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is False
+
+
+async def test_put_loop_relax_is_honoured_for_plain_user_keys(
+    plain_key_client: AsyncClient,
+    test_board: Board,
+    test_git_repo,
+    db_session: AsyncSession,
+):
+    response = await plain_key_client.put(
+        _loop_url(test_board),
+        json={
+            "loop_prompt": "x",
+            "loop_landing": "self_merge",
+            "relax_done_merge_gate": True,
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+    await db_session.refresh(test_board)
+    assert test_board.enforce_done_merge_gate is False
 
 
 async def test_put_loop_without_relax_still_admits_agent_callers(

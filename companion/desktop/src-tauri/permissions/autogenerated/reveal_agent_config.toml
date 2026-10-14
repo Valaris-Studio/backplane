@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reveal-agent-config"
+description = "Enables the reveal_agent_config command without any pre-configured scope."
+commands.allow = ["reveal_agent_config"]
+
+[[permission]]
+identifier = "deny-reveal-agent-config"
+description = "Denies the reveal_agent_config command without any pre-configured scope."
+commands.deny = ["reveal_agent_config"]

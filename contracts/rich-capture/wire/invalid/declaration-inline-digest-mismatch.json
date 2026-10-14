@@ -1,0 +1,29 @@
+{
+  "model": "ContentDeclaration",
+  "why": "sha256 must digest inline_text",
+  "body": {
+    "role": "user",
+    "channel": "prompt",
+    "source": {
+      "kind": "claude_transcript",
+      "parser": "companion-claude-transcript/1",
+      "schema_version": "claude-code-jsonl/2",
+      "native_ref": "d1f0a9e2-0b1c-4d2e-8f3a-4b5c6d7e8f90",
+      "order": 41
+    },
+    "occurred_at": "2026-10-08T14:03:10.120Z",
+    "observed_at": "2026-10-08T14:03:11Z",
+    "media_type": "text/plain",
+    "redaction": {
+      "filter_version": "asymptoteobserve-redact/1",
+      "replacements": 0
+    },
+    "coverage": "captured",
+    "delivery": "inline",
+    "byte_count": 78,
+    "sha256": "f41f3fa625ff120ddca7ef456bf66371ecea23c129f4e4c32367101edb516cf8",
+    "inline_text": "Add a retry with exponential backoff to the uploader and keep the tests green.",
+    "content_key": "31cd5d842d6b4a38beb9d020f846ce1c9b9b7cce603bf796b57325bc680437c6",
+    "turn_id": "turn-7"
+  }
+}

@@ -22,6 +22,34 @@ class AgentRepository(BaseRepository[Agent]):
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def get_current(self, agent_id: uuid.UUID) -> Agent | None:
+        """Re-read from the database even if this session already holds the
+        row, so an authorization re-check sees a concurrent deactivation."""
+        return await self.db.scalar(
+            select(Agent)
+            .where(Agent.id == agent_id)
+            .execution_options(populate_existing=True)
+        )
+
+    async def enrollable_ids(
+        self, agent_ids: set[uuid.UUID], *, owner_id: uuid.UUID, workspace_slug: str
+    ) -> set[uuid.UUID]:
+        """Which of these agents `owner_id` created AND whose workspace scope
+        admits the slug (an empty/NULL allowlist is the legacy all-scope).
+        Active/paused state is deliberately not checked: enrollment is not
+        permission to run."""
+        if not agent_ids:
+            return set()
+        rows = await self.db.execute(
+            select(Agent.id, Agent.allowed_workspaces).where(
+                Agent.id.in_(agent_ids), Agent.created_by_id == owner_id
+            )
+        )
+        return {
+            agent_id for agent_id, scope in rows.all()
+            if not scope or workspace_slug in scope
+        }
+
     async def get_by_owner_and_name(
         self, user_id: uuid.UUID, name: str
     ) -> Agent | None:

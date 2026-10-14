@@ -35,6 +35,11 @@ afterEach(async () => {
 });
 
 describe("application locale formatting", () => {
+  it("preserves integer history counts beyond Number precision in the selected locale", async () => {
+    await i18n.changeLanguage("pt-BR");
+    expect(formatNumber(9_007_199_254_740_993n)).toBe("9.007.199.254.740.993");
+  });
+
   it("uses pt-BR selected in Backplane even when the browser is English", async () => {
     await i18n.changeLanguage("pt-BR");
     const timestamp = new Date("2026-08-07T15:04:00Z");

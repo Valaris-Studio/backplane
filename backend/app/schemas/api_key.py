@@ -17,6 +17,8 @@ class ApiKeyRead(UTCModel):
     key_prefix: str
     created_at: datetime
     last_used_at: datetime | None = None
+    # The companion installation that minted this key for its agents.
+    installation_id: uuid.UUID | None = None
 
     model_config = {"from_attributes": True}
 

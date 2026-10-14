@@ -5,13 +5,14 @@ import hashlib
 import logging
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import API_KEY_FIRST_USED
-from app.database import async_session
-from app.exceptions import ResourceNotFoundError
+from app.exceptions import ConflictError, ResourceNotFoundError
 from app.models.api_key import ApiKey
 from app.repositories.api_key import ApiKeyRepository
 from app.repositories.workspace import WorkspaceMemberRepository
@@ -27,11 +28,26 @@ KEY_PREFIX = "vlr_"
 LAST_USED_REFRESH_INTERVAL = timedelta(hours=1)
 
 
+@dataclass(frozen=True)
+class ApiKeyStamp:
+    api_key_id: uuid.UUID
+    user_id: uuid.UUID
+    key_name: str
+    used_at: datetime
+    # Set only for the request whose write moved the key off "never used".
+    first_use_workspace_ids: list[uuid.UUID] | None
+
+
 class ApiKeyService:
     def __init__(self, db: AsyncSession):
         self.repo = ApiKeyRepository(db)
 
-    async def create_key(self, user_id: uuid.UUID, name: str) -> tuple[ApiKey, str]:
+    async def create_key(
+        self,
+        user_id: uuid.UUID,
+        name: str,
+        installation_id: uuid.UUID | None = None,
+    ) -> tuple[ApiKey, str]:
         raw = KEY_PREFIX + secrets.token_urlsafe(32)
         key_hash = hashlib.sha256(raw.encode()).hexdigest()
         key_prefix = raw[:8]
@@ -40,8 +56,35 @@ class ApiKeyService:
             name=name,
             key_hash=key_hash,
             key_prefix=key_prefix,
+            installation_id=installation_id,
         )
         return api_key, raw
+
+    async def rotate_installation_key(
+        self, user_id: uuid.UUID, installation_id: uuid.UUID, name: str
+    ) -> tuple[ApiKey, str]:
+        """One key per installation: minting replaces whatever it held before.
+
+        The row lock makes a concurrent rotation wait and then replace this
+        key; the unique index is the backstop if one still slips past, and the
+        device answers that 409 by reading the key that won.
+        """
+        await self.repo.lock_installation(installation_id)
+        await self.repo.delete_for_installation(installation_id)
+        try:
+            async with self.repo.db.begin_nested():
+                return await self.create_key(user_id, name, installation_id)
+        except IntegrityError:
+            raise ConflictError(
+                "Another request replaced this device's agent key; read it again",
+                error_code="agent_key_rotation_conflict",
+            ) from None
+
+    async def get_installation_key(self, installation_id: uuid.UUID) -> ApiKey | None:
+        return await self.repo.latest_for_installation(installation_id)
+
+    async def delete_installation_keys(self, installation_id: uuid.UUID) -> None:
+        await self.repo.delete_for_installation(installation_id)
 
     async def get_key(self, key_id: uuid.UUID) -> ApiKey | None:
         return await self.repo.get_by_id(key_id)
@@ -57,22 +100,75 @@ class ApiKeyService:
 
     async def verify_key(self, raw_key: str) -> ApiKey | None:
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        return await self.repo.get_by_key_hash(key_hash)
+        api_key = await self.repo.get_by_key_hash(key_hash)
+        # Revoking an installation deletes its keys; this refuses one that
+        # survived anyway (defence in depth), on HTTP and WebSocket alike.
+        if (
+            api_key is not None
+            and api_key.installation_id is not None
+            and await self.repo.installation_revoked(api_key.installation_id)
+        ):
+            return None
+        return api_key
 
-    async def touch(self, api_key: ApiKey) -> None:
-        """Record that `api_key` just authenticated a request.
+    async def touch(self, api_key: ApiKey) -> ApiKeyStamp | None:
+        """Stamp that `api_key` just authenticated a request, on the caller's session.
 
-        Called from both verify sites (HTTP auth and the WS handshake) and
-        wrapped end-to-end: usage tracking is telemetry, and no failure in it
-        may turn a valid credential into a rejected one.
+        Called from both verify sites (HTTP auth and the WS handshake) while the
+        caller's session holds nothing but the key lookup; the caller commits
+        the returned stamp at once and then calls `announce`. A session of its
+        own would check out a second pooled connection per request (pool_size=3,
+        see app/database.py). Usage tracking is telemetry, so no failure in it
+        may turn a valid credential into a rejected one: failures are logged and
+        reported as "nothing stamped". Returns None when nothing was written.
         """
+        now = datetime.now(timezone.utc)
+        if not self._needs_touch(api_key, now):
+            return None
+        user_id = api_key.user_id
         try:
-            now = datetime.now(timezone.utc)
-            if not self._needs_touch(api_key, now):
-                return
-            await self._apply_touch(api_key, now)
+            # The savepoint keeps a failed stamp from aborting the caller's
+            # transaction; the loaded key row stays usable either way.
+            async with self.repo.db.begin_nested():
+                is_first_use = await self.repo.stamp_last_used(
+                    api_key.id,
+                    now,
+                    older_than=now - LAST_USED_REFRESH_INTERVAL,
+                    expect_never_used=api_key.last_used_at is None,
+                )
+                first_use_workspace_ids = (
+                    await WorkspaceMemberRepository(
+                        self.repo.db
+                    ).list_workspace_ids_for_user(user_id)
+                    if is_first_use
+                    else None
+                )
         except Exception:
             logger.exception("api key touch failed key=%s", api_key.id)
+            return None
+        return ApiKeyStamp(
+            api_key_id=api_key.id,
+            user_id=user_id,
+            key_name=api_key.name,
+            used_at=now,
+            first_use_workspace_ids=first_use_workspace_ids,
+        )
+
+    async def announce(self, stamp: ApiKeyStamp | None) -> None:
+        """Publish first use, only after the caller committed the stamp.
+
+        A failure here loses the event permanently and that is DELIBERATE: the
+        claim is NOT released back to NULL. The column is the durable signal and
+        the event is only a latency optimization — the frontend wizard falls
+        back to refetching. Rolling the stamp back would strand an agent that
+        makes exactly one call, leaving last_used_at NULL forever.
+        """
+        if stamp is None or stamp.first_use_workspace_ids is None:
+            return
+        try:
+            await self._publish_first_used(stamp)
+        except Exception:
+            logger.exception("api key first-use publish failed key=%s", stamp.api_key_id)
 
     @staticmethod
     def _needs_touch(api_key: ApiKey, now: datetime) -> bool:
@@ -87,53 +183,7 @@ class ApiKeyService:
             last_used = last_used.replace(tzinfo=timezone.utc)
         return now - last_used >= LAST_USED_REFRESH_INTERVAL
 
-    async def _apply_touch(self, api_key: ApiKey, now: datetime) -> None:
-        """Write the stamp on a session of its own, then publish first use.
-
-        Deliberately NOT the request-scoped session: `get_db` rolls back on any
-        exception, so a stamp written there would vanish whenever the request
-        later 4xx/5xxes — precisely the requests where "did my agent reach the
-        API?" matters most.
-
-        `async_session` is read from module globals on each call (never bound to
-        self or a default arg), so tests can monkeypatch
-        `app.services.api_key.async_session` onto their in-memory engine — the
-        same seam `app.routers.events` uses.
-        """
-        async with async_session() as session:
-            repo = ApiKeyRepository(session)
-            if api_key.last_used_at is None:
-                is_first_use = await repo.claim_first_use(api_key.id, now)
-            else:
-                is_first_use = False
-                await repo.refresh_last_used(
-                    api_key.id, now, older_than=now - LAST_USED_REFRESH_INTERVAL
-                )
-            # Read the fan-out targets while the session is open, so the publish
-            # below doesn't hold a pooled connection (pool_size=3) across its
-            # network I/O.
-            workspace_ids = (
-                await WorkspaceMemberRepository(session).list_workspace_ids_for_user(
-                    api_key.user_id
-                )
-                if is_first_use
-                else []
-            )
-            await session.commit()
-
-        # Publish outside the session block, after the stamp is durable. A
-        # failure here loses the event permanently and that is DELIBERATE: we do
-        # NOT release the claim back to NULL. The column is the durable signal
-        # and the event is only a latency optimization — the frontend wizard
-        # falls back to refetching. Rolling the stamp back would strand an agent
-        # that makes exactly one call, leaving last_used_at NULL forever with no
-        # second request to re-trigger it.
-        if is_first_use:
-            await self._publish_first_used(workspace_ids, api_key, now)
-
-    async def _publish_first_used(
-        self, workspace_ids: list[uuid.UUID], api_key: ApiKey, used_at: datetime
-    ) -> None:
+    async def _publish_first_used(self, stamp: ApiKeyStamp) -> None:
         """Announce first use into every workspace the key's owner belongs to.
 
         API keys are not workspace-scoped, but the WS fan-out is: a subscriber
@@ -149,12 +199,12 @@ class ApiKeyService:
         from app.core.event_bus import event_bus
 
         payload = {
-            "api_key_id": str(api_key.id),
-            "user_id": str(api_key.user_id),
-            "key_name": api_key.name,
-            "last_used_at": used_at.isoformat(),
+            "api_key_id": str(stamp.api_key_id),
+            "user_id": str(stamp.user_id),
+            "key_name": stamp.key_name,
+            "last_used_at": stamp.used_at.isoformat(),
         }
-        for workspace_id in workspace_ids:
+        for workspace_id in stamp.first_use_workspace_ids or []:
             await event_bus.publish(
                 event_type=API_KEY_FIRST_USED,
                 payload=payload,

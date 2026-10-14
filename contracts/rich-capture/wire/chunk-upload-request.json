@@ -1,0 +1,13 @@
+{
+  "model": "ChunkUploadHeaders",
+  "http": {
+    "method": "PUT",
+    "path": "/api/companion/contents/4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f/chunks/0",
+    "body_base64": "aGVsbG8sIGNodW5rIHplcm8gb2YgYSBwYXN0ZWQgc2NyZWVuc2hvdA=="
+  },
+  "body": {
+    "content_type": "application/octet-stream",
+    "content_length": 40,
+    "backplane_chunk_sha256": "1a83823ca674652aa3fda3cd5b33fc2fb8bbba3fb99b9fed6c647834bc0bf8d8"
+  }
+}

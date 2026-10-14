@@ -28,6 +28,7 @@ func TestLoopCLICompletionEventWakesWithoutKeepAlive(t *testing.T) {
 	var loopGets atomic.Int32
 	var subscribed atomic.Bool
 	var unsupported atomic.Bool
+	dispatch := cliDispatchFixture{workspaceSlug: "test"}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/ws/") {
 			conn, err := websocket.Accept(w, r, nil)
@@ -51,12 +52,15 @@ func TestLoopCLICompletionEventWakesWithoutKeepAlive(t *testing.T) {
 			_, _, _ = conn.Read(ctx)
 			return
 		}
+		if dispatch.serve(t, w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/me":
 			_, _ = w.Write([]byte(`{"id":"user-test"}`))
 		case r.URL.Path == "/api/agents/me" || strings.HasSuffix(r.URL.Path, "/heartbeat"):
-			_, _ = w.Write([]byte(`{"id":"agent-test","is_active":true,"allowed_workspaces":["test"]}`))
+			_, _ = w.Write([]byte(`{"id":"11111111-1111-4111-8111-111111111111","is_active":true,"allowed_workspaces":["test"]}`))
 		case strings.HasSuffix(r.URL.Path, "/loop"):
 			if r.Header.Get("X-Backplane-Completion-Version") != "1" {
 				unsupported.Store(true)
@@ -96,7 +100,7 @@ exit 99
 	mcp := `#!/bin/sh
 while IFS= read -r line; do
   case "$line" in
-    *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture","version":"0.8.0"}}}';;
+    *'"initialize"'*) printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"fixture","version":"0.9.1"}}}';;
     *'"tools/list"'*) printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_board_loop"},{"name":"get_completion_policy"},{"name":"get_completion_status"},{"name":"submit_completion_candidate"},{"name":"request_landing"},{"name":"retry_completion"}]}}';;
     *'"tools/call"'*) printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"completion_policy\":{\"version\":1},\"completion_policy_hash\":\"policy-fixture\",\"completion_context\":\"Mandatory fixture policy.\"}"}]}}';;
   esac
@@ -134,10 +138,11 @@ done
 	if err != nil {
 		t.Fatalf("completion event did not resume the actual non-keepalive loop: %v\n%s", err, output)
 	}
+	dispatch.assertRequested(t)
 	if !subscribed.Load() || unsupported.Load() || loopGets.Load() != 2 {
 		t.Fatalf("incomplete completion wake/handshake: subscribed=%v unsupported=%v loop_gets=%d", subscribed.Load(), unsupported.Load(), loopGets.Load())
 	}
-	for _, want := range []string{"MCP launch verified", "mcp_version=0.8.0", "mcp_config=" + cfg.LLM.MCPConfigPath, "mcp_executable=" + filepath.Join(bin, "fixture-mcp")} {
+	for _, want := range []string{"MCP launch verified", "mcp_version=0.9.1", "mcp_config=" + cfg.LLM.MCPConfigPath, "mcp_executable=" + filepath.Join(bin, "fixture-mcp")} {
 		if !strings.Contains(string(output), want) {
 			t.Errorf("launch summary is missing %q: %s", want, output)
 		}

@@ -1,0 +1,355 @@
+{
+  "surface": "codex_cli",
+  "agent": {
+    "name": "codex-cli",
+    "version": "0.161.0",
+    "originators": [
+      "codex_exec"
+    ],
+    "otlp_service_name": "codex_exec"
+  },
+  "os": "macOS 14.4 (23E214) arm64",
+  "captured_on": "2026-10-09",
+  "produced": "live-captured-then-sanitized",
+  "session": {
+    "how": "codex exec --json with a disposable CODEX_HOME (auth.json copied, minimal config.toml, otel log+trace exporters to a local sink, hooks.json recording every event, --dangerously-bypass-hook-trust); model gpt-6-luna, reasoning low, sandbox workspace-write, approval never; scratch git repo with fake origin",
+    "turns": [
+      {
+        "turn_id": "01a11e74-b87f-70c1-b545-73f2c743f983",
+        "via": "codex exec -i swatch.png -",
+        "rollout_lines": "2-54"
+      },
+      {
+        "turn_id": "01a11e76-3ebb-7403-8885-b196e8181a6e",
+        "via": "codex exec resume --last (correction)",
+        "rollout_lines": "55-91"
+      },
+      {
+        "turn_id": "01a11e78-99f3-78d3-bec1-189e127167da",
+        "via": "codex exec resume --last (MCP call denied by approval policy)",
+        "rollout_lines": "92-111"
+      },
+      {
+        "turn_id": "01a11e79-0679-76a3-a579-ec3c5ddd34e5",
+        "via": "codex exec resume --last (MCP call approved by default_tools_approval_mode)",
+        "rollout_lines": "112-127"
+      },
+      {
+        "turn_id": "01a11e7a-689f-7b81-99de-a1c2d6f52ee1",
+        "via": "codex exec fork <id>",
+        "file": "rollout-fork.jsonl"
+      }
+    ],
+    "excluded": "Two later resume turns of the same thread are not in the fixture: one ran with the wrong cwd (operator content), one repeats the 1 MiB-output case already in codex-desktop."
+  },
+  "sanitization": {
+    "paths": {
+      "CODEX_HOME (and its /private spelling)": "/home/fixture/.codex",
+      "scratch repo": "/tmp/fixture-repo (the native /tmp vs /private/tmp spelling difference is kept)",
+      "work dir": "/home/fixture/work"
+    },
+    "identities": "creator_user_id, creator_account_id, host name and emails re-mapped consistently; OTLP user.email, user.account_id, host.name attributes removed",
+    "vendor_text": "Codex-authored bodies (session_meta.base_instructions.text, developer-role input_text over 200 chars, world_state host_skills body) replaced by same-length filler keeping the first line; the text(ALL_TOOLS) tool catalog returned at rollout-main.jsonl:73 (custom_tool_call_output) and its telemetry preview at otlp.jsonl:28 replaced by same-length filler (same characters and UTF-8 bytes), keeping the harness framing lines and the `…121046 tokens truncated…` marker at its offset",
+    "opaque": "encrypted reasoning and inter-agent payloads (gAAAAA...) replaced by same-length filler",
+    "kept": "record order, ordinal, timestamps, every id and call_id, record types, image data URL, command output (already synthetic), unicode text",
+    "size_drift": "rollout bytes differ from native by path re-mapping and by the :73 catalog filler, which keeps the decoded text length but drops the JSON escaping of the replaced catalog",
+    "account": "account fingerprints normalized without changing record shapes: rate_limits plan_type/planType -> plus, primary used_percent/usedPercent -> 0, credits balance -> 1000.0000000000, resets_at/resetsAt -> 1792108800; timezone (turn_context and <timezone> in environment context) -> UTC, current_date kept as captured; terminal.type and the user-agent terminal token -> xterm-256color",
+    "revised": "2026-10-13: tool catalog filler and account normalization; files sizes and sha256 recomputed from the committed bytes"
+  },
+  "files": {
+    "rollout-main.jsonl": {
+      "native": "$CODEX_HOME/sessions/2026/10/08/rollout-2026-10-08T22-18-46-<thread>.jsonl",
+      "lines": 127,
+      "bytes": 494094,
+      "largest_line": 224713,
+      "sha256": "1ba0affb761870337ec1f2a6b7ab7bd0672289d1cbefa765f19dcf013e85d253"
+    },
+    "rollout-fork.jsonl": {
+      "native": "new rollout file created by fork; history referenced via session_meta.history_base, not copied",
+      "lines": 12,
+      "bytes": 29225,
+      "sha256": "720a0f87d941ac6492c8eaf94725a2c4ecdef4d0c17ee48cd0fbab3b46b7012b",
+      "largest_line": 19136
+    },
+    "hooks.jsonl": {
+      "native": "stdin payload of every hooks.json command hook, wrapped as {recorded_at, payload}",
+      "lines": 42,
+      "bytes": 23926,
+      "sha256": "f2e5843259304cfb97d898800c91e54585de678f6d56b96bea7ed6e3798326da",
+      "largest_line": 1499
+    },
+    "otlp.jsonl": {
+      "native": "OTLP/HTTP JSON bodies posted by the log and trace exporters, wrapped as {received_at, path, body}; every log record kept, spans reduced to turn/start, thread/start, run_turn, session_task.turn, 3 handle_responses, 2 codex.hooks.command, 2 exec_command, apply_patch",
+      "lines": 56,
+      "bytes": 257284,
+      "sha256": "e5f69d43fccebfdadfa041c85eef5807acfc77a6797d80552307401a2f113ea1",
+      "largest_line": 10513
+    },
+    "mcp-server-requests.jsonl": {
+      "native": "JSON-RPC requests received by a stdio MCP server (rcfixture/shout), including tools/call _meta",
+      "lines": 16,
+      "bytes": 3529,
+      "sha256": "6f84e0172578eaaee54f73a13a949a63325e7f8fdc9ad83b4f68840e1a01cc1e",
+      "largest_line": 1173
+    },
+    "exec-json-events.jsonl": {
+      "native": "codex exec --json stdout of turn 1",
+      "lines": 23,
+      "bytes": 96821,
+      "sha256": "32c10568bf5ded27decf88bf5d4a466a11b4fbb7277e34c1e00b8632e2260810",
+      "largest_line": 91798
+    },
+    "swatch.png": {
+      "native": "the attached local image (synthetic, 59188 bytes, 320x200)",
+      "bytes": 59188,
+      "sha256": "fc506cc85d09f24b9350c756df4b7c857d5d1d4821e0d1cf24783e06e73cdea8"
+    }
+  },
+  "cases": {
+    "text_over_16KiB": "rollout-main.jsonl:25 (CommandExecution stdout and aggregated_output 90090 bytes each; formatted_output 40106)",
+    "text_over_64KiB": "rollout-main.jsonl:25",
+    "unicode": "rollout-main.jsonl:51 (Größe ✓ 完了), :79 and :84 (héllo wörld 🌍 — ünïcödé), :120 (mcp ✓ ok)",
+    "repeated_identical_messages": "rollout-main.jsonl:79 and :84 (two identical commands, distinct item ids)",
+    "streaming_revisions": "not in the rollout: it holds completed items only; codex-desktop/appserver-transcript.jsonl.gz has the deltas",
+    "failed_then_fixed_tool_call": "rollout-main.jsonl:37 (exit 1) then :42 (apply_patch) then :47 (exit 0)",
+    "edit": "rollout-main.jsonl:40 (apply_patch envelope inside the code-mode script) and :42 (FileChange unified_diff)",
+    "final_answer": "rollout-main.jsonl:50-51 (phase final_answer), :54 task_complete.last_agent_message",
+    "attachment": "rollout-main.jsonl:9 (input_image data URL, 78942 chars, detail high) and :10 (UserMessage local_image path); an unreadable path is recorded as text at :9 content[3]",
+    "source_overlap": "each completed item exists as event_msg/item_completed and as response_item (message, custom_tool_call(_output)); hooks.jsonl and otlp.jsonl repeat prompts, tool inputs and model-visible tool output",
+    "pause_resume": "resume appends to the same file: lines 55, 92, 112 open new turns with thread_settings_applied and no new session_meta",
+    "child_sessions": "fork only (rollout-fork.jsonl); subagents are in codex-desktop",
+    "correction": "rollout-main.jsonl:61-62",
+    "mcp": "rollout-main.jsonl:104 (McpToolCall failed by policy), :120 (completed with result); mcp-server-requests.jsonl:7 (_meta.callId equals the item id)",
+    "reasoning": "rollout-main.jsonl:69-70 and :75-76 (summary empty, encrypted_content only)",
+    "plan": "source_unavailable: update_plan is not in the 0.161 default tool set (the text(ALL_TOOLS) output at rollout-main.jsonl:73 listed the tools; that catalog is now filler)"
+  },
+  "expected_coverage": {
+    "prompt": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "correction": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "attachment_image": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "the image could not be read by Codex (input_text error + local_image without image data)",
+          "as": "content",
+          "expected_state": "source_unavailable",
+          "reason": "file_missing"
+        }
+      ],
+      "note": "captured (data URL in the rollout; local path in UserMessage)"
+    },
+    "reply": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "reasoning_summary": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "summary_text is empty (low effort)",
+          "as": "absent",
+          "expected_state": null,
+          "reason": null
+        }
+      ],
+      "note": "captured when non-empty; empty at low effort"
+    },
+    "reasoning_raw": {
+      "as": "content",
+      "expected_state": "source_unavailable",
+      "reason": "encrypted_at_source",
+      "note": "source_unavailable (encrypted_content only)"
+    },
+    "tool_input": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "code-mode exec script (custom_tool_call.input)"
+    },
+    "tool_output": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "custom_tool_call_output of the code-mode script"
+    },
+    "command": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "command_output": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured; Codex's own 1 MiB cut of an output is not in the CLI fixtures (qualified on Codex Desktop's fixtures only)"
+    },
+    "command_exit_code": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured"
+    },
+    "command_duration": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured"
+    },
+    "file_edit": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "a changed path lies outside the mapped root",
+          "as": "content",
+          "expected_state": "withheld_by_policy",
+          "reason": "outside_mapped_root"
+        }
+      ],
+      "note": "captured (FileChange.unified_diff or content)"
+    },
+    "turn_diff": {
+      "as": "absent",
+      "expected_state": null,
+      "reason": "source_not_supported",
+      "note": "source_unavailable in the rollout (app-server turn/diff/updated only)"
+    },
+    "mcp_call": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "note": "captured"
+    },
+    "approval": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "source_unavailable in the rollout (OTLP codex.tool_decision, hook PermissionRequest)"
+    },
+    "plan": {
+      "as": "absent",
+      "expected_state": null,
+      "reason": "source_not_supported",
+      "note": "source_unavailable"
+    },
+    "instructions": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "parts": [
+        {
+          "when": "the AGENTS.md directory lies outside the mapped root",
+          "as": "content",
+          "expected_state": "withheld_by_policy",
+          "reason": "outside_mapped_root"
+        }
+      ],
+      "note": "captured (user-role AGENTS.md message, world_state.agents_md)"
+    },
+    "harness_context": {
+      "as": "content",
+      "expected_state": "withheld_by_policy",
+      "reason": "harness_context",
+      "note": "session_meta.base_instructions, developer/permissions messages and world_state: metadata only"
+    },
+    "usage": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured (token_usage_record per response, token_count running totals)"
+    },
+    "model_identity": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured (turn_context.model, base_instructions.provenance)"
+    },
+    "repo_identity": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "captured (session_meta.git commit_hash, branch, repository_url)"
+    },
+    "resume": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "exec resume appends to the same rollout; the checkpoint starts at its size"
+    },
+    "fork": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "history_base references the parent; it is never followed or re-read"
+    },
+    "native_records": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null
+    },
+    "attachment_file": {
+      "as": "absent",
+      "expected_state": null,
+      "reason": "source_not_supported",
+      "note": "file references are plain prompt text; no structured file attachment exists"
+    },
+    "repeated_identical_prompt": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "identical commands were exercised (rollout-main.jsonl:79, :84), identical prompts were not; keys are item ids either way"
+    },
+    "error": {
+      "as": "content",
+      "expected_state": "captured",
+      "reason": null,
+      "evidence": [
+        "rollout-main.jsonl:104 (McpToolCall error.message)"
+      ],
+      "note": "McpToolCall error and failed items; a failed command's text is its command_output"
+    },
+    "interruption": {
+      "as": "event",
+      "expected_state": null,
+      "reason": null,
+      "note": "evidence from codex-desktop (one core with codex-cli)"
+    },
+    "compaction_summary": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "exec has no /compact and no CLI compaction was driven; Desktop's evidence does not qualify the CLI"
+    },
+    "subagent": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "no CLI subagent rollout in these fixtures (Desktop's evidence does not qualify the CLI); RC-05 pins the CLI path (child thread from SubagentStart's agent_id and transcript_path, codex-cli 0.161) in a daemon test and its native journey"
+    },
+    "user_shell_command": {
+      "as": "not_exercised",
+      "expected_state": null,
+      "reason": null,
+      "note": "the TUI ! shell was not driven (RC-07 qualifies)"
+    }
+  },
+  "coverage_vocabulary": "contracts/rich-capture contract §8-§9: as = content | event | absent | not_exercised; expected_state/reason from COVERAGE_REASONS"
+}
