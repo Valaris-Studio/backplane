@@ -153,15 +153,23 @@ describe("My sessions list — grouping and period", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("period=30d");
   });
 
-  it("drops day groups when sorted by anything but recent activity", async () => {
+  it.each([0, 12])("drops day groups when sorted by anything but recent activity at local hour %i", async (hour) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 14, hour, 1));
+    onTestFinished(() => vi.useRealTimers());
+
     const { requests } = serveSessions(() => ({
-      items: [makeSession({ id: "a", title: "Biggest session" }), makeSession({ id: "b", title: "Smaller session" })],
+      items: [
+        makeSession({ id: "a", title: "Biggest session", last_event_at: minutesAgo(0), ended_at: minutesAgo(0) }),
+        makeSession({ id: "b", title: "Smaller session" }),
+      ],
       next_cursor: null,
     }));
     renderList();
     await screen.findByText("Biggest session");
     const dayHeaders = () => [...document.querySelectorAll('th[scope="rowgroup"]')].map((header) => header.textContent);
     expect(dayHeaders()).toContainEqual(expect.stringContaining("Today"));
+    if (hour === 0) expect(dayHeaders()).toContainEqual(expect.stringContaining("Yesterday"));
 
     await userEvent.click(screen.getByRole("button", { name: "Sort" }));
     await userEvent.click(screen.getByRole("option", { name: "Most tokens" }));

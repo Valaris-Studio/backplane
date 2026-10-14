@@ -26,17 +26,21 @@ func TestRunOverrideCLIExecutesExactModelWithoutPersisting(t *testing.T) {
 	var starts []map[string]any
 	var completions []map[string]any
 	var forbiddenWrites []string
+	dispatch := cliDispatchFixture{workspaceSlug: "test"}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
+		if dispatch.serve(t, w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/me":
 			w.Write([]byte(`{"id":"user-test"}`))
 		case r.URL.Path == "/api/agents/me":
-			w.Write([]byte(`{"id":"agent-test","name":"Synthetic runner","is_active":true,"allowed_workspaces":["test"]}`))
+			w.Write([]byte(`{"id":"11111111-1111-4111-8111-111111111111","name":"Synthetic runner","is_active":true,"allowed_workspaces":["test"]}`))
 		case strings.HasSuffix(r.URL.Path, "/heartbeat"):
-			w.Write([]byte(`{"id":"agent-test","is_active":true,"allowed_workspaces":["test"]}`))
+			w.Write([]byte(`{"id":"11111111-1111-4111-8111-111111111111","is_active":true,"allowed_workspaces":["test"]}`))
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/loop"):
 			json.NewEncoder(w).Encode(valaris.BoardLoopConfig{Enabled: true, Provider: "claude-cli", Model: "premium", LoopPrompt: "Complete a synthetic iteration", BudgetUSD: 10, MaxIterations: 1, IterationTimeoutSeconds: 5, MaxConsecutiveFailures: 1, StarvationPolicy: "always_run"})
 		case strings.HasSuffix(r.URL.Path, "/loop/history"):
@@ -112,6 +116,7 @@ printf '%s\n' '{"type":"thread.started","thread_id":"synthetic"}' '{"type":"item
 	if err != nil {
 		t.Fatalf("bounded subprocess failed: %v\n%s", err, output)
 	}
+	dispatch.assertRequested(t)
 	argv, err := os.ReadFile(argvPath)
 	if err != nil {
 		t.Fatalf("fake CLI never invoked: %v\n%s", err, output)

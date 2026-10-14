@@ -70,15 +70,19 @@ func runOverrideCLIClaimsIndependentConfiguredReviewer(t *testing.T, declaration
 	var receipts []valaris.CompletionResult
 	var unexpected []string
 	var sourceStarts, sourceCompletions []map[string]any
+	dispatch := cliDispatchFixture{workspaceSlug: "test"}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
+		if dispatch.serve(t, w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/me":
 			_, _ = w.Write([]byte(`{"id":"user-fixture"}`))
 		case r.URL.Path == "/api/agents/me" || strings.HasSuffix(r.URL.Path, "/heartbeat"):
-			_, _ = w.Write([]byte(`{"id":"agent-fixture","is_active":true,"allowed_workspaces":["test"]}`))
+			_, _ = w.Write([]byte(`{"id":"11111111-1111-4111-8111-111111111111","is_active":true,"allowed_workspaces":["test"]}`))
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/loop"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"enabled": len(receipts) == 0 || (continueSource && len(sourceCompletions) == 0), "budget_usd": 10, "max_iterations": 1, "iteration_timeout_seconds": 5, "max_consecutive_failures": 1, "starvation_policy": "always_run", "loop_prompt": "Implement the next disposable card after independent review.", "provider": "claude-cli", "model": "saved-source-model", "completion_policy": map[string]any{"version": 1, "source_review": "independent", "review_role": role}, "completion_policy_hash": "policy-fixture", "completion_context": "Review with the configured independent role."})
 		case strings.HasSuffix(r.URL.Path, "/loop/history"):
@@ -182,6 +186,7 @@ done
 	if err != nil {
 		t.Fatalf("Claude/Fable source selection prevented independent configured Codex review: %v\n%s", err, output)
 	}
+	dispatch.assertRequested(t)
 	mu.Lock()
 	defer mu.Unlock()
 	if len(unexpected) != 0 || len(claims) != 1 || len(receipts) != 1 || receipts[0].Outcome != "passed" || receipts[0].SourceSHA != sha || receipts[0].CandidateID != "preserved-candidate" {

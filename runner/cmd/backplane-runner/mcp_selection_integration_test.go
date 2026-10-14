@@ -34,7 +34,11 @@ func TestMCPSelectionWizardProfileRelaunchUsesOnlyChosenConfig(t *testing.T) {
 	store := profile.NewStore(profile.DefaultRoot())
 	const secret = "fixture-mcp-key-never-display"
 	var sourceCompleted atomic.Bool
+	dispatch := cliDispatchFixture{workspaceSlug: "fixture"}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if dispatch.serve(t, w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/loop"):
@@ -50,7 +54,7 @@ func TestMCPSelectionWizardProfileRelaunchUsesOnlyChosenConfig(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/skills"):
 			_, _ = w.Write([]byte(`{"skills":[]}`))
 		case strings.HasSuffix(r.URL.Path, "/heartbeat"):
-			_, _ = w.Write([]byte(`{"id":"fixture-agent","is_active":true}`))
+			_, _ = w.Write([]byte(`{"id":"11111111-1111-4111-8111-111111111111","is_active":true}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/executions"):
 			_, _ = w.Write([]byte(`{"id":"fixture-source-execution"}`))
 		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/executions/"):
@@ -180,8 +184,8 @@ done
 		provider.NameOverride = "claude-cli"
 		provider.QueueStructured([]byte(`{"outcome":"worked","summary":"disposable source completed"}`))
 		client := valaris.NewClient(server.URL, "vlr_fixture")
-		client.Agent = &valaris.AgentConfig{ID: "fixture-agent", IsActive: true}
-		mode := workloop.NewLoopMode(client, saved, map[string]llm.Provider{"claude-cli": provider}, provider, "fixture", "fixture-board", "fixture-agent")
+		client.Agent = &valaris.AgentConfig{ID: cliDispatchAgentID, IsActive: true}
+		mode := workloop.NewLoopMode(client, saved, map[string]llm.Provider{"claude-cli": provider}, provider, "fixture", "fixture-board", cliDispatchAgentID)
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer cancel()
 		err := mode.Run(ctx)
@@ -190,6 +194,7 @@ done
 	if calls, err := run(); err != nil || calls != 1 {
 		t.Fatalf("selected profile failed actual preflight/source seam: calls=%d err=%v\n%s", calls, err, &logs)
 	}
+	dispatch.assertRequested(t)
 	if _, err := os.Stat(markerB); err != nil {
 		t.Fatal("selected B was not preflighted")
 	}
