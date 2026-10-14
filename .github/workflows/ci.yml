@@ -161,8 +161,6 @@ jobs:
     name: Companion — source + build contracts (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      COMPANION_GATE_REPORT_DIR: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -182,6 +180,8 @@ jobs:
           cache-dependency-path: companion/desktop/pnpm-lock.yaml
       - name: Go source checks outside the checkout
         timeout-minutes: 15
+        env:
+          COMPANION_GATE_REPORT_DIR: ${{ runner.temp }}
         run: ./scripts/companion-source-gate.sh go
       - name: Packaging contracts without release credentials
         timeout-minutes: 5
