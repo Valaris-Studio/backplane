@@ -18,6 +18,10 @@ const (
 	cafeDecomposed = "Café" // NFD, how another tool may spell it
 )
 
+// Windows supplies native prerequisites; other platforms retain their probes.
+var prepareNativeSensitiveDirectory = func(*testing.T, string) bool { return false }
+var prepareNativeUnreadableParent = func(*testing.T, string, string) bool { return false }
+
 // requireCaseInsensitiveVolume skips unless root lives on a volume that
 // resolves a case-swapped name to the same directory (the macOS default).
 func requireCaseInsensitiveVolume(t *testing.T, root string) {
@@ -242,6 +246,8 @@ func TestDecide_KeepsDistinctCaseFoldersDistinctOnACaseSensitiveVolume(t *testin
 	f := newFixture(t)
 	parent := filepath.Join(f.home, "sensitive")
 	mkdir(t, parent)
+
+	nativeSensitive := prepareNativeSensitiveDirectory(t, parent)
 	upper, lower := filepath.Join(parent, "Repo"), filepath.Join(parent, "repo")
 	if err := os.Mkdir(upper, 0o700); err != nil {
 		t.Fatal(err)
@@ -251,6 +257,9 @@ func TestDecide_KeepsDistinctCaseFoldersDistinctOnACaseSensitiveVolume(t *testin
 	}
 	upperInfo, lowerInfo := openDirectoryInfo(t, upper), openDirectoryInfo(t, lower)
 	if os.SameFile(upperInfo, lowerInfo) {
+		if nativeSensitive {
+			t.Fatal("native sensitive fixture returned one identity for distinct names")
+		}
 		t.Skip("UNQUALIFIED case-sensitive directory gate: owned fixture resolves Repo and repo to one handle identity")
 	}
 	for _, entry := range []struct {
@@ -357,12 +366,15 @@ func BenchmarkCanonicalDir(b *testing.B) {
 // with one child spelled Child inside it.
 func lockedParent(t *testing.T, root string) (parent, child string) {
 	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("root reads any directory")
-	}
 	parent = filepath.Join(root, "locked")
 	child = filepath.Join(parent, "Child")
 	mkdir(t, child)
+	if prepareNativeUnreadableParent(t, parent, child) {
+		return parent, child
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads any directory")
+	}
 	original, err := os.Stat(parent)
 	if err != nil {
 		t.Fatal(err)
