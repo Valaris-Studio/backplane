@@ -1193,7 +1193,8 @@ const ES_MCP_TOOL_CATALOG = {
   "Execution UUID this run is a retry of.": "UUID de la ejecución reintentada.",
   "Pipeline role for this run, e.g. 'implementer', 'reviewer'.":
     "Rol del pipeline, por ejemplo 'implementer' o 'reviewer'.",
-  "Full rendered prompt sent to the LLM for this run.": "Prompt renderizado enviado a la LLM.",
+  "Latest full rendered prompt saved on this execution, including attempts refused before dispatch. Invocation receipts record acknowledged dispatch preparation; they do not confirm provider execution or model use.":
+    "Último prompt completo renderizado guardado en esta ejecución, incluidos los intentos rechazados antes del envío. Los recibos de invocación registran la preparación de envío confirmada; no confirman la ejecución del proveedor ni el uso del prompt por el modelo.",
   "Save the returned execution_id — log_execution_update and cancel_execution need it.":
     "Guarda execution_id para log_execution_update y cancel_execution.",
   "Passing card_id flips the card to 'actively worked' presence on the board immediately — always bind it for card-scoped runs.":
