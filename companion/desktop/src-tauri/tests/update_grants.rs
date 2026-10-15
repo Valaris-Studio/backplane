@@ -114,16 +114,23 @@ fn decode_base64(text: &str) -> Vec<u8> {
 }
 
 #[test]
-fn committed_updater_pubkey_is_blank_or_a_minisign_public_key() {
-    // Blank while the release key is rotated (SECURITY HOLD): the app then
-    // never checks for updates. Once set, it must be a public key.
+fn committed_updater_pubkey_is_the_rotated_minisign_public_key() {
+    use sha2::{Digest, Sha256};
+
     let pubkey = committed_pubkey();
-    if pubkey.trim().is_empty() {
-        return;
-    }
+    assert!(
+        !pubkey.trim().is_empty(),
+        "release updater key must be configured"
+    );
     let key_file = String::from_utf8(decode_base64(&pubkey)).unwrap();
     minisign_verify::PublicKey::decode(&key_file).expect("a minisign public key");
     assert!(!key_file.to_lowercase().contains("secret key"));
+    // Pin the rotated identity so an older, still-parseable key cannot return.
+    let payload = decode_base64(key_file.lines().nth(1).unwrap());
+    assert_eq!(
+        format!("{:x}", Sha256::digest(payload)),
+        "5236945fef8a12ffc7405cefe141f83f3eba6493a97fd192f910e5b360b00260"
+    );
 }
 
 #[test]
