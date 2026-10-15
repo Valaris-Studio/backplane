@@ -1,0 +1,117 @@
+name: Recover runner 0.8.8
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-release-v0.8.8
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository == 'Valaris-Studio/backplane' && github.ref == 'refs/tags/v-recovery-runner-20261015'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-tooling
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: 82375d7e62d7f4e31e7e3258cdba2b08f67dce39
+          path: release-source
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bind immutable source and reviewed tooling
+        run: python release-tooling/scripts/runner-release-recovery.py --tooling release-tooling --source release-source --receipt "$RUNNER_TEMP/recovery-validation.json"
+
+  qualify:
+    if: github.repository == 'Valaris-Studio/backplane'
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  recover:
+    needs: [validate, qualify]
+    if: github.repository == 'Valaris-Studio/backplane' && vars.PUBLIC_RELEASES_ENABLED == 'true'
+    environment: runner-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-tooling
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: 82375d7e62d7f4e31e7e3258cdba2b08f67dce39
+          path: release-source
+          fetch-depth: 1
+      - name: Fetch runner source history
+        working-directory: release-source
+        run: |
+          git fetch --unshallow --no-tags origin
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main '+refs/tags/v*:refs/tags/v*' '^refs/tags/v-recovery-*'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recheck source, tooling, and publication conflicts after approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python release-tooling/scripts/runner-release-recovery.py --tooling release-tooling --source release-source --receipt "$RUNNER_TEMP/recovery-provenance.json" --check-publication
+      - name: Render source release notes with packaging provenance
+        env:
+          TOOLING_COMMIT: ${{ github.sha }}
+        run: |
+          python release-source/scripts/platform-release.py check-changelog --tag v0.8.8
+          python release-source/scripts/platform-release.py release-notes --tag v0.8.8 --output "$RUNNER_TEMP/runner-release-notes.md"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'runner-release-notes.md'
+          with path.open('a') as output:
+              output.write('\n\nPackaging recovery: runner code remains the immutable `v0.8.8` source commit '
+                           '`82375d7e62d7f4e31e7e3258cdba2b08f67dce39`. The container build context is supplied by '
+                           '`v-recovery-runner-20261015` tooling commit `' + os.environ['TOOLING_COMMIT'] + '`. '
+                           'The only runner configuration difference is the explicit source-file inclusion for GoReleaser.\n')
+          PY
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: release-source/runner/go.mod
+          cache-dependency-path: release-source/runner/go.sum
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: 'v2.18.3'
+          args: release --clean --config ../../release-tooling/runner/.goreleaser.yaml --release-notes ${{ runner.temp }}/runner-release-notes.md
+          workdir: release-source/runner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: v0.8.8
+      - name: Verify immutable source remained clean
+        if: always()
+        working-directory: release-source
+        run: test -z "$(git status --porcelain)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runner-recovery-provenance
+          path: |
+            ${{ runner.temp }}/recovery-provenance.json
+            ${{ runner.temp }}/runner-release-notes.md
+            release-source/runner/dist/artifacts.json
+            release-source/runner/dist/metadata.json
+          if-no-files-found: error

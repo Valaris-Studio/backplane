@@ -130,7 +130,7 @@ def test_publish_jobs_are_opt_in_and_environment_gated(filename, job, environmen
 @pytest.mark.parametrize("annotated", [False, True], ids=["lightweight", "annotated"])
 def test_runner_history_fetch_excludes_other_component_tags(release, tmp_path, annotated):
     _, repo, git = release
-    tags = ("v0.8.3", "v0.8.4", "platform-v0.1.1-preview.1", "mcp-server-v0.8.0")
+    tags = ("v0.8.3", "v0.8.4", "platform-v0.1.1-preview.1", "mcp-server-v0.8.0", "v-recovery-runner-20261015")
     for tag in tags:
         if annotated:
             git("tag", "-a", tag, "-m", f"Release {tag}")
