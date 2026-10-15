@@ -43,8 +43,10 @@ INVOCATION_RECORDING_RELEASE_DATE = "2026-10-04"
 # Obstacles WP1: string params keep JSON text, slim note receipts, card column labels.
 WP1_RELEASE = "0.9.1"
 # Wire-budget headroom: usage guidance moved off tools/list into the docs.
-CURRENT_RELEASE = "0.9.2"
-CURRENT_RELEASE_DATE = "2026-10-07"
+WIRE_GUIDANCE_RELEASE = "0.9.2"
+# Reviewed excerpt saves retain their provenance and retry identity.
+CURRENT_RELEASE = "0.9.3"
+CURRENT_RELEASE_DATE = "2026-10-15"
 # One line that restores the pre-0.6.0 full surface for an unchanged config.
 FULL_SURFACE_ONE_LINER = '"VALARIS_MCP_TOOLSETS": "all"'
 
@@ -403,9 +405,9 @@ def test_default_board_release_adds_the_default_board_and_fixes_the_slug_refusal
     assert DEFAULT_BOARD_RELEASE_DATE in heading_line, heading_line
 
 
-def test_current_release_moves_usage_guidance_off_the_wire_without_renames():
+def test_wire_guidance_release_moves_usage_guidance_off_the_wire_without_renames():
     text = _changelog_text()
-    start = _release_heading_re(CURRENT_RELEASE).search(text).start()
+    start = _release_heading_re(WIRE_GUIDANCE_RELEASE).search(text).start()
     end = _release_heading_re(WP1_RELEASE).search(text).start()
     section = text[start:end]
     assert re.findall(r"^### (.+)$", section, re.MULTILINE) == ["Added", "Changed", "Fixed", "Upgrade notes"]

@@ -213,6 +213,21 @@ intersection; `enabled_tools` is the hand after it.
 
 ## Upgrading
 
+### Upgrading from 0.9.2
+
+0.9.3 adds optional `client_request_id` and `excerpt_source` parameters to
+`create_note` for deliberately reviewed session excerpts. Supply `board_id`,
+the reviewed `content`, a UUID retry key and source item IDs/digests. Retry an
+uncertain save with the same key, content and destination. The backend owns
+source, destination and freshness checks; publishing the note does not share
+the raw session.
+
+Upgrade the backend before using this capability: it needs the board-scoped
+`/notes/from-excerpt` endpoint. An older backend returns an error without a
+fallback to ordinary note creation. Calls without the excerpt parameters remain
+unchanged. Keep credentials, custom toolsets and allowlists; restart the MCP
+server/connection to load the new tool schema.
+
 ### Upgrading from 0.8.x
 
 No configuration changes. What behaves differently:

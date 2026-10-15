@@ -7,7 +7,7 @@ components on independent version lines:
 | --- | --- | --- | --- |
 | **Platform** | The web app, API and database you self-host | [0.1.3-preview.1](#platform-v0.1.3-preview.1) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.3-preview.1) |
 | **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.5](#v0.8.5) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.5) · `ghcr.io/valaris-studio/backplane-runner:0.8.5` |
-| **MCP server** | Connects any MCP client to your boards | [0.9.2](#mcp-server-v0.9.2) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
+| **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 
 A platform release never republishes the runner or MCP server; each entry
 says which versions it was qualified with. Upgrade the platform before the
@@ -74,8 +74,8 @@ Changes in the source tree that are not yet part of a published platform release
 
 #### Upgrade notes
 
-- These additions are an unreleased source preview, not new platform, runner,
-  MCP package or Companion binary releases. The release table above is unchanged.
+- These platform and runner additions are an unreleased source preview, not new
+  platform, runner or Companion binary releases. MCP ships independently below.
   Build matching backend and runner source before enabling required-context
   policies; the linked runner 0.8.5 binaries do not implement this protocol.
 - Companion and rich capture remain disabled by default. Enable them deliberately
@@ -85,9 +85,36 @@ Changes in the source tree that are not yet part of a published platform release
   Schema compatibility alone does not qualify an older runtime for rollback:
   keep context policies in legacy mode with no budgets until all workers and
   runners, including the rollback runtime, support the enabled policies.
-- MCP excerpt tooling in this source must be installed from the reviewed commit
-  or a wheel built from it. The existing PyPI 0.9.2 package is not republished by
-  this preview.
+- MCP 0.9.3 includes the excerpt-note parameters, but their use still requires
+  the matching backend's dedicated publication route.
+
+---
+
+<a id="mcp-server-v0.9.3"></a>
+
+## MCP server 0.9.3 — 2026-10-15
+
+`mcp-server` · [PyPI](https://pypi.org/project/backplane-mcp/0.9.3/)
+
+> Save a reviewed session excerpt with its provenance and a stable retry key.
+
+#### Added
+
+- `create_note` accepts `client_request_id` and `excerpt_source` for a
+  board-scoped reviewed excerpt. The backend verifies source ownership,
+  destination access and freshness; an identical retry returns the original
+  note. Recipients receive the saved note, not access to its private source.
+
+#### Upgrade notes
+
+- Excerpt saves require a backend with `/notes/from-excerpt`. An older backend
+  returns an error rather than silently creating a note without retry safety.
+  Ordinary `create_note` calls are unchanged.
+- Preserve credentials, custom toolsets and allowlists. Restart the MCP
+  server/connection to refresh the tool schema. This MCP release does not deploy
+  the platform, upgrade the runner or publish a Companion installer.
+
+[Full MCP notes](mcp-server/CHANGELOG.md#093---2026-10-15)
 
 ---
 

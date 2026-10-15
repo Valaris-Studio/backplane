@@ -4,6 +4,27 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] - 2026-10-15
+
+### Added
+
+- `create_note` accepts optional `client_request_id` and `excerpt_source` for
+  a reviewed session excerpt. Supply a board, the reviewed note content, a UUID
+  retry key and source item IDs with their SHA-256 digests. The backend checks
+  source ownership, current destination access and source freshness. Retrying
+  the same request preserves the original note instead of creating a duplicate.
+  Sharing the note does not grant access to the private source session.
+
+### Upgrade notes
+
+- Excerpt saves require a matching backend with the board-scoped
+  `/notes/from-excerpt` route. An older backend returns an error; the tool never
+  falls back to an ordinary note save that would lose provenance or retry safety.
+  Calls without either excerpt field keep their existing note-creation behavior.
+- No credential, toolset, allowlist or technical `valaris` namespace changes are
+  required. Restart the MCP server/connection so clients refresh the tool schema.
+  Existing deprecated aliases remain available until 0.10.0.
+
 ## [0.9.2] - 2026-10-07
 
 ### Added
