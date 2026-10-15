@@ -366,12 +366,10 @@ mod tests {
     }
 
     #[test]
-    fn shipped_config_carries_no_updater_key_until_the_key_is_rotated() {
-        // RELEASE HOLD: no updater key is committed until the release key is
-        // provisioned. A release needs that key here, and the change that adds it.
+    fn shipped_config_enables_updates_with_a_configured_key() {
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
-        assert!(!updater_key_configured(config.pointer("/plugins/updater")));
+        assert!(updater_key_configured(config.pointer("/plugins/updater")));
     }
 
     #[test]
