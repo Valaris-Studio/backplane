@@ -25,6 +25,7 @@ def test_normal_runner_release_excludes_recovery_tooling_tags():
     assert matches("v0.8.8")
     assert matches("v0.9.0-beta.1")
     assert not matches("v-recovery-runner-20261015")
+    assert not matches("v-recovery-runner-20261015-2")
     assert not matches("platform-v0.1.4-preview.2")
 
 
@@ -189,7 +190,7 @@ def test_recovery_dispatch_has_fixed_source_and_normal_protection():
     assert set(workflow["on"]) == {"workflow_dispatch"}
     assert not workflow["on"]["workflow_dispatch"]
     assert workflow["permissions"] == {"contents": "read"}
-    assert "refs/tags/v-recovery-runner-20261015" in workflow["jobs"]["validate"]["if"]
+    assert "github.ref == 'refs/tags/v-recovery-runner-20261015-2'" in workflow["jobs"]["validate"]["if"]
     job = workflow["jobs"]["recover"]
     assert job["environment"] == "runner-release"
     assert job["needs"] == ["validate", "qualify"]
