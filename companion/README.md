@@ -50,11 +50,32 @@ For an existing installation:
    the app. Stopping sends a shutdown request; if it still reports `true`, wait
    and repeat `service status` until shutdown finishes.
 
+   For the one-time transition from an ad hoc or source-built app to this signed
+   preview, also unload the stopped service registration:
+
+   ```sh
+   launchctl bootout "gui/$(id -u)/dev.backplane.companion"
+   ```
+
+   This preserves the service definition and data while letting macOS register
+   the signed executable after replacement.
+
 2. Open the downloaded DMG and replace **Backplane Companion** in **Applications**.
-3. Start the same background service and check its status:
+3. If you unloaded the registration in step 1, load the same service definition:
+
+   ```sh
+   launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.backplane.companion.plist"
+   ```
+
+   Otherwise, start the existing service:
 
    ```sh
    "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service start
+   ```
+
+   Check its status:
+
+   ```sh
    "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service status
    ```
 

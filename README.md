@@ -31,7 +31,7 @@ your team works, ready to reuse across projects.
 The current platform preview includes private session readers, reviewed excerpt
 handoff and prepared runner context. Use [platform 0.1.4-preview.2](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2),
 [runner 0.8.8](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8)
-and [MCP server 0.9.3](https://pypi.org/project/backplane-mcp/0.9.3/).
+and [MCP server 0.9.4](https://pypi.org/project/backplane-mcp/0.9.4/).
 The signed [macOS Companion preview](companion/README.md#macos-desktop-preview)
 provides local capture and its desktop controls.
 
