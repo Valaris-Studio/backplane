@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import fnmatch
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 
@@ -53,12 +54,57 @@ def recovery(tmp_path):
     (tooling / "runner/.goreleaser.yaml").write_text(FIXED_CONFIG)
     git(tooling, "commit", "-qam", "Packaging only")
     tooling_sha = git(tooling, "rev-parse", "HEAD")
-    git(tooling, "tag", "-a", "v-recovery-runner-20261015", "-m", "Tooling")
+    git(tooling, "tag", "-a", module.TOOLING_TAG, "-m", "Tooling")
     git(tooling, "update-ref", "refs/remotes/origin/main", "HEAD")
     git(source, "update-ref", "refs/remotes/origin/main", "HEAD")
-    options = dict(repository="Valaris-Studio/backplane", ref="refs/tags/v-recovery-runner-20261015", tooling_sha=tooling_sha,
-                   source_tag="v0.8.8", source_sha=source_sha, tooling_tag="v-recovery-runner-20261015")
+    options = dict(repository="Valaris-Studio/backplane", ref=f"refs/tags/{module.TOOLING_TAG}", tooling_sha=tooling_sha,
+                   source_tag="v0.8.8", source_sha=source_sha, tooling_tag=module.TOOLING_TAG)
     return module, tooling, source, git, options
+
+
+@pytest.mark.parametrize("job_name", ["validate", "recover"])
+@pytest.mark.parametrize("checkout_flattens_tag", [False, True], ids=["annotated", "checkout-peeled"])
+def test_recovery_tooling_checkout_restores_only_exact_annotated_tag(recovery, tmp_path, job_name, checkout_flattens_tag):
+    module, tooling, source, git, options = recovery
+    remote = tmp_path / "remote.git"
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {"PATH": os.environ["PATH"], "HOME": str(home), "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_CONFIG_GLOBAL": os.devnull, "GIT_ALLOW_PROTOCOL": "file", "GIT_TERMINAL_PROMPT": "0"}
+    subprocess.run(["git", "clone", "--bare", "--quiet", str(tooling), str(remote)], env=env, check=True, timeout=10)
+    git(tooling, "remote", "add", "origin", str(remote))
+    git(remote, "tag", "v-recovery-unrelated-remote-only", options["source_sha"])
+    tag_ref = f"refs/tags/{options['tooling_tag']}"
+    remote_tag = git(remote, "rev-parse", tag_ref)
+    source_tag = git(source, "rev-parse", "refs/tags/v0.8.8")
+    assert git(tooling, "cat-file", "-t", tag_ref) == "tag"
+    if checkout_flattens_tag:
+        # actions/checkout performs this targeted fetch after its all-history fetch.
+        subprocess.run(["git", "fetch", "--no-tags", "origin", f"+{options['tooling_sha']}:{tag_ref}"],
+                       cwd=tooling, env=env, check=True, timeout=10)
+        assert git(tooling, "cat-file", "-t", tag_ref) == "commit"
+
+    workflow = yaml.load((ROOT / ".github/workflows/recover-runner.yml").read_text(), Loader=yaml.BaseLoader)
+    steps = workflow["jobs"][job_name]["steps"]
+    tooling_checkout = next(i for i, step in enumerate(steps)
+                            if step.get("uses") == "actions/checkout@v4" and step["with"]["path"] == "release-tooling")
+    source_checkout = next(i for i, step in enumerate(steps)
+                           if step.get("uses") == "actions/checkout@v4" and step["with"]["path"] == "release-source")
+    for step in steps[tooling_checkout + 1:source_checkout]:
+        if "run" in step:
+            assert step["working-directory"] == "release-tooling"
+            subprocess.run(["bash", "-eo", "pipefail", "-c", step["run"]],
+                           cwd=tooling, env=env, check=True, timeout=10)
+
+    receipt = module.prepare(tooling, source, **options)
+    assert receipt["tooling_commit"] == options["tooling_sha"]
+    assert git(tooling, "cat-file", "-t", tag_ref) == "tag"
+    assert git(tooling, "rev-parse", tag_ref) == remote_tag == git(remote, "rev-parse", tag_ref)
+    assert git(source, "rev-parse", "refs/tags/v0.8.8") == source_tag == git(remote, "rev-parse", "refs/tags/v0.8.8")
+    assert git(tooling, "status", "--porcelain") == git(source, "status", "--porcelain") == ""
+    unrelated = subprocess.run(["git", "show-ref", "--verify", "--quiet", "refs/tags/v-recovery-unrelated-remote-only"],
+                               cwd=tooling, env=env, timeout=10)
+    assert unrelated.returncode == 1
 
 
 def test_recovery_preserves_source_and_binds_audited_config(recovery):
