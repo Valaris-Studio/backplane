@@ -50,7 +50,7 @@ func TestGeneratedMCPCompletionPreflight(t *testing.T) {
 					t.Fatalf("compatible generated config must reach BOOTSTRAP: calls=%d err=%v", provider.CallCount(), err)
 				}
 				data, _ := os.ReadFile(requests)
-				for _, want := range []string{"backplane-mcp==0.9.1", "get_board_loop", "board-1", "acme"} {
+				for _, want := range []string{"backplane-mcp==0.9.3", "get_board_loop", "board-1", "acme"} {
 					if !strings.Contains(string(data), want) {
 						t.Errorf("actual generated process did not receive %q: %s", want, data)
 					}

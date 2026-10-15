@@ -24,7 +24,7 @@ func MCPLaunchUvx() MCPLaunch {
 	// Never let an older published/cached package silently satisfy a runner
 	// whose completion workflow requires the 0.8 tool surface; 0.9 adds the
 	// native context that links runner-launched sessions to their MCP calls.
-	return MCPLaunch{Command: "uvx", Args: []string{"backplane-mcp==0.9.1"}}
+	return MCPLaunch{Command: "uvx", Args: []string{"backplane-mcp==0.9.3"}}
 }
 
 // MCPLaunchCheckout runs the server straight out of a source tree, so a
