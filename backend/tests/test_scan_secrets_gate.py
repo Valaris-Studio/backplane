@@ -22,6 +22,7 @@ PATH, so the observed exit codes are the script's own, not the scanner's.
 
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import json
@@ -366,6 +367,51 @@ def test_real_scan_catches_digest_shape_under_other_wire_key(tmp_path: Path):
     repo = _scan_repo(tmp_path, {f"{WIRE_DIR}/probe.json": _wire_json("secret_key", ALLOWED_CONTENT_KEY)})
     run = _run_scan(cwd=repo)
     assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+
+
+UPDATER_CONFIG = "companion/desktop/src-tauri/tauri.conf.json"
+
+
+def _committed_updater_pubkey() -> str:
+    return json.loads((REPO_ROOT / UPDATER_CONFIG).read_text())["plugins"]["updater"]["pubkey"]
+
+
+@requires_real_gitleaks
+def test_real_scan_allows_committed_updater_public_key(tmp_path: Path):
+    repo = _scan_repo(tmp_path, {UPDATER_CONFIG: _wire_json("pubkey", _committed_updater_pubkey())})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 0, f"rc={run.returncode}\n{run.output}"
+    assert CLEAN_MESSAGE in run.stdout
+
+
+@requires_real_gitleaks
+@pytest.mark.parametrize(
+    ("path", "field", "value"),
+    [
+        (UPDATER_CONFIG, "api_key", "generic-sentinel"),
+        (UPDATER_CONFIG, "pubkey", "platform-sentinel"),
+        (UPDATER_CONFIG, "pubkey", "other-key-id"),
+        (f"vendor/{UPDATER_CONFIG}", "pubkey", "public-key"),
+        ("other.json", "pubkey", "public-key"),
+    ],
+)
+def test_real_scan_updater_allowance_rejects_other_values_fields_and_paths(
+    tmp_path: Path, path: str, field: str, value: str
+):
+    values = {
+        "generic-sentinel": _sentinel("generic", 32),
+        "platform-sentinel": PLATFORM_KEY_SENTINEL,
+        "public-key": _committed_updater_pubkey(),
+        "other-key-id": base64.b64encode(
+            base64.b64decode(_committed_updater_pubkey()).replace(
+                b"C16E8D0247AB4D43", b"A19D7B0247CE4D35"
+            )
+        ).decode(),
+    }
+    repo = _scan_repo(tmp_path, {path: _wire_json(field, values[value])})
+    run = _run_scan(cwd=repo)
+    assert run.returncode == 1, f"rc={run.returncode}\n{run.output}"
+    assert path in run.stdout
 
 
 @requires_real_gitleaks

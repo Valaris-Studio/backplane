@@ -71,3 +71,13 @@ condition = "AND"
 paths = ['''^contracts/rich-capture/wire/(invalid/)?[^/]+\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"content_key":\s*"[0-9a-f]{64}",?\s*$''']
+
+# Gitleaks decodes the Minisign file and flags its public key ID in the header.
+# Only that known public ID match is exempt, under the exact updater config path.
+[[allowlists]]
+description = "Companion rotated updater public verification key"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^companion/desktop/src-tauri/tauri\.conf\.json$''']
+regexTarget = "match"
+regexes = ['''^key: C16E8D0247AB4D43$''']
