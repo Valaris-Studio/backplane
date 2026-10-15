@@ -127,21 +127,33 @@ def test_publish_jobs_are_opt_in_and_environment_gated(filename, job, environmen
     assert publish["needs"]
 
 
-def test_runner_history_fetch_excludes_other_component_tags(release, tmp_path):
+@pytest.mark.parametrize("annotated", [False, True], ids=["lightweight", "annotated"])
+def test_runner_history_fetch_excludes_other_component_tags(release, tmp_path, annotated):
     _, repo, git = release
-    for tag in ("v0.8.3", "v0.8.4", "platform-v0.1.1-preview.1", "mcp-server-v0.8.0"):
-        git("tag", tag)
+    tags = ("v0.8.3", "v0.8.4", "platform-v0.1.1-preview.1", "mcp-server-v0.8.0")
+    for tag in tags:
+        if annotated:
+            git("tag", "-a", tag, "-m", f"Release {tag}")
+        else:
+            git("tag", tag)
+    remote_tags = {tag: git("rev-parse", f"refs/tags/{tag}") for tag in tags}
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
     def checkout_git(*args):
         return subprocess.check_output(["git", "-C", str(checkout), *args], text=True).strip()
     checkout_git("remote", "add", "origin", repo.as_uri())
-    checkout_git("fetch", "--no-tags", "--depth=1", "origin", "refs/tags/v0.8.4:refs/tags/v0.8.4")
+    # actions/checkout fetches the event commit into a local lightweight tag.
+    source_commit = git("rev-parse", "HEAD")
+    checkout_git("fetch", "--no-tags", "--depth=1", "origin", f"+{source_commit}:refs/tags/v0.8.4")
+    assert checkout_git("cat-file", "-t", "refs/tags/v0.8.4") == "commit"
     checkout_git("checkout", "--detach", "v0.8.4")
     workflow = yaml.load((ROOT / ".github/workflows/release-runner.yml").read_text(), Loader=yaml.BaseLoader)
     step = next(s for s in workflow["jobs"]["goreleaser"]["steps"] if s.get("name") == "Fetch runner release history")
-    subprocess.run(["bash", "-euo", "pipefail", "-c", step["run"]], cwd=checkout, check=True)
+    subprocess.run(["bash", "-euo", "pipefail", "-c", step["run"]], cwd=checkout, check=True, timeout=30)
     assert checkout_git("tag", "--list").splitlines() == ["v0.8.3", "v0.8.4"]
+    for tag in ("v0.8.3", "v0.8.4"):
+        assert checkout_git("rev-parse", f"refs/tags/{tag}") == remote_tags[tag]
+    assert {tag: git("rev-parse", f"refs/tags/{tag}") for tag in tags} == remote_tags
     assert checkout_git("rev-parse", "HEAD") == git("rev-parse", "HEAD")
     assert checkout_git("rev-parse", "origin/main") == git("rev-parse", "HEAD")
 
