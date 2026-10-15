@@ -52,7 +52,8 @@ jobs:
           if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
             git fetch --unshallow --no-tags origin
           fi
-          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main 'refs/tags/v*:refs/tags/v*'
+          # checkout writes the commit into a lightweight local tag; restore annotations.
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main '+refs/tags/v*:refs/tags/v*'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
