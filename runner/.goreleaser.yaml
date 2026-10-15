@@ -45,6 +45,11 @@ snapshot:
 dockers_v2:
   - id: backplane-runner
     dockerfile: Dockerfile
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd
+      - internal
     images:
       - ghcr.io/valaris-studio/backplane-runner
     tags:
