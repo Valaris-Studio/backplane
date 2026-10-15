@@ -40,16 +40,17 @@ thing that runs on your machines without the platform's copyleft following it.
 
 ## Release compatibility
 
-The current release pair is **runner 0.8.7** with **platform 0.1.4-preview.1**.
-Runner 0.8.7 generates MCP configs pinned to `backplane-mcp==0.9.3`, the
+The current release pair is **runner 0.8.8** with **platform 0.1.4-preview.2**.
+Runner 0.8.8 generates MCP configs pinned to `backplane-mcp==0.9.3`, the
 corresponding published MCP package. Existing custom MCP launch settings are
 preserved; regenerate or update a generated configuration deliberately.
 
-The prepared-context protocol and context budgets require this platform and
-runner pair. Keep policies in legacy mode with no budgets until all workers
+The prepared-context protocol and context budgets require compatible platform
+and runner versions; this release pair supports them. Keep policies in legacy
+mode with no budgets until all workers
 and runners, including the rollback runtime, support the enabled policies.
 Drain incompatible processes before opting in. Upgrade the backend before
-upgrading the runner. See the [upgrade notes](../CHANGELOG.md#platform-v0.1.4-preview.1).
+upgrading the runner. See the [upgrade notes](../CHANGELOG.md#platform-v0.1.4-preview.2).
 
 ## Prerequisites
 
