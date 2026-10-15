@@ -156,3 +156,23 @@ def test_recovery_dispatch_has_fixed_source_and_normal_protection():
     assert job["steps"][publish]["env"]["GORELEASER_CURRENT_TAG"] == "v0.8.8"
     assert "--skip" not in job["steps"][publish]["with"]["args"]
     assert "--config ../../release-tooling/runner/.goreleaser.yaml" in job["steps"][publish]["with"]["args"]
+
+
+@pytest.mark.parametrize("endpoint", ["release", "manifest"])
+@pytest.mark.parametrize("body", [None, [], "not an object"])
+def test_recovery_does_not_treat_successful_non_object_response_as_absence(recovery, monkeypatch, endpoint, body):
+    import io
+    import json
+    import urllib.error
+    module, _, _, _, _ = recovery
+    def respond(request, timeout):
+        if request.full_url.startswith("https://api.github.com/"):
+            if endpoint == "release":
+                return io.BytesIO(json.dumps(body).encode())
+            raise urllib.error.HTTPError(request.full_url, 404, "synthetic absence", {}, None)
+        if request.full_url.startswith("https://ghcr.io/token?"):
+            return io.BytesIO(b'{"token":"synthetic-registry-token"}')
+        return io.BytesIO(json.dumps(body).encode())
+    monkeypatch.setattr(module.urllib.request, "urlopen", respond)
+    with pytest.raises(module.RecoveryError):
+        module.require_unpublished("synthetic-user", "synthetic-token")
