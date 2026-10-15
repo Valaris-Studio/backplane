@@ -213,6 +213,21 @@ intersection; `enabled_tools` is the hand after it.
 
 ## Upgrading
 
+### Upgrading from 0.9.3
+
+0.9.4 requires MCP SDK `>=1.30.0,<2`, fixing unbounded stateful Streamable HTTP
+session retention ([CVE-2026-59951](https://github.com/modelcontextprotocol/python-sdk/security/advisories/GHSA-84m7-p3x7-pcfv)).
+Idle sessions expire after 30 minutes with no request or stream in flight;
+clients must initialize again after a `404`. New sessions receive `503` when
+the 10,000-session capacity is reached. Stdio is outside this advisory.
+
+Upgrade the installed package to `backplane-mcp==0.9.4`, then restart the MCP
+server/connection. Keep credentials, toolsets and allowlists. If you run
+`mcp-server/run.sh` from an older platform source archive, switch to the 0.9.4
+package or the `mcp-server-v0.9.4` source release: existing platform archives,
+including `platform-v0.1.4-preview.2`, retain their original MCP lockfiles.
+The platform, runner and Companion do not need replacement for this MCP fix.
+
 ### Upgrading from 0.9.2
 
 0.9.3 adds optional `client_request_id` and `excerpt_source` parameters to

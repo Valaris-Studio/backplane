@@ -7,7 +7,7 @@ version lines:
 | --- | --- | --- | --- |
 | **Platform** | The web app, API and database you self-host | [0.1.4-preview.2](#platform-v0.1.4-preview.2) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2) |
 | **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
-| **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
+| **MCP server** | Connects any MCP client to your boards | [0.9.4](#mcp-server-v0.9.4) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 | **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.2](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg) |
 
 A platform release never republishes the runner or MCP server; each entry
@@ -32,6 +32,28 @@ keeps its own detailed per-tool history in
 ## Unreleased
 
 No additional changes yet.
+
+---
+
+<a id="mcp-server-v0.9.4"></a>
+
+## MCP server 0.9.4 — 2026-10-15
+
+`mcp` · [Package](https://pypi.org/project/backplane-mcp/0.9.4/)
+
+#### Security
+
+- Require MCP SDK `>=1.30.0,<2` to address CVE-2026-59951: stateful Streamable
+  HTTP sessions now have finite idle and capacity limits and release ended or
+  refused sessions. Stdio is outside this advisory.
+
+#### Upgrade notes
+
+- Upgrade the independent MCP package to 0.9.4 and restart the server/connection;
+  credentials, toolsets, allowlists and the tool catalog stay compatible.
+- MCP launched from an older platform source archive needs the 0.9.4 package
+  or `mcp-server-v0.9.4` source. Existing platform archives retain their original
+  MCP lockfiles; platform, runner and Companion releases are unchanged.
 
 ---
 
