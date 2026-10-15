@@ -53,6 +53,7 @@ TAURI = DESKTOP / "src-tauri"
 ENTITLEMENTS = TAURI / "Entitlements.plist"
 PRODUCT = "Backplane Companion"
 DESKTOP_PACKAGE = "backplane-companion-desktop"
+NOTICE_CATALOG = COMPANION / "licenses" / "desktop" / "catalog.json"
 UNIVERSAL_TRIPLE = "universal-apple-darwin"
 COMPANION_UNIVERSAL = "backplane-companion-" + UNIVERSAL_TRIPLE
 # lipo order; manifests list them sorted.
@@ -216,13 +217,43 @@ def declared_license_allowed(expression):
     return allowed and position == len(tokens)
 
 
+def _pinned_license_files(ecosystem, name, version, declared, directory):
+    package = f"{ecosystem}/{name}@{version}"
+    try:
+        catalog = json.loads(NOTICE_CATALOG.read_text(encoding="utf-8"))
+        record = catalog["packages"][package]
+        vcs = json.loads((Path(directory) / ".cargo_vcs_info.json").read_text(encoding="utf-8"))
+        if ecosystem != "crates.io" or record["license"] != declared or record["vcs_commit"] != vcs["git"]["sha1"]:
+            raise ValueError("package license or source identity differs")
+        if not record["license_files"]:
+            raise ValueError("no pinned license text")
+        files = []
+        for name in record["license_files"] + record["notice_files"]:
+            path = NOTICE_CATALOG.parent / name
+            if Path(name).name != name or path.is_symlink() or not path.is_file():
+                raise ValueError("invalid pinned notice path")
+            if not path.read_bytes().strip() or bundle.sha256(path) != catalog["files"][name]["sha256"]:
+                raise ValueError("pinned notice content differs")
+            files.append(path)
+        return files
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise BuildError(f"{package}: no verified license text ({error})") from error
+
+
 def _declared_entry(ecosystem, name, version, declared, directory, used_by):
     if not declared:
         raise BuildError(f"{ecosystem} package {name}@{version} declares no license")
     if not declared_license_allowed(declared):
         raise BuildError(f"{ecosystem} package {name}@{version} is licensed {declared!r}, which is not on the allowlist")
     licensed, notices = licenses._license_files(Path(directory))
-    return licenses.Entry(f"{ecosystem}/{name}", version, [declared], licensed + notices, [used_by])
+    if licensed:
+        if any(not path.read_bytes().strip() for path in licensed):
+            raise BuildError(f"{ecosystem}/{name}@{version}: empty license text")
+        files = licensed + notices
+    else:
+        # Some registry packages omit their workspace's license files.
+        files = _pinned_license_files(ecosystem, name, version, declared, directory) + notices
+    return licenses.Entry(f"{ecosystem}/{name}", version, [declared], files, [used_by])
 
 
 def rust_entries(metadata_by_target):

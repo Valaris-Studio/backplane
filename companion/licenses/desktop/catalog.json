@@ -1,0 +1,426 @@
+{
+  "files": {
+    "Inflector-LICENSE.md": {
+      "sha256": "03d1bd5bfbee8d44651e7f57faf9e5b4eda4233f0d4eda36a716f2f0533d230b",
+      "sources": [
+        "https://raw.githubusercontent.com/whatisinternet/Inflector/a4a95eac75043f4bffb127c7c8ec886b5b106053/LICENSE.md"
+      ]
+    },
+    "alloc-stdlib-LICENSE": {
+      "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae",
+      "sources": [
+        "https://raw.githubusercontent.com/dropbox/rust-alloc-no-stdlib/0a81fd6928ea3b33c8cd484aa4575d50ffb98012/LICENSE"
+      ]
+    },
+    "defmt-LICENSE-APACHE": {
+      "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+      "sources": [
+        "https://raw.githubusercontent.com/knurling-rs/defmt/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-APACHE"
+      ]
+    },
+    "defmt-LICENSE-MIT": {
+      "sha256": "2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50",
+      "sources": [
+        "https://raw.githubusercontent.com/knurling-rs/defmt/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-MIT"
+      ]
+    },
+    "mac-notification-sys-LICENSE-Apache": {
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "sources": [
+        "https://raw.githubusercontent.com/h4llow3En/mac-notification-sys/deb559683962d314a7693478476bf8d052efa84e/LICENSE-Apache"
+      ]
+    },
+    "mac-notification-sys-LICENSE-MIT": {
+      "sha256": "1299b4d9d15e9d67e4ac0e7d47ae9404887ca3cf0764aadeec7588d5a6e8e0cc",
+      "sources": [
+        "https://raw.githubusercontent.com/h4llow3En/mac-notification-sys/deb559683962d314a7693478476bf8d052efa84e/LICENSE-MIT"
+      ]
+    },
+    "objc2-LICENSE-MIT.txt": {
+      "description": "Original full upstream MIT license from the parent of the licensing-clarification commit; this commit is an ancestor of all four pinned crate revisions. Preserve the upstream copyright verbatim; the current declaration confirms the MIT option.",
+      "sha256": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5",
+      "sources": [
+        "https://raw.githubusercontent.com/madsmtm/objc2/757cd841d0293341dbefd9b99d7548dec244ffde/LICENSE.txt"
+      ]
+    },
+    "objc2-LICENSE.md": {
+      "description": "Current upstream licensing declaration, identical at all four crate source commits; retain alongside the full MIT terms.",
+      "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+      "sources": [
+        "https://raw.githubusercontent.com/madsmtm/objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+        "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+        "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+        "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md"
+      ]
+    },
+    "selectors-MPL-2.0.txt": {
+      "description": "Complete canonical MPL 2.0 text from Mozilla, the license steward, linked by the pinned selectors source header.",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+      "sources": [
+        "https://www.mozilla.org/media/MPL/2.0/index.f75d2927d3c1.txt"
+      ]
+    },
+    "selectors-SOURCE.txt": {
+      "description": "Source-availability notice assembled from the exact crate metadata and upstream source header; not an upstream license text.",
+      "sha256": "fa2f68457a6974a9505b8fb8fc0fd0039e35badb6c953be52ceb9ee6a6ec632b",
+      "sources": [
+        "https://raw.githubusercontent.com/servo/stylo/572ecba2d1600e7c3d490586692a209faf703baa/selectors/lib.rs",
+        "https://static.crates.io/crates/selectors/selectors-0.38.0.crate"
+      ]
+    },
+    "specta-LICENSE": {
+      "sha256": "9ec86f39e235fcd35e6d91ef3fd4d6b88e5763f3ce1e296c222969986b6f6475",
+      "sources": [
+        "https://raw.githubusercontent.com/specta-rs/specta/e7fd23f586b9bd58de39002dabe49b1f978bf971/LICENSE"
+      ]
+    },
+    "tauri-specta-LICENSE": {
+      "sha256": "79b0c7d284efc4c2dc8da73c01a6d10c19caf61e70fca813e642dc010049eee7",
+      "sources": [
+        "https://raw.githubusercontent.com/specta-rs/tauri-specta/e5e578fb339fc2b0d6c676b3031c3dafcec88083/LICENSE"
+      ]
+    }
+  },
+  "packages": {
+    "crates.io/Inflector@0.11.4": {
+      "license": "BSD-2-Clause",
+      "license_files": [
+        "Inflector-LICENSE.md"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "",
+      "repository": "https://github.com/whatisinternet/inflector",
+      "vcs_commit": "a4a95eac75043f4bffb127c7c8ec886b5b106053"
+    },
+    "crates.io/alloc-stdlib@0.3.0": {
+      "license": "BSD-3-Clause",
+      "license_files": [
+        "alloc-stdlib-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "alloc-stdlib",
+      "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+      "vcs_commit": "0a81fd6928ea3b33c8cd484aa4575d50ffb98012"
+    },
+    "crates.io/block2@0.6.2": {
+      "license": "MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "crates/block2",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "b4167b582b2f75f9a1be75495c41b765344fd03c"
+    },
+    "crates.io/defmt-parser@1.0.0": {
+      "license": "MIT OR Apache-2.0",
+      "license_files": [
+        "defmt-LICENSE-APACHE",
+        "defmt-LICENSE-MIT"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "parser",
+      "repository": "https://github.com/knurling-rs/defmt",
+      "vcs_commit": "4a8cdb44891ed57b8ff5a023b6bec7137c48708f"
+    },
+    "crates.io/dispatch2@0.3.1": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "crates/dispatch2",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "8852b424193ca41602281b3d7540d7c8ed51e49a"
+    },
+    "crates.io/mac-notification-sys@0.6.15": {
+      "license": "MIT/Apache-2.0",
+      "license_files": [
+        "mac-notification-sys-LICENSE-Apache",
+        "mac-notification-sys-LICENSE-MIT"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "",
+      "repository": "https://github.com/h4llow3En/mac-notification-sys",
+      "vcs_commit": "deb559683962d314a7693478476bf8d052efa84e"
+    },
+    "crates.io/objc2-app-kit@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-app-kit",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-cloud-kit@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-cloud-kit",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-data@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-data",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-foundation@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-foundation",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-graphics@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-graphics",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-image@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-image",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-text@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-text",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-core-video@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-core-video",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-encode@4.1.0": {
+      "license": "MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "crates/objc2-encode",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7"
+    },
+    "crates.io/objc2-exception-helper@0.1.1": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "crates/objc2-exception-helper",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7"
+    },
+    "crates.io/objc2-foundation@0.3.2": {
+      "license": "MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-foundation",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-io-surface@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-io-surface",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-osa-kit@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-osa-kit",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-quartz-core@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-quartz-core",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2-web-kit@0.3.2": {
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "framework-crates/objc2-web-kit",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+    },
+    "crates.io/objc2@0.6.4": {
+      "license": "MIT",
+      "license_files": [
+        "objc2-LICENSE-MIT.txt"
+      ],
+      "notice_files": [
+        "objc2-LICENSE.md"
+      ],
+      "path_in_vcs": "crates/objc2",
+      "repository": "https://github.com/madsmtm/objc2",
+      "vcs_commit": "8852b424193ca41602281b3d7540d7c8ed51e49a"
+    },
+    "crates.io/selectors@0.38.0": {
+      "license": "MPL-2.0",
+      "license_files": [
+        "selectors-MPL-2.0.txt"
+      ],
+      "notice_files": [
+        "selectors-SOURCE.txt"
+      ],
+      "path_in_vcs": "selectors",
+      "repository": "https://github.com/servo/stylo",
+      "vcs_commit": "572ecba2d1600e7c3d490586692a209faf703baa"
+    },
+    "crates.io/specta-macros@2.0.0-rc.25": {
+      "license": "MIT",
+      "license_files": [
+        "specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "specta-macros",
+      "repository": "https://github.com/specta-rs/specta",
+      "vcs_commit": "e7fd23f586b9bd58de39002dabe49b1f978bf971"
+    },
+    "crates.io/specta-serde@0.0.12": {
+      "license": "MIT",
+      "license_files": [
+        "specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "specta-serde",
+      "repository": "https://github.com/specta-rs/specta",
+      "vcs_commit": "e7fd23f586b9bd58de39002dabe49b1f978bf971"
+    },
+    "crates.io/specta-typescript@0.0.12": {
+      "license": "MIT",
+      "license_files": [
+        "specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "specta-typescript",
+      "repository": "https://github.com/specta-rs/specta",
+      "vcs_commit": "e7fd23f586b9bd58de39002dabe49b1f978bf971"
+    },
+    "crates.io/specta-util@0.0.12": {
+      "license": "MIT",
+      "license_files": [
+        "specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "specta-util",
+      "repository": "https://github.com/specta-rs/specta",
+      "vcs_commit": "e7fd23f586b9bd58de39002dabe49b1f978bf971"
+    },
+    "crates.io/specta@2.0.0-rc.25": {
+      "license": "MIT",
+      "license_files": [
+        "specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "specta",
+      "repository": "https://github.com/specta-rs/specta",
+      "vcs_commit": "e7fd23f586b9bd58de39002dabe49b1f978bf971"
+    },
+    "crates.io/tauri-specta-macros@2.0.0-rc.25": {
+      "license": "MIT",
+      "license_files": [
+        "tauri-specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "macros",
+      "repository": "https://github.com/specta-rs/tauri-specta",
+      "vcs_commit": "e5e578fb339fc2b0d6c676b3031c3dafcec88083"
+    },
+    "crates.io/tauri-specta@2.0.0-rc.25": {
+      "license": "MIT",
+      "license_files": [
+        "tauri-specta-LICENSE"
+      ],
+      "notice_files": [],
+      "path_in_vcs": "",
+      "repository": "https://github.com/specta-rs/tauri-specta",
+      "vcs_commit": "e5e578fb339fc2b0d6c676b3031c3dafcec88083"
+    }
+  }
+}
