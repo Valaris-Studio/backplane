@@ -112,14 +112,18 @@ describe("installing and getting-started documentation against main", () => {
     expect(source).not.toContain("it embeds the API key");
   });
 
-  it("documents the published v0.8.5 runner distribution and explicit config launch", () => {
+  it("documents the published v0.8.6 runner distribution and explicit config launch", () => {
     const source = section("getting-started-your-first-pipeline-run");
 
-    expect(source).toContain("storage.googleapis.com/backplane-artifacts/runner/v0.8.5");
+    expect(source).toContain("storage.googleapis.com/backplane-artifacts/runner/v0.8.6");
     expect(source).toContain("SHA256SUMS");
     expect(source).toMatch(/macOS, Linux, and Windows binaries/);
     expect(source).toContain("backplane-runner-windows-amd64.exe");
-    expect(source).toContain("ghcr.io/valaris-studio/backplane-runner:0.8.5");
+    expect(source).toContain("ghcr.io/valaris-studio/backplane-runner:0.8.6");
+    expect(source).toContain("Runner 0.8.6 and platform 0.1.4-preview.1 support required-context");
+    expect(source).toContain("drain incompatible processes before");
+    expect(source).not.toContain("unreleased source");
+    expect(source).not.toContain("downloads above do not implement");
     expect(source).toContain("-doctor -config runner-laptop-seba.yaml");
     expect(source).toMatch(/polls once immediately/i);
     expect(source).toContain("${`{VALARIS_API_KEY}`}");

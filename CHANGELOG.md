@@ -5,8 +5,8 @@ components on independent version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
-| **Platform** | The web app, API and database you self-host | [0.1.3-preview.1](#platform-v0.1.3-preview.1) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.3-preview.1) |
-| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.5](#v0.8.5) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.5) · `ghcr.io/valaris-studio/backplane-runner:0.8.5` |
+| **Platform** | The web app, API and database you self-host | [0.1.4-preview.1](#platform-v0.1.4-preview.1) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.1) |
+| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.6](#v0.8.6) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.6) · `ghcr.io/valaris-studio/backplane-runner:0.8.6` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 
 A platform release never republishes the runner or MCP server; each entry
@@ -30,7 +30,18 @@ keeps its own detailed per-tool history in
 
 ## Unreleased
 
-Changes in the source tree that are not yet part of a published platform release.
+No additional changes yet.
+
+---
+
+<a id="platform-v0.1.4-preview.1"></a>
+
+## Platform 0.1.4-preview.1 — 2026-10-15
+
+`platform` `preview` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.1)
+
+> Read captured sessions privately, review selected evidence before sharing it,
+> and inspect the context supplied to your coding agents.
 
 #### Added
 
@@ -74,10 +85,11 @@ Changes in the source tree that are not yet part of a published platform release
 
 #### Upgrade notes
 
-- These platform and runner additions are an unreleased source preview, not new
-  platform, runner or Companion binary releases. MCP ships independently below.
-  Build matching backend and runner source before enabling required-context
-  policies; the linked runner 0.8.5 binaries do not implement this protocol.
+- Upgrade the platform before using runner 0.8.6 and MCP 0.9.3. Runner 0.8.5
+  does not implement the required-context protocol; keep policies in legacy
+  mode until every participating runner and the rollback runtime are compatible.
+- Companion source is included. Desktop installers and automatic updates are
+  separate distributions; this platform archive does not install Companion.
 - Companion and rich capture remain disabled by default. Enable them deliberately
   and configure device scope, capture level and retention before collecting data.
 - The source backend applies migrations through 122 even when these features are
@@ -85,8 +97,46 @@ Changes in the source tree that are not yet part of a published platform release
   Schema compatibility alone does not qualify an older runtime for rollback:
   keep context policies in legacy mode with no budgets until all workers and
   runners, including the rollback runtime, support the enabled policies.
-- MCP 0.9.3 includes the excerpt-note parameters, but their use still requires
-  the matching backend's dedicated publication route.
+- MCP 0.9.3 adds provenance-bearing, retry-safe excerpt-note creation and
+  requires this platform API. Existing MCP 0.9.2 installations continue to
+  support ordinary notes without the new excerpt parameters.
+
+---
+
+<a id="v0.8.6"></a>
+
+## Runner 0.8.6 — 2026-10-15
+
+`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.6)
+
+> Dispatch the authorized context prepared by your platform, with explicit
+> receipts and bounded inputs.
+
+#### Added
+
+- Prepare and acknowledge backend-selected mandatory context before invoking
+  the configured coding agent. Missing or stale required context fails before
+  the provider runs.
+- Support configured context budgets and preserve required context within the
+  backend's authorization and freshness contract.
+
+#### Fixed
+
+- Harden resumed coding-agent launches and artifact readiness checks against
+  the supported CLI contract.
+
+#### Security
+
+- Update the Go toolchain and networking dependencies used by release binaries.
+
+#### Upgrade notes
+
+- Upgrade to platform 0.1.4-preview.1 before enabling required-context policies.
+  Inventory and drain incompatible runners and keep a compatible rollback
+  runtime before activation. Installing the binary does not activate a policy.
+- Completion-manifest v2 activation is not part of this release.
+- Native binaries cover macOS, Linux and Windows on arm64 and amd64. The GHCR
+  image covers Linux arm64 and amd64. Checksums identify the exact download.
 
 ---
 
