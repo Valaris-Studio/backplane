@@ -1,0 +1,13 @@
+selectors 0.38.0
+
+The unmodified source distributed by crates.io is available at:
+https://static.crates.io/crates/selectors/selectors-0.38.0.crate
+
+Upstream source revision recorded by that crate:
+https://github.com/servo/stylo/tree/572ecba2d1600e7c3d490586692a209faf703baa/selectors
+
+The crate declares MPL-2.0. Its source files refer to the Mozilla Public
+License, version 2.0, at https://mozilla.org/MPL/2.0/. The complete terms
+are supplied in selectors-MPL-2.0.txt.
+
+Package authors, as declared in Cargo.toml: The Servo Project Developers.
