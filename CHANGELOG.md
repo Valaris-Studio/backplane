@@ -6,7 +6,7 @@ components on independent version lines:
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
 | **Platform** | The web app, API and database you self-host | [0.1.4-preview.1](#platform-v0.1.4-preview.1) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.1) |
-| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.6](#v0.8.6) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.6) · `ghcr.io/valaris-studio/backplane-runner:0.8.6` |
+| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.7](#v0.8.7) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.7) · `ghcr.io/valaris-studio/backplane-runner:0.8.7` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 
 A platform release never republishes the runner or MCP server; each entry
@@ -85,8 +85,8 @@ No additional changes yet.
 
 #### Upgrade notes
 
-- Upgrade the platform before using runner 0.8.6 and MCP 0.9.3. Runner 0.8.5
-  does not implement the required-context protocol; keep policies in legacy
+- Upgrade the platform before using runner 0.8.7 and MCP 0.9.3. Runners 0.8.5 and 0.8.6
+  do not implement the required-context protocol; keep policies in legacy
   mode until every participating runner and the rollback runtime are compatible.
 - Companion source is included. Desktop installers and automatic updates are
   separate distributions; this platform archive does not install Companion.
@@ -103,11 +103,11 @@ No additional changes yet.
 
 ---
 
-<a id="v0.8.6"></a>
+<a id="v0.8.7"></a>
 
-## Runner 0.8.6 — 2026-10-15
+## Runner 0.8.7 — 2026-10-15
 
-`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.6)
+`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.7)
 
 > Dispatch the authorized context prepared by your platform, with explicit
 > receipts and bounded inputs.
@@ -246,6 +246,27 @@ No additional changes yet.
   matching backend change; older platforms still return `null` outside search.
 
 [Full MCP notes](mcp-server/CHANGELOG.md#091---2026-10-05)
+
+---
+
+<a id="v0.8.6"></a>
+
+## Runner 0.8.6 — 2026-10-05
+
+`runner` · [Raw binary checksums](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.6/SHA256SUMS)
+
+#### Changed
+
+- Published checksummed macOS, Linux and Windows binaries for arm64 and amd64.
+  This version was distributed through the artifact bucket; it has no GitHub
+  runner release.
+- Generated MCP configurations select `backplane-mcp==0.9.1`.
+
+#### Upgrade notes
+
+- This version predates required-context preparation and context budgets.
+  Upgrade to runner 0.8.7 with a compatible platform before enabling those
+  policies. Existing versioned binaries and checksums remain unchanged.
 
 ---
 
