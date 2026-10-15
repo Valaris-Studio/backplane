@@ -12,13 +12,16 @@ concurrency:
 
 jobs:
   validate:
-    if: github.repository == 'Valaris-Studio/backplane' && github.ref == 'refs/tags/v-recovery-runner-20261015'
+    if: github.repository == 'Valaris-Studio/backplane' && github.ref == 'refs/tags/v-recovery-runner-20261015-2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           path: release-tooling
           fetch-depth: 0
+      - name: Restore annotated tooling tag
+        working-directory: release-tooling
+        run: git fetch --no-tags origin '+refs/tags/v-recovery-runner-20261015-2:refs/tags/v-recovery-runner-20261015-2'
       - uses: actions/checkout@v4
         with:
           ref: 82375d7e62d7f4e31e7e3258cdba2b08f67dce39
@@ -49,6 +52,9 @@ jobs:
         with:
           path: release-tooling
           fetch-depth: 0
+      - name: Restore annotated tooling tag
+        working-directory: release-tooling
+        run: git fetch --no-tags origin '+refs/tags/v-recovery-runner-20261015-2:refs/tags/v-recovery-runner-20261015-2'
       - uses: actions/checkout@v4
         with:
           ref: 82375d7e62d7f4e31e7e3258cdba2b08f67dce39
@@ -79,7 +85,7 @@ jobs:
           with path.open('a') as output:
               output.write('\n\nPackaging recovery: runner code remains the immutable `v0.8.8` source commit '
                            '`82375d7e62d7f4e31e7e3258cdba2b08f67dce39`. The container build context is supplied by '
-                           '`v-recovery-runner-20261015` tooling commit `' + os.environ['TOOLING_COMMIT'] + '`. '
+                           '`v-recovery-runner-20261015-2` tooling commit `' + os.environ['TOOLING_COMMIT'] + '`. '
                            'The only runner configuration difference is the explicit source-file inclusion for GoReleaser.\n')
           PY
       - uses: actions/setup-go@v5

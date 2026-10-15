@@ -15,7 +15,7 @@ import urllib.request
 
 SOURCE_TAG = "v0.8.8"
 SOURCE_COMMIT = "82375d7e62d7f4e31e7e3258cdba2b08f67dce39"
-TOOLING_TAG = "v-recovery-runner-20261015"
+TOOLING_TAG = "v-recovery-runner-20261015-2"
 REPOSITORY = "Valaris-Studio/backplane"
 EXTRA_FILES = b"    extra_files:\n      - go.mod\n      - go.sum\n      - cmd\n      - internal\n"
 
