@@ -76,7 +76,10 @@ def http_json(url, headers, *, missing_ok=False):
         raise RecoveryError(f"publication preflight refused HTTP {exc.code}") from None
     if len(data) > 1024 * 1024:
         raise RecoveryError("publication preflight response exceeded its bound")
-    return json.loads(data)
+    result = json.loads(data)
+    if not isinstance(result, dict):
+        raise RecoveryError("publication preflight returned a non-object response")
+    return result
 
 
 def require_unpublished(actor, token):
