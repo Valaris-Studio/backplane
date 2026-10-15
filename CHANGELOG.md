@@ -1,13 +1,14 @@
 # Changelog
 
-Every public change to Backplane, newest first. The repository ships three
-components on independent version lines:
+Every public change to Backplane, newest first. Components use independent
+version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
 | **Platform** | The web app, API and database you self-host | [0.1.4-preview.2](#platform-v0.1.4-preview.2) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2) |
 | **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
+| **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.2](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg) |
 
 A platform release never republishes the runner or MCP server; each entry
 says which versions it was qualified with. Upgrade the platform before the

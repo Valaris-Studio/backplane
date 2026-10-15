@@ -28,15 +28,19 @@ your team works, ready to reuse across projects.
 > APIs and workflows may evolve. **Runners are experimental**; review the
 > [known limitations](#known-limitations) before planning a deployment.
 
-The latest source also includes the [Companion](companion/README.md), private
-session readers, excerpt handoff and prepared runner context. These are
-**unreleased source features**; the published versions in the
-[changelog](CHANGELOG.md) and their download links remain unchanged. Companion
-and rich capture are disabled by default. Device scope and capture level decide
-what is retained; sharing a selected excerpt does not share the raw session.
-Build matching backend and runner source before enabling required-context
-policies. Existing runner downloads do not implement that protocol. See the
-[upgrade notes](CHANGELOG.md#unreleased) before migrating an existing installation.
+The current platform preview includes private session readers, reviewed excerpt
+handoff and prepared runner context. Use [platform 0.1.4-preview.2](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2),
+[runner 0.8.8](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8)
+and [MCP server 0.9.3](https://pypi.org/project/backplane-mcp/0.9.3/).
+The signed [macOS Companion preview](companion/README.md#macos-desktop-preview)
+provides local capture and its desktop controls.
+
+Companion and rich capture are disabled by default on self-hosted instances.
+Device scope and capture level decide what is retained; sharing a selected
+excerpt does not share the raw session. Upgrade the platform before the runner,
+and keep required-context policies and budgets inactive until all participating
+runners and rollback runtimes are compatible. See the
+[upgrade notes](CHANGELOG.md#platform-v0.1.4-preview.1) before migrating.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">

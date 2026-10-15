@@ -6,8 +6,8 @@ sessions linked to Backplane work. Claude Code, Pi and Codex (CLI and
 Desktop) are supported; the agent interface (`internal/agent`) is where
 further adapters plug in.
 
-**Source preview.** This tree provides buildable source; it does not announce a
-signed installer or updater release. The backend's `COMPANION_ENABLED` and
+**macOS desktop preview 0.1.1-preview.2 is available below.** Linux and Windows
+desktop packages remain source builds. The backend's `COMPANION_ENABLED` and
 `RICH_CAPTURE_ENABLED` flags default to `false`. Enable the services deliberately
 and choose the device scope, capture level and retention before collecting data.
 Captured sessions are private to their owner. Sharing a selected excerpt with a
@@ -24,6 +24,55 @@ building only the web frontend does not produce an installed desktop app.
 One `connect` registers the machine as a single Backplane installation. Agent
 hooks are installed once at the user level. For every session the companion
 decides, before retaining anything, whether it is in scope.
+
+## macOS desktop preview
+
+[Download Backplane Companion 0.1.1-preview.2](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg)
+for macOS 13 or later, on Apple silicon or Intel. The universal app and DMG are
+Developer ID signed and notarized. This preview adds richer session capture,
+transcript recovery and the current updater verification key.
+
+For a new installation, open the DMG, move **Backplane Companion** into
+**Applications**, then open it and follow the connection and capture setup.
+Choose the project scope, capture levels and retention deliberately.
+
+For an existing installation:
+
+1. Choose **Quit Backplane Companion** from its menu-bar menu. Stop its existing
+   background service before replacing the application:
+
+   ```sh
+   "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service stop
+   "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service status
+   ```
+
+   Confirm that the status reports `"daemon_running": false` before replacing
+   the app. Stopping sends a shutdown request; if it still reports `true`, wait
+   and repeat `service status` until shutdown finishes.
+
+2. Open the downloaded DMG and replace **Backplane Companion** in **Applications**.
+3. Start the same background service and check its status:
+
+   ```sh
+   "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service start
+   "/Applications/Backplane Companion.app/Contents/MacOS/backplane-companion" service status
+   ```
+
+   Confirm `"daemon_running": true`, repeating the status check if startup is
+   still in progress. Then open the updated app:
+
+   ```sh
+   open "/Applications/Backplane Companion.app"
+   ```
+
+Keep the existing connection, mappings and capture settings. Disconnecting or
+removing the companion is a different operation and can delete captured data.
+
+Install this first signed preview manually to establish the current updater
+key. It is published on the **beta** channel; installation does not change your
+chosen channel. Select beta in update settings if you want future beta updates.
+The stable channel is separate. The [versioned update manifest](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/latest.json)
+identifies the signed universal update archive for both Mac architectures.
 
 ## How it works
 
@@ -62,12 +111,16 @@ Decided per session from the canonical working directory, in this order:
 Each mapping has a content level. It decides what leaves the device; the
 server applies the same rules again and never stores more.
 
+For a new binding, the desktop preselects Rich when the server offers it and
+Standard otherwise. Review the choice before confirming. An app update does
+not raise an existing mapping's capture level.
+
 - `metadata` sends activity only: counts, timing, tokens and cost; agent,
   model, tool, MCP server and MCP tool names; the repository URL and branch;
   the working directory's base name (not its path); command exit codes and
   durations; file operation and language. Prompts, messages, commands, tool
   arguments and output become a size and hash. Sessions have no title.
-- `standard` (default) adds prompts, commands and tool arguments, including
+- `standard` adds prompts, commands and tool arguments, including
   file paths relative to the project, each bounded at 4 KiB, plus error
   messages. The first prompt becomes the session title. Tool output (Claude
   `tool_response`, Pi tool results, Codex `codex.tool_result`,
@@ -79,12 +132,21 @@ server applies the same rules again and never stores more.
 - `full` adds tool output (up to 16 KiB per field, with a truncation marker),
   the agent's replies where the harness reports them, file diffs and the file
   content commands carry. Beacon's Claude mapper does not carry tool output
-  into its events, so Claude uploads contain none at any level.
+  into its events; Rich can capture that content separately from native session
+  files.
+- `rich`, where offered by the server, keeps Full's event behavior and adds
+  messages, tool output and supported attachments from native session files.
+  These content bodies can extend beyond Full's 16 KiB event-field limit.
+  Capture requires an authorized Rich mapping and still follows project scope,
+  server-offered size limits, local storage limits and retention. Unsupported
+  or oversized attachments are withheld. URLs in content are not fetched.
 
-At every level the device strips the account and host name and
+For events at every level, the device strips the account and host name and
 `transcript_path`, rewrites local paths (relative to the project root, `~/…`
-under the home directory), masks secret-looking text heuristically, and never
-retains embedded binary.
+under the home directory), masks secret-looking text heuristically, and
+replaces embedded binary with metadata. Rich content uses separate text and
+attachment checks; supported embedded attachments can be retained within the
+limits above.
 
 ## Use
 
@@ -455,7 +517,8 @@ the MCP server and backend both store ids over 200 characters as
 ## Known limits
 
 - Beacon's Claude `Stop` mapping records completion, not the assistant reply.
-  Claude transcripts are opened only by the daemon, for token usage.
+  The daemon reads transcript usage and content according to the mapped
+  project's capture level and scope.
 - Claude usage from while the daemon was not running is never counted:
   nothing observed whether capture was allowed then. A crash loses at most
   the last minute before it the same way.
@@ -466,8 +529,8 @@ the MCP server and backend both store ids over 200 characters as
   companion omits edit input and output for `PostToolUseFailure`.
 - The companion removes the `user` and `endpoint.hostname` members Beacon adds
   to every event; sessions are attributed through the device credential.
-- Windows relies on the default user-private ACL of `%LOCALAPPDATA%`; native
-  Windows and Linux runs, service installation and signing are not yet qualified.
+- Windows and Linux desktop distribution remains source-only. Native runtime
+  tests do not establish a qualified desktop installer, GUI or signing.
 
 ## Licensing and updating
 
