@@ -5,8 +5,8 @@ components on independent version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
-| **Platform** | The web app, API and database you self-host | [0.1.4-preview.1](#platform-v0.1.4-preview.1) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.1) |
-| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.7](#v0.8.7) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.7) · `ghcr.io/valaris-studio/backplane-runner:0.8.7` |
+| **Platform** | The web app, API and database you self-host | [0.1.4-preview.2](#platform-v0.1.4-preview.2) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2) |
+| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.3](#mcp-server-v0.9.3) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 
 A platform release never republishes the runner or MCP server; each entry
@@ -31,6 +31,64 @@ keeps its own detailed per-tool history in
 ## Unreleased
 
 No additional changes yet.
+
+---
+
+<a id="platform-v0.1.4-preview.2"></a>
+
+## Platform 0.1.4-preview.2 — 2026-10-15
+
+`platform` `preview` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2)
+
+> Keep runner installation and upgrade guidance aligned across distribution channels.
+
+#### Changed
+
+- Setup downloads and documentation now target runner 0.8.8 with MCP 0.9.3 in
+  English, Spanish and Brazilian Portuguese.
+- Release notes distinguish GitHub archive checksums from raw native-binary
+  checksums and describe the default container's coding-agent selection.
+
+#### Upgrade notes
+
+- Runtime behavior and migrations are unchanged from 0.1.4-preview.1. Its
+  privacy, capture and upgrade limits still apply.
+- Upgrade the platform before enabling runner required-context policies or
+  budgets. Inventory and drain incompatible runners, and keep a compatible
+  rollback runtime; an update does not enable a policy.
+- Companion installers and completion-manifest v2 activation remain separate
+  from this platform release.
+
+---
+
+<a id="v0.8.8"></a>
+
+## Runner 0.8.8 — 2026-10-15
+
+`runner` `experimental` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8)
+
+> Publish the prepared-context runner through the corrected release workflow.
+
+#### Fixed
+
+- Restore annotated runner tags in the disposable release checkout before
+  building archives and container images. Remote release tags remain immutable.
+
+#### Changed
+
+- Clarify the separate GitHub archive and raw native-binary checksum channels.
+  The default container build selects Claude Code; Codex CLI is an explicit
+  custom-build option.
+
+#### Upgrade notes
+
+- Runner behavior is unchanged from 0.8.7, including MCP 0.9.3, required-context
+  preparation and context budgets. Published 0.8.7 raw binaries remain available
+  without replacement; use 0.8.8 for the coordinated distribution channels.
+- Pair with platform 0.1.4-preview.2. Inventory and drain incompatible runners
+  before enabling required-context policies or budgets, and retain a compatible
+  rollback runtime. Installing the binary does not activate a policy.
+- Completion-manifest v2 activation is not part of this release.
 
 ---
 
@@ -107,7 +165,12 @@ No additional changes yet.
 
 ## Runner 0.8.7 — 2026-10-15
 
-`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.7)
+`runner` · [Raw binary checksums](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.7/SHA256SUMS)
+
+> **Distribution status:** Raw macOS, Linux and Windows binaries were published.
+> GitHub archive and container publication stopped at an annotated-tag checkout
+> conflict. The immutable tag and raw binaries are preserved; 0.8.8 fixes the
+> release workflow for the coordinated channels.
 
 > Dispatch the authorized context prepared by your platform, with explicit
 > receipts and bounded inputs.
@@ -135,8 +198,8 @@ No additional changes yet.
   Inventory and drain incompatible runners and keep a compatible rollback
   runtime before activation. Installing the binary does not activate a policy.
 - Completion-manifest v2 activation is not part of this release.
-- Native binaries cover macOS, Linux and Windows on arm64 and amd64. The GHCR
-  image covers Linux arm64 and amd64. Checksums identify the exact download.
+- Raw native binaries cover macOS, Linux and Windows on arm64 and amd64.
+  GitHub archives and the GHCR image were not published for this version.
 
 ---
 
