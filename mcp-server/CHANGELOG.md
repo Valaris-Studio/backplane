@@ -4,6 +4,25 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.4] - 2026-10-15
+
+### Security
+
+- Require MCP SDK 1.30.0 or later in the supported 1.x series to address
+  [CVE-2026-59951](https://github.com/modelcontextprotocol/python-sdk/security/advisories/GHSA-84m7-p3x7-pcfv).
+  Stateful Streamable HTTP sessions now have finite idle and capacity limits,
+  and ended or refused sessions release their state. Stdio is unaffected by
+  this advisory.
+
+### Upgrade notes
+
+- Upgrade the package to 0.9.4 and restart the MCP server/connection. Preserve
+  credentials, toolsets and allowlists; the tool catalog is unchanged.
+- MCP releases independently of the platform. Operators running MCP from an
+  older platform source archive should use the 0.9.4 package or
+  `mcp-server-v0.9.4` source. Existing platform archives retain their original
+  lockfiles; this fix does not require replacing the platform or Companion.
+
 ## [0.9.3] - 2026-10-15
 
 ### Added
