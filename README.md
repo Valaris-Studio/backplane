@@ -35,6 +35,11 @@ and [MCP server 0.9.4](https://pypi.org/project/backplane-mcp/0.9.4/).
 The signed [macOS Companion preview](companion/README.md#macos-desktop-preview)
 provides local capture and its desktop controls.
 
+Runner 0.8.8 setup still generates `uvx backplane-mcp==0.9.3`. To use MCP
+0.9.4, edit only that package argument to `backplane-mcp==0.9.4` in
+`mcpServers.valaris.args` in the MCP JSON selected by `llm.mcp_config_path`.
+Keep the existing command, environment, toolsets and allowlist settings.
+
 Companion and rich capture are disabled by default on self-hosted instances.
 Device scope and capture level decide what is retained; sharing a selected
 excerpt does not share the raw session. Upgrade the platform before the runner,
