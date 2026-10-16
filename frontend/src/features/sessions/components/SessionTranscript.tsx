@@ -320,7 +320,7 @@ function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, ac
 
   return (
     <li id={itemAnchor(first)} tabIndex={-1} aria-labelledby={labelId} className={ITEM_CLASSES}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <button
           type="button"
           aria-expanded={open}

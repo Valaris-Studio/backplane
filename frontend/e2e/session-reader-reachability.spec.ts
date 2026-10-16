@@ -260,6 +260,46 @@ test("wraps an unbroken captured prose token without widening the mobile reader"
   }
 });
 
+for (const width of [375, 1512]) {
+  test(`keeps long tool arguments inside the reader without losing their text at ${width}px`, async ({ page }, testInfo) => {
+    const argumentsText = JSON.stringify({ command: "inspect", argument: "synthetic-argument-".repeat(300) + "🧭 END" });
+    await page.route("**/sessions/selected-demo/contents**", async (route) => {
+      if (!new URL(route.request().url()).pathname.endsWith("/contents")) return route.fallback();
+      const response = await route.fetch();
+      const contents = await response.json() as SessionContentPage;
+      await route.fulfill({ response, json: { ...contents, items: contents.items.map((item) => item.id === "tool-input"
+        ? { ...item, byte_count: Buffer.byteLength(argumentsText), original_byte_count: Buffer.byteLength(argumentsText), preview: { text: argumentsText, truncated: false } }
+        : item) } });
+    });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/e2e/fixtures/session-excerpt.html?locale=en&theme=light");
+    const selected = page.getByRole("checkbox", { name: "Select You, source item 1", exact: true });
+    await selected.press("Space");
+    const call = page.locator("#content-tool-input");
+    const toggle = call.getByRole("button", { name: /^Tool call call-fixture/ });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const measure = () => call.evaluate((element) => ({ viewport: innerWidth, document: document.documentElement.scrollWidth,
+      rowRight: element.getBoundingClientRect().right, rowWidth: element.getBoundingClientRect().width,
+      rowScrollWidth: element.scrollWidth }));
+    const closed = await measure();
+    await testInfo.attach(`long-tool-summary-${width}`, { body: JSON.stringify(closed, null, 2), contentType: "application/json" });
+    expect.soft(closed.document, "the closed argument summary cannot widen the document").toBeLessThanOrEqual(closed.viewport);
+    expect.soft(closed.rowRight, "the grouped call stays inside the reader").toBeLessThanOrEqual(closed.viewport);
+    await testInfo.attach(`closed-tool-call-${width}`, { body: await page.screenshot(), contentType: "image/png" });
+
+    await toggle.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(await call.locator("pre").first().textContent(), "opening the call retains the exact argument text").toBe(argumentsText);
+    const expanded = await measure();
+    await testInfo.attach(`expanded-tool-arguments-${width}`, { body: JSON.stringify(expanded, null, 2), contentType: "application/json" });
+    expect.soft(expanded.document, "expanded code stays within the reader while retaining its text").toBeLessThanOrEqual(expanded.viewport);
+    await page.getByRole("combobox", { name: "Jump to loaded content", exact: true }).selectOption("tool-output");
+    await expect(page.locator("#content-tool-output")).toBeFocused();
+    await expect(selected).toBeChecked();
+    await testInfo.attach(`long-tool-call-${width}`, { body: await page.screenshot(), contentType: "image/png" });
+  });
+}
+
 async function expectTouchTargets(dialog: Locator, testInfo: TestInfo, state: string) {
   const measurements = await dialog.evaluate((element) => [...element.querySelectorAll("button,a,input,select")]
     .filter((control) => !control.closest('[role="region"]'))
