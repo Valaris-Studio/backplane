@@ -135,6 +135,54 @@ export const ES_GETTING_STARTED = {
     "These underscore names are the registered MCP IDs. Use the identifier shown by your host rather than translating it or replacing underscores with dashes.":
       "Estos nombres con guion bajo son los IDs registrados en MCP. Usa el identificador que muestre tu host en lugar de traducirlo o reemplazar los guiones bajos por guiones.",
   },
+  "capturing-sessions-with-companion": {
+    "Backplane Companion is a small background app for the computer where your coding agents run. It captures Claude Code, Codex (CLI and desktop app) and Pi sessions, uploads them to Backplane, and links each session to the cards and notes it touched. Captured sessions appear under My sessions and are visible only to you.":
+      "Backplane Companion es una pequeña app en segundo plano para el equipo donde corren tus agentes de código. Captura sesiones de Claude Code, Codex (CLI y app de escritorio) y Pi, las sube a Backplane y vincula cada sesión con las tarjetas y notas que tocó. Las sesiones capturadas aparecen en Mis sesiones y solo tú puedes verlas.",
+    "Check that this Backplane accepts sessions":
+      "Comprueba que este Backplane acepta sesiones",
+    "The My sessions entry appears in the sidebar only when the server accepts Companion sessions. Self-hosted operators turn this on with COMPANION_ENABLED, and the Rich content level additionally needs RICH_CAPTURE_ENABLED. Both default to false; see Environment Variables.":
+      "La entrada Mis sesiones aparece en la barra lateral solo cuando el servidor acepta sesiones de Companion. Quienes operan una instalación propia lo activan con COMPANION_ENABLED, y el nivel de contenido Rich necesita además RICH_CAPTURE_ENABLED. Ambas son false por defecto; consulta Variables de entorno.",
+    "Install Companion":
+      "Instala Companion",
+    "The packaged desktop app is available for macOS 13 or later, as one universal build for Apple silicon and Intel, Developer ID signed and notarized. The current preview is 0.1.1-preview.2. Download it from the My sessions page, or directly:":
+      "La app de escritorio empaquetada está disponible para macOS 13 o posterior, como una única compilación universal para Apple silicon e Intel, firmada con Developer ID y notarizada. La versión preliminar actual es 0.1.1-preview.2. Descárgala desde la página Mis sesiones o directamente:",
+    "macOS download":
+      "Descarga para macOS",
+    "Open the DMG, move Backplane Companion into Applications, then open it. On Linux and Windows the desktop app is a source build for now: the companion directory of the public repository documents the toolchain and the package builders.":
+      "Abre el DMG, mueve Backplane Companion a Aplicaciones y ábrelo. En Linux y Windows, por ahora la app de escritorio se compila desde el código fuente: el directorio companion del repositorio público documenta las herramientas necesarias y los empaquetadores.",
+    "Companion source":
+      "Código fuente de Companion",
+    "Sign in and approve the device":
+      "Inicia sesión y aprueba el dispositivo",
+    "Open Companion, enter this Backplane's address, and it shows a short pairing code. Choose Open Backplane, sign in if asked, enter the code and approve the device. Approve only a request you just started on your own computer. The computer then appears under My sessions, in the Devices tab. Nothing is captured until a device is approved.":
+      "Abre Companion, introduce la dirección de este Backplane y te mostrará un código de emparejamiento corto. Elige Abrir Backplane, inicia sesión si se te pide, introduce el código y aprueba el dispositivo. Aprueba solo una solicitud que acabes de iniciar en tu propio equipo. El equipo aparecerá entonces en Mis sesiones, en la pestaña Dispositivos. No se captura nada hasta que el dispositivo esté aprobado.",
+    "Choose what gets captured":
+      "Elige qué se captura",
+    "Companion captures only folders you bind to a workspace, optionally linked to a board. Add a folder in Companion, or let it bind repositories automatically when their origin matches a repository already connected to one of your boards. Folders that match neither are listed as discovered projects and nothing from them is kept.":
+      "Companion captura solo las carpetas que vinculas a un espacio de trabajo, opcionalmente asociadas a un tablero. Añade una carpeta en Companion o deja que vincule repositorios automáticamente cuando su origin coincida con un repositorio ya conectado a uno de tus tableros. Las carpetas que no coinciden con ninguno se listan como proyectos descubiertos y no se conserva nada de ellas.",
+    "Each folder has a content level. Metadata sends activity only: timing, tokens, cost, and tool and model names. Standard adds your prompts, commands and tool arguments. Full adds tool output, agent replies and diffs. Rich, where the server offers it, adds messages and supported attachments from the agent's own session files. The Devices tab shows exactly what each level sends.":
+      "Cada carpeta tiene un nivel de contenido. Metadata envía solo actividad: tiempos, tokens, costo y nombres de herramientas y modelos. Standard añade tus prompts, comandos y argumentos de herramientas. Full añade la salida de las herramientas, las respuestas del agente y los diffs. Rich, si el servidor lo ofrece, añade mensajes y adjuntos compatibles desde los propios archivos de sesión del agente. La pestaña Dispositivos muestra exactamente qué envía cada nivel.",
+    "A new level applies to what is captured next":
+      "Un nivel nuevo se aplica a lo que se capture a continuación",
+    "Raising or lowering a level never rewrites sessions already sent. The server applies the same rules again and never stores more than the level allows.":
+      "Subir o bajar un nivel nunca reescribe las sesiones ya enviadas. El servidor vuelve a aplicar las mismas reglas y nunca almacena más de lo que el nivel permite.",
+    "See your first session":
+      "Mira tu primera sesión",
+    "Run Claude Code, Codex or Pi inside a captured folder. The session appears under My sessions while it runs, with its timeline, cost and the work it linked to. Cards and notes the session touched show it in their own linked sessions panel, to you only.":
+      "Ejecuta Claude Code, Codex o Pi dentro de una carpeta capturada. La sesión aparece en Mis sesiones mientras se ejecuta, con su línea de tiempo, su costo y el trabajo con el que se vinculó. Las tarjetas y notas que tocó la muestran en su propio panel de sesiones vinculadas, solo para ti.",
+    "Privacy and control":
+      "Privacidad y control",
+    "Sessions are private to their owner. Sharing a selected excerpt with a card is an explicit action and does not share the raw session. From the Devices tab you can pause capture, change a folder's level, rename or sign out a device, and delete everything a device sent.":
+      "Las sesiones son privadas para su propietario. Compartir un extracto seleccionado con una tarjeta es una acción explícita y no comparte la sesión completa. Desde la pestaña Dispositivos puedes pausar la captura, cambiar el nivel de una carpeta, renombrar o cerrar la sesión de un dispositivo y eliminar todo lo que un dispositivo envió.",
+    "Companion is not a runner":
+      "Companion no es un runner",
+    "A runner claims and executes cards on its own. Companion only records the sessions you run yourself; it never starts an agent, claims a card or changes a repository.":
+      "Un runner asume y ejecuta tarjetas por su cuenta. Companion solo registra las sesiones que ejecutas tú; nunca inicia un agente, asume una tarjeta ni modifica un repositorio.",
+    "Updates":
+      "Actualizaciones",
+    "The preview is published on the beta update channel. Installing it does not change the channel you chose; select beta in Companion's update settings to receive future previews.":
+      "La versión preliminar se publica en el canal de actualizaciones beta. Instalarla no cambia el canal que elegiste; selecciona beta en los ajustes de actualización de Companion para recibir futuras versiones preliminares.",
+  },
   "registering-a-runner": {
     "A runner is the credentialed process that claims and executes eligible cards. The Launch runner wizard creates its identity and key, binds pipeline roles, exports configuration, and explains how to start the binary on your own machine.":
       "Un runner es el proceso con credenciales que asume y ejecuta tarjetas elegibles. El asistente Lanzar runner crea su identidad y clave, vincula roles del pipeline, exporta la configuración y explica cómo iniciar el binario en tu propia máquina.",

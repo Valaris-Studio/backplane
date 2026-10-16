@@ -110,6 +110,7 @@ export const ES_DOCUMENTATION: DocumentationLocaleCopy = {
     "creating-your-first-workspace": "Creación de tu primer espacio de trabajo",
     "your-first-board-and-card": "Tu primer tablero y tu primera tarjeta",
     "installing-the-mcp-server": "Instalación del servidor MCP en tu cliente de agentes",
+    "capturing-sessions-with-companion": "Captura de sesiones con Companion",
     "registering-a-runner": "Registro de un Runner",
     "your-first-pipeline-run": "Tu primera ejecución del pipeline (recorrido guiado)",
     "troubleshooting-your-first-run": "Solución de problemas de tu primera ejecución",

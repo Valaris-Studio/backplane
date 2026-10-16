@@ -31,7 +31,28 @@ keeps its own detailed per-tool history in
 
 ## Unreleased
 
-No additional changes yet.
+#### Added
+
+- Inspect the captured calls supporting a linked card or note, separately for
+  changed and consulted work. Each call explains whether its relationship was
+  matched exactly or by timing, with explicit earlier-history loading.
+- Refresh session evidence deliberately and continue to captured content for
+  a reviewed handoff without losing the selected excerpt or pending note save.
+
+#### Changed
+
+- Session pages explain how to connect Companion when capture is unavailable,
+  including when older sessions fall outside the selected period.
+- Evidence counts describe loaded calls; filtered timelines no longer imply
+  that omitted activity was idle time. Updated copy is available in English,
+  Spanish and Brazilian Portuguese.
+
+#### Fixed
+
+- Failed session-history checks remain distinct from an empty capture history.
+- Linked work opens in its authorized workspace. Unavailable targets hide
+  retained titles and links, and losing session access cancels private reads
+  and removes cached evidence.
 
 ---
 

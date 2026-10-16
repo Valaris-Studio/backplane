@@ -1,12 +1,14 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useEffect } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isApiError } from "@/lib/api-error";
 import { sessionKeys } from "@/lib/query-keys";
 import { shouldRetry } from "@/lib/should-retry";
 import { useAuthModes } from "@/features/auth/api/use-auth-modes";
+import { useForgetSessionContent } from "./use-session-realtime";
 import type {
   AgentSession,
   AgentSessionList,
@@ -79,9 +81,10 @@ export function useSessionSummary(slug: string, query: SessionSummaryQuery, enab
 export function useSessionRhythm(slug: string, sessionId: string, buckets: number, enabled: boolean) {
   return useQuery({
     queryKey: sessionKeys.rhythm(slug, sessionId, buckets),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const { data } = await api.get<SessionRhythm>(`/workspaces/${slug}/sessions/${sessionId}/rhythm`, {
         params: { buckets },
+        signal,
       });
       return data;
     },
@@ -117,8 +120,9 @@ export function useSessionList(slug: string, query: SessionListQuery, enabled: b
 
 export function useSession(slug: string, sessionId: string, enabled: boolean) {
   const queryClient = useQueryClient();
+  const forgetContent = useForgetSessionContent();
   const queryKey = sessionKeys.detail(slug, sessionId);
-  return useQuery<AgentSession | null>({
+  const session = useQuery<AgentSession | null>({
     queryKey,
     queryFn: async ({ signal }) => {
       try {
@@ -135,14 +139,23 @@ export function useSession(slug: string, sessionId: string, enabled: boolean) {
     enabled: enabled && !!sessionId,
     retry: retryServerErrors,
   });
+  // Parent links also read session authority. Denial clears that session's
+  // private evidence regardless of which detail route is currently mounted.
+  useEffect(() => {
+    if (session.isError && isApiError(session.error) && [401, 403, 404].includes(session.error.status)) {
+      forgetContent(slug, sessionId);
+    }
+  }, [session.isError, session.error, forgetContent, slug, sessionId]);
+  return session;
 }
 
 export function useSessionCalls(slug: string, sessionId: string, filter: CallFilter, enabled: boolean) {
   return useInfiniteQuery({
     queryKey: sessionKeys.calls(slug, sessionId, filter),
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const { data } = await api.get<SessionCallPage>(`/workspaces/${slug}/sessions/${sessionId}/calls`, {
         params: { filter, limit: CALL_PAGE_SIZE, cursor: pageParam ?? undefined },
+        signal,
       });
       return data;
     },
@@ -158,9 +171,10 @@ export function useSessionCalls(slug: string, sessionId: string, filter: CallFil
 export function useSessionCall(slug: string, sessionId: string, callKey: string, enabled: boolean) {
   return useQuery({
     queryKey: sessionKeys.call(slug, sessionId, callKey),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const { data } = await api.get<SessionCallDetail>(
         `/workspaces/${slug}/sessions/${sessionId}/calls/${encodeURIComponent(callKey)}`,
+        { signal },
       );
       return data;
     },
@@ -173,8 +187,8 @@ export function useSessionCall(slug: string, sessionId: string, callKey: string,
 export function useSessionUsage(slug: string, sessionId: string, enabled: boolean) {
   return useQuery({
     queryKey: sessionKeys.usage(slug, sessionId),
-    queryFn: async () => {
-      const { data } = await api.get<SessionUsageList>(`/workspaces/${slug}/sessions/${sessionId}/usage`);
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<SessionUsageList>(`/workspaces/${slug}/sessions/${sessionId}/usage`, { signal });
       return data;
     },
     enabled,
@@ -185,8 +199,8 @@ export function useSessionUsage(slug: string, sessionId: string, enabled: boolea
 export function useSessionLinks(slug: string, sessionId: string, enabled: boolean) {
   return useQuery({
     queryKey: sessionKeys.links(slug, sessionId),
-    queryFn: async () => {
-      const { data } = await api.get<SessionWorkLinkList>(`/workspaces/${slug}/sessions/${sessionId}/links`);
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<SessionWorkLinkList>(`/workspaces/${slug}/sessions/${sessionId}/links`, { signal });
       return data;
     },
     enabled,
@@ -198,8 +212,8 @@ export function useSessionLinks(slug: string, sessionId: string, enabled: boolea
 export function useSessionChildren(slug: string, sessionId: string, enabled: boolean) {
   return useQuery({
     queryKey: sessionKeys.children(slug, sessionId),
-    queryFn: async () => {
-      const { data } = await api.get<AgentSessionList>(`/workspaces/${slug}/sessions/${sessionId}/children`);
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<AgentSessionList>(`/workspaces/${slug}/sessions/${sessionId}/children`, { signal });
       return data;
     },
     enabled,

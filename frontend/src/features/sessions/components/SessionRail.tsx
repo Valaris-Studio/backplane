@@ -5,12 +5,13 @@ import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Check, Coins, Cpu, Eye, GitFork, Link2, Lock, Pencil, ShieldCheck } from "lucide-react";
-import { buildEntityLink } from "@/lib/entity-link";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useBoards } from "@/features/kanban/api/use-boards";
 import type { AgentSession, CaptureLevel, SessionModelUsage, SessionWorkLink } from "@/types/agent-session";
 import { useSessionChildren, useSessionLinks, useSessionUsage } from "../api/use-sessions";
-import { useWorkTitle } from "../api/use-work-title";
+import { useWorkTarget } from "../api/use-work-title";
+import type { SessionWorkIdentity } from "../api/use-session-evidence";
 import { displayCwd, formatTokens, formatUsd, isDevicePath, sessionTotalTokens } from "../utils/format";
 import { isUsageOnly } from "../utils/group-sessions";
 import { AgentMark } from "./AgentMark";
@@ -171,18 +172,23 @@ export function TokensPanel({ session }: { session: AgentSession }) {
   );
 }
 
-export function LinkedWorkPanel({ slug, session }: { slug: string; session: AgentSession }) {
+export function LinkedWorkPanel({ slug, session, onInspect }: { slug: string; session: AgentSession; onInspect?: (identity: SessionWorkIdentity) => void }) {
   const { t } = useTranslation();
   const links = useSessionLinks(slug, session.id, true);
   const items = links.data?.items ?? [];
   return (
-    <RailPanel icon={Link2} title={t("sessions.rail.linked.title")} aside={links.data ? <span className="tabular-nums">{items.length}</span> : undefined}>
-      {links.data && !items.length ? (
+    <RailPanel icon={Link2} title={t("sessions.rail.linked.title")} aside={links.isSuccess ? <span className="tabular-nums">{items.length}</span> : undefined}>
+      {links.isPending ? <p role="status" className="text-sm text-muted-foreground">{t("sessions.evidence.linksLoading")}</p> : links.isError ? (
+        <div className="grid justify-items-start gap-2 text-sm text-muted-foreground">
+          <p role="alert">{t("sessions.evidence.linksError")}</p>
+          <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" onClick={() => void links.refetch()} disabled={links.isFetching}>{t("sessions.work.retry")}</Button>
+        </div>
+      ) : !items.length ? (
         <p className="text-[0.85rem] text-muted-foreground">{t("sessions.rail.linked.none")}</p>
       ) : (
         <ul className="grid gap-2.5">
           {items.map((link) => (
-            <LinkedWorkRow key={`${link.entity_type}-${link.entity_id}-${link.relation}`} slug={slug} link={link} />
+            <LinkedWorkRow key={`${link.workspace_id}-${link.entity_type}-${link.entity_id}-${link.relation}`} link={link} onInspect={onInspect} />
           ))}
         </ul>
       )}
@@ -190,33 +196,42 @@ export function LinkedWorkPanel({ slug, session }: { slug: string; session: Agen
   );
 }
 
-function LinkedWorkRow({ slug, link }: { slug: string; link: SessionWorkLink }) {
+function LinkedWorkRow({ link, onInspect }: { link: SessionWorkLink; onInspect?: (identity: SessionWorkIdentity) => void }) {
   const { t } = useTranslation();
-  const title = useWorkTitle(slug, link, true);
-  const boards = useBoards(slug);
-  const board = boards.data?.find((candidate) => candidate.id === link.board_id);
-  const href = buildEntityLink({ type: link.entity_type, id: link.entity_id, slug, boardId: link.board_id ?? undefined })?.href;
+  const target = useWorkTarget(link);
+  const boards = useBoards(target.status === "available" ? target.slug : "", { enabled: target.status === "available" && link.entity_type === "card" });
+  const board = target.status === "available" && boards.isSuccess ? boards.data.find((candidate) => candidate.id === link.board_id) : undefined;
   const Icon = link.relation === "changed" ? Pencil : Eye;
   const facts = [
     t(`sessions.work.${link.relation}`),
     t("sessions.rail.linked.calls", { count: link.invocation_count }),
-    link.entity_type === "card" && board ? t("sessions.rail.linked.boardName", { board: board.name }) : t(`sessions.rail.linked.${link.entity_type}`),
+    board ? t("sessions.rail.linked.boardName", { board: board.name }) : t(`sessions.rail.linked.${link.entity_type}`),
     ...(link.provenance === "correlated" ? [t("sessions.rail.linked.matchedByTiming")] : []),
   ];
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 text-[0.88rem]">
       <Icon aria-hidden className={cn("mt-0.5 size-4", link.relation === "changed" ? "text-primary" : "text-muted-foreground")} />
-      {href && title ? (
+      {target.status === "available" ? (
         <Link
-          to={href}
-          className="rounded-[var(--radius-cap)] font-semibold text-[color:color-mix(in_oklab,var(--color-primary)_70%,var(--color-foreground))] underline-offset-[0.18em] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          to={target.href}
+          className="min-w-0 break-words rounded-[var(--radius-cap)] font-semibold text-[color:color-mix(in_oklab,var(--color-primary)_70%,var(--color-foreground))] underline-offset-[0.18em] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {title}
+          {target.title}
         </Link>
       ) : (
-        <span aria-hidden className="mt-1 h-3.5 w-3/4 rounded-[var(--radius-cap)] bg-[color:var(--color-surface-3)]" />
+        <p role={target.status === "loading" ? "status" : undefined} className="text-sm text-muted-foreground">
+          {t(target.status === "loading" ? "sessions.work.loadingTitle" : target.status === "error" ? "sessions.work.loadError" : "sessions.work.unavailable")}
+        </p>
       )}
       <small className="col-start-2 text-[0.78rem] text-muted-foreground">{facts.join(" · ")}</small>
+      {target.status === "available" && onInspect ? (
+        <Button variant="ghost" size="sm" className="col-start-2 mt-1 justify-self-start max-sm:min-h-[44px]" aria-label={t("sessions.evidence.inspectLabel", { relation: t(`sessions.work.${link.relation}`), title: target.title })}
+          onClick={() => onInspect({ workspace_id: link.workspace_id, entity_type: link.entity_type, entity_id: link.entity_id, relation: link.relation })}>
+          {t("sessions.evidence.inspect")}
+        </Button>
+      ) : target.status === "error" ? (
+        <Button variant="ghost" size="sm" className="col-start-2 mt-1 justify-self-start max-sm:min-h-[44px]" onClick={() => void target.refetch()}>{t("sessions.work.retry")}</Button>
+      ) : null}
     </li>
   );
 }

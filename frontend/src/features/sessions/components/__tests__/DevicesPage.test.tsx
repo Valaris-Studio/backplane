@@ -362,10 +362,24 @@ describe("Devices", () => {
     expect(screen.getByRole("heading", { name: "Add a computer" })).toBeInTheDocument();
   });
 
-  it("says when there are no devices yet", async () => {
+  it("says when there are no devices yet and offers Companion right there", async () => {
     serve([]);
     renderDevices();
     expect(await screen.findByRole("heading", { name: "No devices yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Setup guide" })).toHaveAttribute(
+      "href",
+      `/${SLUG}/documentation/capturing-sessions-with-companion`,
+    );
+  });
+
+  it("links the Companion download and setup guide from Add a computer", async () => {
+    serve();
+    renderDevices();
+    const addComputer = (await screen.findByRole("heading", { name: "Add a computer" })).closest("section") as HTMLElement;
+    expect(within(addComputer).getByRole("link", { name: /Get Companion/ })).toHaveAttribute(
+      "href",
+      `/${SLUG}/documentation/capturing-sessions-with-companion`,
+    );
   });
 
   it("links the two tabs and counts the devices", async () => {

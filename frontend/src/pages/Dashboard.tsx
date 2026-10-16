@@ -38,6 +38,7 @@ import { ActivityTrendPanel } from "@/features/dashboard/components/ActivityTren
 import { ActivityTypeFilter } from "@/features/dashboard/components/ActivityTypeFilter";
 import { OnboardingChecklist } from "@/features/dashboard/components/OnboardingChecklist";
 import { WelcomeModal } from "@/features/dashboard/components/WelcomeModal";
+import { CompanionAnnouncement } from "@/features/sessions/components/CompanionAnnouncement";
 import { McpConnectionWizard } from "@/features/mcp-onboarding/McpConnectionWizard";
 import { ConnectAgentCallout } from "@/features/mcp-onboarding/components/ConnectAgentCallout";
 import {
@@ -309,6 +310,9 @@ export function Dashboard() {
           modal treats "unknown" as "not empty", so a failed request can't
           burn the one-time welcome. */}
       <WelcomeModal slug={slug!} boardCount={summary?.board_count} />
+      {/* Same unknown-is-not-established rule; it waits for a workspace with
+          boards, so it never stacks on the welcome. */}
+      <CompanionAnnouncement boardCount={summary?.board_count} />
       <OnboardingChecklist slug={slug!} />
 
       {/* Above the empty/populated fork on purpose: a brand-new workspace

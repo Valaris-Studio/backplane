@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -30,14 +30,15 @@ interface SessionTranscriptProps {
   slug: string;
   session: AgentSession;
   active?: boolean;
+  headingRef?: RefCallback<HTMLHeadingElement>;
 }
 
 /** What rich capture kept of the session, in source order. Absent where nothing was captured. */
-export function SessionTranscript({ slug, session, active = true }: SessionTranscriptProps) {
-  return <SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} />;
+export function SessionTranscript({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
+  return <SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} headingRef={headingRef} />;
 }
 
-function SessionTranscriptReader({ slug, session, active = true }: SessionTranscriptProps) {
+function SessionTranscriptReader({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const [view, setView] = useState<View>("conversation");
@@ -83,6 +84,7 @@ function SessionTranscriptReader({ slug, session, active = true }: SessionTransc
   return (
     <TranscriptFrame
       headingId={headingId}
+      headingRef={items.length ? headingRef : undefined}
       actionsHeight={actionsHeight}
       controls={
         <Segmented
@@ -153,7 +155,7 @@ function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSe
   </div>;
 }
 
-function TranscriptFrame({ headingId, actionsHeight, controls, children }: { headingId: string; actionsHeight: number; controls?: ReactNode; children: ReactNode }) {
+function TranscriptFrame({ headingId, headingRef, actionsHeight, controls, children }: { headingId: string; headingRef?: RefCallback<HTMLHeadingElement>; actionsHeight: number; controls?: ReactNode; children: ReactNode }) {
   const { t } = useTranslation();
   return (
     <section
@@ -162,7 +164,7 @@ function TranscriptFrame({ headingId, actionsHeight, controls, children }: { hea
       className="rounded-[var(--radius-cap)] border border-border/70 bg-[color:var(--color-surface-1)] shadow-panel"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-[var(--card-padding)] py-2.5">
-        <h2 id={headingId} className="text-base font-bold">
+        <h2 id={headingId} ref={headingRef} tabIndex={-1} className="scroll-mt-[calc(var(--topbar-height)+1rem)] rounded-[var(--radius-cap)] text-base font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {t("sessions.contents.title")}
         </h2>
         {controls}

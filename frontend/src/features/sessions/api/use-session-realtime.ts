@@ -31,16 +31,19 @@ export function useSessionRealtime(slug: string) {
   });
 }
 
-// Captured content is private: once its session is gone, it leaves the cache
-// now rather than when the cache would collect it.
+// Session detail descendants include private call previews as well as bodies.
+// Cancel before removal so a late response cannot repopulate denied evidence.
 export function useForgetSessionContent() {
   const queryClient = useQueryClient();
   return useCallback(
     (slug: string, sessionId: string) => {
       const detail = sessionKeys.detail(slug, sessionId);
-      for (const part of ["contents", ...IMMUTABLE_CONTENT]) {
-        queryClient.removeQueries({ queryKey: [...detail, part] });
-      }
+      const descendants = {
+        queryKey: detail,
+        predicate: (query: Query) => query.queryKey.length > detail.length,
+      };
+      void queryClient.cancelQueries(descendants);
+      queryClient.removeQueries(descendants);
     },
     [queryClient],
   );

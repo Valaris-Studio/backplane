@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
-import type { AgentSession, AgentSessionPage } from "@/types/agent-session";
+import type { AgentSession, AgentSessionPage, CompanionInstallation } from "@/types/agent-session";
 import { SLUG, makeSession, minutesAgo, stubAuthModes } from "../../__tests__/fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { MySessionsPage } from "../MySessionsPage";
@@ -24,6 +24,9 @@ interface ListServer {
 function serveSessions(pages: AgentSessionPage[] | ((params: URLSearchParams) => AgentSessionPage)): ListServer {
   const requests: URLSearchParams[] = [];
   server.use(
+    http.get("/api/workspaces", () =>
+      HttpResponse.json([{ id: "ws-1", slug: SLUG, name: "Acme" }]),
+    ),
     http.get(`/api/workspaces/${SLUG}/sessions`, ({ request }) => {
       const params = new URL(request.url).searchParams;
       requests.push(params);
@@ -37,6 +40,10 @@ function serveSessions(pages: AgentSessionPage[] | ((params: URLSearchParams) =>
     ),
   );
   return { requests };
+}
+
+function serveDevices(devices: Partial<CompanionInstallation>[]) {
+  server.use(http.get("/api/me/companion/installations", () => HttpResponse.json(devices)));
 }
 
 function renderList(search = "") {
@@ -320,6 +327,109 @@ describe("My sessions list — filters live in the URL", () => {
     expect(await screen.findByRole("heading", { name: "See what your agents did" })).toBeInTheDocument();
   });
 
+  it("does not blame hidden subagents when the only sessions are older than the period", async () => {
+    serveSessions((params) => ({
+      items: params.get("since") ? [] : [makeSession({ title: "Last month's work", last_event_at: minutesAgo(20 * DAY_MINUTES) })],
+      next_cursor: null,
+    }));
+    serveDevices([]);
+    renderList();
+
+    expect(await screen.findByRole("heading", { name: "No sessions match" })).toBeInTheDocument();
+    expect(screen.getByText("Nothing was captured in the last 7 days.")).toBeInTheDocument();
+    expect(screen.queryByText(/Only subagent sessions were captured/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try 30 days" })).toBeInTheDocument();
+  });
+
+  it.each([
+    { failedRootOnly: "true", search: "" },
+    { failedRootOnly: "false", search: "" },
+    { failedRootOnly: "false", search: "?subagents=1" },
+  ])("does not classify history when its all-time probe fails ($failedRootOnly, $search)", async ({ failedRootOnly, search }) => {
+    let unavailable = true;
+    const requests: URLSearchParams[] = [];
+    serveSessions(() => ({ items: [], next_cursor: null }));
+    serveDevices([]);
+    server.use(http.get(`/api/workspaces/${SLUG}/sessions`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      requests.push(params);
+      if (params.has("since")) return HttpResponse.json({ items: [], next_cursor: null });
+      if (unavailable && params.get("root_only") === failedRootOnly) {
+        return HttpResponse.json({ detail: "History is temporarily unavailable" }, { status: 429 });
+      }
+      return HttpResponse.json({ items: [makeSession({ title: "Last month's work", last_event_at: minutesAgo(20 * DAY_MINUTES) })], next_cursor: null });
+    }));
+    renderList(search);
+
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    expect(screen.queryByText(/Only subagent sessions were captured/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "See what your agents did" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Companion is connected" })).not.toBeInTheDocument();
+    unavailable = false;
+    await userEvent.click(retry);
+    expect(await screen.findByText("Nothing was captured in the last 7 days.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try 30 days" })).toBeInTheDocument();
+    expect(requests.filter((params) => params.has("since"))).toHaveLength(1);
+    const retried = requests.filter((params) => !params.has("since") && params.get("root_only") === failedRootOnly);
+    expect(retried).toHaveLength(2);
+    expect(retried.every((params) => params.get("limit") === "1")).toBe(true);
+  });
+
+  it("offers Companion above the list when no computer is sending sessions anymore", async () => {
+    serveSessions([{ items: [makeSession({ title: "Captured before the Mac was signed out" })], next_cursor: null }]);
+    serveDevices([{ installation_id: "old", name: "Old Mac", revoked_at: minutesAgo(60) }]);
+    renderList();
+
+    const notice = await screen.findByRole("status", { name: "No computer is sending sessions" });
+    expect(within(notice).getByRole("link", { name: "Setup guide" })).toHaveAttribute(
+      "href",
+      `/${SLUG}/documentation/capturing-sessions-with-companion`,
+    );
+    expect(screen.getByText("Captured before the Mac was signed out")).toBeInTheDocument();
+  });
+
+  it("keeps the list quiet about Companion while a computer is sending sessions", async () => {
+    serveSessions([{ items: [makeSession({ title: "Fresh work" })], next_cursor: null }]);
+    serveDevices([{ installation_id: "mac", name: "Mac", revoked_at: null }]);
+    renderList();
+
+    await screen.findByText("Fresh work");
+    await waitFor(() => expect(screen.queryByRole("status", { name: "No computer is sending sessions" })).not.toBeInTheDocument());
+  });
+
+  it("leads a first run without a paired computer to getting Companion", async () => {
+    serveSessions(() => ({ items: [], next_cursor: null }));
+    serveDevices([]);
+    renderList();
+
+    expect(await screen.findByRole("heading", { name: "See what your agents did" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Setup guide" })).toHaveAttribute(
+      "href",
+      `/${SLUG}/documentation/capturing-sessions-with-companion`,
+    );
+    expect(screen.getByRole("list", { name: "How to start" })).toBeInTheDocument();
+  });
+
+  it("still offers Companion when every paired computer was signed out", async () => {
+    serveSessions(() => ({ items: [], next_cursor: null }));
+    serveDevices([{ installation_id: "old", name: "Old Mac", revoked_at: minutesAgo(60) }]);
+    renderList();
+
+    expect(await screen.findByRole("heading", { name: "See what your agents did" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Companion is connected" })).not.toBeInTheDocument();
+  });
+
+  it("tells someone with a paired computer what is left before the first session arrives", async () => {
+    serveSessions(() => ({ items: [], next_cursor: null }));
+    serveDevices([{ installation_id: "mac", name: "Carol's MacBook Pro", revoked_at: null }]);
+    renderList();
+
+    expect(await screen.findByRole("heading", { name: "Companion is connected" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "See what your agents did" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Download for macOS" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Devices" })).toHaveAttribute("href", `/${SLUG}/sessions/devices`);
+  });
+
   it("explains an empty filtered result and clears the filters", async () => {
     serveSessions((params) => ({
       items: params.get("harness") ? [] : [makeSession({ title: "Back again" })],
@@ -400,7 +510,7 @@ describe("My sessions list — rows", () => {
     expect(badge.closest("[title]")).toHaveAttribute("title", "3 records weren't captured");
   });
 
-  it("renders linked work as green Changed chips and outline Consulted chips", async () => {
+  it("renders workspace-less previews as readable inert Changed and Consulted chips", async () => {
     serveOne(
       makeSession({
         link_count: 3,
@@ -412,13 +522,20 @@ describe("My sessions list — rows", () => {
     );
     renderList();
 
-    const changed = await screen.findByRole("link", { name: "Changed: Bug: double-counts" });
-    expect(changed).toHaveAttribute("href", `/${SLUG}/boards/board-1/kanban?card=card-1`);
+    const changed = await screen.findByLabelText("Changed: Bug: double-counts");
+    expect(changed).toHaveTextContent("Bug: double-counts");
+    expect(changed.closest("a")).toBeNull();
+    expect(changed).not.toHaveAttribute("href");
     expect(changed).toHaveAttribute("data-relation", "changed");
-    const consulted = screen.getByRole("link", { name: "Consulted: Codex desktop capture plan, matched by timing" });
+    expect(changed).toHaveClass("border-primary/25", "bg-primary/9");
+    const consulted = screen.getByLabelText("Consulted: Codex desktop capture plan, matched by timing");
+    expect(consulted).toHaveTextContent("Codex desktop capture plan");
+    expect(consulted.closest("a")).toBeNull();
+    expect(consulted).not.toHaveAttribute("href");
     expect(consulted).toHaveAttribute("data-relation", "consulted");
-    expect(consulted).toHaveAttribute("title", "Matched by timing, not by an exact call id");
+    expect(consulted).toHaveClass("border-border", "bg-transparent", "border-dashed");
     expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Audit i18n keys for the sessions namespace" })).toHaveAttribute("href", `/${SLUG}/sessions/sess-1`);
   });
 
   it("says when a session touched no work", async () => {
@@ -429,12 +546,16 @@ describe("My sessions list — rows", () => {
 
   it("takes linked work from the list itself, never one request per row", async () => {
     const perRow = vi.fn();
+    const targetReads = vi.fn();
     serveOne(
       makeSession({
         id: "s-1",
         child_count: 2,
-        link_count: 1,
-        link_preview: [{ entity_type: "card", entity_id: "card-9", board_id: "board-1", title: "Checkout retries on 502", relation: "changed", provenance: "exact" }],
+        link_count: 2,
+        link_preview: [
+          { entity_type: "card", entity_id: "card-9", board_id: "board-1", title: "Checkout retries on 502", relation: "changed", provenance: "exact" },
+          { entity_type: "note", entity_id: "note-1", board_id: null, title: "Retry decision", relation: "consulted", provenance: "exact" },
+        ],
       }),
     );
     server.use(
@@ -442,10 +563,20 @@ describe("My sessions list — rows", () => {
         perRow();
         return HttpResponse.json({ items: [] });
       }),
+      ...[
+        "/api/workspaces/:slug/boards/:boardId/cards/:cardId",
+        "/api/workspaces/:slug/boards/:boardId/notes/:noteId",
+        "/api/workspaces/:slug/notes/:noteId",
+      ].map((path) => http.get(path, () => {
+        targetReads();
+        return HttpResponse.json({}, { status: 404 });
+      })),
     );
     renderList();
-    expect(await screen.findByRole("link", { name: "Changed: Checkout retries on 502" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Changed: Checkout retries on 502")).toHaveTextContent("Checkout retries on 502");
+    expect(screen.getByLabelText("Consulted: Retry decision")).toHaveTextContent("Retry decision");
     expect(screen.getByText("2 subagents")).toBeInTheDocument();
     expect(perRow).not.toHaveBeenCalled();
+    expect(targetReads).not.toHaveBeenCalled();
   });
 });

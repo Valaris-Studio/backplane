@@ -41,9 +41,9 @@ describe("documentation locale contract", () => {
     expect(versions.size).toBe(1);
   });
 
-  it("keeps all 10 groups and 57 stable section slugs in every locale", () => {
+  it("keeps all 10 groups and 58 stable section slugs in every locale", () => {
     expect(DOC_GROUPS).toHaveLength(10);
-    expect(DOC_SECTIONS).toHaveLength(57);
+    expect(DOC_SECTIONS).toHaveLength(58);
 
     const expectedGroupIds = DOC_GROUPS.map(({ id }) => id).sort();
     const expectedSlugs = DOC_SECTIONS.map(({ slug }) => slug).sort();
@@ -247,21 +247,21 @@ describe("documentation locale contract", () => {
 
   it("reports canonical English coverage", () => {
     expect(getDocumentationCoverage("en")).toEqual({
-      source: 57,
+      source: 58,
       translated: 0,
       fallback: 0,
-      total: 57,
+      total: 58,
     });
   });
 
   it.each(["es", "pt-BR"] as const)(
-    "reports 57/57 translated coverage for %s without fallback",
+    "reports 58/58 translated coverage for %s without fallback",
     (locale) => {
       expect(getDocumentationCoverage(locale)).toEqual({
         source: 0,
-        translated: 57,
+        translated: 58,
         fallback: 0,
-        total: 57,
+        total: 58,
       });
     },
   );
