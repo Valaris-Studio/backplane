@@ -39,6 +39,7 @@ import {
 import { tildeHome } from "../utils/presenter";
 import { AgentMark, harnessName } from "./AgentMark";
 import { CompanionGate } from "./CompanionGate";
+import { GetCompanion, GetCompanionLink } from "./GetCompanion";
 import { HidePromptsToggle } from "./HidePromptsToggle";
 import { Segmented, Switch } from "./controls";
 import { CallContentText } from "./PromptText";
@@ -135,7 +136,12 @@ function DevicesView() {
             />
           ))
         ) : (
-          <EmptyState icon={Laptop} title={t("sessions.devices.empty.title")} description={t("sessions.devices.empty.body")} />
+          <EmptyState
+            icon={Laptop}
+            title={t("sessions.devices.empty.title")}
+            description={t("sessions.devices.empty.body")}
+            action={<GetCompanion />}
+          />
         )}
       </div>
       <aside className="flex flex-col gap-4">
@@ -605,6 +611,9 @@ function AddComputer() {
         <li>{t("sessions.devices.addComputer.signIn")}</li>
         <li>{t("sessions.devices.addComputer.approve")}</li>
       </ol>
+      <p className="mt-2.5 text-[0.86rem]">
+        <GetCompanionLink />
+      </p>
     </section>
   );
 }

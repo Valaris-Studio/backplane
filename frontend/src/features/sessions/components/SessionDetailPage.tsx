@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, RotateCw, SearchX } from "lucide-react";
@@ -13,7 +13,8 @@ import { isApiError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 import type { AgentSession } from "@/types/agent-session";
 import { useCompanionEnabled, useSession } from "../api/use-sessions";
-import { useForgetSessionContent, useSessionRealtime } from "../api/use-session-realtime";
+import { useRefreshSessionEvidence, type SessionWorkIdentity } from "../api/use-session-evidence";
+import { useSessionRealtime } from "../api/use-session-realtime";
 import { useNow } from "../hooks/use-now";
 import { formatTokens, formatUsd, formatWallTime, sessionTotalTokens, sessionWallSeconds } from "../utils/format";
 import { isUsageOnly } from "../utils/group-sessions";
@@ -89,11 +90,6 @@ function SessionDetail() {
   const accessLost = session.isError && [401, 403, 404].includes(errorStatus);
   const gone = accessLost && errorStatus === 404;
   const retainSession = !!session.data && (!session.isError || errorStatus === 0 || errorStatus === 408 || errorStatus === 429 || errorStatus >= 500);
-  const forgetContent = useForgetSessionContent();
-  useEffect(() => {
-    if (accessLost) forgetContent(slug, sessionId);
-  }, [accessLost, forgetContent, slug, sessionId]);
-
   if (session.isPending) return <SessionDetailSkeleton />;
   if (gone) return <SessionNotFound />;
   return <>
@@ -124,14 +120,41 @@ function SessionDetail() {
 type CompactTab = "timeline" | "linked" | "cost";
 
 function SessionDetailBody({ slug, session }: { slug: string; session: AgentSession }) {
+  const { t } = useTranslation();
   const compact = useMediaQuery(COMPACT_LIST_QUERY);
   const [tab, setTab] = useState<CompactTab>("timeline");
+  const [selectedWork, setSelectedWork] = useState<SessionWorkIdentity | null>(null);
+  const [timelineTarget, setTimelineTarget] = useState<HTMLElement | null>(null);
+  const [readerTarget, setReaderTarget] = useState<HTMLHeadingElement | null>(null);
+  const [navigation, setNavigation] = useState<{ destination: "timeline" | "reader"; request: number } | null>(null);
+  const appliedNavigation = useRef<number | null>(null);
+  const { refresh, refreshing } = useRefreshSessionEvidence(slug, session.id);
   const usageOnly = isUsageOnly(session);
+
+  function navigateTo(destination: "timeline" | "reader") {
+    setTab("timeline");
+    setNavigation((previous) => ({ destination, request: (previous?.request ?? 0) + 1 }));
+  }
+
+  useEffect(() => {
+    if (!navigation || appliedNavigation.current === navigation.request) return;
+    const target = navigation.destination === "timeline" ? timelineTarget : readerTarget;
+    if (!target?.isConnected || target.closest("[hidden]") || (compact && tab !== "timeline")) return;
+    target.scrollIntoView?.({ block: "start" });
+    target.focus({ preventScroll: true });
+    appliedNavigation.current = navigation.request;
+  }, [navigation, timelineTarget, readerTarget, compact, tab]);
+
   const timeline = (
     <div className="flex min-w-0 flex-col gap-3">
       <SessionBanners session={session} />
-      {usageOnly ? null : <SessionTimeline slug={slug} session={session} headingHidden={compact} />}
-      <SessionTranscript slug={slug} session={session} active={!compact || tab === "timeline"} />
+      {usageOnly ? null : <SessionTimeline
+        slug={slug} session={session} headingHidden={compact} selectedWork={selectedWork}
+        headingRef={setTimelineTarget}
+        onReturn={() => { setSelectedWork(null); navigateTo("timeline"); }}
+        onReadContent={readerTarget ? () => navigateTo("reader") : undefined}
+      />}
+      <SessionTranscript slug={slug} session={session} active={!compact || tab === "timeline"} headingRef={setReaderTarget} />
     </div>
   );
 
@@ -140,7 +163,15 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
       <SessionHeader slug={slug} session={session} />
       {compact ? <SessionStatStrip session={session} /> : null}
       {usageOnly ? null : <RhythmStrip slug={slug} session={session} />}
-      <SessionPanels slug={slug} session={session} timeline={timeline} compact={compact} tab={tab} onTabChange={setTab} />
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" className="aria-disabled:opacity-45 max-sm:min-h-[44px] max-sm:min-w-[44px]"
+          aria-disabled={refreshing} onClick={() => { if (!refreshing) void refresh(); }}>
+          <RotateCw aria-hidden className={refreshing ? "motion-safe:animate-spin" : undefined} />
+          {t("sessions.evidence.refresh")}
+        </Button>
+      </div>
+      <SessionPanels slug={slug} session={session} timeline={timeline} compact={compact} tab={tab} onTabChange={setTab}
+        onInspect={usageOnly ? undefined : (identity) => { setSelectedWork(identity); navigateTo("timeline"); }} />
     </div>
   );
 }
@@ -168,7 +199,7 @@ function SessionStatStrip({ session }: { session: AgentSession }) {
   );
 }
 
-function SessionPanels({ slug, session, timeline, compact, tab, onTabChange }: { slug: string; session: AgentSession; timeline: ReactNode; compact: boolean; tab: CompactTab; onTabChange: (tab: CompactTab) => void }) {
+function SessionPanels({ slug, session, timeline, compact, tab, onTabChange, onInspect }: { slug: string; session: AgentSession; timeline: ReactNode; compact: boolean; tab: CompactTab; onTabChange: (tab: CompactTab) => void; onInspect?: (identity: SessionWorkIdentity) => void }) {
   const { t } = useTranslation();
   const baseId = useId();
   const tabs: { id: CompactTab; label: string }[] = [
@@ -178,7 +209,7 @@ function SessionPanels({ slug, session, timeline, compact, tab, onTabChange }: {
   ];
   const cost = <CostPanel slug={slug} session={session} />;
   const tokens = <TokensPanel session={session} />;
-  const linked = <LinkedWorkPanel slug={slug} session={session} />;
+  const linked = <LinkedWorkPanel slug={slug} session={session} onInspect={onInspect} />;
   const capture = <CapturePanel session={session} />;
   const subagents = <SubagentsPanel slug={slug} session={session} />;
 

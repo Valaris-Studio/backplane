@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { getDocumentationCopy } from "./content";
-import { NOTES_SECTION_TITLE } from "./content/en";
+import { COMPANION_SECTION_TITLE, NOTES_SECTION_TITLE } from "./content/en";
 
 export const DOC_GROUPS = [
   { id: "introduction", title: "Introduction" },
@@ -58,6 +58,7 @@ export const DOC_SECTIONS = [
   { slug: "creating-your-first-workspace", title: "Creating Your First Workspace", group: "getting-started", order: 10 },
   { slug: "your-first-board-and-card", title: "Your First Board and Card", group: "getting-started", order: 20 },
   { slug: "installing-the-mcp-server", title: "Installing the MCP Server in Your Agent Client", group: "getting-started", order: 30 },
+  { slug: "capturing-sessions-with-companion", title: COMPANION_SECTION_TITLE, group: "getting-started", order: 35 },
   { slug: "registering-a-runner", title: "Registering a Runner", group: "getting-started", order: 40 },
   { slug: "your-first-pipeline-run", title: "Your First Pipeline Run (Guided Walkthrough)", group: "getting-started", order: 50 },
   { slug: "troubleshooting-your-first-run", title: "Troubleshooting Your First Run", group: "getting-started", order: 60 },

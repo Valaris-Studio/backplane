@@ -20,11 +20,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
-import type { SessionCallItem, WithheldField } from "@/types/agent-session";
+import type { LinkProvenance, SessionCallItem, WithheldField } from "@/types/agent-session";
 import { useSessionCall } from "../api/use-sessions";
 import { callError, callOutput, formatCallDuration, OUTPUT_DISPLAY_LIMIT } from "../utils/call-content";
 import { usePromptsHidden } from "../hooks/use-hide-prompts";
-import { formatBytes } from "../utils/format";
+import { formatBytes, formatClock } from "../utils/format";
 import { presentArgs } from "../utils/presenter";
 import { CallContentText } from "./PromptText";
 import { WithheldChip } from "./WithheldChip";
@@ -98,12 +98,13 @@ interface CallRowProps {
   slug: string;
   sessionId: string;
   item: SessionCallItem;
+  evidenceProvenance?: LinkProvenance;
 }
 
-export function CallRow({ slug, sessionId, item }: CallRowProps) {
+export function CallRow({ slug, sessionId, item, evidenceProvenance }: CallRowProps) {
   const { t } = useTranslation();
   const failed = item.outcome === "failed";
-  const [expanded, setExpanded] = useState(failed);
+  const [expanded, setExpanded] = useState(failed && !evidenceProvenance);
   const panelId = useId();
   const { Icon, tone } = callVisual(item);
   const name = callDisplayName(item);
@@ -112,6 +113,13 @@ export function CallRow({ slug, sessionId, item }: CallRowProps) {
 
   return (
     <li data-call-row="">
+      {evidenceProvenance ? <div className="mb-1.5 grid gap-0.5 text-[0.8rem] text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <time dateTime={item.started_at} className="tabular-nums">{formatClock(item.started_at)}</time>
+          <span className="font-semibold">{t(`sessions.evidence.${evidenceProvenance}`)}</span>
+        </p>
+        <p>{t(`sessions.evidence.${evidenceProvenance}Hint`)}</p>
+      </div> : null}
       <div
         className={cn(
           "-mx-2 grid grid-cols-[1.6rem_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-[var(--radius-cap)] px-2 py-1 text-[0.89rem] transition-colors duration-150 hover:bg-accent/75",
@@ -142,7 +150,7 @@ export function CallRow({ slug, sessionId, item }: CallRowProps) {
             />
           ) : null}
           {item.work_refs.map((ref) => (
-            <WorkChip key={`${ref.entity_type}-${ref.entity_id}`} slug={slug} work={ref} className="shrink" />
+            <WorkChip key={`${ref.workspace_id}-${ref.entity_type}-${ref.entity_id}-${ref.relation}`} slug={slug} work={ref} className="shrink" />
           ))}
         </div>
         <div className="flex items-center gap-3 whitespace-nowrap text-[0.8rem] text-muted-foreground">

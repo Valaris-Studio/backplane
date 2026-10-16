@@ -94,12 +94,6 @@ export function hasChosenFilters(filters: SessionFilters): boolean {
   return !!(filters.agent || filters.state || filters.board || filters.linkedOnly || filters.q.trim());
 }
 
-// Anything that can hide sessions, including the default of hiding subagent
-// threads: an empty list under it is not proof that nothing was captured.
-export function hasNarrowingFilters(filters: SessionFilters): boolean {
-  return hasChosenFilters(filters) || !filters.subagents;
-}
-
 // Periods start at a local midnight, so `since` (part of the query key) stays
 // put while the shared clock ticks instead of refetching every 30 seconds.
 export function periodStart(period: Period, now: number): number {

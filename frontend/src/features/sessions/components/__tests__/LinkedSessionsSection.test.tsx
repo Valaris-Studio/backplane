@@ -87,6 +87,7 @@ function serve({ companion = true, devices = [DEVICE], list = listOf([]) }: { co
   stubAuthModes(companion);
   const calls = vi.fn();
   server.use(
+    http.get("/api/workspaces", () => HttpResponse.json([{ id: "ws-1", slug: SLUG, name: "Acme" }])),
     http.get(DEVICES, () => HttpResponse.json(devices)),
     http.get(CARD_SESSIONS, () => {
       calls();
@@ -128,7 +129,7 @@ describe("Your sessions on this card", () => {
     renderCard();
 
     const section = await screen.findByRole("region", { name: "Your sessions on this card" });
-    const main = within(section).getByRole("link", { name: "Fix linked_summary double-counting overlapping subagent spans" });
+    const main = await within(section).findByRole("link", { name: "Fix linked_summary double-counting overlapping subagent spans" });
     expect(main).toHaveAttribute("href", `/${SLUG}/sessions/s-main`);
 
     const mainRow = main.closest("li") as HTMLElement;
@@ -196,13 +197,14 @@ describe("Your sessions on this card", () => {
     serve({ list: THREE });
     renderCard();
     const section = await screen.findByRole("region", { name: "Your sessions on this card" });
-    expect(within(section).getByText("matched by timing")).toHaveAttribute("title", "Matched by timing, not by an exact call id");
+    expect(await within(section).findByText("matched by timing")).toHaveAttribute("title", "Matched by timing, not by an exact call id");
   });
 
   it("keeps its heading and offers a retry when the server fails", async () => {
     stubAuthModes(true);
     let attempts = 0;
     server.use(
+      http.get("/api/workspaces", () => HttpResponse.json([{ id: "ws-1", slug: SLUG, name: "Acme" }])),
       http.get(DEVICES, () => HttpResponse.json([DEVICE])),
       http.get(CARD_SESSIONS, () => {
         attempts += 1;
@@ -221,7 +223,7 @@ describe("Your sessions on this card", () => {
     serve({ list: THREE });
     renderCard();
     const section = await screen.findByRole("region", { name: "Your sessions on this card" });
-    expect(within(section).getByText("Fix linked_summary double-counting overlapping subagent spans")).toHaveAttribute("aria-hidden", "true");
+    expect(await within(section).findByText("Fix linked_summary double-counting overlapping subagent spans")).toHaveAttribute("aria-hidden", "true");
   });
 });
 

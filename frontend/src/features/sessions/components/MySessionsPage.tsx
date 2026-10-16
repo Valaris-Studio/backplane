@@ -10,14 +10,14 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { Button } from "@/components/ui/button";
 import i18n from "@/i18n/config";
 import { useBoards } from "@/features/kanban/api/use-boards";
-import type { AgentSession } from "@/types/agent-session";
+import type { AgentSession, AgentSessionPage } from "@/types/agent-session";
 import { useCompanionEnabled, useSessionList, useSessionSummary } from "../api/use-sessions";
+import { useCompanionDevices } from "../api/use-linked-sessions";
 import { useSessionRealtime } from "../api/use-session-realtime";
 import { useNow } from "../hooks/use-now";
 import {
   displayStateFor,
   hasChosenFilters,
-  hasNarrowingFilters,
   periodStart,
   toListQuery,
   useSessionFilters,
@@ -28,6 +28,7 @@ import { AGENT_KEY_ORDER, agentKey, agentKeyName, markHarnessFor, serverHarnessF
 import { PeriodTotals } from "./PeriodTotals";
 import { SessionsTabs } from "./SessionsTabs";
 import { CompanionGate } from "./CompanionGate";
+import { NoActiveComputerNotice } from "./GetCompanion";
 import { HidePromptsToggle } from "./HidePromptsToggle";
 import { PeriodPicker, SessionsFilterBar, SortSelect, type AgentOption } from "./SessionsFilterBar";
 import { SessionsTable } from "./SessionsTable";
@@ -86,6 +87,9 @@ function useSeenAgents(sessions: AgentSession[], selected: string | null): Agent
   }, [seen, selected]);
 }
 
+function hasFirstItem(probe: { pages: AgentSessionPage[] } | undefined): boolean {
+  return !!probe?.pages[0]?.items.length;
+}
 
 function SessionsList() {
   const { t } = useTranslation();
@@ -132,26 +136,41 @@ function SessionsList() {
   const summary = useSessionSummary(slug, summaryQuery, enabled);
   const periodPhrase = t(`sessions.period.phrase.${filters.period === "today" ? "today" : filters.period === "7d" ? "d7" : "d30"}`);
 
-  // Empty under only the default "hide subagents": ask once (one row) whether
-  // any session exists at all before calling it a first run.
-  const emptyUnderDefaults = list.isSuccess && !loaded.length && !hasChosenFilters(filters) && !filters.subagents;
-  const anySession = useSessionList(slug, { root_only: false }, enabled && emptyUnderDefaults, 1);
-  const subagentsOnly = emptyUnderDefaults && !!anySession.data?.pages[0]?.items.length;
+  // Empty without chosen filters can still hide earlier work: sessions older
+  // than the period, or subagent threads. Ask once (one row each, no period)
+  // whether anything was ever captured before calling it a first run.
+  const emptyUnfiltered = list.isSuccess && !loaded.length && !hasChosenFilters(filters);
+  const anyRootSession = useSessionList(slug, { root_only: true }, enabled && emptyUnfiltered && !filters.subagents, 1);
+  const anySession = useSessionList(slug, { root_only: false }, enabled && emptyUnfiltered, 1);
+  const probing = emptyUnfiltered && (anySession.isPending || (!filters.subagents && anyRootSession.isPending));
+  const capturedBeforePeriod =
+    emptyUnfiltered && hasFirstItem(filters.subagents ? anySession.data : anyRootSession.data);
+  const subagentsOnly = emptyUnfiltered && !filters.subagents && !capturedBeforePeriod && hasFirstItem(anySession.data);
+  const firstRun = emptyUnfiltered && !capturedBeforePeriod && !subagentsOnly;
+  const failedHistoryQuery = anySession.isError
+    ? anySession
+    : !filters.subagents && anyRootSession.isError ? anyRootSession : null;
+  const failedQuery = list.isError ? list : emptyUnfiltered ? failedHistoryQuery : null;
+
+  // Whoever has no paired computer left is told how to capture again, even
+  // with older sessions in the list; the first run already teaches it.
+  const devices = useCompanionDevices(enabled);
+  const noActiveComputer = devices.isSuccess && !devices.data.some((device) => !device.revoked_at);
 
   let body: React.ReactNode;
-  if (list.isPending || (emptyUnderDefaults && anySession.isPending)) {
+  if (list.isPending || probing) {
     body = <SessionListSkeleton />;
-  } else if (list.isError) {
+  } else if (failedQuery) {
     body = (
       <LoadErrorState
-        error={list.error}
+        error={failedQuery.error}
         title={t("sessions.loadError.title")}
         description={t("sessions.loadError.description")}
-        onRetry={() => void list.refetch()}
-        retrying={list.isFetching}
+        onRetry={() => void failedQuery.refetch()}
+        retrying={failedQuery.isFetching}
       />
     );
-  } else if (!loaded.length && (!hasNarrowingFilters(filters) || (emptyUnderDefaults && !subagentsOnly))) {
+  } else if (firstRun) {
     body = <FirstRunState />;
   } else if (subagentsOnly) {
     body = (
@@ -202,6 +221,7 @@ function SessionsList() {
 
   return (
     <div className="flex flex-col gap-3">
+      {noActiveComputer && !firstRun ? <NoActiveComputerNotice /> : null}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <PeriodPicker period={filters.period} onChange={(period) => updateFilters({ period })} />
         {summary.data ? <PeriodTotals summary={summary.data} periodPhrase={periodPhrase} partial={totalsPartial} /> : null}

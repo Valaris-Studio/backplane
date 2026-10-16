@@ -6,6 +6,7 @@ import type { DocumentationLocaleCopy } from "./types";
 // Shared with routes.ts so the section's English source title lives only in
 // this content catalog, not as copy in the route table.
 export const NOTES_SECTION_TITLE = "Notes (editing, media, and Markdown)";
+export const COMPANION_SECTION_TITLE = "Capturing Sessions with Companion";
 
 export const EN_DOCUMENTATION: DocumentationLocaleCopy = {
   locale: "en",
@@ -114,6 +115,7 @@ export const EN_DOCUMENTATION: DocumentationLocaleCopy = {
     "creating-your-first-workspace": "Creating Your First Workspace",
     "your-first-board-and-card": "Your First Board and Card",
     "installing-the-mcp-server": "Installing the MCP Server in Your Agent Client",
+    "capturing-sessions-with-companion": COMPANION_SECTION_TITLE,
     "registering-a-runner": "Registering a Runner",
     "your-first-pipeline-run": "Your First Pipeline Run (Guided Walkthrough)",
     "troubleshooting-your-first-run": "Troubleshooting Your First Run",

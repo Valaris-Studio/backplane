@@ -9343,6 +9343,41 @@
       "folder": "Choose a folder to capture",
       "folderBody": "You pick what gets sent."
     },
+    "getCompanion": {
+      "downloadMac": "Download for macOS",
+      "macOnly": "The desktop app is macOS-only for now. On Linux and Windows, build Companion from source.",
+      "buildFromSource": "Build from source",
+      "macDownload": "macOS download",
+      "requirements": "Companion {{version}} · macOS 13 or later · Apple silicon and Intel",
+      "otherPlatforms": "Linux and Windows: build from source",
+      "setupGuide": "Setup guide",
+      "getLink": "Get Companion {{version}}"
+    },
+    "noComputer": {
+      "title": "No computer is sending sessions",
+      "body": "Sessions already captured stay here. To capture new ones, set up Companion on the computer where your agents run."
+    },
+    "awaitingFirst": {
+      "title": "Companion is connected",
+      "description": "Your first session shows up here as soon as a coding agent runs in a folder Companion captures.",
+      "folder": "Choose a folder in Companion",
+      "folderBody": "Or let it match repositories already bound to your boards.",
+      "run": "Run Claude Code, Codex or Pi there",
+      "runBody": "Sessions arrive live. No refresh needed.",
+      "openDevices": "Open Devices"
+    },
+    "announcement": {
+      "badge": "New",
+      "title": "Meet Companion",
+      "description": "A small desktop app that brings your coding agents' sessions into Backplane.",
+      "captureTitle": "Every agent session in one place",
+      "captureBody": "Claude Code, Codex and Pi sessions from your computers, with time, tokens and cost.",
+      "linkedTitle": "Linked to your work",
+      "linkedBody": "Each session links to the cards and notes it touched.",
+      "privateTitle": "Private by default",
+      "privateBody": "Only you see your sessions. You choose the folders and how much gets sent.",
+      "notNow": "Not now"
+    },
     "loadError": {
       "title": "Couldn't load your sessions",
       "description": "Backplane didn't answer. Your sessions are safe. Try again in a moment.",
@@ -9448,7 +9483,10 @@
       "correlatedHint": "Matched by timing, not by an exact call id",
       "accessible": "{{relation}}: {{title}}",
       "accessibleCorrelated": "{{relation}}: {{title}}, matched by timing",
-      "loadingTitle": "Loading title"
+      "loadingTitle": "Loading work item…",
+      "loadError": "Work item could not be loaded.",
+      "unavailable": "Work item unavailable",
+      "retry": "Retry"
     },
     "cost": {
       "apiEquivalent": "API-equivalent",
@@ -9597,8 +9635,8 @@
       "newCalls_one": "{{count}} new call",
       "newCalls_other": "{{count}} new calls",
       "empty": "No calls were captured for this session yet.",
-      "emptyWork": "No call in this session touched Backplane work.",
-      "emptyFailures": "No call in this session failed.",
+      "emptyWork": "No captured calls with recorded Backplane work links are loaded.",
+      "emptyFailures": "No failed captured calls are loaded.",
       "loadError": "Couldn't load the timeline.",
       "retry": "Try again",
       "showRun_one": "Show {{count}} more call",
@@ -9638,8 +9676,8 @@
       "linked": {
         "title": "Linked work",
         "none": "No card or note links have been recorded for this session.",
-        "calls_one": "{{count}} call",
-        "calls_other": "{{count}} calls",
+        "calls_one": "{{count}} recorded tool call",
+        "calls_other": "{{count}} recorded tool calls",
         "card": "card",
         "note": "note",
         "matchedByTiming": "matched by timing",
@@ -9668,7 +9706,7 @@
           "rich": "Anything outside the bound folder stayed on your device"
         },
         "coverage": "Coverage",
-        "coverageFull": "Full activity, no gaps",
+        "coverageFull": "No capture gaps reported",
         "coverageUsageOnly": "Usage only",
         "coverageGaps_one": "{{count}} record wasn't captured",
         "coverageGaps_other": "{{count}} records weren't captured",
@@ -9703,7 +9741,10 @@
       "privacyNote": "Only your own sessions are listed. Other people's sessions on this note stay private to them.",
       "subagentOfAbove": "subagent of the session above",
       "spanLive": "{{start}} – now",
-      "loadError": "Couldn't load your sessions here."
+      "loadError": "Couldn't load your sessions here.",
+      "workspaceUnavailable": "Session workspace unavailable",
+      "loadingWorkspace": "Loading session workspace…",
+      "workspaceError": "Session workspace could not be verified."
     },
     "totals": {
       "label": "Totals for {{period}}",
@@ -10044,6 +10085,31 @@
       },
       "download": "Download",
       "downloading": "Downloading…"
+    },
+    "evidence": {
+      "inspect": "Inspect evidence",
+      "inspectLabel": "Inspect {{relation}} evidence for {{title}}",
+      "title": "Evidence for {{title}}",
+      "heading": "Work evidence",
+      "loaded_zero": "0 matching calls loaded",
+      "loaded_one": "1 matching call loaded",
+      "loaded_other": "{{count}} matching calls loaded",
+      "scope": "Only loaded captured calls with this recorded relationship are shown.",
+      "earlier": "Earlier calls may contain more evidence.",
+      "empty": "No matching captured calls are loaded.",
+      "exact": "Exact call match",
+      "exactHint": "Matched using the captured call identity.",
+      "correlated": "Matched by timing",
+      "correlatedHint": "Matched using tool, arguments and timing. This is not an exact call match.",
+      "return": "Return to timeline",
+      "read": "Read captured content",
+      "refresh": "Refresh evidence",
+      "loading": "Loading evidence…",
+      "error": "Evidence could not be refreshed.",
+      "missing": "This work link is no longer available.",
+      "linksLoading": "Loading linked work…",
+      "linksError": "Linked work could not be loaded.",
+      "sessionTotals": "Session totals"
     }
   }
 }

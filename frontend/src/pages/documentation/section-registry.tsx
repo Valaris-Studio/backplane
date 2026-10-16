@@ -30,6 +30,7 @@ import { InstallingBackupAndRestore } from "./sections/installing-backup-and-res
 import { GettingStartedCreatingYourFirstWorkspace } from "./sections/getting-started-creating-your-first-workspace";
 import { GettingStartedYourFirstBoardAndCard } from "./sections/getting-started-your-first-board-and-card";
 import { GettingStartedInstallingTheMcpServer } from "./sections/getting-started-installing-the-mcp-server";
+import { GettingStartedCapturingSessionsWithCompanion } from "./sections/getting-started-capturing-sessions-with-companion";
 import { GettingStartedRegisteringARunner } from "./sections/getting-started-registering-a-runner";
 import { GettingStartedYourFirstPipelineRun } from "./sections/getting-started-your-first-pipeline-run";
 import { GettingStartedTroubleshootingYourFirstRun } from "./sections/getting-started-troubleshooting-your-first-run";
@@ -114,6 +115,7 @@ export const SOURCE_SECTION_RENDERERS: Record<
   "creating-your-first-workspace": GettingStartedCreatingYourFirstWorkspace,
   "your-first-board-and-card": GettingStartedYourFirstBoardAndCard,
   "installing-the-mcp-server": GettingStartedInstallingTheMcpServer,
+  "capturing-sessions-with-companion": GettingStartedCapturingSessionsWithCompanion,
   "registering-a-runner": GettingStartedRegisteringARunner,
   "your-first-pipeline-run": GettingStartedYourFirstPipelineRun,
   "troubleshooting-your-first-run": GettingStartedTroubleshootingYourFirstRun,

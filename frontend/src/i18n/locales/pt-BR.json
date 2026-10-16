@@ -9397,6 +9397,41 @@
       "folder": "Escolha uma pasta para capturar",
       "folderBody": "Você decide o que é enviado."
     },
+    "getCompanion": {
+      "downloadMac": "Baixar para macOS",
+      "macOnly": "Por enquanto o app de desktop é só para macOS. No Linux e no Windows, compile o Companion a partir do código-fonte.",
+      "buildFromSource": "Compilar a partir do código-fonte",
+      "macDownload": "Download para macOS",
+      "requirements": "Companion {{version}} · macOS 13 ou posterior · Apple silicon e Intel",
+      "otherPlatforms": "Linux e Windows: compilar a partir do código-fonte",
+      "setupGuide": "Guia de configuração",
+      "getLink": "Obter o Companion {{version}}"
+    },
+    "noComputer": {
+      "title": "Nenhum computador está enviando sessões",
+      "body": "As sessões já capturadas continuam aqui. Para capturar novas, configure o Companion no computador onde seus agentes rodam."
+    },
+    "awaitingFirst": {
+      "title": "O Companion está conectado",
+      "description": "Sua primeira sessão aparece aqui assim que um agente de código rodar em uma pasta que o Companion captura.",
+      "folder": "Escolha uma pasta no Companion",
+      "folderBody": "Ou deixe-o reconhecer repositórios já vinculados aos seus quadros.",
+      "run": "Rode Claude Code, Codex ou Pi nela",
+      "runBody": "As sessões chegam ao vivo. Não precisa recarregar.",
+      "openDevices": "Abrir Dispositivos"
+    },
+    "announcement": {
+      "badge": "Novo",
+      "title": "Conheça o Companion",
+      "description": "Um pequeno app de desktop que traz para o Backplane as sessões dos seus agentes de código.",
+      "captureTitle": "Todas as sessões dos seus agentes em um só lugar",
+      "captureBody": "Sessões de Claude Code, Codex e Pi dos seus computadores, com tempo, tokens e custo.",
+      "linkedTitle": "Vinculadas ao seu trabalho",
+      "linkedBody": "Cada sessão se vincula aos cartões e notas que tocou.",
+      "privateTitle": "Privadas por padrão",
+      "privateBody": "Só você vê suas sessões. Você escolhe as pastas e quanto é enviado.",
+      "notNow": "Agora não"
+    },
     "loadError": {
       "title": "Não foi possível carregar suas sessões",
       "description": "O Backplane não respondeu. Suas sessões estão seguras. Tente de novo em instantes.",
@@ -9505,7 +9540,10 @@
       "correlatedHint": "Vinculado pelo horário, não por um id de chamada exato",
       "accessible": "{{relation}}: {{title}}",
       "accessibleCorrelated": "{{relation}}: {{title}}, vinculado pelo horário",
-      "loadingTitle": "Carregando título"
+      "loadingTitle": "Carregando item de trabalho…",
+      "loadError": "Não foi possível carregar o item de trabalho.",
+      "unavailable": "Item de trabalho indisponível",
+      "retry": "Tentar novamente"
     },
     "cost": {
       "apiEquivalent": "equivalente em API",
@@ -9667,8 +9705,8 @@
       "newCalls_many": "{{count}} chamadas novas",
       "newCalls_other": "{{count}} chamadas novas",
       "empty": "Nenhuma chamada foi capturada nesta sessão ainda.",
-      "emptyWork": "Nenhuma chamada desta sessão tocou trabalho no Backplane.",
-      "emptyFailures": "Nenhuma chamada desta sessão falhou.",
+      "emptyWork": "Nenhuma chamada capturada com vínculos registrados ao trabalho do Backplane foi carregada.",
+      "emptyFailures": "Nenhuma chamada capturada com falha foi carregada.",
       "loadError": "Não foi possível carregar a linha do tempo.",
       "retry": "Tentar de novo",
       "showRun_one": "Mostrar mais {{count}} chamada",
@@ -9709,9 +9747,9 @@
       "linked": {
         "title": "Trabalho vinculado",
         "none": "Nenhum vínculo com cartões ou notas foi registrado para esta sessão.",
-        "calls_one": "{{count}} chamada",
-        "calls_many": "{{count}} chamadas",
-        "calls_other": "{{count}} chamadas",
+        "calls_one": "{{count}} chamada de ferramenta registrada",
+        "calls_many": "{{count}} chamadas de ferramenta registradas",
+        "calls_other": "{{count}} chamadas de ferramenta registradas",
         "card": "cartão",
         "note": "nota",
         "matchedByTiming": "vinculado pelo horário",
@@ -9740,7 +9778,7 @@
           "rich": "O que está fora da pasta vinculada ficou no seu dispositivo"
         },
         "coverage": "Cobertura",
-        "coverageFull": "Atividade completa, sem lacunas",
+        "coverageFull": "Nenhuma lacuna de captura reportada",
         "coverageUsageOnly": "Só uso",
         "coverageGaps_one": "{{count}} registro não foi capturado",
         "coverageGaps_many": "{{count}} registros não foram capturados",
@@ -9777,7 +9815,10 @@
       "privacyNote": "Só as suas próprias sessões aparecem aqui. As sessões de outras pessoas nesta nota continuam privadas para elas.",
       "subagentOfAbove": "subagente da sessão acima",
       "spanLive": "{{start}} – agora",
-      "loadError": "Não foi possível carregar suas sessões aqui."
+      "loadError": "Não foi possível carregar suas sessões aqui.",
+      "workspaceUnavailable": "Espaço de trabalho da sessão indisponível",
+      "loadingWorkspace": "Carregando espaço de trabalho da sessão…",
+      "workspaceError": "Não foi possível verificar o espaço de trabalho da sessão."
     },
     "totals": {
       "label": "Totais de {{period}}",
@@ -10132,6 +10173,32 @@
       },
       "download": "Baixar",
       "downloading": "Baixando…"
+    },
+    "evidence": {
+      "inspect": "Inspecionar evidências",
+      "inspectLabel": "Inspecionar evidências ({{relation}}): {{title}}",
+      "title": "Evidências de {{title}}",
+      "heading": "Evidências do trabalho",
+      "loaded_one": "1 chamada correspondente carregada",
+      "loaded_other": "{{count}} chamadas correspondentes carregadas",
+      "scope": "São mostradas apenas as chamadas capturadas já carregadas com esta relação registrada.",
+      "earlier": "Chamadas anteriores podem conter mais evidências.",
+      "empty": "Nenhuma chamada capturada correspondente foi carregada.",
+      "exact": "Correspondência exata de chamada",
+      "exactHint": "Vinculada pela identidade da chamada capturada.",
+      "correlated": "Vinculada pelo horário",
+      "correlatedHint": "Vinculada por ferramenta, argumentos e horário. Não é uma correspondência exata de chamada.",
+      "return": "Voltar à linha do tempo",
+      "read": "Ler conteúdo capturado",
+      "refresh": "Atualizar evidências",
+      "loading": "Carregando evidências…",
+      "error": "Não foi possível atualizar as evidências.",
+      "missing": "Este vínculo de trabalho não está mais disponível.",
+      "linksLoading": "Carregando trabalho vinculado…",
+      "linksError": "Não foi possível carregar o trabalho vinculado.",
+      "sessionTotals": "Totais da sessão",
+      "loaded_many": "{{count}} chamadas correspondentes carregadas",
+      "loaded_zero": "0 chamadas correspondentes carregadas"
     }
   }
 }

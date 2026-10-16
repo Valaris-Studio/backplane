@@ -63,6 +63,12 @@ describe("installing and getting-started documentation against main", () => {
     expect(source).not.toContain("first post-launch milestone");
   });
 
+  it("documents workspace folder bindings without requiring a board", () => {
+    const source = section("getting-started-capturing-sessions-with-companion");
+    expect(source).toMatch(/bind to a workspace[\s\S]*optionally[\s\S]*board/);
+    expect(source).not.toContain("only folders you bind to a board");
+  });
+
   it("documents the MCP origin contract, current Claude Code config and exact prompt IDs", () => {
     const source = section("getting-started-installing-the-mcp-server");
 
@@ -164,6 +170,7 @@ describe("installing and getting-started documentation against main", () => {
         "creating-your-first-workspace",
         "your-first-board-and-card",
         "installing-the-mcp-server",
+        "capturing-sessions-with-companion",
         "registering-a-runner",
         "your-first-pipeline-run",
         "troubleshooting-your-first-run",

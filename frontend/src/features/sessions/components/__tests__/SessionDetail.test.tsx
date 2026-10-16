@@ -91,6 +91,7 @@ function serveDetail(options: ServeOptions = {}): DetailServer {
   const session = liveSession(options.session);
   const pages = options.pages ?? [callPage([])];
   server.use(
+    http.get("/api/workspaces", () => HttpResponse.json([{ id: "ws-1", slug: SLUG, name: "Acme" }])),
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}`, () => HttpResponse.json(session)),
     http.delete(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}`, () => {
       deleted.push(SESSION_ID);
@@ -248,7 +249,7 @@ describe("Session detail — timeline of turns and calls", () => {
     expect(within(turn).getByText("24 calls")).toBeInTheDocument();
     expect(within(turn).getByText("1 failed")).toBeInTheDocument();
     expect(within(turn).getByText("19m")).toBeInTheDocument();
-    expect(screen.getByText("3 turns · 41 calls")).toBeInTheDocument();
+    expect(screen.getByText("Session totals: 3 turns · 41 calls")).toBeInTheDocument();
   });
 
   it("does not label ingested failure events as the timeline failed-call total", async () => {
@@ -272,7 +273,7 @@ describe("Session detail — timeline of turns and calls", () => {
     expect(within(turn).getByText("1 failed")).toBeInTheDocument();
     expect(await screen.findByRole("img", { name: /Session rhythm.*1 prompt, 1 call, 1 failed/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Failures" })).toBeInTheDocument();
-    expect(screen.getByText("3 turns · 41 calls")).toBeInTheDocument();
+    expect(screen.getByText("Session totals: 3 turns · 41 calls")).toBeInTheDocument();
     expect(screen.queryByText(/3 turns · 41 calls · 2 failed/)).not.toBeInTheDocument();
   });
 
@@ -370,10 +371,13 @@ describe("Session detail — timeline of turns and calls", () => {
         ]),
       ],
     });
+    server.use(http.get(`/api/workspaces/${SLUG}/boards/board-1/cards/card-1`, () =>
+      HttpResponse.json({ id: "card-1", board_id: "board-1", title: "Bug: linked_summary double-counts" }),
+    ));
     renderDetail();
 
     const row = await waitFor(() => callRow("valaris · get_card"));
-    expect(within(row).getByRole("link", { name: "Consulted: Bug: linked_summary double-counts" })).toHaveAttribute(
+    expect(await within(row).findByRole("link", { name: "Consulted: Bug: linked_summary double-counts" })).toHaveAttribute(
       "href",
       `/${SLUG}/boards/board-1/kanban?card=card-1`,
     );
@@ -590,7 +594,7 @@ describe("Session detail — facts rail", () => {
     const linked = await screen.findByRole("region", { name: "Linked work" });
     expect(await within(linked).findByRole("link", { name: "Bug: agent_session linked_summary double-counts" })).toBeInTheDocument();
     expect(within(linked).getByText(/Changed/)).toBeInTheDocument();
-    expect(within(linked).getByText(/3 calls/)).toBeInTheDocument();
+    expect(within(linked).getByText(/3 recorded tool calls/)).toBeInTheDocument();
   });
 
   it("describes missing work links without claiming no work happened", async () => {
@@ -607,7 +611,7 @@ describe("Session detail — facts rail", () => {
     const captured = await screen.findByRole("region", { name: "What was captured" });
     expect(within(captured).getByText("Captured before levels were recorded")).toBeInTheDocument();
     expect(within(captured).queryByText("Standard")).not.toBeInTheDocument();
-    expect(within(captured).getByText("Full activity, no gaps")).toBeInTheDocument();
+    expect(within(captured).getByText("No capture gaps reported")).toBeInTheDocument();
   });
 
   it("shows the folder as the server sends it: the bound folder and the path inside it", async () => {

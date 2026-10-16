@@ -12,6 +12,7 @@ import { isApiError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 import type { CostBasis, LinkedSessionList, LinkedSessionRead } from "@/types/agent-session";
 import { useCompanionEnabled } from "../api/use-sessions";
+import { useWorkspaceTarget } from "../api/use-work-title";
 import { useCardSessions, useCompanionDevices, useNoteSessions } from "../api/use-linked-sessions";
 import { useInView } from "../hooks/use-in-view";
 import { formatClock, formatTokens, formatUsd, formatWallTime, isLive } from "../utils/format";
@@ -119,7 +120,7 @@ function LinkedSessions({ kind, slug, boardId, list, hasDevices }: LinkedSession
       ) : items.length && list.data ? (
         <>
           <SummaryLine list={list.data} />
-          <LinkedRows slug={slug} items={items} />
+          <LinkedRows items={items} />
         </>
       ) : (
         <p className="text-xs text-muted-foreground">
@@ -177,14 +178,13 @@ function SummaryLine({ list }: { list: LinkedSessionList }) {
   );
 }
 
-function LinkedRows({ slug, items }: { slug: string; items: LinkedSessionRead[] }) {
+function LinkedRows({ items }: { items: LinkedSessionRead[] }) {
   const listed = new Set(items.map((item) => item.session.id));
   return (
     <ul>
       {items.map((item) => (
         <LinkedRow
           key={item.session.id}
-          slug={slug}
           item={item}
           parentListed={!!item.session.parent_session_id && listed.has(item.session.parent_session_id)}
         />
@@ -221,12 +221,23 @@ function withSeparators(parts: (ReactNode | null)[]): ReactNode[] {
     );
 }
 
-function LinkedRow({ slug, item, parentListed }: { slug: string; item: LinkedSessionRead; parentListed: boolean }) {
+function LinkedRow({ item, parentListed }: { item: LinkedSessionRead; parentListed: boolean }) {
   const { t } = useTranslation();
   const { session } = item;
   const title = useSessionTitle(session);
+  const workspace = useWorkspaceTarget(session.workspace_id);
   const changed = item.relations.includes("changed");
   const consulted = item.relations.includes("consulted");
+
+  if (workspace.status !== "available") {
+    return <li className="flex flex-wrap items-center gap-2 border-t border-border/65 py-2 text-sm text-muted-foreground first:border-t-0">
+      <span>{t(workspace.status === "loading" ? "sessions.linked.loadingWorkspace"
+        : workspace.status === "error" ? "sessions.linked.workspaceError" : "sessions.linked.workspaceUnavailable")}</span>
+      {workspace.status === "error" ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px]" onClick={() => void workspace.refetch()}>
+        {t("sessions.work.retry")}
+      </Button> : null}
+    </li>;
+  }
 
   return (
     <li
@@ -240,7 +251,7 @@ function LinkedRow({ slug, item, parentListed }: { slug: string; item: LinkedSes
         <div className="flex min-w-0 items-center gap-1.5">
           {title.kind === "withheld" ? <WithheldTitleGlyph /> : null}
           <Link
-            to={`/${slug}/sessions/${session.id}`}
+            to={`/${workspace.slug}/sessions/${session.id}`}
             className={cn(
               "min-w-0 truncate rounded-[var(--radius-cap)] font-semibold text-foreground underline-offset-[0.18em] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               title.kind !== "title" && "font-medium text-muted-foreground",
