@@ -8,7 +8,7 @@ import json
 import uuid
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import delete, update
 
 from app.core.event_bus import event_bus
@@ -17,6 +17,7 @@ from app.main import create_app
 from app.models.agents.agent import Agent
 from app.models.agents.execution import AgentExecution
 from app.models.kanban.board import Board
+from app.models.kanban.card import Card
 from app.models.notes.note import Note
 from app.models.workspace import WorkspaceMember
 from tests.routers.agents.context_dispatch_support import (
@@ -25,7 +26,7 @@ from tests.routers.agents.context_dispatch_support import (
     _receipt_case_fixture,  # noqa: F401
     finding_codes,
 )
-from tests.routers.agents.context_receipts_support import ALIAS, document, sha256
+from tests.routers.agents.context_receipts_support import ALIAS, document, note_revision, sha256
 
 pytestmark = [pytest.mark.slow, pytest.mark.timeout(30)]
 
@@ -179,17 +180,155 @@ async def test_legacy_a1_receipt_remains_prepared_and_has_no_invented_dispatch_e
 async def test_exact_execution_scope_is_not_replaced_by_caller_or_typo_fallback(dispatch_case):
     d = dispatch_case
     execution, _, payload = await setup_call(d)
-    for actor in ["other_agent", "curator", "outsider"]:
-        response = await d.prepare(execution, payload, actor=actor)
-        assert response.status_code in {403, 404}, response.text
-        assert "receipt_id" not in response.json()
     unknown = await d.prepare({"id": str(uuid.uuid4())}, payload)
     assert unknown.status_code == 404, unknown.text
+    # Exact per tier: a stranger answered 403 here would enumerate agent ids.
+    for actor, status in [("other_agent", 403), ("curator", 404), ("outsider", 403)]:
+        response = await d.prepare(execution, payload, actor=actor)
+        assert response.status_code == status, (actor, response.text)
+        assert "receipt_id" not in response.json()
+        if actor == "other_agent":
+            assert "agent_identity_mismatch" in finding_codes(response)
+        if actor == "curator":
+            assert response.json() == unknown.json()
     path = (f"/api/workspaces/{d.case.foreign_workspace['slug']}/executions/{execution['id']}"
             "/dispatch-preparations")
     foreign = await d.case.http.post(path, json=payload, headers=d.headers("recipient"))
     assert foreign.status_code == 404, foreign.text
     assert await history(d, execution) == []
+
+
+SECRET_CARD_TITLE = "Confidential handoff card 47"
+
+
+async def snapshot_as(d, execution_path, actor):
+    return await d.case.http.get(execution_path + "/dispatch-context", headers=d.headers(actor),
+                                 params={"invocation_kind": "stage", "prompt_slot": "main"})
+
+
+async def visible_snapshot(d):
+    async with d.case.factory() as db:
+        await db.execute(update(Card).where(Card.id == uuid.UUID(d.case.card_id)).values(title=SECRET_CARD_TITLE))
+        await db.commit()
+    execution, snapshot, _ = await setup_call(d)
+    secrets = [snapshot["context"][ALIAS], snapshot["dispatch"]["input_template"], snapshot["card"]["title"]]
+    assert snapshot["card"]["title"] == SECRET_CARD_TITLE
+    assert snapshot["dispatch"]["input_template"].startswith("Current template")
+    return execution, secrets
+
+
+def returned_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from returned_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from returned_strings(item)
+
+
+def assert_returns_no_secret(response, secrets):
+    # Decoded, not response.text: JSON escapes newlines and may escape
+    # non-ASCII, so a raw substring check misses a leaked multiline block.
+    for text in returned_strings(response.json()):
+        for secret in secrets:
+            assert secret not in text, f"{secret!r} returned inside {text!r}"
+
+
+def test_secret_check_reads_decoded_strings_not_escaped_wire_text():
+    secret = "Selected block 🧪\nsecond line"
+    leaked = Response(403, json={"detail": {"message": "denied: " + secret + " (end)"}})
+    assert secret not in leaked.text  # the prior raw-text check passed this leak
+    with pytest.raises(AssertionError):
+        assert_returns_no_secret(leaked, [secret])
+    clean = Response(403, json={"detail": {"message": "denied"}})
+    assert_returns_no_secret(clean, [secret])
+
+
+@pytest.mark.parametrize("tier, status, code", [
+    ("curator", 404, None),
+    ("other_agent", 403, "agent_identity_mismatch"),
+    ("outsider", 403, None),
+    ("owner_after_deactivation", 403, "agent_inactive"),
+    ("owner_after_scope_removal", 403, None),
+])
+async def test_dispatch_context_is_refused_to_every_caller_but_the_bound_agent_or_its_owner(
+        dispatch_case, tier, status, code):
+    d = dispatch_case
+    execution, secrets = await visible_snapshot(d)
+    path = d.case.execution_path(execution["id"])
+    owner_view = await snapshot_as(d, path, "recipient")
+    assert owner_view.status_code == 200, owner_view.text
+    actor = tier
+    if tier.startswith("owner_after_"):
+        actor = "recipient"
+        changes = {"is_active": False} if tier == "owner_after_deactivation" else {"allowed_workspaces": ["elsewhere"]}
+        async with d.case.factory() as db:
+            await db.execute(update(Agent).where(Agent.id == uuid.UUID(d.case.agent_id)).values(**changes))
+            await db.commit()
+    denied = await snapshot_as(d, path, actor)
+    assert denied.status_code == status, denied.text
+    if code is not None:
+        assert code in finding_codes(denied)
+    if tier == "curator":
+        unknown = await snapshot_as(d, d.case.execution_path(str(uuid.uuid4())), "recipient")
+        assert unknown.status_code == 404 and denied.json() == unknown.json()
+    assert_returns_no_secret(denied, secrets)
+
+
+async def test_dispatch_context_through_foreign_workspace_is_indistinguishable_from_unknown(dispatch_case):
+    d = dispatch_case
+    execution, secrets = await visible_snapshot(d)
+    own = d.case.execution_path(execution["id"])
+    # Recipient belongs to both workspaces, so the 404 is tenancy, not membership.
+    foreign = await snapshot_as(d, own.replace(f"/{d.case.workspace['slug']}/", "/foreign/"), "recipient")
+    unknown_in_foreign = await snapshot_as(d, f"/api/workspaces/foreign/executions/{uuid.uuid4()}", "recipient")
+    unknown_in_own = await snapshot_as(d, d.case.execution_path(str(uuid.uuid4())), "recipient")
+    for response in [foreign, unknown_in_foreign, unknown_in_own]:
+        assert response.status_code == 404, response.text
+        assert response.json() == foreign.json()
+    assert_returns_no_secret(foreign, secrets)
+
+
+async def test_note_edit_refuses_old_key_then_fresh_snapshot_prepares_under_new_revision(dispatch_case):
+    d = dispatch_case
+    execution, snapshot, payload = await setup_call(d)
+    first = await d.prepare(execution, payload)
+    assert first.status_code == 201, first.text
+    first_receipt = (await d.case.receipt(execution, first.json()["receipt_id"])).json()
+    edited = json.dumps(document("Edited handoff 🧪 after the first preparation"))
+    async with d.case.factory() as db:
+        await db.execute(update(Note).where(Note.id == uuid.UUID(d.case.notes[0]["id"])).values(content=edited))
+        await db.commit()
+    # The lost-ack retry under the old key meets the edit before any replay.
+    stale = await d.prepare(execution, payload)
+    assert stale.status_code == 409, stale.text
+    assert "execution_context_changed" in finding_codes(stale) and "receipt_id" not in stale.json()
+    fresh = await d.current(execution)
+    assert fresh["context_revision"] != snapshot["context_revision"]
+    assert "Edited handoff" in fresh["context"][ALIAS]
+    record = next(r for r in fresh["context_manifest"]["sources"][0]["records"]
+                  if r["note_id"] == d.case.notes[0]["id"])
+    old_record = next(r for r in snapshot["context_manifest"]["sources"][0]["records"]
+                      if r["note_id"] == d.case.notes[0]["id"])
+    assert record["revision_sha256"] == note_revision({**d.case.notes[0], "kind": record["kind"], "content": edited})
+    assert record["revision_sha256"] != old_record["revision_sha256"]
+    retry = d.payload(fresh)
+    assert retry["client_request_id"] != payload["client_request_id"]
+    second = await d.prepare(execution, retry)
+    assert second.status_code == 201, second.text
+    ack = second.json()
+    assert ack["ordinal"] == 2 and ack["receipt_id"] != first.json()["receipt_id"]
+    assert ack["context_revision"] == fresh["context_revision"]
+    second_receipt = (await d.case.receipt(execution, ack["receipt_id"])).json()
+    assert second_receipt["context_manifest"] == fresh["context_manifest"]
+    assert second_receipt["input_prompt"] == retry["input_prompt"]
+    assert (await d.case.receipt(execution, first.json()["receipt_id"])).json() == first_receipt
+    assert first_receipt["context_manifest"] == snapshot["context_manifest"]
+    rows = await history(d, execution)
+    assert sorted(row["id"] for row in rows) == sorted([first_receipt["id"], second_receipt["id"]])
 
 
 @pytest.mark.parametrize("field", ["input_prompt", "system_prompt", "adapter", "resume", "unknown", "forged_manifest"])

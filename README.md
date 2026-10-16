@@ -21,6 +21,16 @@ your team works, ready to reuse across projects.
 [Screenshots](#a-closer-look) · [Documentation](#documentation) ·
 [Report an issue](https://github.com/Valaris-Studio/backplane/issues/new/choose)
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=TPGJFEQgFvc">
+    <img src=".github/assets/readme/backplane-explainer.jpg" alt="Watch the Backplane explainer on YouTube: shared context for projects built with coding agents." width="720">
+  </a>
+</p>
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=TPGJFEQgFvc"><strong>Watch: What is Backplane?</strong></a><br>
+  <sub>Shared context for projects built with coding agents · Valaris.studio · YouTube</sub>
+</p>
+
 > [!NOTE]
 > **Open Source Preview.** Start with [Self-hosting](#self-hosting) for an instance
 > with password login. Bring your own agents whenever you're ready.
@@ -46,14 +56,6 @@ excerpt does not share the raw session. Upgrade the platform before the runner,
 and keep required-context policies and budgets inactive until all participating
 runners and rollback runtimes are compatible. See the
 [upgrade notes](CHANGELOG.md#platform-v0.1.4-preview.1) before migrating.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">
-  <img src=".github/assets/readme/board-light.png" alt="Backplane's Tidewatch demo board, with tasks across Backlog, In Progress, In Review, Done, and Blocked" width="1200">
-</picture>
-
-<p align="center"><strong>See the project at a glance. Keep the details within reach.</strong><br>
-<sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
 
 ## Your workflow belongs here
 
@@ -160,6 +162,14 @@ configuration and available MCP features vary by client.
 > and are a separate setup from connecting an MCP client.
 
 ## A closer look
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/board-dark.png">
+  <img src=".github/assets/readme/board-light.png" alt="Backplane's Tidewatch demo board, with tasks across Backlog, In Progress, In Review, Done, and Blocked" width="1200">
+</picture>
+
+<p align="center"><strong>See the project at a glance. Keep the details within reach.</strong><br>
+<sub>Tidewatch demo project · Open full size: <a href=".github/assets/readme/board-light.png">Light</a> / <a href=".github/assets/readme/board-dark.png">Dark</a></sub></p>
 
 <table>
   <tr>
@@ -314,9 +324,14 @@ for the pull-request lifecycle. Connecting through MCP **does not require a runn
 Run Backplane with **one Compose file**: Postgres, backend, and frontend.
 **Local password login is enabled by default**, with no cloud dependency.
 
+**You need:** Git, Docker with the Compose plugin, and OpenSSL (for the signing key). The first start builds the images, so it downloads dependencies once; no local Python, Node, or Go install is required.
+
 > **☁️ Cloud & support:** Visit [getbackplane.ai](https://getbackplane.ai) for
 > product information and the planned **Backplane Cloud** offering, including
 > managed hosting, support, and guided onboarding. **Cloud is not yet available.**
+
+> [!IMPORTANT]
+> **Complete first-run setup before exposing this instance.** Keep the stack reachable only by you until you have created the first admin account. Then follow [SECURITY.md](SECURITY.md) before allowing other users or internet access.
 
 **1. Configure and start**
 
@@ -372,7 +387,7 @@ is manual. No external error collection service is enabled.
 
 Open **http://localhost:8080** or your `BACKPLANE_URL`.
 The first-run screen creates your admin account; later visits use the normal login page.
-Use `BACKPLANE_HTTP_PORT` to override the port.
+To change the port, set both `BACKPLANE_HTTP_PORT=8090` and `BACKPLANE_URL=http://localhost:8090` in `.env`, then open that URL. For another machine or a TLS proxy, set `BACKPLANE_URL` to the exact URL your browser uses.
 
 **The first start builds backend and frontend from source**, then runs database
 migrations automatically. There are no published images for these two services
@@ -462,17 +477,15 @@ The wizard ends with the command that starts the binary. For the full guide, see
 [`runner/README.md`](runner/README.md#quickstart).
 The in-app guide is also available at `/documentation` without creating a workspace.
 
-> [!NOTE]
-> **Before your first `make dev-runner`:** if `~/.claude.json` does not exist,
-> run `touch ~/.claude.json`. Otherwise Docker creates a root-owned directory
-> at that path instead of bind-mounting the file.
-
 ## Quickstart
 
 🛠️ **Working on Backplane itself? Start here.**
 
 This is the **local development setup**, with automatic authentication.
 For an instance with password login, follow [Self-hosting](#self-hosting).
+
+> [!WARNING]
+> Development mode trusts request headers and signs you in automatically. Do not expose this stack to untrusted networks. For a shared instance, use [Self-hosting](#self-hosting).
 
 **You need:** Docker + Compose, git, make, bash, and curl.
 The stack runs in containers. Native Python, Node, pnpm, and Go installs are only
@@ -497,6 +510,7 @@ from the frontend. Migrations run automatically, so first boot takes a little lo
 
 ```bash
 # Terminal B (optional)
+cd backplane
 make seed-demo            # a sample workspace + populated board
 ```
 
@@ -532,6 +546,11 @@ in a Docker volume, so `make dev` picks up where you left off.
 **Use `make runner-test` for runner checks.** Bare Go tests inside this repository
 can modify the live worktree.
 
+> [!NOTE]
+> **Before your first `make dev-runner`:** if `~/.claude.json` does not exist,
+> run `touch ~/.claude.json`. Otherwise Docker creates a root-owned directory
+> at that path instead of bind-mounting the file.
+
 </details>
 
 ## Documentation
@@ -552,7 +571,7 @@ plus a candid guide to current rough edges.
 | **Events** | [Event taxonomy](docs/events.md) |
 | **Forge credentials** | [Accounts, tokens, scopes, and troubleshooting](docs/git-credentials.md) |
 | **Agent and forge providers** | [Provider guide](runner/docs/providers.md) |
-| **REST API** | [Schema](docs/api/openapi.json) · [API browser](docs/api/index.html) |
+| **REST API** | [Schema](docs/api/openapi.json) · [API viewer source](docs/api/index.html); interactive Swagger UI is available at `/api/docs` on a development instance |
 | **Development** | [Contribution policy, setup, architecture, and tests](CONTRIBUTING.md) |
 | **Architecture history** | [Historical reference](docs/platform-source-of-truth.md); use in-app docs for current behavior |
 | **Pipeline history** | [Historical design](docs/pipeline-config-reference.md); use in-app docs for current fields |
@@ -638,6 +657,7 @@ We expect to open contributions once the architecture settles.
 |---|---|
 | **Platform core:** `backend/`, `frontend/`, `mcp-server/` | AGPL-3.0-or-later |
 | **Runner:** `runner/` | MIT |
+| **Companion:** `companion/` | MIT |
 | **API / OpenAPI / MCP tool schemas** | Apache-2.0 |
 
 Third-party dependencies, including the documented **non-OSI exception (GSAP)**,
