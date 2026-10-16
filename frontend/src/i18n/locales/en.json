@@ -9911,6 +9911,7 @@
           "retry": "Retry save",
           "resume": "Resume note save",
           "openNote": "Open note",
+          "openCard": "Open card",
           "audience": "Members and authorized agents in {{workspace}} can read this note.",
           "chooseAudience": "Choose the workspace whose members and authorized agents will read this note.",
           "cardVisibility": "Linking a card organizes the note; it does not restrict its audience.",
@@ -9928,6 +9929,7 @@
           "deleted": "The saved note was deleted. This request cannot recreate it.",
           "rejected": "The note could not be saved. Check the destination and retry the same request.",
           "serverUnsupported": "This server does not support saving excerpts right now. Keep this draft and retry after the server is updated.",
+          "unsent": "Draft only. Nothing has been sent.",
           "saving": "Saving the reviewed note. Closing this dialog does not cancel the request.",
           "saved": "Note saved.",
           "hide": "Hide for now",
@@ -9935,6 +9937,12 @@
         }
       },
       "title": "Transcript",
+      "navigation": {
+        "label": "Jump to loaded content",
+        "loaded": "Only loaded content in the current view is listed.",
+        "incomplete": "Only loaded content in the current view is listed. More items are available.",
+        "item": "{{label}} · {{source}} · {{time}} · {{coverage}}"
+      },
       "filterLabel": "Records",
       "filters": {
         "conversation": "Conversation",

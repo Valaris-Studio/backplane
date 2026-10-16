@@ -173,12 +173,12 @@ export function TopBar({
         // the viewport). The sidebar fills the gutter with no extra offset, so
         // the TopBar must not add one either — a `pt-4` here left the bar
         // sitting 1rem lower than the menu whenever the page could scroll.
-        "sticky top-0 z-20 px-[var(--page-gutter)]",
+        "pointer-events-none sticky top-0 z-20 h-[var(--topbar-height)] px-[var(--page-gutter)]",
       )}
     >
       <div
         className={cn(
-          "mx-auto flex max-w-[var(--page-shell-max)] items-center gap-3 border border-border/70 bg-background/85 shadow-soft backdrop-blur-xl transition-[height,padding,border-radius,background-color] duration-200",
+          "pointer-events-auto mx-auto flex max-w-[var(--page-shell-max)] items-center gap-3 border border-border/70 bg-background/85 shadow-soft backdrop-blur-xl transition-[height,padding,border-radius,background-color] duration-200",
           scrolled
             ? "h-10 rounded-none rounded-b-[var(--radius-lg)] border-t-0 px-3 bg-background/92"
             : "h-[var(--topbar-height)] rounded-[min(var(--radius-cap),calc(var(--radius-xl)+0.2rem))] px-4",

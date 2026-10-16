@@ -9998,6 +9998,7 @@
           "retry": "Tentar salvar novamente",
           "resume": "Retomar salvamento da nota",
           "openNote": "Abrir nota",
+          "openCard": "Abrir cartão",
           "audience": "Membros e agentes autorizados de {{workspace}} podem ler esta nota.",
           "chooseAudience": "Escolha o espaço de trabalho cujos membros e agentes autorizados lerão esta nota.",
           "cardVisibility": "Vincular um cartão organiza a nota; não restringe quem pode lê-la.",
@@ -10015,6 +10016,7 @@
           "deleted": "A nota salva foi excluída. Esta solicitação não pode recriá-la.",
           "rejected": "Não foi possível salvar a nota. Verifique o destino e tente a mesma solicitação novamente.",
           "serverUnsupported": "Esta versão do servidor ainda não permite salvar trechos. Mantenha este rascunho e tente novamente após a atualização do servidor.",
+          "unsent": "Apenas um rascunho. Nada foi enviado.",
           "saving": "Salvando a nota revisada. Fechar esta janela não cancela a solicitação.",
           "saved": "Nota salva.",
           "hide": "Ocultar por enquanto",
@@ -10022,6 +10024,12 @@
         }
       },
       "title": "Transcrição",
+      "navigation": {
+        "label": "Ir para o conteúdo carregado",
+        "loaded": "Apenas o conteúdo carregado na visualização atual é listado.",
+        "incomplete": "Apenas o conteúdo carregado na visualização atual é listado. Há mais itens disponíveis.",
+        "item": "{{label}} · {{source}} · {{time}} · {{coverage}}"
+      },
       "filterLabel": "Registros",
       "filters": {
         "conversation": "Conversa",

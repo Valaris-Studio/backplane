@@ -5,7 +5,7 @@ version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
-| **Platform** | The web app, API and database you self-host | [0.1.4-preview.2](#platform-v0.1.4-preview.2) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2) |
+| **Platform** | The web app, API and database you self-host | [0.1.4-preview.3](#platform-v0.1.4-preview.3) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.3) |
 | **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.4](#mcp-server-v0.9.4) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 | **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.2](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg) |
@@ -32,6 +32,46 @@ keeps its own detailed per-tool history in
 ## Unreleased
 
 No additional changes yet.
+
+---
+
+<a id="platform-v0.1.4-preview.3"></a>
+
+## Platform 0.1.4-preview.3 — 2026-10-16
+
+`platform` `preview` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.3)
+
+#### Changed
+
+- Session pages put captured content before secondary diagnostics and keep
+  excerpt review and selection counts within reach while reading.
+- Navigate directly to loaded transcript items without changing the selected
+  excerpt. The reader distinguishes loaded content from items still to load.
+- Reviewed notes show their destination and audience beside the save action,
+  preserve the reviewed request when a save response is lost, and link to the
+  confirmed note and optional card after saving.
+- Execution receipts explain the selected context before the full prompt.
+  Historical invocation selection and exact retained prompt copying stay intact.
+- Updated reader and handoff copy is available in English, Spanish and
+  Brazilian Portuguese.
+
+#### Fixed
+
+- Reviewed handoffs survive compact-section changes, resizing and temporary
+  session refresh failures. Losing access to the session removes its private
+  preview and captured-content cache.
+- A save that finishes while its dialog is hidden can be dismissed, allowing
+  another excerpt to be prepared.
+
+#### Upgrade notes
+
+- This frontend update introduces no API changes or database migrations.
+  Existing capture settings and source-access rules remain in effect; sharing
+  a reviewed note does not grant access to the owner's private session.
+- Runner 0.8.8, MCP server 0.9.4 and Companion 0.1.1-preview.2 retain their
+  independent versions. This platform release does not republish those clients.
+- Navigation covers loaded captured items, not a complete session analysis.
+  Existing preview capture, privacy and upgrade limitations still apply.
 
 ---
 

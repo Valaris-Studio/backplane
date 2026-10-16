@@ -253,6 +253,36 @@ describe("execution receipt history through the real page", () => {
     expect(within(panel()).queryByText("operator-provider-1")).not.toBeInTheDocument();
   });
 
+  it("explains the selected historical context before its full prompt while copying the retained bytes exactly", async () => {
+    const historical = receipt(1);
+    historical.input_prompt += Array.from({ length: 200 }, (_, index) =>
+      `Retained context line ${index + 1} — café 🧭  \r\n`,
+    ).join("");
+    historical.prompt_bytes = bytes(historical.input_prompt);
+    historical.prompt_sha256 = sha(historical.input_prompt);
+    setup([receipt(2), historical]);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    await openPrompt(); await loaded(receipt(2));
+    await choose(1); await loaded(historical);
+    fireEvent.click(within(panel()).getByRole("button", { name: "Copy prompt" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(historical.input_prompt));
+
+    const promptBody = within(panel()).getByTestId("execution-prompt-body");
+    const contextHeading = within(panel()).getByRole("heading", { name: "Selected context" });
+    const sources = historical.context_manifest.sources.map((source) => {
+      if (!source.alias) throw new Error("Historical receipt fixture must name every source");
+      return within(panel()).getByRole("button", { name: new RegExp(source.alias) });
+    });
+    let preceding = contextHeading;
+    for (const following of [...sources, promptBody]) {
+      expect(preceding.compareDocumentPosition(following)
+        & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+      preceding = following;
+    }
+  });
+
   it("shows Prepared and unverified use even when the execution completed", async () => {
     setup(); await openPrompt(); await loaded(receipt(2));
     expect(within(panel()).getByText("Prepared", { exact: true })).toBeVisible();

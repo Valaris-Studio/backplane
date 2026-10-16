@@ -260,6 +260,10 @@ describe("private excerpt selection", () => {
     await user.keyboard("{Escape}");
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
+    expect(checkbox).toBeChecked();
+    expect(screen.getByText("1 selected from 1 loaded items")).toBeInTheDocument();
+    expect(requests.lists).toEqual([null]);
+    expect(requests.bodies).toEqual([{ id: "a", offset: 0 }]);
   });
 });
 

@@ -9998,6 +9998,7 @@
           "retry": "Reintentar guardado",
           "resume": "Retomar guardado de la nota",
           "openNote": "Abrir nota",
+          "openCard": "Abrir tarjeta",
           "audience": "Los miembros y agentes autorizados de {{workspace}} pueden leer esta nota.",
           "chooseAudience": "Elige el espacio de trabajo cuyos miembros y agentes autorizados leerán esta nota.",
           "cardVisibility": "Vincular una tarjeta organiza la nota; no restringe quién puede leerla.",
@@ -10015,6 +10016,7 @@
           "deleted": "La nota guardada fue eliminada. Esta solicitud no puede volver a crearla.",
           "rejected": "No se pudo guardar la nota. Comprueba el destino y reintenta la misma solicitud.",
           "serverUnsupported": "Esta versión del servidor aún no admite guardar extractos. Conserva este borrador y vuelve a intentarlo después de actualizar el servidor.",
+          "unsent": "Solo es un borrador. No se ha enviado nada.",
           "saving": "Guardando la nota revisada. Cerrar este diálogo no cancela la solicitud.",
           "saved": "Nota guardada.",
           "hide": "Ocultar por ahora",
@@ -10022,6 +10024,12 @@
         }
       },
       "title": "Transcripción",
+      "navigation": {
+        "label": "Saltar al contenido cargado",
+        "loaded": "Solo se muestra el contenido cargado en la vista actual.",
+        "incomplete": "Solo se muestra el contenido cargado en la vista actual. Hay más elementos disponibles.",
+        "item": "{{label}} · {{source}} · {{time}} · {{coverage}}"
+      },
       "filterLabel": "Registros",
       "filters": {
         "conversation": "Conversación",

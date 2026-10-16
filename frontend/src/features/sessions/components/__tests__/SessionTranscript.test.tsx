@@ -13,7 +13,7 @@ import type { WebSocketEvent } from "@/lib/websocket";
 import type { AgentSession, SessionContent, SessionContentPage } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
-import { formatBytes } from "../../utils/format";
+import { formatBytes, formatClock } from "../../utils/format";
 import { SessionDetailPage } from "../SessionDetailPage";
 
 const socket = vi.hoisted(() => ({ handlers: new Map<string, (event: WebSocketEvent) => void>() }));
@@ -904,13 +904,108 @@ describe("Transcript — deep links", () => {
     await waitFor(() => expect(document.getElementById("content-b")).toHaveFocus());
   });
 
+  it("focuses a loaded raw-record link when Everything reveals it without fetching another page or body", async () => {
+    const user = userEvent.setup();
+    const requests = serveSession({ pages: [contentPage([
+      makeContent({ id: "reply" }),
+      makeContent({ id: "raw", channel: "native_record", role: "unknown", preview: { text: "native envelope", truncated: true } }),
+    ], "page-1")] });
+    serveBody(requests, "raw", "Complete native envelope");
+    renderAt("#content-raw");
+
+    await transcript();
+    expect(document.getElementById("content-raw")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Everything" }));
+    await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
+    await user.click(screen.getByRole("button", { name: "Conversation" }));
+    expect(document.getElementById("content-raw")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Everything" }));
+    await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
+    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    expect(requests.bodyRequests).toEqual([]);
+  });
+
   // Release one does not page ahead to find a linked item (known limitation).
   it("says to load more when a linked item is beyond the loaded pages", async () => {
-    serveSession({ pages: [contentPage([makeContent({ id: "a" })], "page-1"), contentPage([makeContent({ id: "far" })])] });
+    const requests = serveSession({ pages: [contentPage([makeContent({ id: "a" })], "page-1"), contentPage([makeContent({ id: "far" })])] });
     renderAt("#content-far");
 
     await transcript();
     expect(await screen.findByText("Load more to reach this item.")).toBeInTheDocument();
+    expect(document.getElementById("content-far")).toBeNull();
+    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    expect(requests.bodyRequests).toEqual([]);
+  });
+});
+
+describe("Transcript — loaded-content orientation", () => {
+  it("offers only content in the current view with source and coverage metadata, never body or path text", async () => {
+    const user = userEvent.setup();
+    const requests = serveSession({ pages: [contentPage([
+      makeContent({ id: "reply", occurred_at: "2026-10-16T14:35:00Z", source: { kind: "claude_transcript", order: 1 }, display_path: "private/plan.md", preview: { text: "CONFIDENTIAL PREVIEW", truncated: true } }),
+      makeContent({ id: "input", role: "tool", channel: "tool_input", call_id: "call-7", source: { kind: "claude_transcript", order: 2 } }),
+      makeContent({ id: "output", role: "tool", channel: "tool_output", call_id: "call-7", coverage: "withheld_by_policy", coverage_reason: "excluded_path", render: "none", preview: null, source: { kind: "claude_transcript", order: 3 } }),
+      makeContent({ id: "raw", role: "unknown", channel: "native_record", display_path: "private-envelope.json", source: { kind: "claude_transcript", order: 4 } }),
+    ], "page-1"), contentPage([makeContent({ id: "unloaded", source: { kind: "claude_transcript", order: 5 } })])] });
+    for (const id of ["reply", "input", "output", "raw"]) serveBody(requests, id, `Complete body for ${id}`);
+    renderSession();
+
+    await transcript();
+    const navigation = screen.getByRole("combobox", { name: "Jump to loaded content" });
+    expect(within(navigation).getByRole("option", { name: /Claude Code.*#1/ })).toHaveTextContent(formatClock("2026-10-16T14:35:00Z"));
+    expect(within(navigation).getByRole("option", { name: /Input.*#2/ })).toBeInTheDocument();
+    expect(within(navigation).getByRole("option", { name: /Output.*#3.*Withheld/ })).toBeInTheDocument();
+    expect(within(navigation).queryByRole("option", { name: /#4|#5/ })).not.toBeInTheDocument();
+    expect(navigation).not.toHaveTextContent(/CONFIDENTIAL PREVIEW|private\/plan\.md|private-envelope\.json/);
+    expect(navigation).toHaveAccessibleDescription(/loaded.*current view.*more.*available/i);
+
+    await user.click(screen.getByRole("button", { name: "Everything" }));
+    expect(within(navigation).getByRole("option", { name: /Raw record.*#4/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Conversation" }));
+    expect(within(navigation).queryByRole("option", { name: /#4/ })).not.toBeInTheDocument();
+    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    expect(requests.bodyRequests).toEqual([]);
+  });
+
+  it("reaches a grouped loaded part repeatedly while preserving selection, view and explicit paging", async () => {
+    const user = userEvent.setup();
+    const requests = serveSession({ pages: [contentPage([
+      makeContent({ id: "reply", source: { kind: "claude_transcript", order: 1 } }),
+      makeContent({ id: "input", role: "tool", channel: "tool_input", call_id: "call-7", source: { kind: "claude_transcript", order: 2 } }),
+      makeContent({ id: "output", role: "tool", channel: "tool_output", call_id: "call-7", preview: { text: "Output preview", truncated: true }, source: { kind: "claude_transcript", order: 3 } }),
+    ], "page-1")] });
+    serveBody(requests, "output", "Complete grouped output");
+    renderSession();
+
+    const list = await transcript();
+    const selected = within(entry(list, "Claude Code")).getByRole("checkbox");
+    await user.click(selected);
+    const call = entry(list, "Tool call");
+    const toggle = within(call).getByRole("button", { name: /Tool call/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const navigation = screen.getByRole("combobox", { name: "Jump to loaded content" });
+    const destination = within(navigation).getByRole("option", { name: /Output.*#3/ });
+    await user.selectOptions(navigation, destination);
+    await waitFor(() => expect(document.getElementById("content-output")).toHaveFocus());
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(selected).toBeChecked();
+    expect(within(call).getAllByRole("checkbox").every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getByText("1 selected from 3 loaded items")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Conversation" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.selectOptions(navigation, destination);
+    await waitFor(() => expect(document.getElementById("content-output")).toHaveFocus());
+    await user.click(toggle);
+    expect(document.getElementById("content-output")).toBeNull();
+    await user.click(toggle);
+    await waitFor(() => expect(document.getElementById("content-output")).toHaveFocus());
+    await user.click(toggle);
+    expect(document.getElementById("content-output")).toBeNull();
+    await user.selectOptions(navigation, destination);
+    await waitFor(() => expect(document.getElementById("content-output")).toHaveFocus());
+    expect(selected).toBeChecked();
+    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    expect(requests.bodyRequests).toEqual([]);
   });
 });
 
@@ -931,6 +1026,10 @@ describe("Transcript — every locale", () => {
       renderSession();
 
       const list = await screen.findByRole("list", { name: t("sessions.contents.title") });
+      const navigation = screen.getByRole("combobox", { name: t("sessions.contents.navigation.label") });
+      expect(navigation).toHaveAccessibleDescription(t("sessions.contents.navigation.loaded"));
+      expect(t("sessions.contents.navigation.label")).not.toBe(en("sessions.contents.navigation.label"));
+      expect(navigation).not.toHaveTextContent(/sessions\.contents\./);
       const translated = [
         t("sessions.contents.coverage.withheld_by_policy"),
         t("sessions.contents.reasons.quota_exceeded"),

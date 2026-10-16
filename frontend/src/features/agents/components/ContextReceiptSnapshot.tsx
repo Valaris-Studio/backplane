@@ -107,6 +107,14 @@ export function ContextReceiptSnapshot({
 
   return (
     <div className="space-y-6">
+      {/* What was selected reads first: the retained prompt can run to
+          hundreds of lines and would otherwise bury the explanation. */}
+      <SelectedContext
+        slug={slug}
+        manifest={receipt.context_manifest}
+        dispatch={receipt.dispatch ?? null}
+      />
+
       <section className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex items-baseline gap-3">
@@ -166,12 +174,6 @@ export function ContextReceiptSnapshot({
           )}
         </div>
       </section>
-
-      <SelectedContext
-        slug={slug}
-        manifest={receipt.context_manifest}
-        dispatch={receipt.dispatch ?? null}
-      />
 
       <ReceiptEvidence receipt={receipt} />
     </div>

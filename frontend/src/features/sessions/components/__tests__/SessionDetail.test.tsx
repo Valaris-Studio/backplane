@@ -6,7 +6,7 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import type { AgentSession, SessionCallPage, SessionUsageList } from "@/types/agent-session";
-import { SLUG, callPage, makeCall, makeSession, makeTurn, minutesAgo, stubAuthModes } from "../../__tests__/fixtures";
+import { SLUG, callPage, contentPage, makeCall, makeContent, makeSession, makeTurn, minutesAgo, stubAuthModes } from "../../__tests__/fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { SessionDetailPage } from "../SessionDetailPage";
 
@@ -534,6 +534,22 @@ describe("Session detail — banners", () => {
 });
 
 describe("Session detail — facts rail", () => {
+  it("puts the transcript before secondary facts in the middle-width reading order", async () => {
+    serveDetail({ session: { capture_levels: ["rich"] } });
+    server.use(http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/contents`, () =>
+      HttpResponse.json(contentPage([makeContent({ id: "read-first", session_id: SESSION_ID })])),
+    ));
+    renderDetail();
+
+    // The default media-query fixture is neither compact nor wide: the rail
+    // and reader share one column, so document order is also reading order.
+    const transcript = await screen.findByRole("region", { name: "Transcript" });
+    for (const name of ["Cost", "Tokens", "What was captured"]) {
+      const facts = screen.getByRole("region", { name });
+      expect(transcript.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING, `${name} follows the reader`).toBeTruthy();
+    }
+  });
+
   it("states cost with its basis and what a subscription means", async () => {
     serveDetail();
     renderDetail();

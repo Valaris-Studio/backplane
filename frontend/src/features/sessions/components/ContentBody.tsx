@@ -48,12 +48,12 @@ function FailureNote({ error, onRetry }: { error: unknown; onRetry: () => void }
   );
 }
 
-const TEXT_CLASSES = "max-w-[76ch] whitespace-pre-wrap break-words text-[0.92rem] leading-relaxed";
+const TEXT_CLASSES = "max-w-[76ch] whitespace-pre-wrap wrap-anywhere text-[0.92rem] leading-relaxed";
 
 function TextBlock({ text, markdown, emphasis }: { text: string; markdown: boolean; emphasis?: boolean }) {
   const hidden = usePromptsHidden();
   // Presenting, markdown would format text the blur is meant to hide.
-  if (markdown && !hidden) return <ContentMarkdown text={text} className={cn("max-w-[76ch]", emphasis && "font-semibold")} />;
+  if (markdown && !hidden) return <ContentMarkdown text={text} className={cn("max-w-[76ch] wrap-anywhere", emphasis && "font-semibold")} />;
   return (
     <p className={cn(TEXT_CLASSES, emphasis && "font-semibold")}>
       <CallContentText text={text} />

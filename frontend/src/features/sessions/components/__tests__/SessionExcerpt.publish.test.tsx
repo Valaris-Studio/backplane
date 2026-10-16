@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import * as RichTextEditorModule from "@/components/shared/RichTextEditor";
+import { useState, type ComponentProps } from "react";
+import { Link, Route, Routes } from "react-router-dom";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n/config";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { api } from "@/lib/api";
 import { boardKeys, memberKeys, noteKeys, sessionKeys, workspaceKeys } from "@/lib/query-keys";
-import { ME, SLUG, contentPage, makeContent, makeSession } from "../../__tests__/fixtures";
+import { ME, SLUG, callPage, contentPage, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { SessionTranscript } from "../SessionTranscript";
 import { SessionExcerpt } from "../SessionExcerpt";
+import { SessionDetailPage } from "../SessionDetailPage";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const SOURCE_WORKSPACE_ID = "22222222-2222-4222-8222-222222222222";
@@ -106,6 +110,82 @@ function saved(payload: Publication, status = 201) {
   return HttpResponse.json({ id: NOTE_ID, workspace_id: DESTINATION_WORKSPACE_ID, board_id: BOARD_ID, card_id: payload.card_id ?? null, title: payload.title, content: typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content), pinned: false, kind: "user_note", created_by: ME, created_at: AT, updated_at: AT }, { status });
 }
 
+function SessionExcerptHarness(props: Omit<ComponentProps<typeof SessionExcerpt>, "draft" | "onDraftChange">) {
+  const [draft, setDraft] = useState<ComponentProps<typeof SessionExcerpt>["draft"]>(null);
+  return <SessionExcerpt {...props} draft={draft} onDraftChange={setDraft} />;
+}
+
+const SESSION_PATH = `/api/workspaces/${SLUG}/sessions/${SESSION_ID}`;
+
+function serveSessionPage() {
+  stubAuthModes(true);
+  server.use(
+    http.get(SESSION_PATH, () => HttpResponse.json(sourceSession)),
+    http.get(`${SESSION_PATH}/calls`, () => HttpResponse.json(callPage([]))),
+    http.get(`${SESSION_PATH}/usage`, () => HttpResponse.json({ items: [], price_table_version: "test" })),
+    http.get(`${SESSION_PATH}/links`, () => HttpResponse.json({ items: [] })),
+    http.get(`${SESSION_PATH}/children`, () => HttpResponse.json({ items: [] })),
+    http.get(`${SESSION_PATH}/rhythm`, () => HttpResponse.json({ start: sourceSession.started_at, end: sourceSession.last_event_at, live: false, bucket_seconds: 60, buckets: [], idle_spans: [], children: [], capture_gaps: 0 })),
+  );
+}
+
+function renderSessionPage(client: ReturnType<typeof createTestQueryClient>, linkedContentId?: string) {
+  return renderWithProviders(<>
+    {linkedContentId ? <Link to={`/${SLUG}/sessions/${SESSION_ID}#content-${linkedContentId}`}>Follow content link</Link> : null}
+    <Routes><Route path="/:slug/sessions/:sessionId" element={<SessionDetailPage />} /></Routes>
+  </>, {
+    queryClient: client,
+    routerProps: { initialEntries: [`/${SLUG}/sessions/${SESSION_ID}`] },
+  });
+}
+
+function responsiveViewport(initialWidth: number) {
+  let width = initialWidth;
+  const queries = new Map<string, { media: MediaQueryList; target: EventTarget }>();
+  const matches = (query: string) => query === "(max-width: 639.98px)" ? width < 640 : query === "(min-width: 1280px)" ? width >= 1280 : false;
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => {
+    const existing = queries.get(query);
+    if (existing) return existing.media;
+    const target = new EventTarget();
+    const media = {
+      get matches() { return matches(query); },
+      media: query,
+      onchange: null,
+      addEventListener: target.addEventListener.bind(target),
+      removeEventListener: target.removeEventListener.bind(target),
+      dispatchEvent: target.dispatchEvent.bind(target),
+      addListener: () => {},
+      removeListener: () => {},
+    } satisfies MediaQueryList;
+    queries.set(query, { media, target });
+    return media;
+  });
+  return (nextWidth: number) => {
+    const changed = [...queries].filter(([query]) => matches(query) !== (query === "(max-width: 639.98px)" ? nextWidth < 640 : query === "(min-width: 1280px)" ? nextWidth >= 1280 : false));
+    width = nextWidth;
+    for (const [, { target }] of changed) target.dispatchEvent(new Event("change"));
+  };
+}
+
+async function unknownSaveOnSessionPage(linkedContentId?: string, additionalItems: typeof chosen[] = []) {
+  const state = serve();
+  state.items.push(...additionalItems);
+  state.respond = async () => HttpResponse.error();
+  const client = createTestQueryClient();
+  client.setQueryDefaults(sessionKeys.detail(SLUG, SESSION_ID), { gcTime: Infinity });
+  serveSessionPage();
+  const view = renderSessionPage(client, linkedContentId);
+  const user = userEvent.setup();
+  const dialog = await openPublish(user);
+  await destination(user, dialog, true);
+  await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+  const sent = structuredClone(state.writes[0]!);
+  await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
+  const reader = screen.getByRole("region", { name: "Transcript" });
+  return { state, client, user, sent, reader, view };
+}
+
 async function openPrivatePreview(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("list", { name: i18n.t("sessions.contents.title") });
   const entry = document.getElementById(`content-${CONTENT_ID}`);
@@ -135,6 +215,26 @@ async function destination(user: ReturnType<typeof userEvent.setup>, dialog: HTM
   await choose(user, dialog, "Board", "Summit");
   if (withCard) await choose(user, dialog, "Card (optional)", "Ship companion");
   await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save note" })).toBeEnabled());
+}
+function expectFinalDestination(dialog: HTMLElement, action: HTMLElement, withCard: boolean) {
+  const content = within(dialog).getByRole("region", { name: "Note content" });
+  const audience = within(dialog).getAllByText(/members and authorized agents/i).find((element) => (
+    content.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING
+  ));
+  expect(audience, "the final audience reminder follows the reviewed content in reading order").toBeDefined();
+  expect(audience!.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  let actionArea: HTMLElement | null = audience!;
+  while (actionArea && !actionArea.contains(action)) actionArea = actionArea.parentElement;
+  expect(actionArea, "destination and audience stay together with the final save action").not.toBeNull();
+  expect(actionArea).not.toContainElement(content);
+  expect(within(actionArea!).queryByRole("combobox")).not.toBeInTheDocument();
+  expect(actionArea).toHaveTextContent("Launch team");
+  expect(actionArea).toHaveTextContent("Summit");
+  expect(actionArea).toHaveTextContent(/members and authorized agents/i);
+  expect(actionArea).toHaveTextContent(/card.*does not (?:limit|restrict)|card.*doesn.t (?:limit|restrict)/i);
+  if (withCard) expect(actionArea).toHaveTextContent("Ship companion");
+  else expect(actionArea).not.toHaveTextContent("Ship companion");
+  return actionArea!;
 }
 async function editorIn(dialog: HTMLElement) {
   const region = within(dialog).getByRole("region", { name: "Note content" });
@@ -214,6 +314,96 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(within(dialog).getByText(/(?:independent|separate).*snapshot|(?:delet|remov).*session.*(?:not|won.t).*note/i)).toBeVisible();
     expect(state.writes).toEqual([]);
     expect(state.mutations).toEqual([]);
+  });
+
+  it.each([false, true])("repeats the selected destination and audience beside the final Save after reviewing content (card: %s)", async (withCard) => {
+    const state = serve();
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />);
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, withCard);
+    expectFinalDestination(dialog, within(dialog).getByRole("button", { name: "Save note" }), withCard);
+    expect(state.writes).toEqual([]);
+    expect(state.mutations).toEqual([]);
+  });
+
+  it("does not describe an unavailable selected card as a board-only destination", async () => {
+    const state = serve();
+    const client = createTestQueryClient();
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />, { queryClient: client });
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, true);
+    server.use(http.get(`/api/workspaces/${DESTINATION}/boards/${BOARD_ID}`, () => HttpResponse.json({ ...board, columns: [] })));
+    await act(() => client.invalidateQueries({ queryKey: boardKeys.detail(DESTINATION, BOARD_ID) }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/destination is unavailable/i);
+    const save = within(dialog).getByRole("button", { name: "Save note" });
+    expect(save).toBeDisabled();
+    const finalArea = expectFinalDestination(dialog, save, false);
+    expect(within(finalArea).queryByText("No card")).not.toBeInTheDocument();
+    expect(within(finalArea).queryByText("Card (optional)")).not.toBeInTheDocument();
+    expect(within(dialog).getAllByText(/destination is unavailable/i)).toHaveLength(1);
+    expect(state.writes).toEqual([]);
+    expect(state.mutations).toEqual([]);
+  });
+
+  it("claims nothing was sent only before dispatch, including an invalid local draft", async () => {
+    const state = serve();
+    const response = deferred<Response>();
+    state.respond = async () => response.promise;
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />);
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    const unsent = /draft only\. nothing has been sent\./i;
+    await waitFor(() => expect(within(dialog).getByText(unsent)).toBeVisible());
+    await destination(user, dialog);
+    const finalArea = expectFinalDestination(dialog, within(dialog).getByRole("button", { name: "Save note" }), false);
+    expect(within(finalArea).getByText(unsent)).toBeVisible();
+    await user.clear(within(dialog).getByRole("textbox", { name: "Note title" }));
+    expect(within(dialog).getByRole("button", { name: "Save note" })).toBeDisabled();
+    expect(within(finalArea).getByText(unsent)).toBeVisible();
+    expect(state.writes).toEqual([]);
+    expect(state.mutations).toEqual([]);
+    await user.type(within(dialog).getByRole("textbox", { name: "Note title" }), "Reviewed handoff");
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(state.writes).toHaveLength(1));
+    expect(within(dialog).queryByText(unsent)).not.toBeInTheDocument();
+    await act(async () => { response.resolve(HttpResponse.json({ error: "Invalid request" }, { status: 400 })); });
+    await user.click(await within(dialog).findByRole("button", { name: "Revise draft" }));
+    expect(within(dialog).queryByText(unsent)).not.toBeInTheDocument();
+    state.respond = async () => HttpResponse.error();
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    expect(within(dialog).queryByText(unsent)).not.toBeInTheDocument();
+    const original = state.writes[1]!;
+    state.respond = async (payload) => saved(payload, 200);
+    await user.click(within(dialog).getByRole("button", { name: "Retry save" }));
+    expect(await within(dialog).findByRole("link", { name: "Open note" })).toHaveAttribute("href", `/${DESTINATION}/boards/${BOARD_ID}/notes?note=${NOTE_ID}`);
+    expect(state.writes[2]).toEqual(original);
+    expect(within(dialog).queryByText(unsent)).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("offers only confirmed canonical note and selected-card links (card: %s)", async (withCard) => {
+    const state = serve();
+    const response = deferred<Response>();
+    state.respond = async () => response.promise;
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />);
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, withCard);
+    expect(within(dialog).queryByRole("link", { name: /open note|open card/i })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(state.writes).toHaveLength(1));
+    expect(within(dialog).queryByRole("link", { name: /open note|open card/i })).not.toBeInTheDocument();
+    await act(async () => { response.resolve(saved(state.writes[0]!.payload)); });
+    expect(await within(dialog).findByRole("link", { name: "Open note" })).toHaveAttribute("href", `/${DESTINATION}/boards/${BOARD_ID}/notes?note=${NOTE_ID}`);
+    if (withCard) {
+      expect(within(dialog).getByRole("link", { name: "Open card" })).toHaveAttribute("href", `/${DESTINATION}/boards/${BOARD_ID}/kanban?card=${CARD_ID}`);
+    } else {
+      expect(within(dialog).queryByRole("link", { name: "Open card" })).not.toBeInTheDocument();
+    }
+    expect(state.writes[0]!.payload.card_id ?? null).toBe(withCard ? CARD_ID : null);
+    expect(state.mutations).toEqual([{ method: "POST", path: NOTE_PATH }]);
   });
 
   it("persists the exact reviewed editor document, selected full literal bodies and edited title as an unpinned ordinary card note", async () => {
@@ -416,6 +606,10 @@ describe("explicit excerpt publication through the session reader", () => {
     state.items = [unselected];
     if (sourceLoss === "404") server.use(http.get(CONTENTS_PATH, () => HttpResponse.json({ detail: "Source deleted" }, { status: 404 })));
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.all(SLUG) }));
+    if (sourceLoss === "404") {
+      await screen.findByText("Couldn't load the transcript.");
+      expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+    }
     // Dismissal is permitted, but it must preserve an accessible recovery action.
     let retry = screen.queryByRole("button", { name: "Retry save" });
     if (!retry) {
@@ -429,6 +623,384 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(await screen.findByRole("link", { name: /open note|view note/i })).toHaveAttribute("href", expect.stringContaining(NOTE_ID));
   });
 
+  it("preserves the frozen request while source metadata is pending and then reloads", async () => {
+    const state = serve();
+    state.respond = async () => HttpResponse.error();
+    const client = createTestQueryClient();
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />, { queryClient: client });
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, true);
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    const sent = structuredClone(state.writes[0]!);
+    await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
+    const metadata = deferred<Response>();
+    server.use(http.get(CONTENTS_PATH, () => metadata.promise));
+    const key = sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 });
+    try {
+      await act(async () => { void client.resetQueries({ queryKey: key, exact: true }); });
+      await waitFor(() => expect(client.getQueryState(key)?.status).toBe("pending"));
+      expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+    } finally {
+      await act(async () => { metadata.resolve(HttpResponse.json(contentPage(state.items))); });
+    }
+    await screen.findByRole("list", { name: "Transcript" });
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    state.respond = async (payload) => saved(payload, 200);
+    await user.click(screen.getByRole("button", { name: "Retry save" }));
+    await screen.findByRole("link", { name: "Open note" });
+    expect(state.writes).toHaveLength(2);
+    expect(state.writes[1]).toEqual(sent);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+  it.each(["404", "pending", "empty"])("retains the frozen save after unselecting every item and source metadata becomes %s", async (sourceChange) => {
+    const state = serve();
+    state.respond = async () => HttpResponse.error();
+    const client = createTestQueryClient();
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />, { queryClient: client });
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, true);
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    const sent = structuredClone(state.writes[0]!);
+    await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
+    const entry = document.getElementById(`content-${CONTENT_ID}`)!;
+    const checkbox = within(entry).getByRole("checkbox");
+    expect(checkbox).toBeEnabled();
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByText("0 selected from 2 loaded items")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+    const key = sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 });
+    if (sourceChange === "pending") {
+      const metadata = deferred<Response>();
+      server.use(http.get(CONTENTS_PATH, () => metadata.promise));
+      try {
+        await act(async () => { void client.resetQueries({ queryKey: key, exact: true }); });
+        await waitFor(() => expect(client.getQueryState(key)?.status).toBe("pending"));
+        expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+      } finally {
+        await act(async () => { metadata.resolve(HttpResponse.json(contentPage(state.items))); });
+      }
+      await screen.findByRole("list", { name: "Transcript" });
+    } else {
+      state.items = [];
+      if (sourceChange === "404") server.use(http.get(CONTENTS_PATH, () => HttpResponse.json({ detail: "Source deleted" }, { status: 404 })));
+      await act(() => client.invalidateQueries({ queryKey: key, exact: true }));
+      await waitFor(() => expect(screen.queryByRole("list", { name: "Transcript" })).not.toBeInTheDocument());
+      expect(client.getQueryState(key)?.status).toBe(sourceChange === "404" ? "error" : "success");
+    }
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    const resumed = screen.getByRole("dialog", { name: "Share as note" });
+    const retry = within(resumed).getByRole("button", { name: "Retry save" });
+    expectFinalDestination(resumed, retry, true);
+    state.respond = async (payload) => saved(payload, 200);
+    await user.click(retry);
+    expect(await screen.findByRole("link", { name: "Open note" })).toHaveAttribute("href", `/${DESTINATION}/boards/${BOARD_ID}/notes?note=${NOTE_ID}`);
+    expect(state.writes).toHaveLength(2);
+    expect(state.writes[1]).toEqual(sent);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+  it("keeps hidden pending, unknown and confirmed save actions with the persistent selection controls", async () => {
+    const state = serve();
+    const first = deferred<Response>();
+    const retry = deferred<Response>();
+    state.respond = async () => first.promise;
+    renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />);
+    const user = userEvent.setup();
+    const dialog = await openPublish(user);
+    await destination(user, dialog, true);
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(state.writes).toHaveLength(1));
+    const sent = structuredClone(state.writes[0]!);
+    await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
+    const actions = screen.getByText("1 selected from 2 loaded items").parentElement!;
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Clear selection" }));
+    expect(actions).not.toContainElement(screen.getByRole("list", { name: "Transcript" }));
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Resume note save" }));
+    await act(async () => { first.resolve(HttpResponse.error()); });
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    await user.click(screen.getByRole("button", { name: "Hide for now" }));
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Resume note save" }));
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    state.respond = async () => retry.promise;
+    await user.click(screen.getByRole("button", { name: "Retry save" }));
+    await waitFor(() => expect(state.writes).toHaveLength(2));
+    await user.click(screen.getByRole("button", { name: "Hide for now" }));
+    await act(async () => { retry.resolve(saved(sent.payload, 200)); });
+    expect(actions).toContainElement(await screen.findByRole("link", { name: "Open note" }));
+    expect(actions).toContainElement(screen.getByRole("link", { name: "Open card" }));
+    expect(state.writes[1]).toEqual(sent);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+
+  it("retains one frozen handoff on the full session page through every responsive boundary and compact tab", async () => {
+    const resize = responsiveViewport(1280);
+    const { state, user, sent, reader } = await unknownSaveOnSessionPage();
+    for (const width of [1279, 640, 639]) {
+      act(() => resize(width));
+      expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+      expect(screen.getAllByRole("region", { name: "Transcript" })).toHaveLength(1);
+      expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+    }
+    const linked = screen.getByRole("tab", { name: "Linked work" });
+    await user.click(linked);
+    expect(reader).toBeInTheDocument();
+    expect(reader).not.toBeVisible();
+    for (const tab of screen.getAllByRole("tab")) {
+      const panelId = tab.getAttribute("aria-controls")!;
+      expect(document.getElementById(panelId)).toHaveAttribute("aria-labelledby", tab.id);
+      expect(document.querySelectorAll(`[id="${panelId}"]`)).toHaveLength(1);
+    }
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", linked.id);
+    await user.keyboard("{ArrowRight}");
+    const cost = screen.getByRole("tab", { name: "Cost" });
+    expect(cost).toHaveFocus();
+    expect(cost).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", cost.id);
+    expect(reader).not.toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Timeline" }));
+    expect(reader).toBeVisible();
+    for (const width of [640, 1279, 1280]) {
+      act(() => resize(width));
+      expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+      expect(screen.getAllByRole("region", { name: "Transcript" })).toHaveLength(1);
+    }
+    for (const name of ["Cost", "Tokens", "Linked work", "What was captured"]) {
+      expect(reader.compareDocumentPosition(screen.getByRole("region", { name })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    const dialog = screen.getByRole("dialog", { name: "Share as note" });
+    expectFinalDestination(dialog, within(dialog).getByRole("button", { name: "Retry save" }), true);
+    state.respond = async (payload) => saved(payload, 200);
+    await user.click(within(dialog).getByRole("button", { name: "Retry save" }));
+    await screen.findByRole("link", { name: "Open note" });
+    expect(state.writes).toHaveLength(2);
+    expect(state.writes[1]).toEqual(sent);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+  it.each([
+    { tab: "Linked work", target: "unselected" },
+    { tab: "Cost", target: "linked-output" },
+  ])("defers a content link opened in compact $tab until Timeline returns without losing its frozen handoff", async ({ tab, target }) => {
+    responsiveViewport(375);
+    const { state, user, sent, reader } = await unknownSaveOnSessionPage(target, [
+      makeContent({ id: "linked-input", role: "tool", channel: "tool_input", call_id: "linked-call" }),
+      makeContent({ id: "linked-output", role: "tool", channel: "tool_output", call_id: "linked-call" }),
+    ]);
+    await user.click(screen.getByRole("tab", { name: tab }));
+    expect(reader).not.toBeVisible();
+    const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    try {
+      await user.click(screen.getByRole("link", { name: "Follow content link" }));
+      const hiddenScrolls = scroll.mock.calls.length;
+      scroll.mockClear();
+      await user.click(screen.getByRole("tab", { name: "Timeline" }));
+      const destination = document.getElementById(`content-${target}`);
+      await waitFor(() => expect(destination).toHaveFocus());
+      expect(destination).toBeVisible();
+      expect(scroll).toHaveBeenCalledWith({ block: "start" });
+      expect(hiddenScrolls).toBe(0);
+      expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+      expect(within(document.getElementById(`content-${CONTENT_ID}`)!).getByRole("checkbox")).toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Resume note save" }));
+      state.respond = async (payload) => saved(payload, 200);
+      await user.click(screen.getByRole("button", { name: "Retry save" }));
+      await screen.findByRole("link", { name: "Open note" });
+      expect(state.writes).toHaveLength(2);
+      expect(state.writes[1]).toEqual(sent);
+      expect(state.bodies).toEqual([CONTENT_ID]);
+    } finally {
+      if (originalScroll) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScroll);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
+  it.each([
+    { tab: "Linked work", target: "unselected", away: "{ArrowRight}", back: "{ArrowLeft}" },
+    { tab: "Cost", target: "linked-output", away: "{ArrowLeft}", back: "{ArrowRight}" },
+  ])("keeps compact tab focus after an already-followed $target link when returning from $tab", async ({ tab, target, away, back }) => {
+    responsiveViewport(375);
+    const { state, user, sent, reader } = await unknownSaveOnSessionPage(target, [
+      makeContent({ id: "linked-input", role: "tool", channel: "tool_input", call_id: "linked-call" }),
+      makeContent({ id: "linked-output", role: "tool", channel: "tool_output", call_id: "linked-call" }),
+    ]);
+    const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    try {
+      await user.click(screen.getByRole("link", { name: "Follow content link" }));
+      await waitFor(() => expect(document.getElementById(`content-${target}`)).toHaveFocus());
+      expect(scroll).toHaveBeenCalledWith({ block: "start" });
+      scroll.mockClear();
+
+      const timeline = screen.getByRole("tab", { name: "Timeline" });
+      await user.click(timeline);
+      await user.keyboard(away);
+      expect(screen.getByRole("tab", { name: tab })).toHaveFocus();
+      expect(reader).not.toBeVisible();
+      await user.keyboard(back);
+      expect(timeline).toHaveFocus();
+      expect(timeline).toHaveAttribute("aria-selected", "true");
+      expect(reader).toBeVisible();
+      expect(scroll).not.toHaveBeenCalled();
+      expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+      expect(within(document.getElementById(`content-${CONTENT_ID}`)!).getByRole("checkbox")).toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Resume note save" }));
+      state.respond = async (payload) => saved(payload, 200);
+      await user.click(screen.getByRole("button", { name: "Retry save" }));
+      await screen.findByRole("link", { name: "Open note" });
+      expect(state.writes).toHaveLength(2);
+      expect(state.writes[1]).toEqual(sent);
+      expect(state.bodies).toEqual([CONTENT_ID]);
+    } finally {
+      if (originalScroll) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScroll);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
+  it.each([0, 408, 429, 500])("retains the frozen handoff on the full session page through a transient %s metadata failure and recovery", async (status) => {
+    const { state, client, user, sent, reader } = await unknownSaveOnSessionPage();
+    server.use(http.get(SESSION_PATH, () => status === 0 ? HttpResponse.error() : HttpResponse.json({ detail: "Temporarily unavailable" }, { status })));
+    await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await screen.findByRole("heading", { name: "Couldn't load this session" });
+    expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+    expect(client.getQueryData(sessionKeys.detail(SLUG, SESSION_ID))).toEqual(sourceSession);
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    state.respond = async (payload) => saved(payload, 200);
+    await user.click(screen.getByRole("button", { name: "Retry save" }));
+    await screen.findByRole("link", { name: "Open note" });
+    expect(state.writes).toHaveLength(2);
+    expect(state.writes[1]).toEqual(sent);
+    server.use(http.get(SESSION_PATH, () => HttpResponse.json(sourceSession)));
+    await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Couldn't load this session" })).not.toBeInTheDocument());
+    expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+  it("keeps newer authorized metadata and the frozen handoff when a cancelled older request settles with a denial", async () => {
+    const { state, client, reader } = await unknownSaveOnSessionPage();
+    const queryKey = sessionKeys.detail(SLUG, SESSION_ID);
+    const oldResponse = deferred<Response>();
+    let oldStarted = false;
+    const apiCalls = vi.spyOn(api, "get");
+    server.use(http.get(SESSION_PATH, () => {
+      oldStarted = true;
+      return oldResponse.promise;
+    }));
+    act(() => { void client.refetchQueries({ queryKey, exact: true }); });
+    await waitFor(() => expect(oldStarted).toBe(true));
+    const oldRequestIndex = apiCalls.mock.calls.findIndex(([path]) => path === SESSION_PATH.slice(4));
+    const oldRequest = apiCalls.mock.results[oldRequestIndex];
+    if (!oldRequest || oldRequest.type !== "return") throw new Error("Expected the pending metadata transport");
+    const oldSettled = Promise.resolve(oldRequest.value).catch(() => undefined);
+    try {
+      await act(() => client.cancelQueries({ queryKey, exact: true }));
+      const refreshed = { ...sourceSession, title: "Authorized refreshed session" };
+      server.use(http.get(SESSION_PATH, () => HttpResponse.json(refreshed)));
+      await act(() => client.refetchQueries({ queryKey, exact: true }));
+      await screen.findByRole("heading", { name: refreshed.title });
+      expect(client.getQueryData(queryKey)).toEqual(refreshed);
+      await act(async () => {
+        oldResponse.resolve(HttpResponse.json({ detail: "Unavailable" }, { status: 403 }));
+        await oldSettled;
+      });
+      expect(client.getQueryData(queryKey)).toEqual(refreshed);
+      expect(screen.getByRole("heading", { name: refreshed.title })).toBeVisible();
+      expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+      expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
+      expect(state.writes).toHaveLength(1);
+      expect(state.bodies).toEqual([CONTENT_ID]);
+    } finally {
+      oldResponse.resolve(HttpResponse.json({ detail: "Unavailable" }, { status: 403 }));
+      await oldSettled;
+    }
+  });
+
+  it.each([401, 403, 404])("purges private content and the frozen handoff on the full session page after definitive %s", async (status) => {
+    const { state, client, reader, view } = await unknownSaveOnSessionPage();
+    const bodyKey = sessionKeys.contentBody(SLUG, SESSION_ID, CONTENT_ID, chosen.sha256!, 0);
+    const fileKey = sessionKeys.contentFile(SLUG, SESSION_ID, CONTENT_ID, chosen.sha256!);
+    const otherKey = sessionKeys.contentBody(SLUG, "other-session", "other-content", "other-digest", 0);
+    client.setQueryDefaults(otherKey, { gcTime: Infinity });
+    client.setQueryData(bodyKey, { text: RAW_BODY });
+    client.setQueryData(fileKey, { url: "private-capture" });
+    client.setQueryData(otherKey, { text: "Other session" });
+    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeDefined();
+    server.use(http.get(SESSION_PATH, () => HttpResponse.json({ detail: "Unavailable" }, { status })));
+    await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await waitFor(() => expect(reader).not.toBeInTheDocument());
+    expect(client.getQueryState(sessionKeys.detail(SLUG, SESSION_ID))).toMatchObject({ status: "error", error: { status } });
+    expect(screen.queryByRole("button", { name: "Resume note save" })).not.toBeInTheDocument();
+    expect(screen.queryByText(RAW_BODY)).not.toBeInTheDocument();
+    await waitFor(() => expect(client.getQueryData(bodyKey)).toBeUndefined());
+    expect(client.getQueryData(fileKey)).toBeUndefined();
+    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeUndefined();
+    expect(client.getQueryData(otherKey)).toEqual({ text: "Other session" });
+    expect(client.getQueryData(sessionKeys.detail(SLUG, SESSION_ID))).toBeNull();
+    server.use(http.get(SESSION_PATH, () => HttpResponse.json({ detail: "Temporarily unavailable" }, { status: 500 })));
+    await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await screen.findByRole("heading", { name: "Couldn't load this session" });
+    expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resume note save" })).not.toBeInTheDocument();
+    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeUndefined();
+    view.unmount();
+    renderSessionPage(client);
+    await screen.findByRole("heading", { name: "Couldn't load this session" });
+    await waitFor(() => expect(client.getQueryState(sessionKeys.detail(SLUG, SESSION_ID))?.fetchStatus).toBe("idle"));
+    expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: SOURCE_TITLE })).not.toBeInTheDocument();
+    expect(client.getQueryData(sessionKeys.detail(SLUG, SESSION_ID))).toBeNull();
+    server.use(http.get(SESSION_PATH, () => HttpResponse.json(sourceSession)));
+    await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await screen.findByRole("region", { name: "Transcript" });
+    expect(screen.queryByRole("button", { name: "Resume note save" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview excerpt" })).toBeDisabled();
+    expect(state.writes).toHaveLength(1);
+    expect(state.bodies).toEqual([CONTENT_ID]);
+  });
+
+  it("finishes only a confirmed hidden handoff on the full session page and permits a new excerpt", async () => {
+    const { state, user, sent } = await unknownSaveOnSessionPage();
+    expect(screen.queryByRole("button", { name: "Done" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Resume note save" }));
+    const response = deferred<Response>();
+    state.respond = async () => response.promise;
+    await user.click(screen.getByRole("button", { name: "Retry save" }));
+    await waitFor(() => expect(state.writes).toHaveLength(2));
+    await user.click(screen.getByRole("button", { name: "Hide for now" }));
+    expect(screen.queryByRole("button", { name: "Done" })).not.toBeInTheDocument();
+    await act(async () => { response.resolve(saved(sent.payload, 200)); });
+    await screen.findByRole("link", { name: "Open note" });
+    expect(state.writes[1]).toEqual(sent);
+    expect(screen.getByRole("button", { name: "Preview excerpt" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("link", { name: "Open note" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview excerpt" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Preview excerpt" }));
+    const preview = await screen.findByRole("dialog", { name: "Selected excerpt" });
+    const share = within(preview).getByRole("button", { name: "Share as note" });
+    await waitFor(() => expect(share).toBeEnabled());
+    await user.click(share);
+    const dialog = await screen.findByRole("dialog", { name: "Share as note" });
+    await destination(user, dialog, true);
+    state.respond = async (payload) => saved(payload);
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(state.writes).toHaveLength(3));
+    expect(state.writes[2]!.payload.client_request_id).not.toBe(sent.payload.client_request_id);
+    expect(state.bodies).toEqual([CONTENT_ID, CONTENT_ID]);
+  });
 
   it("posts an unedited generated title exactly as its single-line input displays it", async () => {
     const state = serve();
@@ -502,9 +1074,10 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(await screen.findByRole("link", { name: /open note|view note/i })).toHaveAttribute("href", expect.stringContaining(NOTE_ID));
   });
 
-  it("keeps the frozen destination names and audience visible when live destination lists change after dispatch", async () => {
+  it.each(["removed", "renamed"])("keeps the frozen destination names and audience visible when live destination lists are %s after dispatch", async (change) => {
     const state = serve();
-    state.respond = async (payload) => state.writes.length === 1 ? HttpResponse.error() : saved(payload, 200);
+    const replay = deferred<Response>();
+    state.respond = async () => state.writes.length === 1 ? HttpResponse.error() : replay.promise;
     const client = createTestQueryClient();
     renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />, { queryClient: client });
     const user = userEvent.setup();
@@ -513,10 +1086,16 @@ describe("explicit excerpt publication through the session reader", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save note" }));
     await within(dialog).findByRole("alert");
     const original = structuredClone(state.writes[0]!);
+    const renamedWorkspace = { id: DESTINATION_WORKSPACE_ID, slug: DESTINATION, name: "Renamed workspace", created_by: ME, created_at: AT, updated_at: AT };
+    const renamedBoard = { ...board, name: "Renamed board" };
+    const updatedWorkspaces = change === "removed" ? [] : [renamedWorkspace];
+    const updatedBoards = change === "removed" ? [] : [renamedBoard];
+    const updatedBoard = change === "removed" ? { ...board, columns: [] }
+      : { ...renamedBoard, columns: [{ id: "todo", name: "To do", cards: [{ ...card, title: "Renamed card" }] }] };
     server.use(
-      http.get("/api/workspaces", () => HttpResponse.json([])),
-      http.get(`/api/workspaces/${DESTINATION}/boards`, () => HttpResponse.json([])),
-      http.get(`/api/workspaces/${DESTINATION}/boards/${BOARD_ID}`, () => HttpResponse.json({ ...board, columns: [] })),
+      http.get("/api/workspaces", () => HttpResponse.json(updatedWorkspaces)),
+      http.get(`/api/workspaces/${DESTINATION}/boards`, () => HttpResponse.json(updatedBoards)),
+      http.get(`/api/workspaces/${DESTINATION}/boards/${BOARD_ID}`, () => HttpResponse.json(updatedBoard)),
     );
     await act(async () => {
       await client.invalidateQueries({ queryKey: workspaceKeys.all });
@@ -524,8 +1103,8 @@ describe("explicit excerpt publication through the session reader", () => {
       // Query notifications are batched onto the next task, after refetch resolves.
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    expect(client.getQueryData(workspaceKeys.all)).toEqual([]);
-    expect(client.getQueryData(boardKeys.byWorkspace(DESTINATION))).toEqual([]);
+    expect(client.getQueryData(workspaceKeys.all)).toEqual(updatedWorkspaces);
+    expect(client.getQueryData(boardKeys.byWorkspace(DESTINATION))).toEqual(updatedBoards);
     for (const [label, name] of [["Workspace", "Launch team"], ["Board", "Summit"], ["Card (optional)", "Ship companion"]]) {
       const control = within(dialog).getByLabelText(label!);
       expect(control).toBeDisabled();
@@ -536,6 +1115,11 @@ describe("explicit excerpt publication through the session reader", () => {
     await user.click(within(dialog).getByRole("button", { name: "Retry save" }));
     await waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]).toEqual(original);
+    expect(within(dialog).queryByRole("link", { name: /open note|open card/i })).not.toBeInTheDocument();
+    await act(async () => { replay.resolve(saved(original.payload, 200)); });
+    expect(await within(dialog).findByRole("link", { name: "Open note" })).toHaveAttribute("href", `/${DESTINATION}/boards/${BOARD_ID}/notes?note=${NOTE_ID}`);
+    expect(dialog).not.toHaveTextContent(/Renamed workspace|Renamed board|Renamed card/);
+    expectFinalDestination(dialog, within(dialog).getByRole("button", { name: "Hide for now" }), true);
   });
 
   it.each([
@@ -750,7 +1334,7 @@ describe("publication descriptor limit preserves local export", () => {
       requested.push(String(params.id));
       return HttpResponse.json({ content_id: params.id, offset: 0, next_offset: null, total_bytes: 0, text: "" });
     }));
-    renderWithProviders(<SessionExcerpt slug={SLUG} session={sourceSession} items={items} selected={new Set(items.map(({ id }) => id))} hasMore onClear={() => {}} />);
+    renderWithProviders(<SessionExcerptHarness slug={SLUG} session={sourceSession} items={items} selected={new Set(items.map(({ id }) => id))} hasMore onClear={() => {}} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: i18n.t("sessions.contents.excerpt.preview") }));
     const preview = await screen.findByRole("dialog", { name: i18n.t("sessions.contents.excerpt.title") });

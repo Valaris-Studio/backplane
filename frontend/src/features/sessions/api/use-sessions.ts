@@ -116,11 +116,21 @@ export function useSessionList(slug: string, query: SessionListQuery, enabled: b
 }
 
 export function useSession(slug: string, sessionId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: sessionKeys.detail(slug, sessionId),
-    queryFn: async () => {
-      const { data } = await api.get<AgentSession>(`/workspaces/${slug}/sessions/${sessionId}`);
-      return data;
+  const queryClient = useQueryClient();
+  const queryKey = sessionKeys.detail(slug, sessionId);
+  return useQuery<AgentSession | null>({
+    queryKey,
+    queryFn: async ({ signal }) => {
+      try {
+        const { data } = await api.get<AgentSession>(`/workspaces/${slug}/sessions/${sessionId}`, { signal });
+        return data;
+      } catch (error) {
+        if (!signal.aborted && isApiError(error) && [401, 403, 404].includes(error.status)) {
+          // A later transient failure or remount must not revive denied metadata.
+          queryClient.setQueryData<AgentSession | null>(queryKey, null);
+        }
+        throw error;
+      }
     },
     enabled: enabled && !!sessionId,
     retry: retryServerErrors,

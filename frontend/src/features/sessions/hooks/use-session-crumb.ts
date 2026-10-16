@@ -13,7 +13,7 @@ import { usePromptsHidden } from "./use-hide-prompts";
 export function useSessionCrumb(slug: string, sessionId: string | undefined): string | undefined {
   const { t } = useTranslation();
   const promptsHidden = usePromptsHidden();
-  const { data } = useQuery<AgentSession>({
+  const { data } = useQuery<AgentSession | null>({
     queryKey: sessionKeys.detail(slug, sessionId ?? ""),
     queryFn: skipToken,
   });

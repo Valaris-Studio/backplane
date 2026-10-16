@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ChevronRight, FilePen, Link2, RotateCw, SquareTerminal } from "lucide-react";
@@ -12,7 +12,8 @@ import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { AgentSession, ContentChannel, ContentCoverage, SessionContent } from "@/types/agent-session";
 import { useSessionContents } from "../api/use-session-contents";
-import { transcriptEntries } from "../utils/contents";
+import { transcriptEntries, type TranscriptEntry } from "../utils/contents";
+import type { ExcerptNoteDraft } from "../utils/excerpt-note";
 import { formatBytes, formatClock } from "../utils/format";
 import { KindIcon } from "./CallRow";
 import { ContentBody } from "./ContentBody";
@@ -28,18 +29,21 @@ const PROSE: ReadonlySet<ContentChannel> = new Set(["prompt", "reply", "reasonin
 interface SessionTranscriptProps {
   slug: string;
   session: AgentSession;
+  active?: boolean;
 }
 
 /** What rich capture kept of the session, in source order. Absent where nothing was captured. */
-export function SessionTranscript({ slug, session }: SessionTranscriptProps) {
-  return <SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} />;
+export function SessionTranscript({ slug, session, active = true }: SessionTranscriptProps) {
+  return <SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} />;
 }
 
-function SessionTranscriptReader({ slug, session }: SessionTranscriptProps) {
+function SessionTranscriptReader({ slug, session, active = true }: SessionTranscriptProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const [view, setView] = useState<View>("conversation");
+  const [actionsHeight, setActionsHeight] = useState(0);
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [draft, setDraft] = useState<ExcerptNoteDraft | null>(null);
   const onSelect = (id: string, checked: boolean) => setSelected((current) => {
     const next = new Set(current);
     if (checked) next.add(id);
@@ -49,17 +53,19 @@ function SessionTranscriptReader({ slug, session }: SessionTranscriptProps) {
   const contents = useSessionContents(slug, session.id);
   const items = useMemo(() => contents.data?.pages.flatMap((page) => page.items) ?? [], [contents.data]);
   const entries = useMemo(() => transcriptEntries(items, { includeRaw: view === "everything" }), [items, view]);
-  const linked = useLinkedItem(items, contents.isSuccess);
+  const visibleItems = useMemo(() => items.filter((item) => view === "everything" || item.channel !== "native_record"), [items, view]);
+  const linked = useLinkedItem(items, entries, contents.isSuccess, active);
+  const hasSelectionOrDraft = selected.size > 0 || draft !== null;
 
-  if (contents.isPending) return null;
-  if (contents.isError) {
+  if (contents.isPending && !hasSelectionOrDraft) return null;
+  if (contents.isPending || contents.isError) {
     // A deleted session is the detail page's to explain.
-    if (isApiError(contents.error) && contents.error.status === 404 && !selected.size) return null;
+    if (isApiError(contents.error) && contents.error.status === 404 && !hasSelectionOrDraft) return null;
     const refused = isApiError(contents.error) && contents.error.status === 403;
     return (
-      <TranscriptFrame headingId={headingId}>
-        {selected.size ? <SessionExcerpt slug={slug} session={session} items={[]} selected={selected} hasMore={false} onClear={() => setSelected(new Set())} /> : null}
-        <div className="flex flex-col items-center gap-3 px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">
+      <TranscriptFrame headingId={headingId} actionsHeight={actionsHeight}>
+        {hasSelectionOrDraft ? <SessionExcerpt key="excerpt" slug={slug} session={session} items={[]} selected={selected} hasMore={false} draft={draft} onDraftChange={setDraft} onClear={() => setSelected(new Set())} onActionsHeightChange={setActionsHeight} /> : null}
+        {contents.isError ? <div className="flex flex-col items-center gap-3 px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">
           <p>{refused ? t("sessions.contents.refused") : t("sessions.contents.loadError")}</p>
           {refused ? null : (
             <Button variant="outline" size="sm" onClick={() => void contents.refetch()}>
@@ -67,16 +73,17 @@ function SessionTranscriptReader({ slug, session }: SessionTranscriptProps) {
               {t("sessions.contents.retry")}
             </Button>
           )}
-        </div>
+        </div> : null}
       </TranscriptFrame>
     );
   }
   // A session captured before rich capture keeps the page it always had.
-  if (!items.length && !contents.hasNextPage && !selected.size) return null;
+  if (!items.length && !contents.hasNextPage && !hasSelectionOrDraft) return null;
 
   return (
     <TranscriptFrame
       headingId={headingId}
+      actionsHeight={actionsHeight}
       controls={
         <Segmented
           className="ml-auto"
@@ -90,12 +97,13 @@ function SessionTranscriptReader({ slug, session }: SessionTranscriptProps) {
         />
       }
     >
-      <SessionExcerpt slug={slug} session={session} items={items} selected={selected} hasMore={contents.hasNextPage} onClear={() => setSelected(new Set())} />
+      {visibleItems.length ? <LoadedContentNavigation session={session} items={visibleItems} hasMore={contents.hasNextPage} /> : null}
+      <SessionExcerpt key="excerpt" slug={slug} session={session} items={items} selected={selected} hasMore={contents.hasNextPage} draft={draft} onDraftChange={setDraft} onClear={() => setSelected(new Set())} onActionsHeightChange={setActionsHeight} />
       {entries.length ? (
         <ol aria-labelledby={headingId} className="flex flex-col">
           {entries.map((entry) =>
             entry.type === "call" ? (
-              <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} />
+              <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} active={active} />
             ) : (
               <TranscriptMessage key={entry.item.id} slug={slug} session={session} item={entry.item} selected={selected} onSelect={onSelect} />
             ),
@@ -116,12 +124,42 @@ function SessionTranscriptReader({ slug, session }: SessionTranscriptProps) {
   );
 }
 
-function TranscriptFrame({ headingId, controls, children }: { headingId: string; controls?: ReactNode; children: ReactNode }) {
+function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSession; items: SessionContent[]; hasMore: boolean }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const location = useLocation();
+  const navigate = useNavigate();
+  return <div className="grid gap-2 border-b border-border/60 px-[var(--card-padding)] py-3">
+    <label htmlFor={id} className="sr-only">{t("sessions.contents.navigation.label")}</label>
+    <select
+      id={id}
+      value=""
+      aria-describedby={`${id}-scope`}
+      className="h-10 w-full min-w-0 rounded-[var(--radius-cap)] border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:min-h-[44px] max-sm:min-w-[44px]"
+      onChange={(event) => {
+        if (!items.some((item) => item.id === event.target.value)) return;
+        navigate({ pathname: location.pathname, search: location.search, hash: `${ANCHOR_PREFIX}${event.target.value}` }, { replace: true, preventScrollReset: true });
+      }}
+    >
+      <option value="" disabled>{t("sessions.contents.navigation.label")}</option>
+      {items.map((item) => <option key={item.id} value={item.id}>{t("sessions.contents.navigation.item", {
+        label: messageLabel(item, session, t),
+        source: t("sessions.contents.source.reference", { source: t(`sessions.contents.source.${item.source.kind}`), order: item.source.order }),
+        time: formatClock(item.occurred_at),
+        coverage: t(`sessions.contents.coverage.${item.coverage}`),
+      })}</option>)}
+    </select>
+    <p id={`${id}-scope`} className="text-xs text-muted-foreground">{t(hasMore ? "sessions.contents.navigation.incomplete" : "sessions.contents.navigation.loaded")}</p>
+  </div>;
+}
+
+function TranscriptFrame({ headingId, actionsHeight, controls, children }: { headingId: string; actionsHeight: number; controls?: ReactNode; children: ReactNode }) {
   const { t } = useTranslation();
   return (
     <section
       aria-labelledby={headingId}
-      className="overflow-hidden rounded-[var(--radius-cap)] border border-border/70 bg-[color:var(--color-surface-1)] shadow-panel"
+      style={{ "--session-excerpt-actions-height": `${actionsHeight}px` } as CSSProperties}
+      className="rounded-[var(--radius-cap)] border border-border/70 bg-[color:var(--color-surface-1)] shadow-panel"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-[var(--card-padding)] py-2.5">
         <h2 id={headingId} className="text-base font-bold">
@@ -138,20 +176,27 @@ function TranscriptFrame({ headingId, controls, children }: { headingId: string;
  * Focuses the item a `#content-<id>` link names once it is loaded. Release one
  * does not page ahead for it: "beyond" says to load more.
  */
-function useLinkedItem(items: SessionContent[], loaded: boolean): "none" | "shown" | "beyond" {
-  const { hash } = useLocation();
+function useLinkedItem(items: SessionContent[], entries: TranscriptEntry[], loaded: boolean, active: boolean): "none" | "shown" | "beyond" {
+  const { hash, key } = useLocation();
   const target = hash.startsWith(ANCHOR_PREFIX) ? hash.slice(ANCHOR_PREFIX.length) : null;
   const present = !!target && items.some((item) => item.id === target);
-  const focused = useRef<string | null>(null);
+  // Grouped parts belong to TranscriptCall, which knows when its panel is open.
+  const visible = !!target && entries.some((entry) => entry.type === "message" && entry.item.id === target);
+  const appliedNavigation = useRef<{ key: string; target: string } | null>(null);
 
   useEffect(() => {
-    if (!present || !target || focused.current === target) return;
+    if (!visible || !target) {
+      appliedNavigation.current = null;
+      return;
+    }
+    // A compact tab return must not replay a link that already moved focus.
+    if (!active || (appliedNavigation.current?.key === key && appliedNavigation.current.target === target)) return;
     const element = document.getElementById(`content-${target}`);
     if (!element) return;
-    focused.current = target;
     element.scrollIntoView?.({ block: "start" });
     element.focus({ preventScroll: true });
-  }, [present, target]);
+    appliedNavigation.current = { key, target };
+  }, [active, visible, target, key]);
 
   if (!target || !loaded) return "none";
   return present ? "shown" : "beyond";
@@ -204,7 +249,7 @@ function ItemMeta({ item, onCopy }: { item: SessionContent; onCopy: () => void }
 }
 
 const ITEM_CLASSES =
-  "grid scroll-mt-[calc(var(--topbar-height)+1rem)] gap-1.5 border-t border-border/60 px-[var(--card-padding)] py-3 first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [content-visibility:auto] [contain-intrinsic-size:auto_6rem]";
+  "grid scroll-mt-[calc(var(--topbar-height)+var(--session-excerpt-actions-height,0px)+1rem)] gap-1.5 border-t border-border/60 px-[var(--card-padding)] py-3 first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 const LABEL_CLASSES = "text-[0.75rem] font-bold uppercase tracking-[0.08em] text-muted-foreground";
 
 interface ExcerptSelection {
@@ -242,22 +287,30 @@ interface TranscriptCallProps extends ExcerptSelection {
   sessionId: string;
   callId: string;
   parts: SessionContent[];
+  active: boolean;
 }
 
-function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect }: TranscriptCallProps) {
+function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, active }: TranscriptCallProps) {
   const { t } = useTranslation();
-  const { hash } = useLocation();
+  const { hash, key } = useLocation();
   const linkedId = parts.find((part) => hash === `#${itemAnchor(part)}`)?.id;
   const labelId = useId();
   const panelId = useId();
   const [open, setOpen] = useState(!!linkedId);
-  useEffect(() => { if (linkedId) setOpen(true); }, [linkedId]);
+  const appliedNavigation = useRef<{ key: string; target: string } | null>(null);
+  useEffect(() => { if (linkedId) setOpen(true); }, [linkedId, key]);
   useEffect(() => {
-    if (!open || !linkedId) return;
+    if (!open || !linkedId) {
+      appliedNavigation.current = null;
+      return;
+    }
+    if (!active || (appliedNavigation.current?.key === key && appliedNavigation.current.target === linkedId)) return;
     const element = document.getElementById(`content-${linkedId}`);
-    element?.scrollIntoView?.({ block: "start" });
-    element?.focus({ preventScroll: true });
-  }, [open, linkedId]);
+    if (!element) return;
+    element.scrollIntoView?.({ block: "start" });
+    element.focus({ preventScroll: true });
+    appliedNavigation.current = { key, target: linkedId };
+  }, [active, open, linkedId, key]);
   const copy = useCopyItemLink(slug, sessionId);
   const first = parts[0]!;
   const edits = parts.some((part) => part.channel === "diff" || part.channel === "file_content");
@@ -289,7 +342,7 @@ function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect }: 
       {open ? (
         <div id={panelId} className="ml-[2.1rem] grid gap-3 rounded-[var(--radius-cap)] border border-border bg-[color:var(--color-surface-2)] px-3 py-2.5">
           {parts.map((part) => (
-            <div key={part.id} id={part === first ? undefined : itemAnchor(part)} tabIndex={-1} className="grid scroll-mt-[calc(var(--topbar-height)+1rem)] gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <div key={part.id} id={part === first ? undefined : itemAnchor(part)} tabIndex={-1} className="grid scroll-mt-[calc(var(--topbar-height)+var(--session-excerpt-actions-height,0px)+1rem)] gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <div className="flex items-center gap-2">
                 <ExcerptCheckbox item={part} selected={selected} onSelect={onSelect} />
                 <h3 className="text-[0.78rem] font-semibold text-muted-foreground">{partLabel(part, t)}</h3>

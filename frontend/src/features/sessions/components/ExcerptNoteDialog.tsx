@@ -12,13 +12,14 @@ import { useWorkspaces } from "@/features/workspaces/api/use-workspaces";
 import { useBoards, useBoard } from "@/features/kanban/api/use-boards";
 import { useMembers } from "@/features/members/api/use-members";
 import { useCurrentUser } from "@/features/notifications/api/use-current-user";
+import { buildCardLink } from "@/features/kanban/utils/card-link";
 import { buildNoteLink } from "@/features/notes/utils/note-link";
 import { isApiError } from "@/lib/api-error";
 import { useSaveExcerptNote, type ExcerptNoteRequest } from "../api/use-save-excerpt-note";
 import { compactNoteDocument, EXCERPT_NOTE_MAX_BYTES, EXCERPT_NOTE_MAX_ITEMS, type ExcerptNoteDraft } from "../utils/excerpt-note";
 import { utf8Bytes } from "../utils/excerpt";
 
-const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-[44px] max-sm:min-w-[44px]";
 
 interface ReviewedDestination {
   workspace: { id: string; slug: string; name: string };
@@ -45,6 +46,7 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
   const request = useRef<ExcerptNoteRequest | null>(null);
   const reviewedDestination = useRef<ReviewedDestination | null>(null);
   const hadUnknownOutcome = useRef(false);
+  const hasSentRequest = useRef(false);
   const dispatching = useRef(false);
   const save = useSaveExcerptNote();
   const workspaces = useWorkspaces();
@@ -63,6 +65,8 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
   const boardOptions = frozen && reviewedDestination.current ? [reviewedDestination.current.board] : boards.data;
   const cardOptions = frozen && reviewedDestination.current ? (reviewedDestination.current.card ? [reviewedDestination.current.card] : []) : cards;
   const audienceName = frozen ? reviewedDestination.current?.workspace.name : workspace?.name;
+  const destinationBoard = frozen ? reviewedDestination.current?.board : destination;
+  const destinationCard = frozen ? reviewedDestination.current?.card : cards.find((card) => card.id === cardId);
 
   let problem: string | null = null;
   if (!frozen) {
@@ -120,6 +124,7 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
       };
     }
     dispatching.current = true;
+    hasSentRequest.current = true;
     save.mutate(request.current, {
       onError: (error) => { if (outcomeIsUnknown(error)) hadUnknownOutcome.current = true; },
       onSettled: () => { dispatching.current = false; },
@@ -141,13 +146,16 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
   }
 
   const noteLink = save.data && request.current ? buildNoteLink({ slug: request.current.slug, boardId: request.current.boardId, noteId: save.data.id }) : null;
+  const cardLink = noteLink && request.current?.payload.card_id ? buildCardLink({ slug: request.current.slug, boardId: request.current.boardId, cardId: request.current.payload.card_id }) : null;
   return <>
-    {!open ? <div className="flex flex-wrap items-center gap-3 px-[var(--card-padding)] py-3" role="status">
-      {noteLink ? <Link className="text-sm text-primary underline underline-offset-4" to={noteLink}>{label("openNote")}</Link> : <Button variant="outline" size="sm" onClick={() => setOpen(true)}>{label("resume")}</Button>}
+    {!open ? <div className="flex basis-full flex-wrap items-center gap-3" role="status">
+      {noteLink ? <Link className="inline-flex items-center text-sm text-primary underline underline-offset-4 max-sm:min-h-[44px] max-sm:min-w-[44px]" to={noteLink}>{label("openNote")}</Link> : <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" onClick={() => setOpen(true)}>{label("resume")}</Button>}
+      {cardLink ? <Link className="inline-flex items-center text-sm text-primary underline underline-offset-4 max-sm:min-h-[44px] max-sm:min-w-[44px]" to={cardLink}>{label("openCard")}</Link> : null}
+      {noteLink ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" onClick={onDiscard}>{t("common.done")}</Button> : null}
     </div> : null}
     <Dialog open={open} onOpenChange={(next) => { if (!next) dismiss(); }}>
-      <DialogContent className="max-w-4xl" aria-describedby={`${id}-audience`}>
-        <DialogHeader><DialogTitle>{label("share")}</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-4xl max-sm:[&>button]:min-h-[44px] max-sm:[&>button]:min-w-[44px]" aria-describedby={`${id}-audience`}>
+        <DialogHeader className="max-sm:min-h-[44px] max-sm:pr-[44px]"><DialogTitle>{label("share")}</DialogTitle></DialogHeader>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1.5 text-sm" htmlFor={`${id}-workspace`}>{label("workspace")}
             <select id={`${id}-workspace`} className={selectClass} value={slug} disabled={frozen} onChange={(event) => { setSlug(event.target.value); setBoardId(""); setCardId(""); }}>
@@ -168,26 +176,38 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
             </select>
           </label>
         </div>
-        <div id={`${id}-audience`} className="grid gap-1 text-sm leading-relaxed text-muted-foreground">
-          <p>{audienceName ? label("audience", { workspace: audienceName }) : label("chooseAudience")}</p>
-          <p>{label("cardVisibility")}</p>
-          <p>{label("snapshot")}</p>
-        </div>
         <label className="grid gap-1.5 text-sm" htmlFor={`${id}-title`}>{label("title")}
-          <Input id={`${id}-title`} value={title} disabled={frozen} onChange={(event) => setTitle(event.target.value)} />
+          <Input className="max-sm:min-h-[44px] max-sm:min-w-[44px]" id={`${id}-title`} value={title} disabled={frozen} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <section role="region" aria-label={label("content")} className="min-w-0">
           <RichTextEditor content={content} onChange={setContent} editable={!frozen} allowMediaUpload={false} workspaceSlug={slug || undefined} className="max-h-[45dvh] min-h-48 overflow-auto" />
         </section>
         {!frozen ? <p className="text-xs text-muted-foreground">{label("review")}</p> : null}
-        {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
-        {save.isPending ? <p role="status" className="text-sm text-muted-foreground">{label("saving")}</p> : null}
-        {noteLink ? <p role="status" className="text-sm">{label("saved")} <Link className="text-primary underline underline-offset-4" to={noteLink}>{label("openNote")}</Link></p> : null}
-        <DialogFooter>
-          <Button variant="ghost" onClick={dismiss}>{frozen ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
-          {canRevise ? <Button variant="outline" onClick={revise}>{label("revise")}</Button> : null}
-          {save.isError ? <Button onClick={dispatch}>{label("retry")}</Button> : !save.isSuccess ? <Button onClick={dispatch} disabled={!canSave || save.isPending}>{label("save")}</Button> : null}
-        </DialogFooter>
+        <div className="grid gap-3 border-t pt-4">
+          {audienceName && destinationBoard ? <dl className="grid gap-2 text-sm sm:grid-cols-3">
+            <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label("workspace")}</dt><dd className="break-words font-medium">{audienceName}</dd></div>
+            <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label("board")}</dt><dd className="break-words font-medium">{destinationBoard.name}</dd></div>
+            {!cardId || destinationCard ? <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label("card")}</dt><dd className="break-words font-medium">{destinationCard?.title ?? label("noCard")}</dd></div> : null}
+          </dl> : null}
+          <div id={`${id}-audience`} className="grid gap-1 text-sm leading-relaxed text-muted-foreground">
+            <p>{audienceName ? label("audience", { workspace: audienceName }) : label("chooseAudience")}</p>
+            <p>{label("cardVisibility")}</p>
+            <p>{label("snapshot")}</p>
+          </div>
+          {!hasSentRequest.current ? <p className="text-sm text-muted-foreground">{label("unsent")}</p> : null}
+          {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
+          {save.isPending ? <p role="status" className="text-sm text-muted-foreground">{label("saving")}</p> : null}
+          {noteLink ? <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span>{label("saved")}</span>
+            <Link className="text-primary underline underline-offset-4 max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:min-w-[44px]" to={noteLink}>{label("openNote")}</Link>
+            {cardLink ? <Link className="text-primary underline underline-offset-4 max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:min-w-[44px]" to={cardLink}>{label("openCard")}</Link> : null}
+          </div> : null}
+          <DialogFooter className="max-sm:[&>button]:min-h-[44px] max-sm:[&>button]:min-w-[44px]">
+            <Button variant="ghost" onClick={dismiss}>{frozen ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
+            {canRevise ? <Button variant="outline" onClick={revise}>{label("revise")}</Button> : null}
+            {save.isError ? <Button onClick={dispatch}>{label("retry")}</Button> : !save.isSuccess ? <Button onClick={dispatch} disabled={!canSave || save.isPending}>{label("save")}</Button> : null}
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   </>;
