@@ -29,10 +29,14 @@ export function useRefreshSessionEvidence(slug: string, sessionId: string) {
 
       // All, Work and Failures keep separate pages. Refresh the variants the
       // operator has visited so returning to a filter cannot revive old links.
-      const callPages = { queryKey: [...detailKey, "calls"], type: "all" as const };
+      const callPages = { queryKey: [...detailKey, "calls"] };
+      for (const query of queryClient.getQueryCache().findAll({ queryKey: sessionKeys.contentsRoot(slug, sessionId) })) {
+        const resume = query.meta?.explicitSessionRefresh;
+        if (typeof resume === "function") resume();
+      }
       await Promise.all([
         queryClient.refetchQueries({ queryKey: sessionKeys.links(slug, sessionId), exact: true }),
-        queryClient.refetchQueries(callPages),
+        queryClient.invalidateQueries({ ...callPages, refetchType: "active" }),
         queryClient.refetchQueries({ queryKey: workspaceKeys.all, exact: true }),
         // Only mounted lists refresh now; visited closed inspectors stay stale
         // until reopened. Body/file keys are outside this metadata prefix.

@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import type { AgentSession, SessionCallPage, SessionUsageList } from "@/types/agent-session";
 import { SLUG, callPage, contentPage, makeCall, makeContent, makeSession, makeTurn, minutesAgo, stubAuthModes } from "../../__tests__/fixtures";
+import { contentWindowResponse } from "../../__tests__/window-fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { SessionDetailPage } from "../SessionDetailPage";
 
@@ -119,6 +120,7 @@ function serveDetail(options: ServeOptions = {}): DetailServer {
       }),
     ),
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/links`, () => HttpResponse.json({ items: [] })),
+    http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/contents/window`, ({ request }) => contentWindowResponse([contentPage([])], new URL(request.url).searchParams)),
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/contents`, () => HttpResponse.json({ items: [], next_cursor: null })),
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/children`, () =>
       HttpResponse.json({ items: options.children ?? [] }),
@@ -165,7 +167,13 @@ const PROMPT = makeCall({
   duration_ms: null,
 });
 
+beforeEach(() => {
+  const matchMedia = window.matchMedia;
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ ...matchMedia(query), matches: query === "(min-width: 1280px)" }));
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   // The store notifies every mounted subscriber; reset inside act().
   act(() => setPromptsHidden(false));
   window.localStorage.clear();
@@ -538,20 +546,23 @@ describe("Session detail — banners", () => {
 });
 
 describe("Session detail — facts rail", () => {
-  it("puts the transcript before secondary facts in the middle-width reading order", async () => {
+  it("keeps the transcript as a peer reader and puts middle-width facts behind Session details", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: false, media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false }));
     serveDetail({ session: { capture_levels: ["rich"] } });
-    server.use(http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/contents`, () =>
-      HttpResponse.json(contentPage([makeContent({ id: "read-first", session_id: SESSION_ID })])),
+    server.use(http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/contents/window`, ({ request }) =>
+      contentWindowResponse([contentPage([makeContent({ id: "read-first", session_id: SESSION_ID })])], new URL(request.url).searchParams),
     ));
     renderDetail();
-
-    // The default media-query fixture is neither compact nor wide: the rail
-    // and reader share one column, so document order is also reading order.
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
     const transcript = await screen.findByRole("region", { name: "Transcript" });
-    for (const name of ["Cost", "Tokens", "Capture level"]) {
-      const facts = screen.getByRole("region", { name });
-      expect(transcript.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING, `${name} follows the reader`).toBeTruthy();
-    }
+    expect(transcript).toBeVisible();
+    for (const name of ["Cost", "Tokens", "Capture level"]) expect(screen.queryByRole("region", { name })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Session details" }));
+    expect(transcript).not.toBeVisible();
+    for (const name of ["Cost", "Tokens", "Capture level"]) expect(screen.getByRole("region", { name })).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
+    expect(screen.getByRole("region", { name: "Transcript" })).toBe(transcript);
   });
 
   it("states cost with its basis and what a subscription means", async () => {

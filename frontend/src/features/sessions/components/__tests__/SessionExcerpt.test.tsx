@@ -9,6 +9,7 @@ import { http, HttpResponse, server } from "@/test/msw-server";
 import { sessionKeys } from "@/lib/query-keys";
 import type { SessionContent, SessionContentPage } from "@/types/agent-session";
 import { SLUG, contentPage, makeContent, makeSession } from "../../__tests__/fixtures";
+import { contentWindowResponse, selectedMetadata } from "../../__tests__/window-fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { SessionTranscript } from "../SessionTranscript";
 
@@ -33,12 +34,19 @@ interface Requests {
 
 function serve(pages: SessionContentPage[] | (() => SessionContentPage), sessionId = SESSION_ID): Requests {
   const requests: Requests = { lists: [], bodies: [] };
-  server.use(http.get(`/api/workspaces/${SLUG}/sessions/${sessionId}/contents`, ({ request }) => {
-    const cursor = new URL(request.url).searchParams.get("cursor");
-    requests.lists.push(cursor);
-    const page = typeof pages === "function" ? pages() : pages[cursor === null ? 0 : Number(cursor)];
-    return HttpResponse.json(page ?? contentPage([]));
-  }));
+  const currentPages = () => typeof pages === "function" ? [pages()] : pages;
+  const path = `/api/workspaces/${SLUG}/sessions/${sessionId}/contents`;
+  server.use(
+    http.get(`${path}/window`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      requests.lists.push(params.get("cursor"));
+      return contentWindowResponse(currentPages(), params);
+    }),
+    http.post(`${path}/metadata`, async ({ request }) => {
+      const { content_ids } = await request.json() as { content_ids: string[] };
+      return HttpResponse.json(selectedMetadata(currentPages().flatMap((page) => page.items), content_ids));
+    }),
+  );
   return requests;
 }
 
@@ -112,7 +120,7 @@ afterEach(async () => {
 });
 
 describe("private excerpt selection", () => {
-  it("counts selected and loaded items, warns about later pages, and never selects new pages implicitly", async () => {
+  it("counts selected evidence independently of the current window and never selects visited history implicitly", async () => {
     const user = userEvent.setup();
     const requests = serve([
       contentPage([textItem("a", "alpha", 1), textItem("b", "beta", 2)], "1"),
@@ -120,18 +128,19 @@ describe("private excerpt selection", () => {
     ]);
     renderWithProviders(<SessionTranscript slug={SLUG} session={session} />);
 
-    await select("b", user);
-    expect(screen.getByText("1 selected from 2 loaded items")).toBeInTheDocument();
-    expect(screen.getByText(/More transcript items are available/)).toBeInTheDocument();
+    await select("c", user);
+    expect(screen.getByText("Selected: 1 · 1 record in this window")).toBeInTheDocument();
+    expect(screen.getByText(/Selection stays with you/)).toBeInTheDocument();
     expect(requests.lists).toEqual([null]);
     expect(requests.bodies).toEqual([]);
 
-    await user.click(screen.getByRole("button", { name: "Load more" }));
-    expect(within(await item("c")).getByRole("checkbox")).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Earlier records" }));
     expect(within(await item("a")).getByRole("checkbox")).not.toBeChecked();
-    expect(within(await item("b")).getByRole("checkbox")).toBeChecked();
-    expect(screen.getByText("1 selected from 3 loaded items")).toBeInTheDocument();
-    expect(screen.queryByText(/More transcript items are available/)).not.toBeInTheDocument();
+    expect(within(await item("b")).getByRole("checkbox")).not.toBeChecked();
+    expect(document.getElementById("content-c")).toBeNull();
+    expect(screen.getByText("Selected: 1 · 2 records in this window")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Later records" }));
+    expect(within(await item("c")).getByRole("checkbox")).toBeChecked();
   });
 
   it("keeps explicitly selected tool parts counted and previewed when their call is collapsed", async () => {
@@ -149,7 +158,7 @@ describe("private excerpt selection", () => {
     await user.click(parts[1]!);
     await user.click(within(await item("input")).getByRole("button", { name: /Tool call/ }));
     expect(within(await item("input")).queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.getByText("1 selected from 2 loaded items")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 1 · 2 records in this window")).toBeInTheDocument();
 
     const text = await previewText(await preview(user));
     expect(text).toContain("chosen tool result");
@@ -170,7 +179,7 @@ describe("private excerpt selection", () => {
     await select("raw", user);
     await user.click(screen.getByRole("button", { name: "Conversation" }));
     expect(document.getElementById("content-raw")).toBeNull();
-    expect(screen.getByText("1 selected from 2 loaded items")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 1 · 2 records in this window")).toBeInTheDocument();
 
     const text = await previewText(await preview(user));
     expect(text).toContain("chosen native record");
@@ -190,7 +199,7 @@ describe("private excerpt selection", () => {
     expect(within(document.getElementById("content-output")!).getByRole("checkbox")).not.toBeChecked();
   });
 
-  it("keeps selection through a refreshed page without selecting newly arrived items", async () => {
+  it("keeps the pinned window and selection through refresh, then reaches new records only through Latest", async () => {
     const user = userEvent.setup();
     const client = createTestQueryClient();
     let items = [textItem("a", "alpha", 1)];
@@ -200,9 +209,12 @@ describe("private excerpt selection", () => {
 
     items = [...items, textItem("new", "new content", 2)];
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.all(SLUG) }));
+    expect(document.getElementById("content-new")).toBeNull();
+    expect(within(await item("a")).getByRole("checkbox")).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Latest" }));
     expect(within(await item("new")).getByRole("checkbox")).not.toBeChecked();
     expect(within(await item("a")).getByRole("checkbox")).toBeChecked();
-    expect(screen.getByText("1 selected from 2 loaded items")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 1 · 2 records in this window")).toBeInTheDocument();
   });
 
   it.each(["disappears", "becomes unavailable"])("blocks export when a selected item %s during refresh, instead of silently exporting the remaining subset", async (change) => {
@@ -261,7 +273,7 @@ describe("private excerpt selection", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
     expect(checkbox).toBeChecked();
-    expect(screen.getByText("1 selected from 1 loaded items")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 1 · 1 record in this window")).toBeInTheDocument();
     expect(requests.lists).toEqual([null]);
     expect(requests.bodies).toEqual([{ id: "a", offset: 0 }]);
   });
@@ -321,7 +333,8 @@ describe("private excerpt bytes and provenance", () => {
       expect(await blobText(blob as Blob)).toBe(text);
       expect(clicked).toEqual([{ name: expect.stringMatching(/\.(md|txt)$/), href: "blob:private-excerpt" }]);
       await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:private-excerpt"));
-      expect(network.every((request) => request.method === "GET" && new URL(request.url).pathname.startsWith(CONTENTS))).toBe(true);
+      expect(network.every((request) => new URL(request.url).pathname.startsWith(CONTENTS)
+        && (request.method === "GET" || (request.method === "POST" && new URL(request.url).pathname === `${CONTENTS}/metadata`)))).toBe(true);
     } finally {
       server.events.removeListener("request:start", observe);
     }

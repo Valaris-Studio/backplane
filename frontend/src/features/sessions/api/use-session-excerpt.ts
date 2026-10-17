@@ -6,6 +6,7 @@ import type { TFunction } from "i18next";
 import { api } from "@/lib/api";
 import type { AgentSession, ContentBodyPage, SessionContent } from "@/types/agent-session";
 import { canExcerpt, EXCERPT_MAX_BYTES, formatExcerpt, utf8Bytes } from "../utils/excerpt";
+import { usePrivateContentRead } from "./use-session-contents";
 
 interface ExcerptRequest {
   slug: string;
@@ -17,7 +18,8 @@ interface ExcerptRequest {
 
 export class ExcerptTooLarge extends Error {}
 
-export function useSessionExcerpt() {
+export function useSessionExcerpt(slug: string, sessionId: string) {
+  const read = usePrivateContentRead(slug, sessionId);
   return useMutation({
     gcTime: 0,
     retry: false,
@@ -36,10 +38,10 @@ export function useSessionExcerpt() {
         let offset = 0;
         while (offset <= item.byte_count!) {
           signal.throwIfAborted();
-          const { data } = await api.get<ContentBodyPage>(
+          const { data } = await read(signal, () => api.get<ContentBodyPage>(
             new URL(api.getUri({ url: `/workspaces/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(session.id)}/contents/${encodeURIComponent(item.id)}/body` }), window.location.origin).href,
             { params: { offset }, signal, adapter: "fetch" },
-          );
+          ));
           signal.throwIfAborted();
           if (typeof data.text !== "string") throw new Error("Invalid selected body");
           const bytes = utf8Bytes(data.text);

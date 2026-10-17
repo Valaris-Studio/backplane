@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { sessionKeys } from "@/lib/query-keys";
 import type { AgentSession, SessionCallItem, SessionContent, SessionContentPage } from "@/types/agent-session";
 import { SLUG, callPage, contentPage, makeCall, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
+import { contentWindowResponse, selectedMetadata, windowFromResponse } from "../../__tests__/window-fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { SessionDetailPage } from "../SessionDetailPage";
 
@@ -54,6 +56,18 @@ function serve(options: {
         mcp_server: null, mcp_tool: null, outcome: "unknown", data: {},
       })) });
     }),
+    http.get(`${CONTENTS}/window`, async ({ request }) => {
+      record(request);
+      const response = await state.contents(new URLSearchParams());
+      const params = new URL(request.url).searchParams;
+      return response instanceof Response ? windowFromResponse(response, params) : contentWindowResponse([response], params);
+    }),
+    http.post(`${CONTENTS}/metadata`, async ({ request }) => {
+      record(request);
+      const { content_ids } = await request.json() as { content_ids: string[] };
+      const response = await state.contents(new URLSearchParams());
+      return response instanceof Response ? response : HttpResponse.json(selectedMetadata(response.items, content_ids));
+    }),
     http.get(CONTENTS, async ({ request }) => {
       record(request);
       const response = await state.contents(new URL(request.url).searchParams);
@@ -96,6 +110,8 @@ function callRow(name = "Bash") {
 }
 
 async function inspect(user: ReturnType<typeof userEvent.setup>, name = "Bash") {
+  const timelineTab = await screen.findByRole("tab", { name: "Timeline" });
+  if (timelineTab.getAttribute("aria-selected") !== "true") await user.click(timelineTab);
   await screen.findByText(name, { selector: "[data-call-name]" });
   const row = callRow(name);
   const toggle = within(row).getByRole("button", { name: new RegExp(`^${name}`) });
@@ -105,7 +121,7 @@ async function inspect(user: ReturnType<typeof userEvent.setup>, name = "Bash") 
 }
 
 function captured(id: string, overrides: Partial<SessionContent> = {}) {
-  return makeContent({ id, session_id: SESSION_ID, call_id: EXACT_ID, role: "tool", channel: "tool_output", preview: { text: `PREVIEW_${id}`, truncated: false }, ...overrides });
+  return makeContent({ id, occurred_at: "2026-10-17T12:00:00.000Z", session_id: SESSION_ID, call_id: EXACT_ID, role: "tool", channel: "tool_output", preview: { text: `PREVIEW_${id}`, truncated: false }, ...overrides });
 }
 
 function metadataRequest(callId: string | null, cursor: string | null = null): RequestRecord {
@@ -142,7 +158,7 @@ describe("Exact captured content from a timeline call", () => {
     const { client } = renderDetail();
     await screen.findByText("Bash", { selector: "[data-call-name]" });
     await waitFor(() => expect(client.isFetching()).toBe(0));
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([]);
     expect(within(callRow()).queryByText("No output")).not.toBeInTheDocument();
 
     const panel = await inspect(user);
@@ -154,7 +170,7 @@ describe("Exact captured content from a timeline call", () => {
     expect(within(callRow()).getByText(/No output.*call events/i)).toBeInTheDocument();
     expect(within(callRow()).queryByText("Completion not recorded")).not.toBeInTheDocument();
     expect(within(callRow()).queryByRole("img", { name: "Succeeded" })).not.toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(EXACT_ID)]);
     expect(state.requests.every(({ method }) => method === "GET")).toBe(true);
   });
 
@@ -170,21 +186,21 @@ describe("Exact captured content from a timeline call", () => {
     expect(await within(panel).findByText(/6.*(?:items|records).*loaded/i)).toBeInTheDocument();
     expect(within(panel).getByText(/2.*raw.*hidden/i)).toBeInTheDocument();
     expect(within(panel).queryByText("PREVIEW_native-one")).not.toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(EXACT_ID)]);
 
     await user.click(within(panel).getByRole("button", { name: /Show raw records/i }));
     expect(within(panel).getByText("PREVIEW_native-one")).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toHaveLength(2);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toHaveLength(1);
     await user.click(within(panel).getByRole("button", { name: /^Show all/ }));
     expect(await within(panel).findByText("FULL_SYNTHETIC_BODY_long")).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents")).map(({ path }) => path)).toEqual([CONTENTS, CONTENTS, `${CONTENTS}/long/body`]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents")).map(({ path }) => path)).toEqual([CONTENTS, `${CONTENTS}/long/body`]);
     await user.click(within(panel).getByRole("button", { name: "Show image" }));
     expect(await within(panel).findByRole("img", { name: /Attached image/ })).toHaveAttribute("src", "blob:synthetic-call-image");
-    expect(state.requests.filter(({ path }) => path.includes("/contents")).map(({ path }) => path)).toEqual([CONTENTS, CONTENTS, `${CONTENTS}/long/body`, `${CONTENTS}/image/download`]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents")).map(({ path }) => path)).toEqual([CONTENTS, `${CONTENTS}/long/body`, `${CONTENTS}/image/download`]);
     const fileActions = within(panel).getByText(/application\/pdf/).parentElement!;
     await user.click(within(fileActions).getByRole("button", { name: "Download" }));
     await waitFor(() => expect(state.requests.filter(({ path }) => path.includes("/contents")).map(({ path }) => path)).toEqual([
-      CONTENTS, CONTENTS, `${CONTENTS}/long/body`, `${CONTENTS}/image/download`, `${CONTENTS}/file/download`,
+      CONTENTS, `${CONTENTS}/long/body`, `${CONTENTS}/image/download`, `${CONTENTS}/file/download`,
     ]));
     await user.click(screen.getByRole("button", { name: "Presenter mode" }));
     expect(within(panel).getByText("PREVIEW_native-one")).toHaveAttribute("aria-hidden", "true");
@@ -227,7 +243,7 @@ describe("Exact captured content from a timeline call", () => {
     const panel = await inspect(user);
     expect(await within(panel).findByText("No captured content is currently linked to this call.")).toBeInTheDocument();
     expect(within(panel).queryByText("PREVIEW_parent-output")).not.toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(callId)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(callId)]);
   });
 
   it("does not invent a lookup for a call without a native identity", async () => {
@@ -242,7 +258,7 @@ describe("Exact captured content from a timeline call", () => {
       await user.click(inspectButton);
       await waitFor(() => expect(client.isFetching()).toBe(0));
     }
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([]);
     expect(within(callRow()).queryByText("No captured content is currently linked to this call.")).not.toBeInTheDocument();
   });
 
@@ -258,33 +274,31 @@ describe("Exact captured content from a timeline call", () => {
     expect(within(panel).queryByText("PREVIEW_native-only")).not.toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: /Show raw records/i }));
     expect(within(panel).getByText("PREVIEW_native-only")).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(EXACT_ID)]);
   });
 
-  it("refreshes active loaded metadata after authority, invalidates the closed inspector and does not race Load more", async () => {
+  it("refreshes active inspector pages after authority, leaves Transcript stale, and does not race Load more", async () => {
     const otherId = "closed-inspector";
     let current = false;
-    const heldReader = deferred<SessionContentPage>();
     const heldInspector = deferred<SessionContentPage>();
     let holdRefresh = false;
     const page = (scope: string | null, cursor: string | null) => {
       const name = scope === null ? "reader" : scope === EXACT_ID ? "open" : "closed";
       const number = cursor ? Number(cursor.split(":").at(-1)) : 1;
       return contentPage([captured(`${name}-${number}`, { call_id: scope, role: "assistant", channel: "reply",
-        preview: { text: `${current ? "CURRENT" : "PREVIOUS"}_${name}_${number}`, truncated: false } })], `${name}:${number + 1}`);
+        preview: { text: `${current ? "CURRENT" : "PREVIOUS"}_${name}_${number}`, truncated: false } })], scope === null ? null : `${name}:${number + 1}`);
     };
     const state = serve({ calls: [CALL, { ...CALL, key: "second-call", name: "Read", call_id: otherId }], contents: (params) => {
       const scope = params.get("call_id");
       const cursor = params.get("cursor");
-      if (holdRefresh && !cursor && scope === null) return heldReader.promise;
       if (holdRefresh && !cursor && scope === EXACT_ID) return heldInspector.promise;
       return page(scope, cursor);
     } });
     const user = userEvent.setup();
     const { client } = renderDetail();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
     const reader = await screen.findByRole("region", { name: "Transcript" });
-    await user.click(within(reader).getByRole("button", { name: "Load more" }));
-    await within(reader).findByText("PREVIOUS_reader_2");
+    await within(reader).findByText("PREVIOUS_reader_1");
     await inspect(user, "Read");
     await user.click(within(callRow("Read")).getByRole("button", { name: /^Read/ }));
     const panel = await inspect(user);
@@ -294,37 +308,34 @@ describe("Exact captured content from a timeline call", () => {
     const before = state.requests.length;
     current = true;
     holdRefresh = true;
-
     await user.click(screen.getByRole("button", { name: "Refresh evidence" }));
-    await waitFor(() => expect(state.requests.slice(before).filter(({ path }) => path.includes("/contents"))).toHaveLength(2));
-    const readerMore = within(reader).getByRole("button", { name: "Load more" });
+    await waitFor(() => expect(state.requests.slice(before).filter(({ path }) => path.includes("/contents"))).toHaveLength(1));
     const inspectorMore = within(panel).getByRole("button", { name: "Load more" });
-    expect(readerMore).toBeDisabled();
     expect(inspectorMore).toBeDisabled();
-    await user.click(readerMore);
     await user.click(inspectorMore);
-    expect(state.requests.slice(before).filter(({ path }) => path.includes("/contents"))).toHaveLength(2);
+    expect(state.requests.slice(before).filter(({ path }) => path.includes("/contents"))).toHaveLength(1);
     holdRefresh = false;
-    await act(async () => { heldReader.resolve(page(null, null)); heldInspector.resolve(page(EXACT_ID, null)); });
-    await within(reader).findByText("CURRENT_reader_2");
+    await act(async () => { heldInspector.resolve(page(EXACT_ID, null)); });
     await within(panel).findByText("CURRENT_open_2");
     await waitFor(() => expect(client.isFetching()).toBe(0));
     const refreshed = state.requests.slice(before);
     expect(refreshed[0]?.path).toBe(ROOT);
-    expect(refreshed.filter(({ path }) => path.includes("/contents")).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))).toEqual([
-      metadataRequest(null), metadataRequest(null, "reader:2"), metadataRequest(EXACT_ID), metadataRequest(EXACT_ID, "open:2"),
-    ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+    expect(refreshed.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(EXACT_ID), metadataRequest(EXACT_ID, "open:2")]);
     expect(refreshed.every(({ method }) => method === "GET")).toBe(true);
-    expect(readerMore).toBeEnabled();
     expect(inspectorMore).toBeEnabled();
-    await user.click(readerMore);
     await user.click(inspectorMore);
-    await within(reader).findByText("CURRENT_reader_3");
     await within(panel).findByText("CURRENT_open_3");
     const beforeReopen = state.requests.length;
     const reopened = await inspect(user, "Read");
     expect(await within(reopened).findByText("CURRENT_closed_1")).toBeInTheDocument();
     expect(state.requests.slice(beforeReopen).filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(otherId)]);
+    const beforeReader = state.requests.length;
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
+    expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
+    expect(await within(reader).findByText("CURRENT_reader_1")).toBeInTheDocument();
+    expect(state.requests.slice(beforeReader).filter(({ path }) => path.includes("/contents"))).toEqual([
+      { path: `${CONTENTS}/window`, method: "GET", callId: null, cursor: expect.any(String), limit: null },
+    ]);
   });
 
   it("distinguishes pending metadata from a successful unmatched call", async () => {
@@ -337,11 +348,10 @@ describe("Exact captured content from a timeline call", () => {
     expect(within(panel).queryByText("No captured content is currently linked to this call.")).not.toBeInTheDocument();
     await act(async () => held.resolve(contentPage([])));
     expect(await within(panel).findByText("No captured content is currently linked to this call.")).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(EXACT_ID)]);
   });
 
   it.each([
-    { status: 403, explanation: /can't read.*content/i },
     { status: 404, explanation: /(?:no longer available|unavailable)/i },
     { status: 503, explanation: /couldn't load.*content/i },
   ])("hides a retained private preview on metadata status $status without denying the whole session", async ({ status, explanation }) => {
@@ -361,7 +371,7 @@ describe("Exact captured content from a timeline call", () => {
     expect(within(panel).queryByText("PRIVATE_CACHED_CALL_PREVIEW")).not.toBeInTheDocument();
     expect(within(panel).queryByText("No captured content is currently linked to this call.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Inspect exact captured evidence" })).toBeInTheDocument();
-    expect(screen.getByText("READER_STAYS_AUTHORIZED")).toBeInTheDocument();
+
     if (status === 503) {
       responseStatus = 200;
       preview = "RECOVERED_CALL_PREVIEW";
@@ -369,7 +379,44 @@ describe("Exact captured content from a timeline call", () => {
       expect(await within(panel).findByText(preview)).toBeInTheDocument();
     }
     const contentRequests = state.requests.filter(({ path }) => path.includes("/contents"));
-    expect(contentRequests.every(({ path, callId, cursor, method }) => path === CONTENTS && (callId === null || callId === EXACT_ID) && cursor === null && method === "GET")).toBe(true);
+    expect(contentRequests.every(({ path, callId, cursor, method }) => path === CONTENTS && callId === EXACT_ID && cursor === null && method === "GET")).toBe(true);
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
+    expect(await screen.findByText("READER_STAYS_AUTHORIZED")).toBeVisible();
+    expect(state.requests.filter(({ path }) => path === `${CONTENTS}/window`)).toHaveLength(1);
+  });
+
+  it.each([401, 403])("purges the session's retained private evidence after exact-call metadata status %s, preserving unrelated sessions", async (status) => {
+    let responseStatus = 200;
+    const state = serve({ contents: (params) => !params.has("call_id")
+      ? contentPage([captured("reader", { call_id: null, role: "assistant", channel: "reply", preview: { text: "PRIVATE_READER_PREVIEW", truncated: false } })])
+      : responseStatus === 200 ? contentPage([captured("retained", { preview: { text: "PRIVATE_CACHED_CALL_PREVIEW", truncated: false } })])
+        : HttpResponse.json({ detail: "Synthetic content refusal" }, { status: responseStatus }) });
+    const user = userEvent.setup();
+    const { client } = renderDetail();
+    const root = sessionKeys.detail(SLUG, SESSION_ID);
+    const unrelated = makeSession({ id: "unrelated-session", title: "Other authorized session" });
+    const unrelatedBody = sessionKeys.contentBody(SLUG, unrelated.id, "other-body", "other-digest", 0);
+    client.setQueryData(sessionKeys.detail(SLUG, unrelated.id), unrelated);
+    client.setQueryData(unrelatedBody, { text: "OTHER_SESSION_BODY" });
+    client.setQueryData(sessionKeys.contentBody(SLUG, SESSION_ID, "retained-body", "private-digest", 0), { text: "PRIVATE_RETAINED_BODY" });
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
+    await screen.findByText("PRIVATE_READER_PREVIEW");
+    const panel = await inspect(user);
+    await within(panel).findByText("PRIVATE_CACHED_CALL_PREVIEW");
+    responseStatus = status;
+    await user.click(screen.getByRole("button", { name: "Refresh evidence" }));
+    await waitFor(() => expect(client.getQueryData(root)).toBeNull());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Session unavailable" })).toBeVisible());
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    await waitFor(() => expect(client.getQueryCache().findAll({ queryKey: root, predicate: (query) => query.queryKey.length > root.length })).toEqual([]));
+    expect(screen.queryByText("PRIVATE_READER_PREVIEW")).not.toBeInTheDocument();
+    expect(screen.queryByText("PRIVATE_CACHED_CALL_PREVIEW")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Captured content" })).not.toBeInTheDocument();
+    expect(client.getQueryData(sessionKeys.detail(SLUG, unrelated.id))).toEqual(unrelated);
+    expect(client.getQueryData(unrelatedBody)).toEqual({ text: "OTHER_SESSION_BODY" });
+    expect(state.requests.filter(({ path }) => path === CONTENTS)).toEqual([metadataRequest(EXACT_ID), metadataRequest(EXACT_ID)]);
+    expect(state.requests.some(({ path }) => /\/contents\/[^/]+\/(?:body|download)/.test(path))).toBe(false);
+
   });
 
   it.each([403, 404])("contains delayed inspector metadata and opened bodies after authoritative session denial %s", async (status) => {
@@ -379,6 +426,8 @@ describe("Exact captured content from a timeline call", () => {
       : params.has("cursor") ? held.promise : contentPage([captured("private", { preview: { text: "PRIVATE_INSPECTOR_PREVIEW", truncated: true } })], "held-next") });
     const user = userEvent.setup();
     const view = renderDetail();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
+    await screen.findByText("PRIVATE_READER_PREVIEW");
     const panel = await inspect(user);
     await within(panel).findByText("PRIVATE_INSPECTOR_PREVIEW");
     await user.click(within(panel).getByRole("button", { name: /^Show all/ }));
@@ -409,22 +458,26 @@ describe("Exact captured content from a timeline call", () => {
       : contentPage([shared], "unvisited-reader") });
     const user = userEvent.setup();
     renderDetail();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
     const reader = await screen.findByRole("region", { name: "Transcript" });
+    await screen.findByText("SHARED_CAPTURE");
     const canonical = document.getElementById("content-shared")!;
     const selection = within(canonical).getByRole("checkbox");
     await user.click(selection);
     const panel = await inspect(user);
     expect(await within(panel).findByText(/100.*(?:items|records).*loaded/i)).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID)]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([{ path: `${CONTENTS}/window`, method: "GET", callId: null, cursor: null, limit: null }, metadataRequest(EXACT_ID)]);
     await user.click(within(panel).getByRole("button", { name: "Load more" }));
     expect(await within(panel).findByText(/101.*(?:items|records).*loaded/i)).toBeInTheDocument();
     expect(within(panel).getByText("PREVIEW_last")).toBeInTheDocument();
-    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([metadataRequest(null), metadataRequest(EXACT_ID), metadataRequest(EXACT_ID, "call-page-2")]);
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([{ path: `${CONTENTS}/window`, method: "GET", callId: null, cursor: null, limit: null }, metadataRequest(EXACT_ID), metadataRequest(EXACT_ID, "call-page-2")]);
     expect(document.querySelectorAll('[id="content-shared"]')).toHaveLength(1);
     expect(panel.contains(canonical)).toBe(false);
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
     await user.selectOptions(within(reader).getByRole("combobox", { name: "Jump to loaded content" }), "shared");
     await waitFor(() => expect(canonical).toHaveFocus());
     expect(selection).toBeChecked();
+    await user.click(screen.getByRole("tab", { name: "Timeline" }));
     const toggle = within(callRow()).getByRole("button", { name: /^Bash/ });
     act(() => toggle.focus());
     await user.keyboard("{Enter}");
@@ -435,6 +488,6 @@ describe("Exact captured content from a timeline call", () => {
     await user.keyboard(" ");
     expect(await within(callRow()).findByRole("region", { name: "Captured content" })).toBeInTheDocument();
     expect(selection).toBeChecked();
-    expect(state.requests.filter(({ path, callId }) => path.includes("/contents") && callId === null)).toEqual([metadataRequest(null)]);
+    expect(state.requests.filter(({ path, callId }) => path.includes("/contents") && callId === null)).toEqual([{ path: `${CONTENTS}/window`, method: "GET", callId: null, cursor: null, limit: null }]);
   });
 });

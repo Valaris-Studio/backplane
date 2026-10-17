@@ -36,6 +36,7 @@ from app.repositories.session_content import SessionContentRepository
 from app.schemas.session_content import (
     INLINE_IMAGE_MEDIA_TYPES,
     MAX_BODY_PAGE_BYTES,
+    MAX_CONTENT_WINDOW_ITEMS,
     PREVIEW_BYTES,
     TEXT_MEDIA_TYPES,
     WITH_BODY,
@@ -44,8 +45,12 @@ from app.schemas.session_content import (
     ContentPreview,
     ContentRead,
     ContentSourceRead,
+    ContentWindow,
+    ContentWindowMode,
     RedactionFact,
+    SelectedContentMetadata,
 )
+from app.services.session_content_cursor import ContentPosition, ContentWindowCursor
 from app.services.storage.session_content import (
     ContentObject,
     ContentStore,
@@ -87,7 +92,9 @@ def preview_of(content: AgentSessionContent) -> ContentPreview | None:
     )
 
 
-def content_read(content: AgentSessionContent) -> ContentRead:
+def content_read(
+    content: AgentSessionContent, *, include_preview: bool = True
+) -> ContentRead:
     return ContentRead(
         id=content.id,
         session_id=content.session_id,
@@ -110,8 +117,12 @@ def content_read(content: AgentSessionContent) -> ContentRead:
         source=ContentSourceRead(kind=content.source_kind, order=content.source_order),
         occurred_at=content.occurred_at,
         render=render_of(content),
-        preview=preview_of(content),
+        preview=preview_of(content) if include_preview else None,
     )
+
+
+def content_position(content: AgentSessionContent) -> ContentPosition:
+    return as_utc(content.occurred_at), content.source_order, content.id
 
 
 def encode_cursor(content: AgentSessionContent) -> str:
@@ -211,6 +222,141 @@ class AgentSessionContentService:
         return ContentPage(
             items=[content_read(row) for row in page],
             next_cursor=encode_cursor(page[-1]) if len(rows) > limit else None,
+        )
+
+    async def content_window(
+        self,
+        workspace_id: uuid.UUID,
+        owner_id: uuid.UUID,
+        session_id: uuid.UUID,
+        *,
+        mode: ContentWindowMode,
+        cursor: str | None,
+        anchor_id: uuid.UUID | None,
+    ) -> ContentWindow:
+        await self._owned_session(workspace_id, owner_id, session_id)
+        if (mode == "anchor") != (anchor_id is not None) or (
+            mode in ("earlier", "later", "refresh")
+        ) != (cursor is not None):
+            raise ValidationError("Navigation inputs do not match the window mode")
+        decoded = (
+            ContentWindowCursor.decode(cursor, session_id, mode)
+            if cursor is not None
+            else None
+        )
+        lower = upper = None
+        empty_direction = None
+        origin = mode
+        if mode == "anchor":
+            anchor = await self.repo.of_owner(
+                anchor_id, session_id, workspace_id, owner_id
+            )
+            if anchor is None:
+                raise _not_found()
+            boundary = content_position(anchor)
+            before = await self.repo.content_window(
+                session_id, before=boundary, descending=True, limit=49
+            )
+            after = await self.repo.content_window(session_id, after=boundary, limit=50)
+            rows = [*reversed(before), anchor, *after]
+        elif mode == "refresh" and decoded.empty_direction is not None:
+            lower = upper = decoded.boundary
+            empty_direction = decoded.empty_direction
+            rows = []
+        elif mode == "refresh" and decoded.origin is None:
+            lower, upper = decoded.lower, decoded.upper
+            rows = await self.repo.content_window(
+                session_id,
+                lower=lower,
+                upper=upper,
+                limit=MAX_CONTENT_WINDOW_ITEMS + 1,
+            )
+            if len(rows) > MAX_CONTENT_WINDOW_ITEMS:
+                raise ConflictError(
+                    "The captured records in this window changed; choose a new window",
+                    error_code="content_window_changed",
+                )
+        else:
+            origin = decoded.origin if mode == "refresh" else mode
+            descending = origin in ("latest", "earlier")
+            rows = await self.repo.content_window(
+                session_id,
+                before=decoded.boundary if origin == "earlier" else None,
+                after=decoded.boundary if origin == "later" else None,
+                descending=descending,
+                limit=MAX_CONTENT_WINDOW_ITEMS + 1,
+            )
+            rows = rows[:MAX_CONTENT_WINDOW_ITEMS]
+            if descending:
+                rows.reverse()
+
+        if lower is None and rows:
+            lower, upper = content_position(rows[0]), content_position(rows[-1])
+        if lower is None:
+            # A cursor can outlive every row beyond its seek boundary. Retain
+            # that boundary rather than sliding an empty page to another end.
+            if mode in ("earlier", "later"):
+                lower = upper = decoded.boundary
+                empty_direction = mode
+            else:
+                return ContentWindow(
+                    mode=mode,
+                    items=[],
+                    earlier_cursor=None,
+                    later_cursor=None,
+                    window_cursor=ContentWindowCursor(
+                        session_id, "refresh", origin=origin
+                    ).encode(),
+                    anchor_id=anchor_id,
+                )
+        has_earlier, has_later = await self.repo.content_window_neighbors(
+            session_id, lower, upper
+        )
+        return ContentWindow(
+            mode=mode,
+            items=[content_read(row) for row in rows],
+            earlier_cursor=(
+                ContentWindowCursor(session_id, "earlier", boundary=lower).encode()
+                if has_earlier
+                else None
+            ),
+            later_cursor=(
+                ContentWindowCursor(session_id, "later", boundary=upper).encode()
+                if has_later
+                else None
+            ),
+            window_cursor=(
+                ContentWindowCursor(
+                    session_id,
+                    "refresh",
+                    boundary=lower,
+                    empty_direction=empty_direction,
+                )
+                if empty_direction is not None
+                else ContentWindowCursor(
+                    session_id, "refresh", lower=lower, upper=upper
+                )
+            ).encode(),
+            anchor_id=anchor_id,
+        )
+
+    async def selected_metadata(
+        self,
+        workspace_id: uuid.UUID,
+        owner_id: uuid.UUID,
+        session_id: uuid.UUID,
+        content_ids: list[uuid.UUID],
+    ) -> SelectedContentMetadata:
+        await self._owned_session(workspace_id, owner_id, session_id)
+        rows = await self.repo.selected_metadata(
+            content_ids, session_id, workspace_id, owner_id
+        )
+        available = {row.id for row in rows}
+        return SelectedContentMetadata(
+            items=[content_read(row, include_preview=False) for row in rows],
+            unavailable_ids=[
+                row_id for row_id in content_ids if row_id not in available
+            ],
         )
 
     async def body_page(

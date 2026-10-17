@@ -11,6 +11,7 @@ import { http, HttpResponse, server } from "@/test/msw-server";
 import { api } from "@/lib/api";
 import { boardKeys, memberKeys, noteKeys, sessionKeys, workspaceKeys } from "@/lib/query-keys";
 import { ME, SLUG, callPage, contentPage, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
+import { contentWindowResponse, selectedMetadata } from "../../__tests__/window-fixtures";
 import { SessionTranscript } from "../SessionTranscript";
 import { SessionExcerpt } from "../SessionExcerpt";
 import { SessionDetailPage } from "../SessionDetailPage";
@@ -87,7 +88,11 @@ function serve() {
     http.get(`/api/workspaces/${SLUG}/boards`, () => HttpResponse.json([])),
     http.get(`/api/workspaces/${DESTINATION}/boards`, () => HttpResponse.json([{ ...board, is_frozen: state.frozen }, { ...board, id: OTHER_BOARD_ID, name: "Follow-up" }])),
     http.get(`/api/workspaces/${DESTINATION}/boards/:id`, ({ params }) => HttpResponse.json({ ...board, id: params.id, is_frozen: state.frozen, columns: [{ id: "todo", name: "To do", cards: params.id === BOARD_ID ? [card] : [] }] })),
-    http.get(CONTENTS_PATH, () => HttpResponse.json(contentPage(state.items))),
+    http.get(`${CONTENTS_PATH}/window`, ({ request }) => contentWindowResponse([contentPage(state.items)], new URL(request.url).searchParams)),
+    http.post(`${CONTENTS_PATH}/metadata`, async ({ request }) => {
+      const { content_ids } = await request.json() as { content_ids: string[] };
+      return HttpResponse.json(selectedMetadata(state.items, content_ids));
+    }),
     http.get(`${CONTENTS_PATH}/:id/body`, ({ params, request }) => {
       state.bodies.push(String(params.id));
       expect(params.id).toBe(CONTENT_ID);
@@ -176,6 +181,7 @@ async function unknownSaveOnSessionPage(linkedContentId?: string, additionalItem
   serveSessionPage();
   const view = renderSessionPage(client, linkedContentId);
   const user = userEvent.setup();
+  await user.click(await screen.findByRole("tab", { name: "Transcript" }));
   const dialog = await openPublish(user);
   await destination(user, dialog, true);
   await user.click(within(dialog).getByRole("button", { name: "Save note" }));
@@ -187,6 +193,8 @@ async function unknownSaveOnSessionPage(linkedContentId?: string, additionalItem
 }
 
 async function openPrivatePreview(user: ReturnType<typeof userEvent.setup>) {
+  const transcript = screen.queryByRole("tab", { name: i18n.t("sessions.detail.tabs.transcript") });
+  if (transcript) await user.click(transcript);
   await screen.findByRole("list", { name: i18n.t("sessions.contents.title") });
   const entry = document.getElementById(`content-${CONTENT_ID}`);
   expect(entry).not.toBeNull();
@@ -604,10 +612,10 @@ describe("explicit excerpt publication through the session reader", () => {
     const close = remainingDialog && within(remainingDialog).queryByRole("button", { name: /^(?:close|dismiss)$/i });
     if (close) await user.click(close);
     state.items = [unselected];
-    if (sourceLoss === "404") server.use(http.get(CONTENTS_PATH, () => HttpResponse.json({ detail: "Source deleted" }, { status: 404 })));
+    if (sourceLoss === "404") server.use(http.get(`${CONTENTS_PATH}/window`, () => HttpResponse.json({ detail: "Source deleted", error_code: "content_not_found" }, { status: 404 })));
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.all(SLUG) }));
     if (sourceLoss === "404") {
-      await screen.findByText("Couldn't load the transcript.");
+      await screen.findByText("Linked record unavailable");
       expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
     }
     // Dismissal is permitted, but it must preserve an accessible recovery action.
@@ -636,14 +644,14 @@ describe("explicit excerpt publication through the session reader", () => {
     const sent = structuredClone(state.writes[0]!);
     await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
     const metadata = deferred<Response>();
-    server.use(http.get(CONTENTS_PATH, () => metadata.promise));
-    const key = sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 });
+    server.use(http.get(`${CONTENTS_PATH}/window`, () => metadata.promise));
+    const key = sessionKeys.contentWindow(SLUG, SESSION_ID, { mode: "latest", anchor_id: undefined, request: 0 });
     try {
       await act(async () => { void client.resetQueries({ queryKey: key, exact: true }); });
       await waitFor(() => expect(client.getQueryState(key)?.status).toBe("pending"));
       expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
     } finally {
-      await act(async () => { metadata.resolve(HttpResponse.json(contentPage(state.items))); });
+      await act(async () => { metadata.resolve(contentWindowResponse([contentPage(state.items)])); });
     }
     await screen.findByRole("list", { name: "Transcript" });
     await user.click(screen.getByRole("button", { name: "Resume note save" }));
@@ -672,23 +680,23 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(checkbox).toBeEnabled();
     await user.click(checkbox);
     expect(checkbox).not.toBeChecked();
-    expect(screen.getByText("0 selected from 2 loaded items")).toBeVisible();
+    expect(screen.getByText("Selected: 0 · 2 records in this window")).toBeVisible();
     expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
-    const key = sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 });
+    const key = sessionKeys.contentWindow(SLUG, SESSION_ID, { mode: "latest", anchor_id: undefined, request: 0 });
     if (sourceChange === "pending") {
       const metadata = deferred<Response>();
-      server.use(http.get(CONTENTS_PATH, () => metadata.promise));
+      server.use(http.get(`${CONTENTS_PATH}/window`, () => metadata.promise));
       try {
         await act(async () => { void client.resetQueries({ queryKey: key, exact: true }); });
         await waitFor(() => expect(client.getQueryState(key)?.status).toBe("pending"));
         expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
       } finally {
-        await act(async () => { metadata.resolve(HttpResponse.json(contentPage(state.items))); });
+        await act(async () => { metadata.resolve(contentWindowResponse([contentPage(state.items)])); });
       }
       await screen.findByRole("list", { name: "Transcript" });
     } else {
       state.items = [];
-      if (sourceChange === "404") server.use(http.get(CONTENTS_PATH, () => HttpResponse.json({ detail: "Source deleted" }, { status: 404 })));
+      if (sourceChange === "404") server.use(http.get(`${CONTENTS_PATH}/window`, () => HttpResponse.json({ detail: "Source deleted", error_code: "content_not_found" }, { status: 404 })));
       await act(() => client.invalidateQueries({ queryKey: key, exact: true }));
       await waitFor(() => expect(screen.queryByRole("list", { name: "Transcript" })).not.toBeInTheDocument());
       expect(client.getQueryState(key)?.status).toBe(sourceChange === "404" ? "error" : "success");
@@ -718,7 +726,7 @@ describe("explicit excerpt publication through the session reader", () => {
     await waitFor(() => expect(state.writes).toHaveLength(1));
     const sent = structuredClone(state.writes[0]!);
     await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
-    const actions = screen.getByText("1 selected from 2 loaded items").parentElement!;
+    const actions = screen.getByText("Selected: 1 · 2 records in this window").parentElement!;
     expect(actions).toContainElement(screen.getByRole("button", { name: "Clear selection" }));
     expect(actions).not.toContainElement(screen.getByRole("list", { name: "Transcript" }));
     expect(actions).toContainElement(screen.getByRole("button", { name: "Resume note save" }));
@@ -749,7 +757,7 @@ describe("explicit excerpt publication through the session reader", () => {
       expect(screen.getAllByRole("region", { name: "Transcript" })).toHaveLength(1);
       expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
     }
-    const linked = screen.getByRole("tab", { name: "Linked work" });
+    const linked = screen.getByRole("tab", { name: "Session details" });
     await user.click(linked);
     expect(reader).toBeInTheDocument();
     expect(reader).not.toBeVisible();
@@ -761,12 +769,12 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
     expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", linked.id);
     await user.keyboard("{ArrowRight}");
-    const cost = screen.getByRole("tab", { name: "Cost" });
-    expect(cost).toHaveFocus();
-    expect(cost).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", cost.id);
+    const timeline = screen.getByRole("tab", { name: "Timeline" });
+    expect(timeline).toHaveFocus();
+    expect(timeline).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", timeline.id);
     expect(reader).not.toBeVisible();
-    await user.click(screen.getByRole("tab", { name: "Timeline" }));
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
     expect(reader).toBeVisible();
     for (const width of [640, 1279, 1280]) {
       act(() => resize(width));
@@ -788,9 +796,9 @@ describe("explicit excerpt publication through the session reader", () => {
   });
 
   it.each([
-    { tab: "Linked work", target: "unselected" },
-    { tab: "Cost", target: "linked-output" },
-  ])("defers a content link opened in compact $tab until Timeline returns without losing its frozen handoff", async ({ tab, target }) => {
+    { tab: "Session details", target: "unselected" },
+    { tab: "Timeline", target: "linked-output" },
+  ])("opens Transcript for a content link from compact $tab without losing its frozen handoff", async ({ tab, target }) => {
     responsiveViewport(375);
     const { state, user, sent, reader } = await unknownSaveOnSessionPage(target, [
       makeContent({ id: "linked-input", role: "tool", channel: "tool_input", call_id: "linked-call" }),
@@ -803,14 +811,11 @@ describe("explicit excerpt publication through the session reader", () => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
     try {
       await user.click(screen.getByRole("link", { name: "Follow content link" }));
-      const hiddenScrolls = scroll.mock.calls.length;
-      scroll.mockClear();
-      await user.click(screen.getByRole("tab", { name: "Timeline" }));
       const destination = document.getElementById(`content-${target}`);
       await waitFor(() => expect(destination).toHaveFocus());
       expect(destination).toBeVisible();
       expect(scroll).toHaveBeenCalledWith({ block: "start" });
-      expect(hiddenScrolls).toBe(0);
+      expect(screen.getByRole("tab", { name: "Transcript" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
       expect(within(document.getElementById(`content-${CONTENT_ID}`)!).getByRole("checkbox")).toBeChecked();
       await user.click(screen.getByRole("button", { name: "Resume note save" }));
@@ -827,8 +832,8 @@ describe("explicit excerpt publication through the session reader", () => {
   });
 
   it.each([
-    { tab: "Linked work", target: "unselected", away: "{ArrowRight}", back: "{ArrowLeft}" },
-    { tab: "Cost", target: "linked-output", away: "{ArrowLeft}", back: "{ArrowRight}" },
+    { tab: "Session details", target: "unselected", away: "{ArrowRight}", back: "{ArrowLeft}" },
+    { tab: "Timeline", target: "linked-output", away: "{ArrowLeft}", back: "{ArrowRight}" },
   ])("keeps compact tab focus after an already-followed $target link when returning from $tab", async ({ tab, target, away, back }) => {
     responsiveViewport(375);
     const { state, user, sent, reader } = await unknownSaveOnSessionPage(target, [
@@ -844,14 +849,14 @@ describe("explicit excerpt publication through the session reader", () => {
       expect(scroll).toHaveBeenCalledWith({ block: "start" });
       scroll.mockClear();
 
-      const timeline = screen.getByRole("tab", { name: "Timeline" });
-      await user.click(timeline);
+      const transcript = screen.getByRole("tab", { name: "Transcript" });
+      await user.click(transcript);
       await user.keyboard(away);
       expect(screen.getByRole("tab", { name: tab })).toHaveFocus();
       expect(reader).not.toBeVisible();
       await user.keyboard(back);
-      expect(timeline).toHaveFocus();
-      expect(timeline).toHaveAttribute("aria-selected", "true");
+      expect(transcript).toHaveFocus();
+      expect(transcript).toHaveAttribute("aria-selected", "true");
       expect(reader).toBeVisible();
       expect(scroll).not.toHaveBeenCalled();
       expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
@@ -937,7 +942,7 @@ describe("explicit excerpt publication through the session reader", () => {
     client.setQueryData(bodyKey, { text: RAW_BODY });
     client.setQueryData(fileKey, { url: "private-capture" });
     client.setQueryData(otherKey, { text: "Other session" });
-    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeDefined();
+    expect(client.getQueryData(sessionKeys.contentWindow(SLUG, SESSION_ID, { mode: "latest", anchor_id: undefined, request: 0 }))).toBeDefined();
     server.use(http.get(SESSION_PATH, () => HttpResponse.json({ detail: "Unavailable" }, { status })));
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
     await waitFor(() => expect(reader).not.toBeInTheDocument());
@@ -946,7 +951,7 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(screen.queryByText(RAW_BODY)).not.toBeInTheDocument();
     await waitFor(() => expect(client.getQueryData(bodyKey)).toBeUndefined());
     expect(client.getQueryData(fileKey)).toBeUndefined();
-    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeUndefined();
+    expect(client.getQueryData(sessionKeys.contentWindow(SLUG, SESSION_ID, { mode: "latest", anchor_id: undefined, request: 0 }))).toBeUndefined();
     expect(client.getQueryData(otherKey)).toEqual({ text: "Other session" });
     expect(client.getQueryData(sessionKeys.detail(SLUG, SESSION_ID))).toBeNull();
     server.use(http.get(SESSION_PATH, () => HttpResponse.json({ detail: "Temporarily unavailable" }, { status: 500 })));
@@ -954,7 +959,7 @@ describe("explicit excerpt publication through the session reader", () => {
     await screen.findByRole("heading", { name: "Couldn't load this session" });
     expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resume note save" })).not.toBeInTheDocument();
-    expect(client.getQueryData(sessionKeys.contents(SLUG, SESSION_ID, { limit: 100 }))).toBeUndefined();
+    expect(client.getQueryData(sessionKeys.contentWindow(SLUG, SESSION_ID, { mode: "latest", anchor_id: undefined, request: 0 }))).toBeUndefined();
     view.unmount();
     renderSessionPage(client);
     await screen.findByRole("heading", { name: "Couldn't load this session" });
@@ -964,6 +969,7 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(client.getQueryData(sessionKeys.detail(SLUG, SESSION_ID))).toBeNull();
     server.use(http.get(SESSION_PATH, () => HttpResponse.json(sourceSession)));
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.detail(SLUG, SESSION_ID), exact: true }));
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "Transcript" }));
     await screen.findByRole("region", { name: "Transcript" });
     expect(screen.queryByRole("button", { name: "Resume note save" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview excerpt" })).toBeDisabled();

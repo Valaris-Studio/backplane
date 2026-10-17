@@ -4,15 +4,18 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { QueryClient, onlineManager } from "@tanstack/react-query";
 import i18n from "@/i18n/config";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { sessionKeys } from "@/lib/query-keys";
 import type { WebSocketEvent } from "@/lib/websocket";
 import { WebSocketContext } from "@/providers/WebSocketProvider";
 import type { AgentSession, SessionContent, SessionContentPage } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
+import { contentWindowResponse, selectedMetadata, windowFromResponse } from "../../__tests__/window-fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { formatBytes, formatClock } from "../../utils/format";
 import { SessionDetailPage } from "../SessionDetailPage";
@@ -72,13 +75,21 @@ function serveSession(options: ServeOptions = {}): ContentServer {
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/links`, () => HttpResponse.json({ items: [] })),
     http.get(`/api/workspaces/${SLUG}/sessions/${SESSION_ID}/children`, () => HttpResponse.json({ items: [] })),
     http.get(`/api/workspaces/${SLUG}/boards`, () => HttpResponse.json([])),
-    http.get(CONTENTS, ({ request }) => {
+    http.get(`${CONTENTS}/window`, async ({ request }) => {
       const params = new URL(request.url).searchParams;
       requests.listRequests.push(params);
-      if (options.list) return options.list();
-      const cursor = params.get("cursor");
-      const page = cursor ? pages.find((_, index) => `page-${index}` === cursor) : pages[0];
-      return HttpResponse.json(page ?? contentPage([]));
+      if (options.list) return windowFromResponse(await options.list(), params);
+      return contentWindowResponse(pages, params);
+    }),
+    http.post(`${CONTENTS}/metadata`, async ({ request }) => {
+      const { content_ids } = await request.json() as { content_ids: string[] };
+      let current = pages;
+      if (options.list) {
+        const response = await options.list();
+        if (!response.ok) return response;
+        current = [await response.json() as SessionContentPage];
+      }
+      return HttpResponse.json(selectedMetadata(current.flatMap((page) => page.items), content_ids));
     }),
   );
   return requests;
@@ -102,8 +113,8 @@ function serveBody(requests: ContentServer, id: string, text: string, pageBytes 
   );
 }
 
-function renderSession(queryClient?: QueryClient) {
-  return renderWithProviders(
+async function renderSession(queryClient?: QueryClient) {
+  const view = renderWithProviders(
     <WebSocketContext.Provider value={socketContext}>
       <Routes>
         <Route path="/:slug/sessions/:sessionId" element={<><SessionRealtimeOwner slug={SLUG} /><SessionDetailPage /></>} />
@@ -111,6 +122,8 @@ function renderSession(queryClient?: QueryClient) {
     </WebSocketContext.Provider>,
     { routerProps: { initialEntries: [`/${SLUG}/sessions/${SESSION_ID}`] }, queryClient },
   );
+  fireEvent.click(await screen.findByRole("tab", { name: i18n.t("sessions.detail.tabs.transcript") }));
+  return view;
 }
 
 async function transcript() {
@@ -162,7 +175,7 @@ afterEach(async () => {
 describe("Transcript — the contract's content page", () => {
   it("lists every item of the wire page in the server's order, each with its label", async () => {
     serveSession({ pages: [READER_PAGE] });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     expect(entryNames(list)).toEqual(["Attachment", "Prompt", "Claude Code", "Tool call", "Attachment", "Instructions", "Tool call", "Attachment"]);
@@ -175,7 +188,7 @@ describe("Transcript — the contract's content page", () => {
   it("gives each item a stable anchor and copies its link", async () => {
     const user = userEvent.setup();
     serveSession({ pages: [contentPage([makeContent({ id: "4fcdae96-5071-4293-8e3f-4a5b6c7d8e9f" })])] });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     const item = entry(list, "Claude Code");
@@ -194,33 +207,34 @@ describe("Transcript — the contract's content page", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const tool = entry(await transcript(), "Tool call");
     expect(within(tool).getByText("toolu_01AbC")).toBeInTheDocument();
     expect(within(tool).getByText("Claude Code transcript #47")).toBeInTheDocument();
   });
 
-  it("leaves an existing session without captured content exactly as it was", async () => {
+  it("keeps an empty captured-content view discoverable when the historical capture level was standard", async () => {
     const requests = serveSession({ session: { capture_levels: ["standard"] }, pages: [contentPage([])] });
-    renderSession();
+    await renderSession();
 
     await screen.findByRole("heading", { level: 1, name: "Add a retry to the uploader" });
     await waitFor(() => expect(requests.listRequests).toHaveLength(1));
     expect(screen.queryByRole("list", { name: "Transcript" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Transcript" })).toBeVisible();
+    expect(screen.getByText("No captured content was received for this session.")).toBeVisible();
   });
 });
 
 describe("Transcript — observed rich content availability", () => {
-  it("does not infer rich emptiness for legacy levels or native-only content", async () => {
+  it("distinguishes an empty observed window from hidden native-only records", async () => {
     const requests = serveSession({ session: { capture_levels: [] }, pages: [contentPage([])] });
-    const first = renderSession();
+    const first = await renderSession();
     await waitFor(() => expect(requests.listRequests).toHaveLength(1));
-    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
+    expect(screen.getByText("No captured content was received for this session.")).toBeVisible();
     first.unmount();
     serveSession({ pages: [contentPage([makeContent({ id: "only-native", channel: "native_record", preview: { text: "SYNTHETIC_NATIVE", truncated: false } })])] });
-    renderSession();
+    await renderSession();
     expect(await screen.findByText("Only raw records were captured. Choose Everything to see them.")).toBeInTheDocument();
     expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
     expect(screen.queryByText("SYNTHETIC_NATIVE")).not.toBeInTheDocument();
@@ -230,7 +244,7 @@ describe("Transcript — observed rich content availability", () => {
     let release!: (response: Response) => void;
     const pending = new Promise<Response>((resolve) => { release = resolve; });
     const requests = serveSession({ list: () => pending });
-    renderSession();
+    await renderSession();
     await waitFor(() => expect(requests.listRequests).toHaveLength(1));
     expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
     await act(async () => release(HttpResponse.json(contentPage([makeContent()]))));
@@ -240,7 +254,7 @@ describe("Transcript — observed rich content availability", () => {
 
   it.each([{ capture_levels: ["rich"] }, { capture_levels: ["rich", "standard"] }] satisfies { capture_levels: AgentSession["capture_levels"] }[])("explains an exhausted empty reader with historical levels $capture_levels without promising future content", async ({ capture_levels }) => {
     const requests = serveSession({ session: { capture_levels }, pages: [contentPage([])] });
-    renderSession();
+    await renderSession();
     expect(await screen.findByText("No captured content was received for this session.")).toBeInTheDocument();
     expect(requests.listRequests).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
@@ -262,7 +276,7 @@ describe("Transcript — messages, tools and edits", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     expect(entryNames(list)).toEqual(["Prompt", "Tool call", "Claude Code"]);
@@ -290,7 +304,7 @@ describe("Transcript — messages, tools and edits", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const tool = entry(await transcript(), "Tool call");
     expect(within(tool).getByRole("button", { name: /Tool call/ })).toHaveAttribute("aria-expanded", "false");
@@ -302,7 +316,7 @@ describe("Transcript — messages, tools and edits", () => {
     serveSession({
       pages: [contentPage([makeContent({ id: "in", role: "tool", channel: "tool_input", call_id: "toolu_9", preview: { text: '{"command":"deploy --prod"}', truncated: false } })])],
     });
-    renderSession();
+    await renderSession();
 
     const tool = entry(await transcript(), "Tool call");
     expect(within(tool).getByText('{"command":"deploy --prod"}').closest("[data-prompt-hidden]")).not.toBeNull();
@@ -313,7 +327,7 @@ describe("Transcript — messages, tools and edits", () => {
     serveSession({
       pages: [contentPage([makeContent({ id: "out", role: "tool", channel: "command_output", call_id: "exec-1", preview: { text: "ok 42 tests", truncated: false } })])],
     });
-    renderSession();
+    await renderSession();
 
     const tool = entry(await transcript(), "Tool call");
     within(tool).getByRole("button", { name: /Tool call/ }).focus();
@@ -331,7 +345,7 @@ describe("Transcript — messages, tools and edits", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
@@ -355,7 +369,7 @@ describe("Transcript — messages, tools and edits", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     expect(within(reply).getByText("Done").tagName).toBe("STRONG");
@@ -371,7 +385,7 @@ describe("Transcript — messages, tools and edits", () => {
   it("blurs captured content while prompts are hidden", async () => {
     act(() => setPromptsHidden(true));
     serveSession({ pages: [contentPage([makeContent({ id: "r", preview: { text: "secret plan", truncated: false } })])] });
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     expect(within(reply).getByText("secret plan").closest("[data-prompt-hidden]")).not.toBeNull();
@@ -379,7 +393,7 @@ describe("Transcript — messages, tools and edits", () => {
 });
 
 describe("Transcript — paging and large bodies", () => {
-  it("loads the next page of items on request, in order", async () => {
+  it("opens recent records and replaces the window when reading earlier or later history", async () => {
     const user = userEvent.setup();
     const requests = serveSession({
       pages: [
@@ -387,15 +401,18 @@ describe("Transcript — paging and large bodies", () => {
         contentPage([makeContent({ id: "b", preview: { text: "second page", truncated: false } })]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
-    expect(within(list).getByText("first page")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Load more" }));
-    expect(await within(list).findByText("second page")).toBeInTheDocument();
-    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
-    expect(requests.listRequests.at(-1)?.get("cursor")).toBe("page-1");
-    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(within(list).getByText("second page")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Earlier records" }));
+    expect(await screen.findByText("first page")).toBeInTheDocument();
+    expect(screen.queryByText("second page")).not.toBeInTheDocument();
+    expect(within(await transcript()).getAllByRole("listitem")).toHaveLength(1);
+    expect(requests.listRequests.at(-1)?.get("mode")).toBe("earlier");
+    await user.click(screen.getByRole("button", { name: "Later records" }));
+    expect(await screen.findByText("second page")).toBeInTheDocument();
+    expect(screen.queryByText("first page")).not.toBeInTheDocument();
   });
 
   it("fetches a long body page by page, independent of the preview, and only when asked", async () => {
@@ -410,7 +427,7 @@ describe("Transcript — paging and large bodies", () => {
       ],
     });
     serveBody(requests, "big", head + tail);
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     expect(requests.bodyRequests).toEqual([]);
@@ -438,7 +455,7 @@ describe("Transcript — paging and large bodies", () => {
       pages: [contentPage([makeContent({ id: "r", byte_count: 300, preview: { text: "short", truncated: true } })])],
     });
     serveBody(requests, "r", "x".repeat(300));
-    renderSession(queryClient);
+    await renderSession(queryClient);
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
@@ -451,25 +468,34 @@ describe("Transcript — paging and large bodies", () => {
     expect(requests.bodyRequests).toHaveLength(1);
   });
 
-  it("fetches the body again when the item's digest changes", async () => {
+  it("closes a changed digest's body until another explicit disclosure, then fetches the new body", async () => {
     useFakeClock();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const queryClient = createTestQueryClient();
     let sha256 = "1".repeat(64);
+    const source = makeContent({ id: "r", byte_count: 300, preview: { text: "short", truncated: true } });
     const requests = serveSession({
-      list: () => HttpResponse.json(contentPage([makeContent({ id: "r", sha256, byte_count: 300, preview: { text: "short", truncated: true } })])),
+      list: () => HttpResponse.json(contentPage([{ ...source, sha256 }])),
     });
     serveBody(requests, "r", "y".repeat(300));
-    renderSession(queryClient);
+    await renderSession(queryClient);
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
     await within(reply).findByRole("button", { name: "Show less" });
 
     sha256 = "2".repeat(64);
+    serveBody(requests, "r", "z".repeat(300));
     await emitSessionUpdate("contents");
     await settled(queryClient);
+    expect(requests.bodyRequests).toHaveLength(1);
+    const refreshed = entry(await transcript(), "Claude Code");
+    expect(within(refreshed).queryByRole("button", { name: "Show less" })).not.toBeInTheDocument();
+    expect(within(refreshed).queryByText("y".repeat(300))).not.toBeInTheDocument();
+    await user.click(within(refreshed).getByRole("button", { name: /^Show all/ }));
+    expect(await within(refreshed).findByText("z".repeat(300))).toBeVisible();
     expect(requests.bodyRequests).toHaveLength(2);
+    expect(queryClient.getQueryData(sessionKeys.contentBody(SLUG, SESSION_ID, "r", sha256, 0))).toMatchObject({ text: "z".repeat(300) });
   });
 
   it("says storage is unavailable when a stored body is damaged, and retries", async () => {
@@ -488,7 +514,7 @@ describe("Transcript — paging and large bodies", () => {
         return HttpResponse.json({ content_id: "r", offset: 0, next_offset: null, total_bytes: 9, text: "recovered" });
       }),
     );
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
@@ -501,7 +527,7 @@ describe("Transcript — paging and large bodies", () => {
     const user = userEvent.setup();
     const requests = serveSession({ pages: [contentPage([makeContent({ id: "r", preview: { text: "short", truncated: true } })])] });
     serveBody(requests, "r", "arrives once online");
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     act(() => onlineManager.setOnline(false));
@@ -533,7 +559,7 @@ describe("Transcript — paging and large bodies", () => {
         return HttpResponse.json({ content_id: "big", offset, next_offset: null, total_bytes: head.length + 7, text: "THE-END" });
       }),
     );
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
@@ -556,7 +582,7 @@ describe("Transcript — paging and large bodies", () => {
         HttpResponse.json({ detail: "Content not found", error_code: "content_not_found", error_params: {}, context: null }, { status: 404 }),
       ),
     );
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
@@ -614,7 +640,7 @@ describe("Transcript — coverage", () => {
   for (const [name, overrides, badge, explanation] of cases) {
     it(`states ${name} content plainly`, async () => {
       serveSession({ pages: [contentPage([makeContent({ id: "c", ...overrides })])] });
-      renderSession();
+      await renderSession();
 
       const reply = entry(await transcript(), "Claude Code");
       if (badge) expect(within(reply).getByText(badge)).toBeInTheDocument();
@@ -631,7 +657,7 @@ describe("Transcript — coverage", () => {
         ]),
       ],
     });
-    renderSession();
+    await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
     expect(within(attachment).getByText("This file type isn't captured.")).toBeInTheDocument();
@@ -650,9 +676,11 @@ describe("Transcript — attachments", () => {
         return new HttpResponse(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { headers: { "Content-Type": "image/png" } });
       }),
     );
-    const { unmount } = renderSession();
+    const { unmount } = await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
+    expect(requests.downloads).toEqual([]);
+    await userEvent.setup().click(within(attachment).getByRole("button", { name: "Show image" }));
     const image = await within(attachment).findByRole("img", { name: "Attached image, 278 KB" });
     expect(image.getAttribute("src")).toMatch(/^blob:session-content-/);
     expect(requests.downloads).toEqual(["img"]);
@@ -677,7 +705,7 @@ describe("Transcript — attachments", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       clicked.push(this.download);
     });
-    renderSession();
+    await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
     expect(attachment.querySelector("img, iframe, object, embed")).toBeNull();
@@ -693,9 +721,9 @@ describe("Transcript — live updates", () => {
     useFakeClock();
     let finished = false;
     const pending = makeContent({ id: "up", coverage: "not_yet_uploaded", coverage_reason: "upload_pending", render: "none", preview: null });
-    const available = makeContent({ id: "up", preview: { text: "uploaded at last", truncated: false } });
+    const available = makeContent({ id: "up", occurred_at: pending.occurred_at, preview: { text: "uploaded at last", truncated: false } });
     serveSession({ list: () => HttpResponse.json(contentPage([finished ? available : pending])) });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     expect(within(list).getByText("Your device is still uploading it.")).toBeInTheDocument();
@@ -708,9 +736,9 @@ describe("Transcript — live updates", () => {
     useFakeClock();
     let expired = false;
     const pending = makeContent({ id: "up", coverage: "not_yet_uploaded", coverage_reason: "upload_pending", render: "none", preview: null });
-    const gone = makeContent({ id: "up", coverage: "expired", coverage_reason: "staging_expired", render: "none", preview: null });
+    const gone = makeContent({ id: "up", occurred_at: pending.occurred_at, coverage: "expired", coverage_reason: "staging_expired", render: "none", preview: null });
     serveSession({ list: () => HttpResponse.json(contentPage([expired ? gone : pending])) });
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     expired = true;
@@ -719,42 +747,47 @@ describe("Transcript — live updates", () => {
     expect(within(list).queryByText("Your device is still uploading it.")).not.toBeInTheDocument();
   });
 
-  it("refreshes every loaded page in order, without collapsing or duplicating them", async () => {
+  it("refreshes only the current pinned window after visiting earlier history, without duplicate records", async () => {
     useFakeClock();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const queryClient = createTestQueryClient();
     let finished = false;
     const first = makeContent({ id: "a", preview: { text: "on page one", truncated: false } });
-    const second = () =>
-      finished
-        ? makeContent({ id: "b", preview: { text: "page two arrived", truncated: false } })
-        : makeContent({ id: "b", coverage: "not_yet_uploaded", coverage_reason: "upload_pending", render: "none", preview: null });
+    const source = makeContent({ id: "b" });
+    const second = (): SessionContent => finished
+      ? { ...source, preview: { text: "page two arrived", truncated: false } }
+      : { ...source, coverage: "not_yet_uploaded", coverage_reason: "upload_pending", render: "none", preview: null };
     const requests = serveSession();
     server.use(
-      http.get(CONTENTS, ({ request }) => {
+      http.get(`${CONTENTS}/window`, ({ request }) => {
         const params = new URL(request.url).searchParams;
         requests.listRequests.push(params);
-        return HttpResponse.json(params.get("cursor") === "page-1" ? contentPage([second()]) : contentPage([first], "page-1"));
+        return contentWindowResponse([contentPage([first]), contentPage([second()])], params);
       }),
     );
-    renderSession(queryClient);
+    await renderSession(queryClient);
 
     const list = await transcript();
-    await user.click(screen.getByRole("button", { name: "Load more" }));
     await within(list).findByText("Your device is still uploading it.");
+    await user.click(screen.getByRole("button", { name: "Earlier records" }));
+    await screen.findByText("on page one");
+    await user.click(screen.getByRole("button", { name: "Later records" }));
+    await screen.findByText("Your device is still uploading it.");
+    const before = requests.listRequests.length;
 
     finished = true;
     await emitSessionUpdate("contents");
-    expect(await within(list).findByText("page two arrived")).toBeInTheDocument();
+    expect(await screen.findByText("page two arrived")).toBeInTheDocument();
     await settled(queryClient);
-    expect(within(list).getAllByRole("listitem").map((item) => item.id)).toEqual(["content-a", "content-b"]);
+    expect(within(await transcript()).getAllByRole("listitem").map((item) => item.id)).toEqual(["content-b"]);
+    expect(requests.listRequests.slice(before).map((params) => params.get("mode"))).toEqual(["refresh"]);
   });
 
   it("ignores another member's session events", async () => {
     useFakeClock();
     const queryClient = createTestQueryClient();
     const requests = serveSession({ pages: [contentPage([makeContent()])] });
-    renderSession(queryClient);
+    await renderSession(queryClient);
     await transcript();
     await settled(queryClient);
     const count = requests.listRequests.length;
@@ -777,7 +810,7 @@ describe("Transcript — live updates", () => {
           : HttpResponse.json(contentPage([makeContent({ id: "r", preview: { text: "short", truncated: true } })])),
     });
     serveBody(requests, "r", "the whole private body");
-    renderSession(queryClient);
+    await renderSession(queryClient);
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
@@ -796,13 +829,14 @@ describe("Transcript — live updates", () => {
 });
 
 describe("Transcript — access", () => {
-  it("explains a refused read instead of an empty transcript", async () => {
+  it("removes the reader after denied content authority instead of calling it empty", async () => {
     serveSession({
       list: () => HttpResponse.json({ detail: "Forbidden" }, { status: 403 }),
     });
-    renderSession();
+    await renderSession();
 
-    expect(await screen.findByText("You can't read this session's content.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: "Add a retry to the uploader" })).not.toBeInTheDocument();
     expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
   });
 
@@ -812,7 +846,7 @@ describe("Transcript — access", () => {
     serveSession({
       list: () => (failing ? HttpResponse.json({ detail: "boom" }, { status: 500 }) : HttpResponse.json(contentPage([makeContent()]))),
     });
-    renderSession();
+    await renderSession();
 
     expect(await screen.findByText("Couldn't load the transcript.")).toBeInTheDocument();
     failing = false;
@@ -826,7 +860,7 @@ describe("Transcript — more coverage", () => {
     serveSession({
       pages: [contentPage([makeContent({ id: "c", coverage: "withheld_by_policy", coverage_reason: "content_level", render: "none", preview: null, byte_count: null, sha256: null })])],
     });
-    renderSession();
+    await renderSession();
 
     const reply = entry(await transcript(), "Claude Code");
     expect(within(reply).getByText("Withheld")).toBeInTheDocument();
@@ -837,7 +871,7 @@ describe("Transcript — more coverage", () => {
     serveSession({
       pages: [contentPage([makeContent({ id: "c", coverage: "partially_redacted", coverage_reason: "secret_filter", redaction: { filter_version: "r/1", replacements: 1 } })])],
     });
-    renderSession();
+    await renderSession();
 
     expect(within(entry(await transcript(), "Claude Code")).getByText("1 secret masked.")).toBeInTheDocument();
   });
@@ -845,6 +879,13 @@ describe("Transcript — more coverage", () => {
   it("refuses a body read after access was revoked, without retrying", async () => {
     const user = userEvent.setup();
     const queryClient = createTestQueryClient();
+    queryClient.setDefaultOptions({ queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } });
+    const root = sessionKeys.detail(SLUG, SESSION_ID);
+    const unrelated = makeSession({ id: "unrelated-session", title: "Other authorized session" });
+    queryClient.setQueryData(sessionKeys.detail(SLUG, unrelated.id), unrelated);
+    const unrelatedBody = sessionKeys.contentBody(SLUG, unrelated.id, "other-body", "other-digest", 0);
+    queryClient.setQueryData(unrelatedBody, { text: "OTHER_SESSION_BODY" });
+    queryClient.setQueryData(sessionKeys.contentBody(SLUG, SESSION_ID, "retained-body", "private-digest", 0), { text: "PRIVATE_RETAINED_BODY" });
     serveSession({ pages: [contentPage([makeContent({ id: "r", preview: { text: "short", truncated: true } })])] });
     let attempts = 0;
     server.use(
@@ -853,14 +894,20 @@ describe("Transcript — more coverage", () => {
         return HttpResponse.json({ detail: "Forbidden" }, { status: 403 });
       }),
     );
-    renderSession(queryClient);
+    await renderSession(queryClient);
 
     const reply = entry(await transcript(), "Claude Code");
     await user.click(within(reply).getByRole("button", { name: /^Show all/ }));
-    expect(await within(reply).findByText("You can't read this session's content.")).toBeInTheDocument();
+    await waitFor(() => expect(queryClient.getQueryData(root)).toBeNull());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Session unavailable" })).toBeVisible());
     await settled(queryClient);
     expect(attempts).toBe(1);
-    expect(within(reply).queryByRole("button", { name: "Try again" })).toBeNull();
+    await waitFor(() => expect(queryClient.getQueryCache().findAll({ queryKey: root, predicate: (query) => query.queryKey.length > root.length })).toEqual([]));
+    expect(screen.queryByText("short")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(queryClient.getQueryData(sessionKeys.detail(SLUG, unrelated.id))).toEqual(unrelated);
+    expect(queryClient.getQueryData(unrelatedBody)).toEqual({ text: "OTHER_SESSION_BODY" });
   });
 });
 
@@ -880,9 +927,11 @@ describe("Transcript — attachment failures", () => {
         return attempts === 1 ? storageDown() : new HttpResponse(new Uint8Array([0x89, 0x50]), { headers: { "Content-Type": "image/png" } });
       }),
     );
-    renderSession();
+    await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
+    expect(attempts).toBe(0);
+    await user.click(within(attachment).getByRole("button", { name: "Show image" }));
     expect(await within(attachment).findByText("Storage is unavailable right now. Try again in a moment.")).toBeInTheDocument();
     expect(attachment.querySelector("img")).toBeNull();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -895,7 +944,7 @@ describe("Transcript — attachment failures", () => {
     serveSession({ pages: [contentPage([file])] });
     server.use(http.get(`${CONTENTS}/pdf/download`, () => HttpResponse.json({ detail: "Content not found", error_code: "content_not_found" }, { status: 404 })));
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    renderSession();
+    await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
     await user.click(within(attachment).getByRole("button", { name: "Download" }));
@@ -908,7 +957,7 @@ describe("Transcript — attachment failures", () => {
     const user = userEvent.setup();
     serveSession({ pages: [contentPage([file])] });
     server.use(http.get(`${CONTENTS}/pdf/download`, storageDown));
-    renderSession();
+    await renderSession();
 
     const attachment = entry(await transcript(), "Attachment");
     await user.click(within(attachment).getByRole("button", { name: "Download" }));
@@ -920,7 +969,7 @@ describe("Transcript — attachment failures", () => {
       serveSession({
         pages: [contentPage([makeContent({ id: "f", role: "user", channel: "attachment", media_type: mediaType, render: "download", preview: null, byte_count: 2048 })])],
       });
-      renderSession();
+      await renderSession();
 
       const attachment = entry(await transcript(), "Attachment");
       expect(attachment.querySelector("img, iframe, object, embed, svg image")).toBeNull();
@@ -948,7 +997,7 @@ describe("Transcript — deep links", () => {
     await waitFor(() => expect(document.getElementById("content-b")).toHaveFocus());
   });
 
-  it("focuses a loaded raw-record link when Everything reveals it without fetching another page or body", async () => {
+  it("focuses only raw-record provenance until Everything reveals its preview without fetching another window or body", async () => {
     const user = userEvent.setup();
     const requests = serveSession({ pages: [contentPage([
       makeContent({ id: "reply" }),
@@ -958,26 +1007,29 @@ describe("Transcript — deep links", () => {
     renderAt("#content-raw");
 
     await transcript();
-    expect(document.getElementById("content-raw")).toBeNull();
+    await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
+    expect(document.getElementById("content-raw")).not.toHaveTextContent("native envelope");
+    expect(screen.queryByText("native envelope")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Everything" }));
     await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
     await user.click(screen.getByRole("button", { name: "Conversation" }));
-    expect(document.getElementById("content-raw")).toBeNull();
+    await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
+    expect(document.getElementById("content-raw")).not.toHaveTextContent("native envelope");
+    expect(screen.queryByText("native envelope")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Everything" }));
     await waitFor(() => expect(document.getElementById("content-raw")).toHaveFocus());
     expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
     expect(requests.bodyRequests).toEqual([]);
   });
 
-  // Release one does not page ahead to find a linked item (known limitation).
-  it("says to load more when a linked item is beyond the loaded pages", async () => {
+  it("resolves a distant linked item in one bounded anchor request without draining history", async () => {
     const requests = serveSession({ pages: [contentPage([makeContent({ id: "a" })], "page-1"), contentPage([makeContent({ id: "far" })])] });
     renderAt("#content-far");
 
     await transcript();
-    expect(await screen.findByText("Load more to reach this item.")).toBeInTheDocument();
-    expect(document.getElementById("content-far")).toBeNull();
-    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    await waitFor(() => expect(document.getElementById("content-far")).toHaveFocus());
+    expect(document.getElementById("content-a")).toBeNull();
+    expect(requests.listRequests.map((params) => [params.get("mode"), params.get("anchor_id")])).toEqual([["anchor", "far"]]);
     expect(requests.bodyRequests).toEqual([]);
   });
 });
@@ -992,9 +1044,11 @@ describe("Transcript — loaded-content orientation", () => {
       makeContent({ id: "raw", role: "unknown", channel: "native_record", display_path: "private-envelope.json", source: { kind: "claude_transcript", order: 4 } }),
     ], "page-1"), contentPage([makeContent({ id: "unloaded", source: { kind: "claude_transcript", order: 5 } })])] });
     for (const id of ["reply", "input", "output", "raw"]) serveBody(requests, id, `Complete body for ${id}`);
-    renderSession();
+    await renderSession();
 
     await transcript();
+    await user.click(screen.getByRole("button", { name: "Beginning" }));
+    await screen.findByText("CONFIDENTIAL PREVIEW");
     const navigation = screen.getByRole("combobox", { name: "Jump to loaded content" });
     expect(within(navigation).getByRole("option", { name: /Claude Code.*#1/ })).toHaveTextContent(formatClock("2026-10-16T14:35:00Z"));
     expect(within(navigation).getByRole("option", { name: /Input.*#2/ })).toBeInTheDocument();
@@ -1007,7 +1061,7 @@ describe("Transcript — loaded-content orientation", () => {
     expect(within(navigation).getByRole("option", { name: /Raw record.*#4/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Conversation" }));
     expect(within(navigation).queryByRole("option", { name: /#4/ })).not.toBeInTheDocument();
-    expect(requests.listRequests.map((params) => params.get("cursor"))).toEqual([null]);
+    expect(requests.listRequests.map((params) => params.get("mode"))).toEqual(["latest", "beginning"]);
     expect(requests.bodyRequests).toEqual([]);
   });
 
@@ -1019,7 +1073,7 @@ describe("Transcript — loaded-content orientation", () => {
       makeContent({ id: "output", role: "tool", channel: "tool_output", call_id: "call-7", preview: { text: "Output preview", truncated: true }, source: { kind: "claude_transcript", order: 3 } }),
     ], "page-1")] });
     serveBody(requests, "output", "Complete grouped output");
-    renderSession();
+    await renderSession();
 
     const list = await transcript();
     const selected = within(entry(list, "Claude Code")).getByRole("checkbox");
@@ -1034,7 +1088,7 @@ describe("Transcript — loaded-content orientation", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(selected).toBeChecked();
     expect(within(call).getAllByRole("checkbox").every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
-    expect(screen.getByText("1 selected from 3 loaded items")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 1 · 3 records in this window")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Conversation" })).toHaveAttribute("aria-pressed", "true");
 
     await user.selectOptions(navigation, destination);
@@ -1067,7 +1121,7 @@ describe("Transcript — every locale", () => {
           ]),
         ],
       });
-      renderSession();
+      await renderSession();
 
       const list = await screen.findByRole("list", { name: t("sessions.contents.title") });
       const navigation = screen.getByRole("combobox", { name: t("sessions.contents.navigation.label") });

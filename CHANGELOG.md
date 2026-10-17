@@ -33,6 +33,9 @@ keeps its own detailed per-tool history in
 
 #### Added
 
+- Read captured sessions in peer Timeline and Transcript views. Jump to recent,
+  beginning, earlier or later evidence, or open a linked record directly in a
+  bounded window.
 - Inspect content linked to an individual captured call, with source and
   coverage details, explicit raw-record and media controls, and independent
   history loading.
@@ -44,6 +47,9 @@ keeps its own detailed per-tool history in
 
 #### Changed
 
+- Selected evidence and note drafts survive transcript navigation. Fresh source
+  checks protect preview and sharing; uncertain note saves retain the same
+  retry identity.
 - Capture-level descriptions explain policy limits; event coverage does not
   imply that all content was collected. Prompt labels remain neutral about
   who supplied the text.

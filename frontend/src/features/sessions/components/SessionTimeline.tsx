@@ -7,6 +7,7 @@ import { Layers, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AgentSession, CallFilter, SessionCallItem, SessionWorkLink } from "@/types/agent-session";
+import { useSessionReaderActive } from "../api/use-session-contents";
 import { useSessionCalls, useSessionLinks } from "../api/use-sessions";
 import { sameWorkRelationship, type SessionWorkIdentity } from "../api/use-session-evidence";
 import { useWorkTarget } from "../api/use-work-title";
@@ -37,14 +38,15 @@ export function SessionTimeline({ slug, session, headingHidden = false, selected
   const { t } = useTranslation();
   const headingId = useId();
   const [filter, setFilter] = useState<CallFilter>("all");
+  const active = useSessionReaderActive();
   const callFilter = selectedWork ? "work" : filter;
-  const calls = useSessionCalls(slug, session.id, callFilter, true);
-  const links = useSessionLinks(slug, session.id, !!selectedWork);
+  const calls = useSessionCalls(slug, session.id, callFilter, active);
+  const links = useSessionLinks(slug, session.id, active && !!selectedWork);
   const merged = useMemo(() => mergeCallPages(calls.isPlaceholderData ? [] : calls.data?.pages ?? []), [calls.data, calls.isPlaceholderData]);
   const turns = useMemo(() => buildTimeline(merged.items, filter === "all" ? merged.turns : []).map((turn) =>
     filter === "all" ? turn : { ...turn, entries: turn.entries.filter((entry) => entry.type !== "idle") }), [merged, filter]);
   const live = isLive(session);
-  const announcement = useNewCallAnnouncement(merged.items.length, live && filter === "all" && !selectedWork, `${slug}/${session.id}/${callFilter}`);
+  const announcement = useNewCallAnnouncement(merged.items.length, active && live && filter === "all" && !selectedWork, `${slug}/${session.id}/${callFilter}`);
 
   const summary = [
     t("sessions.timeline.turns", { count: session.prompt_count }),

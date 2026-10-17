@@ -461,3 +461,15 @@ export interface ContentBodyPage {
   total_bytes: number;
   text: string;
 }
+
+export type SessionContentWindowMode = "latest" | "beginning" | "anchor" | "earlier" | "later" | "refresh";
+
+export interface SessionContentWindow {
+  capability: "content-window-v1";
+  mode: SessionContentWindowMode;
+  items: SessionContent[];
+  earlier_cursor: string | null;
+  later_cursor: string | null;
+  window_cursor: string;
+  anchor_id: string | null;
+}

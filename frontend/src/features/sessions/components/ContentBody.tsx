@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -79,9 +79,10 @@ interface ContentBodyProps {
 }
 
 export function ContentBody({ slug, sessionId, content, prose, emphasis }: ContentBodyProps) {
-  if (content.render === "text") return <TextContent slug={slug} sessionId={sessionId} content={content} prose={prose} emphasis={emphasis} />;
-  if (content.render === "image") return <ImageContent slug={slug} sessionId={sessionId} content={content} />;
-  if (content.render === "download") return <FileContent slug={slug} sessionId={sessionId} content={content} />;
+  const identity = JSON.stringify([content.id, content.sha256, content.render]);
+  if (content.render === "text") return <TextContent key={identity} slug={slug} sessionId={sessionId} content={content} prose={prose} emphasis={emphasis} />;
+  if (content.render === "image") return <ImageContent key={identity} slug={slug} sessionId={sessionId} content={content} />;
+  if (content.render === "download") return <FileContent key={identity} slug={slug} sessionId={sessionId} content={content} />;
   return content.channel === "attachment" ? <MediaFacts content={content} /> : null;
 }
 
@@ -172,11 +173,14 @@ function useObjectUrl(blob: Blob | undefined): string | null {
 function ImageContent({ slug, sessionId, content }: Omit<ContentBodyProps, "prose">) {
   const { t } = useTranslation();
   const hidden = usePromptsHidden();
-  const image = useContentImage(slug, sessionId, content, true);
+  const [revealed, setRevealed] = useState(false);
+  const target = useRef<HTMLDivElement>(null);
+  const image = useContentImage(slug, sessionId, content, revealed);
+  useEffect(() => { if (revealed) target.current?.focus({ preventScroll: true }); }, [revealed]);
   const url = useObjectUrl(image.data);
   return (
-    <div className="grid justify-items-start gap-1.5">
-      {image.isError ? (
+    <div ref={target} tabIndex={revealed ? -1 : undefined} role={revealed ? "region" : undefined} aria-label={revealed ? t("sessions.contents.image.alt", { size: formatBytes(content.byte_count ?? 0) }) : undefined} className="grid justify-items-start gap-1.5 rounded-[var(--radius-cap)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {!revealed ? <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" onClick={() => setRevealed(true)}>{t("sessions.contents.call.showImage")}</Button> : image.isError ? (
         <FailureNote error={image.error} onRetry={() => void image.refetch()} />
       ) : url ? (
         <img

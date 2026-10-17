@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RichTextEditor } from "@/components/shared/RichTextEditor";
@@ -31,8 +31,10 @@ function outcomeIsUnknown(error: unknown): boolean {
   return !isApiError(error) || error.status === 0 || error.status === 408 || error.status >= 500;
 }
 
-export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
+export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, sourceCheckFailed = false, onRecheckSources }: {
   draft: ExcerptNoteDraft; stale: boolean; onDiscard: () => void;
+  beforeFirstSave?: () => Promise<boolean>;
+  sourceCheckFailed?: boolean; onRecheckSources?: () => Promise<unknown>;
 }) {
   const { t } = useTranslation();
   const label = (key: string, values?: Record<string, unknown>) => t(`sessions.contents.excerpt.note.${key}`, values);
@@ -48,6 +50,8 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
   const hadUnknownOutcome = useRef(false);
   const hasSentRequest = useRef(false);
   const dispatching = useRef(false);
+  const mounted = useRef(true);
+  const [validating, setValidating] = useState(false);
   const save = useSaveExcerptNote();
   const workspaces = useWorkspaces();
   const boards = useBoards(slug, { enabled: !!slug });
@@ -70,7 +74,8 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
 
   let problem: string | null = null;
   if (!frozen) {
-    if (stale || draft.bodies.some(({ item }) => !item.sha256 || !/^[a-f0-9]{64}$/i.test(item.sha256))) problem = label("sourceChanged");
+    if (sourceCheckFailed) problem = label("sourceCheckFailed");
+    else if (stale || draft.bodies.some(({ item }) => !item.sha256 || !/^[a-f0-9]{64}$/i.test(item.sha256))) problem = label("sourceChanged");
     else if (draft.bodies.length > EXCERPT_NOTE_MAX_ITEMS) problem = label("tooMany");
     else if (oversized) problem = label("tooLarge");
     else if (compact === null) problem = label("invalidDocument");
@@ -100,11 +105,30 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
     && ["member", "admin", "owner"].includes(role ?? "");
   const canRevise = save.isError && !hadUnknownOutcome.current && isApiError(save.error)
     && save.error.status >= 400 && save.error.status < 500;
+  const formIdentity = JSON.stringify([slug, boardId, cardId, title, content, draft.fingerprint, stale, canSave]);
+  const currentForm = useRef(formIdentity);
+  currentForm.current = formIdentity;
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
-  function dispatch() {
+  async function dispatch() {
     if (dispatching.current || save.isSuccess) return;
     if (!request.current) {
       if (!canSave || compact === null || !workspace || !destination) return;
+      dispatching.current = true;
+      if (beforeFirstSave) {
+        setValidating(true);
+        let valid = false;
+        try { valid = await beforeFirstSave(); } catch { /* A failed check never freezes a request. */ }
+        if (!mounted.current) return;
+        setValidating(false);
+        if (!valid || currentForm.current !== formIdentity) {
+          dispatching.current = false;
+          return;
+        }
+      }
       const card = cards.find((item) => item.id === cardId);
       reviewedDestination.current = {
         workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
@@ -141,15 +165,25 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
 
   function dismiss() {
     if (save.isSuccess) onDiscard();
-    else if (request.current) setOpen(false);
+    else if (request.current || stale || sourceCheckFailed) setOpen(false);
     else onDiscard();
+  }
+
+  async function recheckSources() {
+    if (!onRecheckSources || dispatching.current) return;
+    dispatching.current = true;
+    setValidating(true);
+    try { await onRecheckSources(); } finally {
+      dispatching.current = false;
+      if (mounted.current) setValidating(false);
+    }
   }
 
   const noteLink = save.data && request.current ? buildNoteLink({ slug: request.current.slug, boardId: request.current.boardId, noteId: save.data.id }) : null;
   const cardLink = noteLink && request.current?.payload.card_id ? buildCardLink({ slug: request.current.slug, boardId: request.current.boardId, cardId: request.current.payload.card_id }) : null;
   return <>
     {!open ? <div className="flex basis-full flex-wrap items-center gap-3" role="status">
-      {noteLink ? <Link className="inline-flex items-center text-sm text-primary underline underline-offset-4 max-sm:min-h-[44px] max-sm:min-w-[44px]" to={noteLink}>{label("openNote")}</Link> : <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" onClick={() => setOpen(true)}>{label("resume")}</Button>}
+      {noteLink ? <Link className="inline-flex items-center text-sm text-primary underline underline-offset-4 max-sm:min-h-[44px] max-sm:min-w-[44px]" to={noteLink}>{label("openNote")}</Link> : <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" onClick={() => setOpen(true)}>{label(frozen ? "resume" : "resumeDraft")}</Button>}
       {cardLink ? <Link className="inline-flex items-center text-sm text-primary underline underline-offset-4 max-sm:min-h-[44px] max-sm:min-w-[44px]" to={cardLink}>{label("openCard")}</Link> : null}
       {noteLink ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" onClick={onDiscard}>{t("common.done")}</Button> : null}
     </div> : null}
@@ -158,29 +192,29 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
         <DialogHeader className="max-sm:min-h-[44px] max-sm:pr-[44px]"><DialogTitle>{label("share")}</DialogTitle></DialogHeader>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1.5 text-sm" htmlFor={`${id}-workspace`}>{label("workspace")}
-            <select id={`${id}-workspace`} className={selectClass} value={slug} disabled={frozen} onChange={(event) => { setSlug(event.target.value); setBoardId(""); setCardId(""); }}>
+            <select id={`${id}-workspace`} className={selectClass} value={slug} disabled={frozen || validating} onChange={(event) => { setSlug(event.target.value); setBoardId(""); setCardId(""); }}>
               <option value="">{label("chooseWorkspace")}</option>
               {workspaceOptions?.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}
             </select>
           </label>
           <label className="grid gap-1.5 text-sm" htmlFor={`${id}-board`}>{label("board")}
-            <select id={`${id}-board`} className={selectClass} value={boardId} disabled={frozen || !slug || boards.isPending} onChange={(event) => { setBoardId(event.target.value); setCardId(""); }}>
+            <select id={`${id}-board`} className={selectClass} value={boardId} disabled={frozen || validating || !slug || boards.isPending} onChange={(event) => { setBoardId(event.target.value); setCardId(""); }}>
               <option value="">{label("chooseBoard")}</option>
               {boardOptions?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </label>
           <label className="grid gap-1.5 text-sm" htmlFor={`${id}-card`}>{label("card")}
-            <select id={`${id}-card`} className={selectClass} value={cardId} disabled={frozen || !boardId || board.isPending} onChange={(event) => setCardId(event.target.value)}>
+            <select id={`${id}-card`} className={selectClass} value={cardId} disabled={frozen || validating || !boardId || board.isPending} onChange={(event) => setCardId(event.target.value)}>
               <option value="">{label("noCard")}</option>
               {cardOptions.map((card) => <option key={card.id} value={card.id}>{card.title}</option>)}
             </select>
           </label>
         </div>
         <label className="grid gap-1.5 text-sm" htmlFor={`${id}-title`}>{label("title")}
-          <Input className="max-sm:min-h-[44px] max-sm:min-w-[44px]" id={`${id}-title`} value={title} disabled={frozen} onChange={(event) => setTitle(event.target.value)} />
+          <Input className="max-sm:min-h-[44px] max-sm:min-w-[44px]" id={`${id}-title`} value={title} disabled={frozen || validating} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <section role="region" aria-label={label("content")} className="min-w-0">
-          <RichTextEditor content={content} onChange={setContent} editable={!frozen} allowMediaUpload={false} workspaceSlug={slug || undefined} className="max-h-[45dvh] min-h-48 overflow-auto" />
+          <RichTextEditor content={content} onChange={setContent} editable={!frozen && !validating} allowMediaUpload={false} workspaceSlug={slug || undefined} className="max-h-[45dvh] min-h-48 overflow-auto" />
         </section>
         {!frozen ? <p className="text-xs text-muted-foreground">{label("review")}</p> : null}
         <div className="grid gap-3 border-t pt-4">
@@ -196,6 +230,7 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
           </div>
           {!hasSentRequest.current ? <p className="text-sm text-muted-foreground">{label("unsent")}</p> : null}
           {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
+          {validating ? <p role="status" className="text-sm text-muted-foreground">{t("sessions.contents.excerpt.validating")}</p> : null}
           {save.isPending ? <p role="status" className="text-sm text-muted-foreground">{label("saving")}</p> : null}
           {noteLink ? <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span>{label("saved")}</span>
@@ -203,9 +238,13 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard }: {
             {cardLink ? <Link className="text-primary underline underline-offset-4 max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:min-w-[44px]" to={cardLink}>{label("openCard")}</Link> : null}
           </div> : null}
           <DialogFooter className="max-sm:[&>button]:min-h-[44px] max-sm:[&>button]:min-w-[44px]">
-            <Button variant="ghost" onClick={dismiss}>{frozen ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
+            <Button variant="ghost" onClick={dismiss}>{frozen || stale || sourceCheckFailed ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
+            {!frozen && (stale || sourceCheckFailed) ? <>
+              <Button variant="ghost" disabled={validating} onClick={onDiscard}>{label("discard")}</Button>
+              {onRecheckSources ? <Button variant="outline" disabled={validating} onClick={() => void recheckSources()}>{label("recheck")}</Button> : null}
+            </> : null}
             {canRevise ? <Button variant="outline" onClick={revise}>{label("revise")}</Button> : null}
-            {save.isError ? <Button onClick={dispatch}>{label("retry")}</Button> : !save.isSuccess ? <Button onClick={dispatch} disabled={!canSave || save.isPending}>{label("save")}</Button> : null}
+            {save.isError ? <Button onClick={() => void dispatch()} disabled={validating || save.isPending}>{label("retry")}</Button> : !save.isSuccess ? <Button onClick={() => void dispatch()} disabled={!canSave || validating || save.isPending}>{label("save")}</Button> : null}
           </DialogFooter>
         </div>
       </DialogContent>

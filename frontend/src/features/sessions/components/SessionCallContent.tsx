@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { SessionContent } from "@/types/agent-session";
 import { useSessionContents } from "../api/use-session-contents";
 import { formatClock } from "../utils/format";
-import { ContentBody, CoverageNote, MediaFacts } from "./ContentBody";
+import { ContentBody, CoverageNote } from "./ContentBody";
 
 interface SessionCallContentProps {
   slug: string;
@@ -93,13 +93,8 @@ function CapturedCallRecords({ id, slug, sessionId, callId }: SessionCallContent
 
 function CapturedCallRecord({ slug, sessionId, item }: { slug: string; sessionId: string; item: SessionContent }) {
   const { t } = useTranslation();
-  const [showImage, setShowImage] = useState(false);
-  const revealedImageRef = useRef<HTMLDivElement>(null);
   const labelId = useId();
   const label = t(item.channel === "prompt" ? "sessions.contents.labels.you" : item.channel === "reply" ? "sessions.contents.labels.agent" : [`sessions.contents.labels.${item.channel}`, `sessions.contents.parts.${item.channel}`]);
-  useEffect(() => {
-    if (showImage) revealedImageRef.current?.focus({ preventScroll: true });
-  }, [showImage]);
   return <li aria-labelledby={labelId} className="grid min-w-0 gap-2 py-3">
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
       <h4 id={labelId} className="text-sm font-semibold">{label}</h4>
@@ -108,15 +103,6 @@ function CapturedCallRecord({ slug, sessionId, item }: { slug: string; sessionId
       <time dateTime={item.occurred_at} className="ml-auto text-sm tabular-nums text-muted-foreground">{formatClock(item.occurred_at)}</time>
     </div>
     <div className="justify-self-start"><CoverageNote item={item} showCaptured /></div>
-    {item.render === "image" ? showImage ? (
-      <div ref={revealedImageRef} role="region" aria-labelledby={labelId} tabIndex={-1} className="min-w-0 rounded-[var(--radius-cap)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <ContentBody slug={slug} sessionId={sessionId} content={item} prose={false} />
-      </div>
-    ) : (
-      <div className="grid justify-items-start gap-2">
-        <MediaFacts content={item} />
-        <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" onClick={() => setShowImage(true)}>{t("sessions.contents.call.showImage")}</Button>
-      </div>
-    ) : <ContentBody slug={slug} sessionId={sessionId} content={item} prose={false} />}
+    <ContentBody slug={slug} sessionId={sessionId} content={item} prose={false} />
   </li>;
 }

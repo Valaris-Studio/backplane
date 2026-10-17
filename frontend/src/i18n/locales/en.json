@@ -9554,7 +9554,13 @@
         "label": "Session sections",
         "timeline": "Timeline",
         "linkedWork": "Linked work",
-        "cost": "Cost"
+        "cost": "Cost",
+        "transcript": "Transcript",
+        "details": "Session details"
+      },
+      "accessLost": {
+        "title": "Session unavailable",
+        "description": "You can no longer read this session. Return to your sessions to continue."
       }
     },
     "banners": {
@@ -9912,7 +9918,7 @@
         "selectItem": "Select {{channel}}, source item {{order}}",
         "moreItems": "More transcript items are available. Load more to choose from them.",
         "excludedAttachments": "Attachments and binary content are not included.",
-        "unavailable": "Some selected items are no longer available. Clear the selection and choose again.",
+        "unavailable": "Some selected sources changed or are unavailable. Clear the selection and choose again.",
         "tooLarge": "This selection exceeds the 2 MiB text limit. Select fewer items and try again.",
         "failed": "The complete selection could not be read. Cancel and try again, or choose different items.",
         "privacy": "Review the exact text before copying or downloading. This creates a private file; it does not publish the session or grant anyone access.",
@@ -9958,7 +9964,7 @@
           "cardVisibility": "Linking a card organizes the note; it does not restrict its audience.",
           "snapshot": "Your session remains private. The note is an independent snapshot; deleting the session will not delete it.",
           "review": "Review and edit exactly what will be saved. Captured bodies start as literal text; edits are your curation. Media uploads are unavailable in this local draft.",
-          "sourceChanged": "The selected source changed or is unavailable. Close this draft and select the items again.",
+          "sourceChanged": "Selected sources changed or are unavailable. Your draft is kept. Check again, or discard this draft to choose sources again.",
           "tooMany": "A shared note can include at most 256 selected items. Select fewer items to share; local copy and download are still available.",
           "tooLarge": "The reviewed document exceeds 16 MiB. Shorten the draft before saving.",
           "invalidDocument": "The note document is unavailable. Close this draft and create a new preview.",
@@ -9974,8 +9980,17 @@
           "saving": "Saving the reviewed note. Closing this dialog does not cancel the request.",
           "saved": "Note saved.",
           "hide": "Hide for now",
-          "revise": "Revise draft"
-        }
+          "revise": "Revise draft",
+          "resumeDraft": "Resume note draft",
+          "discard": "Discard draft",
+          "recheck": "Check again",
+          "sourceCheckFailed": "Couldn't check the selected sources. Your draft is kept. Check again before saving."
+        },
+        "moreWindows": "Selection stays with you as you move between windows.",
+        "validating": "Checking selected sources…",
+        "validationFailed": "The selected sources could not be checked. Refresh or try again before previewing or sharing.",
+        "windowCount_one": "Selected: {{selected}} · {{loaded}} record in this window",
+        "windowCount_other": "Selected: {{selected}} · {{loaded}} records in this window"
       },
       "title": "Transcript",
       "navigation": {
@@ -10100,6 +10115,26 @@
         "showNative": "Show raw records",
         "hideNative": "Hide raw records",
         "showImage": "Show image"
+      },
+      "window": {
+        "label": "Captured records",
+        "latest": "Latest",
+        "beginning": "Beginning",
+        "earlier": "Earlier records",
+        "later": "Later records",
+        "scope": "This window contains up to 100 captured records. Capture may be incomplete.",
+        "changed": "This range changed. Refresh or choose another range to continue.",
+        "unavailable": "Linked record unavailable",
+        "unsupported": "Recent navigation unavailable on this server",
+        "beginningFallback": "Read from beginning",
+        "loading": "Loading captured records…",
+        "nativeHidden_one": "{{count}} raw record in this window is hidden. Choose Everything to inspect it.",
+        "nativeHidden_other": "{{count}} raw records in this window are hidden. Choose Everything to inspect them.",
+        "selectionLimit": "You can keep up to 1,024 records selected. Deselect a record to choose another.",
+        "range_one": "{{count}} captured record · {{start}}–{{end}}",
+        "range_other": "{{count}} captured records · {{start}}–{{end}}",
+        "beginningScope": "Reading in source order on this server.",
+        "anchorUnlocated": "The linked record is not in the loaded records."
       }
     },
     "evidence": {

@@ -54,6 +54,8 @@ CHUNK_BYTES = 4 << 20
 MAX_CHUNKS = 8
 PREVIEW_BYTES = 2 << 10
 MAX_BODY_PAGE_BYTES = 256 << 10
+MAX_CONTENT_WINDOW_ITEMS = 100
+MAX_SELECTED_CONTENT_ITEMS = 1024
 MAX_SESSION_BODY_BYTES = 512 << 20
 MAX_INSTALLATION_BODY_BYTES = 10 << 30
 MAX_RICH_MAPPINGS = 1000
@@ -707,6 +709,36 @@ class ContentRead(UTCModel):
 class ContentPage(UTCModel):
     items: list[ContentRead]
     next_cursor: str | None
+
+
+ContentWindowMode = Literal[
+    "latest", "beginning", "anchor", "earlier", "later", "refresh"
+]
+
+
+class ContentWindow(UTCModel):
+    capability: Literal["content-window-v1"] = "content-window-v1"
+    mode: ContentWindowMode
+    items: list[ContentRead] = Field(max_length=MAX_CONTENT_WINDOW_ITEMS)
+    earlier_cursor: str | None
+    later_cursor: str | None
+    window_cursor: str
+    anchor_id: uuid.UUID | None = None
+
+
+class SelectedContentRequest(_Request):
+    content_ids: list[uuid.UUID] = Field(max_length=MAX_SELECTED_CONTENT_ITEMS)
+
+    @model_validator(mode="after")
+    def _unique_ids(self):
+        if len(self.content_ids) != len(set(self.content_ids)):
+            raise ValueError("content_ids must be unique")
+        return self
+
+
+class SelectedContentMetadata(UTCModel):
+    items: list[ContentRead]
+    unavailable_ids: list[uuid.UUID]
 
 
 class ContentBodyPage(UTCModel):

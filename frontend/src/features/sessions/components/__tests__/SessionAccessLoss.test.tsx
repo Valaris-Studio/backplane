@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { Route, Routes } from "react-router-dom";
 import { act, renderWithProviders, screen, userEvent, waitFor } from "@/test/test-utils";
@@ -27,7 +27,13 @@ function retainedClient() {
   return client;
 }
 
-afterEach(() => { clients.splice(0).forEach((client) => client.clear()); });
+beforeEach(() => {
+  const matchMedia = window.matchMedia;
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ ...matchMedia(query), matches: query === "(min-width: 1280px)" }));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks(); clients.splice(0).forEach((client) => client.clear()); });
 
 function serveSession() {
   const response = { status: 200 };

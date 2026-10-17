@@ -4,8 +4,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.models.agent_session import (
     AgentSession,
@@ -211,6 +212,101 @@ class SessionContentRepository:
             ).limit(limit)
         )
         return list(rows)
+
+    async def content_window(
+        self,
+        session_id: uuid.UUID,
+        *,
+        before: tuple[datetime, int, uuid.UUID] | None = None,
+        after: tuple[datetime, int, uuid.UUID] | None = None,
+        lower: tuple[datetime, int, uuid.UUID] | None = None,
+        upper: tuple[datetime, int, uuid.UUID] | None = None,
+        descending: bool = False,
+        limit: int,
+    ) -> list[AgentSessionContent]:
+        columns = (
+            AgentSessionContent.occurred_at,
+            AgentSessionContent.source_order,
+            AgentSessionContent.id,
+        )
+        position = tuple_(*columns)
+        query = select(AgentSessionContent).where(
+            AgentSessionContent.session_id == session_id
+        )
+        if before is not None:
+            query = query.where(position < before)
+        if after is not None:
+            query = query.where(position > after)
+        if lower is not None:
+            query = query.where(position >= lower)
+        if upper is not None:
+            query = query.where(position <= upper)
+        ordering = [column.desc() if descending else column.asc() for column in columns]
+        return list(await self.db.scalars(query.order_by(*ordering).limit(limit)))
+
+    async def content_window_neighbors(
+        self,
+        session_id: uuid.UUID,
+        lower: tuple[datetime, int, uuid.UUID],
+        upper: tuple[datetime, int, uuid.UUID],
+    ) -> tuple[bool, bool]:
+        columns = (
+            AgentSessionContent.occurred_at,
+            AgentSessionContent.source_order,
+            AgentSessionContent.id,
+        )
+        position = tuple_(*columns)
+        scoped = select(AgentSessionContent.id).where(
+            AgentSessionContent.session_id == session_id
+        )
+        # EXISTS can discard ordering and scan the session; scalar LIMIT probes
+        # preserve indexed seeks on both sides of the retained range.
+        earlier = (
+            scoped.where(position < lower)
+            .order_by(*(column.desc() for column in columns))
+            .limit(1)
+            .scalar_subquery()
+        )
+        later = (
+            scoped.where(position > upper)
+            .order_by(*(column.asc() for column in columns))
+            .limit(1)
+            .scalar_subquery()
+        )
+        row = (
+            await self.db.execute(select(earlier.is_not(None), later.is_not(None)))
+        ).one()
+        return row[0], row[1]
+
+    async def selected_metadata(
+        self,
+        content_ids: list[uuid.UUID],
+        session_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        owner_id: uuid.UUID,
+    ) -> list[AgentSessionContent]:
+        if not content_ids:
+            return []
+        return list(
+            await self.db.scalars(
+                select(AgentSessionContent)
+                .options(
+                    defer(AgentSessionContent.inline_text, raiseload=True),
+                    defer(AgentSessionContent.preview, raiseload=True),
+                )
+                .where(
+                    AgentSessionContent.id.in_(content_ids),
+                    AgentSessionContent.session_id == session_id,
+                    AgentSessionContent.workspace_id == workspace_id,
+                    AgentSessionContent.owner_id == owner_id,
+                )
+                .order_by(
+                    AgentSessionContent.occurred_at,
+                    AgentSessionContent.source_order,
+                    AgentSessionContent.id,
+                )
+            )
+        )
 
     # --- the deletion queue ---
 

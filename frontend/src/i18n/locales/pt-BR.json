@@ -9615,7 +9615,13 @@
         "label": "Seções da sessão",
         "timeline": "Linha do tempo",
         "linkedWork": "Trabalho vinculado",
-        "cost": "Custo"
+        "cost": "Custo",
+        "transcript": "Transcrição",
+        "details": "Detalhes da sessão"
+      },
+      "accessLost": {
+        "title": "Sessão indisponível",
+        "description": "Você não pode mais consultar esta sessão. Volte às suas sessões para continuar."
       }
     },
     "banners": {
@@ -9999,7 +10005,7 @@
         "selectItem": "Selecionar {{channel}}, item de origem {{order}}",
         "moreItems": "Há mais itens na transcrição. Carregue mais para poder selecioná-los.",
         "excludedAttachments": "Anexos e conteúdo binário não são incluídos.",
-        "unavailable": "Alguns itens selecionados não estão mais disponíveis. Limpe a seleção e escolha novamente.",
+        "unavailable": "Algumas fontes selecionadas mudaram ou estão indisponíveis. Limpe a seleção e escolha novamente.",
         "tooLarge": "Esta seleção excede o limite de texto de 2 MiB. Selecione menos itens e tente novamente.",
         "failed": "Não foi possível ler a seleção completa. Cancele e tente novamente ou escolha outros itens.",
         "privacy": "Revise o texto exato antes de copiar ou baixar. Isso cria um arquivo privado; não publica a sessão nem concede acesso a ninguém.",
@@ -10045,7 +10051,7 @@
           "cardVisibility": "Vincular um cartão organiza a nota; não restringe quem pode lê-la.",
           "snapshot": "Sua sessão continua privada. A nota é uma cópia independente; excluir a sessão não a excluirá.",
           "review": "Revise e edite exatamente o que será salvo. Os corpos capturados começam como texto literal; as alterações são sua curadoria. Não é possível enviar arquivos neste rascunho local.",
-          "sourceChanged": "A fonte selecionada mudou ou está indisponível. Feche este rascunho e selecione os itens novamente.",
+          "sourceChanged": "As fontes selecionadas mudaram ou estão indisponíveis. Seu rascunho foi mantido. Verifique novamente ou descarte este rascunho para escolher as fontes de novo.",
           "tooMany": "Uma nota compartilhada permite até 256 itens selecionados. Reduza a seleção para compartilhar; copiar e baixar localmente continuam disponíveis.",
           "tooLarge": "O documento revisado excede 16 MiB. Reduza o rascunho antes de salvar.",
           "invalidDocument": "O documento está indisponível. Feche este rascunho e crie outra prévia.",
@@ -10061,8 +10067,18 @@
           "saving": "Salvando a nota revisada. Fechar esta janela não cancela a solicitação.",
           "saved": "Nota salva.",
           "hide": "Ocultar por enquanto",
-          "revise": "Revisar rascunho"
-        }
+          "revise": "Revisar rascunho",
+          "resumeDraft": "Retomar rascunho da nota",
+          "discard": "Descartar rascunho",
+          "recheck": "Verificar novamente",
+          "sourceCheckFailed": "Não foi possível verificar as fontes selecionadas. Seu rascunho foi mantido. Verifique novamente antes de salvar."
+        },
+        "moreWindows": "A seleção é mantida ao passar de um intervalo para outro.",
+        "validating": "Verificando as fontes selecionadas…",
+        "validationFailed": "Não foi possível verificar as fontes selecionadas. Atualize ou tente novamente antes de pré-visualizar ou compartilhar.",
+        "windowCount_one": "Seleção: {{selected}} · {{loaded}} registro nesta visualização",
+        "windowCount_other": "Seleção: {{selected}} · {{loaded}} registros nesta visualização",
+        "windowCount_many": "Seleção: {{selected}} · {{loaded}} registros nesta visualização"
       },
       "title": "Transcrição",
       "navigation": {
@@ -10190,6 +10206,28 @@
         "showNative": "Mostrar registros brutos",
         "hideNative": "Ocultar registros brutos",
         "showImage": "Mostrar imagem"
+      },
+      "window": {
+        "label": "Registros capturados",
+        "latest": "Mais recentes",
+        "beginning": "Início",
+        "earlier": "Registros anteriores",
+        "later": "Registros posteriores",
+        "scope": "Esta visualização contém até 100 registros capturados. A captura pode estar incompleta.",
+        "changed": "Este intervalo mudou. Atualize ou escolha outro intervalo para continuar.",
+        "unavailable": "Registro vinculado indisponível",
+        "unsupported": "A navegação para registros recentes está indisponível neste servidor",
+        "beginningFallback": "Ler desde o início",
+        "loading": "Carregando registros capturados…",
+        "nativeHidden_one": "Há {{count}} registro bruto oculto nesta visualização. Escolha Tudo para inspecioná-lo.",
+        "nativeHidden_other": "Há {{count}} registros brutos ocultos nesta visualização. Escolha Tudo para inspecioná-los.",
+        "nativeHidden_many": "Há {{count}} registros brutos ocultos nesta visualização. Escolha Tudo para inspecioná-los.",
+        "selectionLimit": "Você pode manter até 1.024 registros selecionados. Desmarque um registro para escolher outro.",
+        "range_one": "{{count}} registro capturado · {{start}}–{{end}}",
+        "range_other": "{{count}} registros capturados · {{start}}–{{end}}",
+        "beginningScope": "Leitura na ordem de origem neste servidor.",
+        "anchorUnlocated": "O registro vinculado não está entre os registros carregados.",
+        "range_many": "{{count}} registros capturados · {{start}}–{{end}}"
       }
     },
     "evidence": {

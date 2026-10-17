@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, RotateCw, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/layout/EmptyState";
@@ -21,11 +21,11 @@ import { CompanionGate } from "./CompanionGate";
 import { SessionBanners } from "./SessionBanners";
 import { SessionHeader } from "./SessionHeader";
 import { CapturePanel, CostPanel, LinkedWorkPanel, SubagentsPanel, TokensPanel } from "./SessionRail";
-import { COMPACT_LIST_QUERY } from "./SessionsTable";
 import { LoadErrorState } from "./SessionStates";
 import { SessionTimeline } from "./SessionTimeline";
 import { SessionTranscript } from "./SessionTranscript";
 import { RhythmStrip } from "./RhythmStrip";
+import { SessionReaderActive } from "../api/use-session-contents";
 
 export function SessionDetailPage() {
   const { t } = useTranslation();
@@ -46,14 +46,14 @@ export function SessionDetailPage() {
   );
 }
 
-export function SessionNotFound() {
+export function SessionNotFound({ accessLost = false }: { accessLost?: boolean }) {
   const { t } = useTranslation();
   const { slug = "" } = useParams();
   return (
     <EmptyState
       icon={SearchX}
-      title={t("sessions.detail.notFound.title")}
-      description={t("sessions.detail.notFound.description")}
+      title={t(accessLost ? "sessions.detail.accessLost.title" : "sessions.detail.notFound.title")}
+      description={t(accessLost ? "sessions.detail.accessLost.description" : "sessions.detail.notFound.description")}
       action={
         <Link to={`/${slug}/sessions`} className={buttonVariants({ variant: "outline" })}>
           {t("sessions.detail.notFound.back")}
@@ -90,6 +90,7 @@ function SessionDetail() {
   const retainSession = !!session.data && (!session.isError || errorStatus === 0 || errorStatus === 408 || errorStatus === 429 || errorStatus >= 500);
   if (session.isPending) return <SessionDetailSkeleton />;
   if (gone) return <SessionNotFound />;
+  if (session.data === null && !session.isError) return <SessionNotFound accessLost />;
   return <>
     {session.isError ? retainSession ? (
       <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-cap)] border border-border px-[var(--card-padding)] py-3">
@@ -115,12 +116,15 @@ function SessionDetail() {
   </>;
 }
 
-type CompactTab = "timeline" | "linked" | "cost";
+type ReaderTab = "timeline" | "transcript" | "details";
 
 function SessionDetailBody({ slug, session }: { slug: string; session: AgentSession }) {
   const { t } = useTranslation();
-  const compact = useMediaQuery(COMPACT_LIST_QUERY);
-  const [tab, setTab] = useState<CompactTab>("timeline");
+  const compact = !useMediaQuery("(min-width: 1280px)");
+  const location = useLocation();
+  const [tab, setTab] = useState<ReaderTab>(() => location.hash.startsWith("#content-") ? "transcript" : "timeline");
+  useEffect(() => { if (location.hash.startsWith("#content-")) setTab("transcript"); }, [location.hash, location.key]);
+  useEffect(() => { if (!compact && tab === "details") setTab("timeline"); }, [compact, tab]);
   const [selectedWork, setSelectedWork] = useState<SessionWorkIdentity | null>(null);
   const [timelineTarget, setTimelineTarget] = useState<HTMLElement | null>(null);
   const [readerTarget, setReaderTarget] = useState<HTMLHeadingElement | null>(null);
@@ -130,37 +134,38 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
   const usageOnly = isUsageOnly(session);
 
   function navigateTo(destination: "timeline" | "reader") {
-    setTab("timeline");
+    setTab(destination === "reader" ? "transcript" : "timeline");
     setNavigation((previous) => ({ destination, request: (previous?.request ?? 0) + 1 }));
   }
 
   useEffect(() => {
     if (!navigation || appliedNavigation.current === navigation.request) return;
     const target = navigation.destination === "timeline" ? timelineTarget : readerTarget;
-    if (!target?.isConnected || target.closest("[hidden]") || (compact && tab !== "timeline")) return;
+    if (!target?.isConnected || target.closest("[hidden]")) return;
     target.scrollIntoView?.({ block: "start" });
     target.focus({ preventScroll: true });
     appliedNavigation.current = navigation.request;
   }, [navigation, timelineTarget, readerTarget, compact, tab]);
 
   const timeline = (
+    <SessionReaderActive.Provider value={tab === "timeline"}>
     <div className="flex min-w-0 flex-col gap-3">
       <SessionBanners session={session} />
+      {usageOnly ? null : <RhythmStrip slug={slug} session={session} />}
       {usageOnly ? null : <SessionTimeline
-        slug={slug} session={session} headingHidden={compact} selectedWork={selectedWork}
+        slug={slug} session={session} headingHidden={false} selectedWork={selectedWork}
         headingRef={setTimelineTarget}
         onReturn={() => { setSelectedWork(null); navigateTo("timeline"); }}
-        onReadContent={readerTarget ? () => navigateTo("reader") : undefined}
+        onReadContent={() => navigateTo("reader")}
       />}
-      <SessionTranscript slug={slug} session={session} active={!compact || tab === "timeline"} headingRef={setReaderTarget} />
     </div>
+    </SessionReaderActive.Provider>
   );
 
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4")}>
       <SessionHeader slug={slug} session={session} />
       {compact ? <SessionStatStrip session={session} /> : null}
-      {usageOnly ? null : <RhythmStrip slug={slug} session={session} />}
       <div className="flex justify-end">
         <Button variant="ghost" size="sm" className="aria-disabled:opacity-45 max-sm:min-h-[44px] max-sm:min-w-[44px]"
           aria-disabled={refreshing} onClick={() => { if (!refreshing) void refresh(); }}>
@@ -168,7 +173,7 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
           {t("sessions.evidence.refresh")}
         </Button>
       </div>
-      <SessionPanels slug={slug} session={session} timeline={timeline} compact={compact} tab={tab} onTabChange={setTab}
+      <SessionPanels slug={slug} session={session} timeline={timeline} transcript={<SessionTranscript slug={slug} session={session} active={tab === "transcript"} headingRef={setReaderTarget} />} compact={compact} tab={tab} onTabChange={setTab}
         onInspect={usageOnly ? undefined : (identity) => { setSelectedWork(identity); navigateTo("timeline"); }} />
     </div>
   );
@@ -197,71 +202,55 @@ function SessionStatStrip({ session }: { session: AgentSession }) {
   );
 }
 
-function SessionPanels({ slug, session, timeline, compact, tab, onTabChange, onInspect }: { slug: string; session: AgentSession; timeline: ReactNode; compact: boolean; tab: CompactTab; onTabChange: (tab: CompactTab) => void; onInspect?: (identity: SessionWorkIdentity) => void }) {
+function SessionPanels({ slug, session, timeline, transcript, compact, tab, onTabChange, onInspect }: { slug: string; session: AgentSession; timeline: ReactNode; transcript: ReactNode; compact: boolean; tab: ReaderTab; onTabChange: (tab: ReaderTab) => void; onInspect?: (identity: SessionWorkIdentity) => void }) {
   const { t } = useTranslation();
   const baseId = useId();
-  const tabs: { id: CompactTab; label: string }[] = [
+  const tabs: { id: ReaderTab; label: string }[] = [
     { id: "timeline", label: t("sessions.detail.tabs.timeline") },
-    { id: "linked", label: t("sessions.detail.tabs.linkedWork") },
-    { id: "cost", label: t("sessions.detail.tabs.cost") },
+    { id: "transcript", label: t("sessions.detail.tabs.transcript") },
+    ...(compact ? [{ id: "details" as const, label: t("sessions.detail.tabs.details") }] : []),
   ];
-  const cost = <CostPanel slug={slug} session={session} />;
-  const tokens = <TokensPanel session={session} />;
-  const linked = <LinkedWorkPanel slug={slug} session={session} onInspect={onInspect} />;
-  const capture = <CapturePanel session={session} />;
-  const subagents = <SubagentsPanel slug={slug} session={session} />;
 
   function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
     const index = tabs.findIndex((candidate) => candidate.id === tab);
-    const next = tabs[(index + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
-    if (!next) return;
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+      : (index + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
+    const next = tabs[nextIndex]!;
     onTabChange(next.id);
     document.getElementById(`${baseId}-${next.id}-tab`)?.focus();
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {compact ? <div role="tablist" aria-label={t("sessions.detail.tabs.label")} onKeyDown={moveFocus} className="grid grid-cols-3 border-b border-border">
+      <div role="tablist" aria-label={t("sessions.detail.tabs.label")} onKeyDown={moveFocus} className="flex border-b border-border">
         {tabs.map((candidate) => (
-          <button
-            key={candidate.id}
-            id={`${baseId}-${candidate.id}-tab`}
-            type="button"
-            role="tab"
-            aria-selected={tab === candidate.id}
-            aria-controls={`${baseId}-${candidate.id}-panel`}
-            tabIndex={tab === candidate.id ? 0 : -1}
-            onClick={() => onTabChange(candidate.id)}
-            className={cn(
-              "-mb-px min-h-[44px] min-w-[44px] border-b-2 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-              tab === candidate.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
+          <button key={candidate.id} id={`${baseId}-${candidate.id}-tab`} type="button" role="tab"
+            aria-selected={tab === candidate.id} aria-controls={`${baseId}-${candidate.id}-panel`}
+            tabIndex={tab === candidate.id ? 0 : -1} onClick={() => onTabChange(candidate.id)}
+            className={cn("-mb-px min-h-[44px] min-w-[44px] flex-1 border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex-none",
+              tab === candidate.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
             {candidate.label}
           </button>
         ))}
-      </div> : null}
+      </div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_23rem]">
-        <div
-          role={compact ? "tabpanel" : undefined}
-          id={`${baseId}-timeline-panel`}
-          aria-labelledby={compact ? `${baseId}-timeline-tab` : undefined}
-          hidden={compact && tab !== "timeline"}
-          className={cn("min-w-0", compact && tab !== "timeline" && "hidden")}
-        >
-          {timeline}
+        <div className={cn("min-w-0", tab === "details" && "hidden")}>
+          <div role="tabpanel" id={`${baseId}-timeline-panel`} aria-labelledby={`${baseId}-timeline-tab`}
+            hidden={tab !== "timeline"} className={cn("min-w-0", tab !== "timeline" && "hidden")}>{timeline}</div>
+          <div role="tabpanel" id={`${baseId}-transcript-panel`} aria-labelledby={`${baseId}-transcript-tab`}
+            hidden={tab !== "transcript"} className={cn("min-w-0", tab !== "transcript" && "hidden")}>{transcript}</div>
         </div>
-        {/* The rail stays in normal flow so its last panels remain reachable. */}
-        <aside hidden={compact && tab === "timeline"} className={cn("grid min-w-0 items-start gap-4 md:grid-cols-2 xl:grid-cols-1", compact && tab === "timeline" && "hidden")}>
-          {compact ? <>
-            <div role="tabpanel" id={`${baseId}-linked-panel`} aria-labelledby={`${baseId}-linked-tab`} hidden={tab !== "linked"} className={cn("min-w-0", tab !== "linked" && "hidden")}>
-              {linked}
-            </div>
-            <div role="tabpanel" id={`${baseId}-cost-panel`} aria-labelledby={`${baseId}-cost-tab`} hidden={tab !== "cost"} className={cn("flex min-w-0 flex-col gap-3", tab !== "cost" && "hidden")}>
-              {cost}{tokens}{capture}{subagents}
-            </div>
-          </> : <>{cost}{tokens}{linked}{capture}{subagents}</>}
+        <aside role={compact ? "tabpanel" : undefined} id={`${baseId}-details-panel`}
+          aria-labelledby={compact ? `${baseId}-details-tab` : undefined}
+          hidden={compact && tab !== "details"}
+          className={cn("grid min-w-0 items-start gap-4 md:grid-cols-2 xl:grid-cols-1", compact && tab !== "details" && "hidden")}>
+          <LinkedWorkPanel slug={slug} session={session} onInspect={onInspect} />
+          <CapturePanel session={session} />
+          <CostPanel slug={slug} session={session} />
+          <TokensPanel session={session} />
+          <SubagentsPanel slug={slug} session={session} />
         </aside>
       </div>
     </div>

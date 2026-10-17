@@ -372,7 +372,11 @@ export const sessionKeys = {
   rhythm: (slug: string, id: string, buckets: number) => ["sessions", slug, "detail", id, "rhythm", buckets] as const,
   contentsRoot: (slug: string, id: string) => ["sessions", slug, "detail", id, "contents"] as const,
   contents: (slug: string, id: string, filters: object) => ["sessions", slug, "detail", id, "contents", filters] as const,
-  // A body never changes under its digest, so these are cached for good.
+  contentWindow: (slug: string, id: string, navigation: object) =>
+    ["sessions", slug, "detail", id, "contents", "window", navigation] as const,
+  selectedMetadata: (slug: string, id: string, contentIds: readonly string[]) =>
+    ["sessions", slug, "detail", id, "contents", "selected-metadata", contentIds] as const,
+  // Bodies are immutable under their digest; readers release them on unmount.
   contentBody: (slug: string, id: string, contentId: string, sha256: string, offset: number) =>
     ["sessions", slug, "detail", id, "content-body", contentId, sha256, offset] as const,
   contentFile: (slug: string, id: string, contentId: string, sha256: string) =>

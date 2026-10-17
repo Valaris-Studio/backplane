@@ -1242,6 +1242,177 @@
         "x-surface": "internal"
       }
     },
+    "/api/workspaces/{slug}/sessions/{session_id}/contents/window": {
+      "get": {
+        "tags": [
+          "agent-sessions"
+        ],
+        "summary": "Get Session Content Window",
+        "description": "A bounded metadata and preview window, in durable source order.\nReplay `window_cursor` with `refresh` to retain the original range;\nlate insertions exceeding 100 records require deliberate navigation.",
+        "operationId": "get_session_content_window_api_workspaces__slug__sessions__session_id__contents_window_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "latest",
+                "beginning",
+                "anchor",
+                "earlier",
+                "later",
+                "refresh"
+              ],
+              "type": "string",
+              "default": "latest",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "anchor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Anchor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentWindow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "internal"
+      }
+    },
+    "/api/workspaces/{slug}/sessions/{session_id}/contents/metadata": {
+      "post": {
+        "tags": [
+          "agent-sessions"
+        ],
+        "summary": "Get Selected Content Metadata",
+        "description": "Revalidate selected records in source order, without previews or bodies.\nUnavailable IDs identify only requested records absent from this session.",
+        "operationId": "get_selected_content_metadata_api_workspaces__slug__sessions__session_id__contents_metadata_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectedContentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectedContentMetadata"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "internal"
+      }
+    },
     "/api/workspaces/{slug}/sessions/{session_id}/contents/{content_id}/body": {
       "get": {
         "tags": [
@@ -29572,6 +29743,83 @@
         "title": "ContentUploadState",
         "description": "Finalize's answer and `GET /api/companion/contents/{content_id}`."
       },
+      "ContentWindow": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "const": "content-window-v1",
+            "title": "Capability",
+            "default": "content-window-v1"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "latest",
+              "beginning",
+              "anchor",
+              "earlier",
+              "later",
+              "refresh"
+            ],
+            "title": "Mode"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentRead"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "earlier_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earlier Cursor"
+          },
+          "later_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Later Cursor"
+          },
+          "window_cursor": {
+            "type": "string",
+            "title": "Window Cursor"
+          },
+          "anchor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "items",
+          "earlier_cursor",
+          "later_cursor",
+          "window_cursor"
+        ],
+        "title": "ContentWindow"
+      },
       "ContextAdmission": {
         "properties": {
           "required": {
@@ -40312,6 +40560,50 @@
           "next_cursor"
         ],
         "title": "SearchRead"
+      },
+      "SelectedContentMetadata": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "unavailable_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Unavailable Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "unavailable_ids"
+        ],
+        "title": "SelectedContentMetadata"
+      },
+      "SelectedContentRequest": {
+        "properties": {
+          "content_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1024,
+            "title": "Content Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content_ids"
+        ],
+        "title": "SelectedContentRequest"
       },
       "SensorManifestEntry": {
         "properties": {
