@@ -201,10 +201,10 @@ async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2) 
   await waitFor(() => expect(within(preview).getByRole("button", { name: "Share as note" })).toBeEnabled());
   await user.click(within(preview).getByRole("button", { name: "Share as note" }));
   const dialog = await screen.findByRole("dialog", { name: "Share as note" });
-  await user.selectOptions(within(dialog).getByLabelText("Workspace"), SLUG);
+  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Workspace" }), SLUG);
   await within(dialog).findByRole("option", { name: "Reader review" });
-  await user.selectOptions(within(dialog).getByLabelText("Board"), BOARD);
-  await user.clear(within(dialog).getByLabelText("Note title"));
+  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Board" }), BOARD);
+  await user.clear(within(dialog).getByRole("textbox", { name: "Note title" }));
   await user.paste("Owner reviewed handoff");
   await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save note" })).toBeEnabled());
   return dialog;
@@ -335,17 +335,19 @@ describe("bounded session reader navigation", () => {
   it("replaces earlier and later windows in the same reader frame and preserves off-window selection", async () => {
     const state = serveReader(Array.from({ length: 201 }, (_, index) => record(index + 1)));
     const { client } = renderReader(); const user = userEvent.setup(); const frame = await openTranscript(user);
+    const windowNavigation = within(within(frame).getByRole("navigation", { name: "Captured records" }));
+    const excerptActions = within(frame).getByText(/^Selected: \d+ · /).parentElement!;
     await screen.findByText("Captured record 201"); await user.click(recordCheckbox(201));
-    await user.click(screen.getByRole("button", { name: "Earlier records" }));
+    await user.click(windowNavigation.getByRole("button", { name: "Earlier records" }));
     await screen.findByText("Captured record 101");
     expect(screen.getByRole("region", { name: "Transcript" })).toBe(frame);
     expect(visibleIds()).toHaveLength(100); expect(screen.queryByText("Captured record 201")).not.toBeInTheDocument();
     await user.click(recordCheckbox(2));
-    await user.click(screen.getByRole("button", { name: "Later records" }));
+    await user.click(windowNavigation.getByRole("button", { name: "Later records" }));
     await screen.findByText("Captured record 201"); expect(recordCheckbox(201)).toBeChecked();
     expect(visibleIds()).toHaveLength(100); await settled(client);
     expect(state.windows.map((params) => params.get("mode"))).toEqual(["latest", "earlier", "later"]);
-    await user.click(screen.getByRole("button", { name: "Preview excerpt" }));
+    await user.click(within(excerptActions).getByRole("button", { name: "Preview excerpt" }));
     const preview = await screen.findByRole("textbox", { name: "Excerpt preview" });
     await waitFor(() => expect((preview as HTMLTextAreaElement).value).toMatch(/Full selected evidence 201/));
     expect((preview as HTMLTextAreaElement).value.indexOf(bodyText(2))).toBeLessThan((preview as HTMLTextAreaElement).value.indexOf(bodyText(201)));
@@ -614,7 +616,7 @@ describe("selected evidence is independent from the current window", () => {
     await user.click(refreshEvidence); await settled(client);
     await user.click(within(excerptActions).getByRole("button", { name: "Resume note save" }));
     const resumed = screen.getByRole("dialog", { name: "Share as note" });
-    expect(within(resumed).getByLabelText("Note title")).toHaveValue("Owner reviewed handoff");
+    expect(within(resumed).getByRole("textbox", { name: "Note title" })).toHaveValue("Owner reviewed handoff");
     expect(within(resumed).getByRole("region", { name: "Note content" })).toHaveTextContent("OWNER REVIEWED CONTEXT");
     const validations = state.metadata.length;
     state.saveResponse = saved;
