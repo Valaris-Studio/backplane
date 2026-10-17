@@ -3,6 +3,7 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
+import { isInaccessible } from "@testing-library/react";
 import type { JsonBodyType } from "msw";
 import { Link, Route, Routes } from "react-router-dom";
 import i18n from "@/i18n/config";
@@ -192,21 +193,34 @@ function renderTranscript() {
   return { ...view, client };
 }
 
+// jsdom resolves each candidate's labels across the whole transcript.
+// Narrow the action first, retaining exact role, name and accessibility checks.
+function actionButton(container: HTMLElement, name: string) {
+  const button = within(container).getByText(name, { selector: "button" });
+  // Match getByRole's first explicit role token, not fallback role tokens.
+  expect(button.getAttribute("role")?.split(" ")[0] ?? "button").toBe("button");
+  expect(button).toHaveAccessibleName(name);
+  expect(isInaccessible(button)).toBe(false);
+  return button;
+}
+
 async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2) {
   await screen.findByText(`Captured record ${order}`);
   await user.click(recordCheckbox(order));
   const excerptActions = screen.getByText(/^Selected: \d+ · /).parentElement!;
-  await user.click(within(excerptActions).getByRole("button", { name: "Preview excerpt" }));
+  await user.click(actionButton(excerptActions, "Preview excerpt"));
   const preview = await screen.findByRole("dialog", { name: "Selected excerpt" });
-  await waitFor(() => expect(within(preview).getByRole("button", { name: "Share as note" })).toBeEnabled());
-  await user.click(within(preview).getByRole("button", { name: "Share as note" }));
+  await waitFor(() => expect(actionButton(preview, "Share as note")).toBeEnabled(), { container: preview });
+  await user.click(actionButton(preview, "Share as note"));
   const dialog = await screen.findByRole("dialog", { name: "Share as note" });
-  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Workspace" }), SLUG);
-  await within(dialog).findByRole("option", { name: "Reader review" });
-  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Board" }), BOARD);
+  const workspaceField = within(dialog).getByText("Workspace", { selector: "label" });
+  await user.selectOptions(within(workspaceField).getByRole("combobox", { name: "Workspace" }), SLUG);
+  const boardField = within(dialog).getByText("Board", { selector: "label" });
+  await within(boardField).findByRole("option", { name: "Reader review" });
+  await user.selectOptions(within(boardField).getByRole("combobox", { name: "Board" }), BOARD);
   await user.clear(within(dialog).getByRole("textbox", { name: "Note title" }));
   await user.paste("Owner reviewed handoff");
-  await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save note" })).toBeEnabled());
+  await waitFor(() => expect(actionButton(dialog, "Save note")).toBeEnabled(), { container: dialog });
   return dialog;
 }
 
@@ -595,16 +609,16 @@ describe("selected evidence is independent from the current window", () => {
     const refreshEvidence = screen.getByRole("button", { name: "Refresh evidence" });
     const frame = await openTranscript(user);
     const tabs = within(screen.getByRole("tablist", { name: "Session sections" }));
-    const windowNavigation = within(within(frame).getByRole("navigation", { name: "Captured records" }));
+    const windowNavigation = within(frame).getByRole("navigation", { name: "Captured records" });
     const excerptActions = within(frame).getByText(/^Selected: \d+ · /).parentElement!;
     const dialog = await prepareNote(user, 201); await editDraftBody(dialog);
-    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    await user.click(actionButton(dialog, "Save note"));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
     expect(state.writes).toHaveLength(1);
     const frozen = structuredClone(state.writes[0]!);
     expect(frozen.title).toBe("Owner reviewed handoff"); expect(String(frozen.content)).toContain("OWNER REVIEWED CONTEXT");
-    await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
-    await user.click(windowNavigation.getByRole("button", { name: "Beginning" }));
+    await user.click(actionButton(dialog, "Hide for now"));
+    await user.click(actionButton(windowNavigation, "Beginning"));
     await screen.findByText("Captured record 1");
     expect(screen.queryByText("Captured record 201")).not.toBeInTheDocument();
     await user.click(tabs.getByRole("tab", { name: "Timeline" }));
@@ -614,13 +628,13 @@ describe("selected evidence is independent from the current window", () => {
     await settled(client);
     state.metadataStatus = 404;
     await user.click(refreshEvidence); await settled(client);
-    await user.click(within(excerptActions).getByRole("button", { name: "Resume note save" }));
+    await user.click(actionButton(excerptActions, "Resume note save"));
     const resumed = screen.getByRole("dialog", { name: "Share as note" });
     expect(within(resumed).getByRole("textbox", { name: "Note title" })).toHaveValue("Owner reviewed handoff");
     expect(within(resumed).getByRole("region", { name: "Note content" })).toHaveTextContent("OWNER REVIEWED CONTEXT");
     const validations = state.metadata.length;
     state.saveResponse = saved;
-    await user.click(within(resumed).getByRole("button", { name: "Retry save" }));
+    await user.click(actionButton(resumed, "Retry save"));
     await within(resumed).findByRole("link", { name: "Open note" });
     expect(state.writes).toEqual([frozen, frozen]);
     expect(state.metadata).toHaveLength(validations);
