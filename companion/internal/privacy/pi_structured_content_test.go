@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valaris/backplane/companion/internal/agent/pi"
-	"github.com/valaris/backplane/companion/internal/privacy"
+	"github.com/Valaris-Studio/backplane/companion/internal/agent/pi"
+	"github.com/Valaris-Studio/backplane/companion/internal/privacy"
 )
 
 func TestPiStructuredContentIsWithheldAtMetadataAndStandard(t *testing.T) {
