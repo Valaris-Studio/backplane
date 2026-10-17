@@ -773,7 +773,7 @@ describe("explicit excerpt publication through the session reader", () => {
       expect(screen.getByRole("region", { name: "Transcript" })).toBe(reader);
       expect(screen.getAllByRole("region", { name: "Transcript" })).toHaveLength(1);
     }
-    for (const name of ["Cost", "Tokens", "Linked work", "What was captured"]) {
+    for (const name of ["Cost", "Tokens", "Linked work", "Capture level"]) {
       expect(reader.compareDocumentPosition(screen.getByRole("region", { name })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
     await user.click(screen.getByRole("button", { name: "Resume note save" }));

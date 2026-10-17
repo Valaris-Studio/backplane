@@ -51,7 +51,7 @@ var contentMembers = map[string]bool{
 	"tool_input": true, "tool_response": true, "tool_output": true, "output": true,
 	"input": true, "content": true, "text": true, "diff": true, "patch": true,
 	"command": true, "details": true, "code": true, "result": true,
-	"images": true, "data": true,
+	"images": true, "data": true, "structuredcontent": true,
 }
 
 // messageStructure are the members of a Pi message (and its content parts)

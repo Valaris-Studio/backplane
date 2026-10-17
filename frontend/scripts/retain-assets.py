@@ -95,11 +95,29 @@ if __name__ == '__main__':
     parser.add_argument('source', type=Path)
     parser.add_argument('destination', type=Path)
     parser.add_argument('--previous', type=Path)
+    parser.add_argument('--preserve-unexpired', action='store_true', help='Preserve unexpired predecessor assets in a new image history')
     parser.add_argument('--grace-seconds', type=int, default=DEFAULT_GRACE_SECONDS)
     parser.add_argument('--max-retired-releases', type=int, default=DEFAULT_MAX_RETIRED_RELEASES)
     args = parser.parse_args()
     now = time.time()
+    max_retired_releases = args.max_retired_releases
+    if args.preserve_unexpired:
+        if not math.isfinite(args.grace_seconds) or args.grace_seconds <= 0:
+            raise ValueError('Asset grace period must be positive')
+        if max_retired_releases < 1:
+            raise ValueError('Retired release cap must be positive')
+        if args.previous is None:
+            raise ValueError('Preserving unexpired assets requires --previous')
+        if os.path.lexists(args.destination):
+            raise ValueError('Preserving unexpired assets requires a nonexistent destination')
+        if os.path.lexists(args.source / MANIFEST):
+            raise ValueError('Preserving unexpired assets requires a current source without a retention manifest')
     if args.previous:
         previous = args.previous / '.asset-history'
-        retain_assets(previous if previous.is_dir() else args.previous, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=args.max_retired_releases)
-    retain_assets(args.source, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=args.max_retired_releases)
+        previous = previous if previous.is_dir() else args.previous
+        if args.preserve_unexpired:
+            _, expires = inventory(previous)
+            # Retiring the predecessor's active release adds at most one expiry group.
+            max_retired_releases = max(max_retired_releases, len({expiry for expiry in expires.values() if expiry > now}) + 1)
+        retain_assets(previous, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=max_retired_releases)
+    retain_assets(args.source, args.destination, now=now, grace=args.grace_seconds, max_retired_releases=max_retired_releases)

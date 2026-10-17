@@ -14,6 +14,7 @@ import { selectTab, startOnboarding } from "../../shell/navigation";
 import { AGENT_PROBLEM_STATES } from "../../shell/status-model";
 import { attentionStore, statusStore } from "../../stores/daemon-stream";
 import { useStoreSelector } from "../../stores/external-store";
+import { codexRestart } from "../shared/codex-restart";
 import { agentLabel } from "./agent-label";
 import { openInBackplane } from "./open-backplane";
 
@@ -36,7 +37,10 @@ const AGENT_ATTENTION_COPY: Record<string, AgentCopy> = {
   needs_trust: { title: (name) => `${name} needs your approval before its sessions can be captured.`, body: NOT_CAPTURED_UNTIL_FIXED },
   invalid_config: { title: (name) => `${name}’s config file has an error.`, body: NOT_CAPTURED_UNTIL_FIXED },
   agent_broken: { title: (name) => `${name}’s capture hook stopped working.`, body: NOT_CAPTURED_UNTIL_FIXED },
-  conflict_existing_otel: { title: (name) => `${name} already sends its telemetry elsewhere, so capture can’t turn on.` },
+  conflict_existing_otel: {
+    title: (name) => `${name}’s OpenTelemetry settings need review.`,
+    body: () => "Companion can’t confirm that it manages these settings and left them unchanged.",
+  },
 };
 const GENERIC_AGENT_COPY: AgentCopy = { title: (name) => `${name} needs your attention.` };
 
@@ -59,18 +63,25 @@ const CODE_FOR_AGENT_STATE: Record<string, string> = {
 interface AgentProblem {
   agent: string;
   code: string;
+  restartWithConflict: boolean;
 }
 
 function agentProblems(agents: readonly AgentStatus[], attention: readonly AttentionItem[]): AgentProblem[] {
   const problems = new Map<string, string>();
   for (const agent of agents) {
-    const code = CODE_FOR_AGENT_STATE[agent.state];
+    const code = agent.state === "broken" && agent.integration.problems?.includes("conflict_existing_otel")
+      ? "conflict_existing_otel"
+      : CODE_FOR_AGENT_STATE[agent.state];
     if (code && AGENT_PROBLEM_STATES.has(agent.state)) problems.set(agent.id, code);
   }
   for (const item of attention) {
     if (item.agent && !problems.has(item.agent)) problems.set(item.agent, item.code);
   }
-  return [...problems].map(([agent, code]) => ({ agent, code }));
+  return [...problems].map(([agent, code]) => ({
+    agent,
+    code,
+    restartWithConflict: code === "conflict_existing_otel" && codexRestart(agents.find((status) => status.id === agent)?.integration.problems) !== null,
+  }));
 }
 
 const showAgents = () => selectTab("agents");
@@ -101,6 +112,11 @@ export function AttentionBanner() {
     return (
       <Banner title={copy.title(name)} actions={showMeHow}>
         {copy.body?.(name)}
+        {firstProblem.restartWithConflict ? (
+          <p className="home-banner-line">
+            {`${name} also needs to reload its settings. Restarting does not confirm that Companion manages the OpenTelemetry settings.`}
+          </p>
+        ) : null}
       </Banner>
     );
   }

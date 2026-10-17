@@ -629,8 +629,41 @@ describe("Home, attention", () => {
     await renderHome({
       attention: [{ code: "conflict_existing_otel", severity: "warning", agent: "codex_cli", message: "RAW DAEMON TEXT otel" }],
     });
-    expect(screen.getByText(`${codex} already sends its telemetry elsewhere, so capture can’t turn on.`)).toBeInTheDocument();
+    expect(screen.getByText(`${codex}’s OpenTelemetry settings need review.`)).toBeInTheDocument();
+    expect(screen.getByText("Companion can’t confirm that it manages these settings and left them unchanged.")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/telemetry elsewhere|capture can’t turn on|Remove that exporter/);
     expect(document.body.textContent).not.toContain("RAW DAEMON TEXT");
+  });
+
+  it.each(["restart_required", "daemon_restart_required"] as const)("shows conflict and co-present %s without conflating settings ownership and capture", async (restart) => {
+    const status: Status = {
+      ...baseStatus,
+      agents: baseStatus.agents.map((agent) => agent.id === "codex_cli" ? {
+        ...agent,
+        state: "broken",
+        configured: false,
+        broken: true,
+        integration: { ...agent.integration, state: "broken", problems: ["conflict_existing_otel", restart] },
+      } : agent),
+    };
+    // The daemon emits one attention item; status carries the co-present problems.
+    await renderHome({ status, attention: [
+      { code: "agent_broken", severity: "error", agent: "codex_cli", message: "RAW DAEMON TEXT broken" },
+    ] });
+    expect(screen.getByText(`${codex}’s OpenTelemetry settings need review.`)).toBeInTheDocument();
+    expect(screen.getByText("Companion can’t confirm that it manages these settings and left them unchanged.")).toBeInTheDocument();
+    expect(document.body.textContent).toContain("reload its settings");
+    expect(document.body.textContent).toContain("does not confirm that Companion manages the OpenTelemetry settings");
+    expect(document.body.textContent).not.toMatch(/telemetry elsewhere|capture can’t turn on|start capturing|RAW DAEMON TEXT/);
+    expect(screen.getByRole("button", { name: "Show me how" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Restart|Quit|Repair)/i })).toBeNull();
+  });
+
+  it.each(["restart_required", "daemon_restart_required"] as const)("keeps standalone %s separate from an OpenTelemetry conflict", async (restart) => {
+    await renderHome({ attention: [{ code: restart, severity: "warning", agent: "codex_cli", message: "RAW DAEMON TEXT restart" }] });
+    expect(screen.getByText(`${codex} needs your attention.`)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/OpenTelemetry|RAW DAEMON TEXT/);
+    expect(screen.getByRole("button", { name: "Show me how" })).toBeInTheDocument();
   });
 
   it("falls back to a short generic line for an unknown code that names an agent", async () => {
@@ -921,6 +954,7 @@ describe("Home, clock while hidden", () => {
   });
 
   it("stops the clock while the document is hidden and restarts it when shown", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
     const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
     const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
     await renderHome({ sessions: [started(claudeSession)] });

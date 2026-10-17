@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api-error";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
-import type { AgentSession, ContentChannel, ContentCoverage, SessionContent } from "@/types/agent-session";
+import type { AgentSession, ContentChannel, SessionContent } from "@/types/agent-session";
 import { useSessionContents } from "../api/use-session-contents";
 import { transcriptEntries, type TranscriptEntry } from "../utils/contents";
 import type { ExcerptNoteDraft } from "../utils/excerpt-note";
-import { formatBytes, formatClock } from "../utils/format";
+import { formatClock } from "../utils/format";
 import { KindIcon } from "./CallRow";
-import { ContentBody } from "./ContentBody";
+import { ContentBody, CoverageBadge, CoverageNote } from "./ContentBody";
 import { ExcerptCheckbox, SessionExcerpt } from "./SessionExcerpt";
 import { Segmented } from "./controls";
 import { CallContentText } from "./PromptText";
@@ -78,8 +78,12 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
       </TranscriptFrame>
     );
   }
-  // A session captured before rich capture keeps the page it always had.
-  if (!items.length && !contents.hasNextPage && !hasSelectionOrDraft) return null;
+  if (!items.length && !contents.hasNextPage && !hasSelectionOrDraft) {
+    if (!session.capture_levels?.includes("rich")) return null;
+    return <TranscriptFrame headingId={headingId} actionsHeight={actionsHeight}>
+      <p className="px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">{t("sessions.contents.emptyRich")}</p>
+    </TranscriptFrame>;
+  }
 
   return (
     <TranscriptFrame
@@ -117,7 +121,7 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
       {contents.hasNextPage ? (
         <div className="flex flex-col items-center gap-1 border-t border-border/60 py-2">
           {linked === "beyond" ? <p className="text-[0.82rem] text-muted-foreground">{t("sessions.contents.notLoadedTarget")}</p> : null}
-          <Button variant="ghost" size="sm" onClick={() => void contents.fetchNextPage()} disabled={contents.isFetchingNextPage}>
+          <Button variant="ghost" size="sm" onClick={() => void contents.fetchNextPage({ cancelRefetch: false })} disabled={contents.isFetching}>
             {contents.isFetchingNextPage ? t("sessions.contents.loadingMore") : t("sessions.contents.loadMore")}
           </Button>
         </div>
@@ -356,35 +360,5 @@ function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, ac
         </div>
       ) : null}
     </li>
-  );
-}
-
-function CoverageNote({ item }: { item: SessionContent }) {
-  const { t } = useTranslation();
-  if (item.coverage === "captured") return null;
-  const reason = item.coverage_reason;
-  const sized = item.coverage === "truncated" && reason && item.byte_count != null && item.original_byte_count != null;
-  const explanation =
-    reason === "secret_filter"
-      ? t("sessions.contents.reasons.secret_filter", { count: item.redaction.replacements })
-      : sized
-        ? t(`sessions.contents.reasonsSized.${reason}`, { kept: formatBytes(item.byte_count!), original: formatBytes(item.original_byte_count!) })
-        : reason
-          ? t(`sessions.contents.reasons.${reason}`)
-          : null;
-  return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.84rem] text-muted-foreground">
-      <CoverageBadge coverage={item.coverage} />
-      {explanation ? <span>{explanation}</span> : null}
-    </p>
-  );
-}
-
-function CoverageBadge({ coverage }: { coverage: ContentCoverage }) {
-  const { t } = useTranslation();
-  return (
-    <span className="inline-flex shrink-0 items-center rounded-[var(--radius-cap)] border border-dashed border-muted-foreground/45 px-1.5 py-px text-[0.76rem] font-semibold text-muted-foreground">
-      {t(`sessions.contents.coverage.${coverage}`)}
-    </span>
   );
 }

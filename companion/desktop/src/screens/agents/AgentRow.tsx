@@ -173,7 +173,7 @@ function detailFor(kind: AgentRowKind, agent: AgentStatus, liveSessionCount: num
     case "foreign_extension":
       return foreignExtensionDetail(name, fileName);
     case "otel_conflict":
-      return `${name} already sends telemetry to another OpenTelemetry endpoint, so the Companion left its config alone and its sessions aren’t captured. Remove that exporter from config.toml, then check again.`;
+      return `Companion can’t confirm that it manages the OpenTelemetry settings in ${name}’s config.toml. It left those settings unchanged. Review them before making changes.`;
     case "needs_trust":
       return `${name} only runs the Companion’s hooks after you approve them. Until then its sessions aren’t captured.`;
     case "invalid_config": {
@@ -228,6 +228,7 @@ export function AgentRow({ agent, kind, liveSessionCount, now, busy, error, focu
   const toggleable = manageable && TOGGLEABLE_KINDS.has(kind);
   // Approval comes first; a Codex app already running then needs a restart too.
   const restartAfterTrust = kind === "needs_trust" ? codexRestart(agent.integration.problems) : null;
+  const restartWithConflict = kind === "otel_conflict" ? codexRestart(agent.integration.problems) : null;
 
   const recheckButton = (
     <Button size="sm" icon="refresh" loading={busy === "recheck"} disabled={busy !== null && busy !== "recheck"} onClick={onRecheck}>
@@ -302,6 +303,14 @@ export function AgentRow({ agent, kind, liveSessionCount, now, busy, error, focu
               : `Then restart the ${name} app: it was already open when capture was set up.`}
           </p>
           <StepList className="agents-row-indent" label={RESTART_STEPS_LABEL[restartAfterTrust]} steps={RESTART_STEPS[restartAfterTrust]} />
+        </>
+      ) : null}
+      {manageable && restartWithConflict ? (
+        <>
+          <p className="agents-row-detail">
+            {`${name} also needs to reload its settings. Restarting does not confirm that Companion manages the OpenTelemetry settings.`}
+          </p>
+          <StepList className="agents-row-indent" label={RESTART_STEPS_LABEL[restartWithConflict]} steps={RESTART_STEPS[restartWithConflict]} />
         </>
       ) : null}
       {kind === "restart_required" || kind === "daemon_restart_required" ? (

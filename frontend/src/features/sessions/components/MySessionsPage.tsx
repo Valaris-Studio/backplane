@@ -13,7 +13,6 @@ import { useBoards } from "@/features/kanban/api/use-boards";
 import type { AgentSession, AgentSessionPage } from "@/types/agent-session";
 import { useCompanionEnabled, useSessionList, useSessionSummary } from "../api/use-sessions";
 import { useCompanionDevices } from "../api/use-linked-sessions";
-import { useSessionRealtime } from "../api/use-session-realtime";
 import { useNow } from "../hooks/use-now";
 import {
   displayStateFor,
@@ -97,7 +96,6 @@ function SessionsList() {
   const enabled = useCompanionEnabled() === true;
   const now = useNow();
   const { filters, updateFilters, clearFilters } = useSessionFilters();
-  useSessionRealtime(slug);
   const since = useMemo(() => new Date(periodStart(filters.period, now)).toISOString(), [filters.period, now]);
   const listQuery = useMemo(() => toListQuery(filters, since), [filters, since]);
   const list = useSessionList(slug, listQuery, enabled);

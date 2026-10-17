@@ -244,7 +244,7 @@ describe("Session detail — timeline of turns and calls", () => {
     renderDetail();
 
     const turn = await screen.findByRole("article");
-    expect(within(turn).getByText("You")).toBeInTheDocument();
+    expect(within(turn).getByText("Prompt")).toBeInTheDocument();
     expect(within(turn).getByText(/Write the failing test first/)).toBeInTheDocument();
     expect(within(turn).getByText("24 calls")).toBeInTheDocument();
     expect(within(turn).getByText("1 failed")).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("Session detail — timeline of turns and calls", () => {
     expect(screen.queryByText(/3 turns · 41 calls · 2 failed/)).not.toBeInTheDocument();
   });
 
-  it("is explicit about output: withheld with its size, or none at all", async () => {
+  it("keeps withheld output explicit without claiming a collapsed call produced none", async () => {
     serveDetail({
       pages: [
         callPage([
@@ -291,7 +291,7 @@ describe("Session detail — timeline of turns and calls", () => {
 
     await screen.findByText("Output withheld · 1.2 KB as reported");
     expect(within(callRow("Grep")).getByLabelText("Output not sent at this capture level, 1.2 KB as reported")).toBeInTheDocument();
-    expect(within(callRow("Edit")).getByText("No output")).toBeInTheDocument();
+    expect(within(callRow("Edit")).queryByText("No output")).not.toBeInTheDocument();
     expect(within(callRow("Edit")).getByText("backend/tests/test_session_lifecycle.py")).toBeInTheDocument();
   });
 
@@ -311,7 +311,7 @@ describe("Session detail — timeline of turns and calls", () => {
     await screen.findByText("pytest -k overlap");
     expect(within(callRow("Read")).getByLabelText("Succeeded")).toBeInTheDocument();
     expect(within(callRow("Bash")).getByText("Running")).toBeInTheDocument();
-    expect(within(callRow("WebFetch")).getByText("No result captured")).toBeInTheDocument();
+    expect(within(callRow("WebFetch")).getByText("Outcome not reported")).toBeInTheDocument();
     expect(within(callRow("WebFetch")).queryByLabelText("Succeeded")).not.toBeInTheDocument();
   });
 
@@ -347,7 +347,7 @@ describe("Session detail — timeline of turns and calls", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(await screen.findByText("AssertionError: assert 4800.0 == 3600.0")).toBeInTheDocument();
     expect(screen.getByText("toolu_01HcR9x2")).toBeInTheDocument();
-    expect(screen.getByText("Output stayed on your device.")).toBeInTheDocument();
+    expect(screen.getByText("Output was not included in these call events.")).toBeInTheDocument();
 
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -548,7 +548,7 @@ describe("Session detail — facts rail", () => {
     // The default media-query fixture is neither compact nor wide: the rail
     // and reader share one column, so document order is also reading order.
     const transcript = await screen.findByRole("region", { name: "Transcript" });
-    for (const name of ["Cost", "Tokens", "What was captured"]) {
+    for (const name of ["Cost", "Tokens", "Capture level"]) {
       const facts = screen.getByRole("region", { name });
       expect(transcript.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING, `${name} follows the reader`).toBeTruthy();
     }
@@ -608,23 +608,23 @@ describe("Session detail — facts rail", () => {
   it("never claims a level for a session captured before levels were recorded", async () => {
     serveDetail({ session: { capture_levels: [] } });
     renderDetail();
-    const captured = await screen.findByRole("region", { name: "What was captured" });
-    expect(within(captured).getByText("Captured before levels were recorded")).toBeInTheDocument();
+    const captured = await screen.findByRole("region", { name: "Capture level" });
+    expect(within(captured).getByText("Capture level was not recorded")).toBeInTheDocument();
     expect(within(captured).queryByText("Standard")).not.toBeInTheDocument();
-    expect(within(captured).getByText("No capture gaps reported")).toBeInTheDocument();
+    expect(within(captured).getByText("No event rejections reported")).toBeInTheDocument();
   });
 
   it("shows the folder as the server sends it: the bound folder and the path inside it", async () => {
     serveDetail({ session: { cwd: "backplane/packages/api" } });
     renderDetail();
-    const captured = await screen.findByRole("region", { name: "What was captured" });
+    const captured = await screen.findByRole("region", { name: "Capture level" });
     expect(within(captured).getByText("backplane/packages/api")).toBeInTheDocument();
   });
 
   it("falls back to the last folder for an older row that still holds a device path", async () => {
     serveDetail({ session: { cwd: `/home/${OWNER}/code/backplane` } });
     renderDetail();
-    const captured = await screen.findByRole("region", { name: "What was captured" });
+    const captured = await screen.findByRole("region", { name: "Capture level" });
     expect(within(captured).getByText("backplane")).not.toHaveAttribute("title");
     expect(document.body.innerHTML).not.toContain(`/home/${OWNER}`);
   });
@@ -646,7 +646,7 @@ describe("Session detail — facts rail", () => {
   it("reads usage-only from coverage, never guesses it from counts", async () => {
     serveDetail({ session: { coverage: "activity", prompt_count: 0, tool_call_count: 0 } });
     renderDetail();
-    await screen.findByRole("region", { name: "What was captured" });
+    await screen.findByRole("region", { name: "Capture level" });
     expect(screen.queryByText(/reported token usage for this session, but no activity/)).not.toBeInTheDocument();
   });
 
@@ -690,7 +690,7 @@ describe("Session detail — facts rail", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Presenter mode" }));
 
-    const captured = screen.getByRole("region", { name: "What was captured" });
+    const captured = screen.getByRole("region", { name: "Capture level" });
     expect(within(captured).getByText("backplane/packages/api")).toBeInTheDocument();
     expect(within(callRow("Read")).getByText("~/code/backplane/app/main.py")).toBeInTheDocument();
     expect(within(callRow("Bash")).getByText("~/bin/deploy")).toBeInTheDocument();
@@ -699,22 +699,24 @@ describe("Session detail — facts rail", () => {
     expect(document.body.innerHTML).not.toMatch(/\/home\/(carol|operator)\//);
   });
 
-  it("names the level and what stayed on the device once levels are recorded", async () => {
+  it("names the recorded policy level without claiming what actually stayed on the device", async () => {
     serveDetail({ session: { capture_levels: ["standard"] } });
     renderDetail();
-    const captured = await screen.findByRole("region", { name: "What was captured" });
+    const captured = await screen.findByRole("region", { name: "Capture level" });
     expect(within(captured).getByText("Standard")).toBeInTheDocument();
-    expect(within(captured).getByText("Prompts, commands and tool arguments")).toBeInTheDocument();
-    expect(within(captured).getByText("Tool output and the agent's replies stayed on your device")).toBeInTheDocument();
+    expect(within(captured).getByText(/^Allows prompts, commands and tool arguments/)).toBeInTheDocument();
+    expect(within(captured).queryByText(/stayed on your device/)).not.toBeInTheDocument();
+    expect(within(captured).getByText("Event coverage")).toBeInTheDocument();
   });
 
   it("names the rich level on the four-step meter", async () => {
     serveDetail({ session: { capture_levels: ["full", "rich"] } });
     renderDetail();
-    const captured = await screen.findByRole("region", { name: "What was captured" });
+    const captured = await screen.findByRole("region", { name: "Capture level" });
     expect(within(captured).getByText("Rich")).toBeInTheDocument();
     expect(within(captured).getByRole("img", { name: "Capture level: Rich" }).children).toHaveLength(4);
-    expect(within(captured).getByText("Prompts, replies, complete tool output, edits and attached images")).toBeInTheDocument();
-    expect(within(captured).getByText("Anything outside the bound folder stayed on your device")).toBeInTheDocument();
+    expect(within(captured).getByText(/^Allows prompts, replies, tool output, edits and attached images/)).toBeInTheDocument();
+    expect(within(captured).queryByText(/complete tool output|stayed on your device/)).not.toBeInTheDocument();
+    expect(within(captured).getByText("Event coverage")).toBeInTheDocument();
   });
 });

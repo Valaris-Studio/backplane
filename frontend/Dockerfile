@@ -21,7 +21,7 @@ FROM python:3.12-alpine AS retained
 COPY --from=previous /usr/share/nginx/html /previous
 COPY --from=builder /app/dist /current
 COPY scripts/retain-assets.py /retain-assets.py
-RUN python /retain-assets.py /current /retained --previous /previous
+RUN python /retain-assets.py /current /retained --previous /previous --preserve-unexpired
 
 FROM nginx:alpine
 RUN apk add --no-cache python3

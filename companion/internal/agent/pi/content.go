@@ -402,6 +402,10 @@ func (r *entryReader) readToolResult(message map[string]any) {
 		truncation, _ := details["truncation"].(map[string]any)
 		if truncated, _ := truncation["truncated"].(bool); truncated {
 			r.truncated(&output, truncation, details)
+		} else if truncation == nil && message["toolName"] == "codemode" {
+			// Codemode spills only after truncation; this signal does not authorize reading the log.
+			full, _ := details["fullOutputPath"].(string)
+			output.SourceTruncated = full != ""
 		}
 		key := r.add(output)
 		for index, block := range textBlocks {

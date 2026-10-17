@@ -368,9 +368,19 @@ var messages = map[string][3]string{
 		"O agente rejeita o próprio arquivo de configuração %s, então não executa nenhum dos hooks nele, incluindo os do companion. O companion não o alterou; corrija o arquivo e execute agents install novamente.",
 	},
 	"conflict_existing_otel": {
-		"Codex already exports telemetry to another OpenTelemetry endpoint; the companion left it unchanged, so Codex sessions are not captured. Remove that exporter from config.toml and run agents install codex again.",
-		"Codex ya exporta telemetría a otro endpoint de OpenTelemetry; el companion no lo modificó, así que las sesiones de Codex no se capturan. Elimina ese exportador de config.toml y vuelve a ejecutar agents install codex.",
-		"O Codex já exporta telemetria para outro endpoint do OpenTelemetry; o companion não o alterou, então as sessões do Codex não são capturadas. Remova esse exportador do config.toml e execute agents install codex novamente.",
+		"Companion cannot confirm that it manages the OpenTelemetry settings in Codex's config.toml. It left those settings unchanged. Review them before making changes.",
+		"Companion no puede confirmar que gestione la configuración de OpenTelemetry en config.toml de Codex. La dejó sin cambios. Revísala antes de modificarla.",
+		"Companion não pode confirmar que gerencia as configurações de OpenTelemetry no config.toml do Codex. Elas foram mantidas sem alterações. Revise-as antes de modificá-las.",
+	},
+	"conflict_restart_required": {
+		"Codex also needs to reload its settings. When convenient, quit and reopen Codex. This does not confirm that Companion manages the OpenTelemetry settings.",
+		"Codex también necesita recargar su configuración. Cuando te convenga, cierra y vuelve a abrir Codex. Esto no confirma que Companion gestione la configuración de OpenTelemetry.",
+		"O Codex também precisa recarregar suas configurações. Quando for conveniente, feche e reabra o Codex. Isso não confirma que o Companion gerencia as configurações de OpenTelemetry.",
+	},
+	"conflict_daemon_restart_required": {
+		"Codex's background app server also needs to reload its settings. When convenient, run: codex app-server daemon restart. This does not confirm that Companion manages the OpenTelemetry settings.",
+		"El servidor en segundo plano de Codex también necesita recargar su configuración. Cuando te convenga, ejecuta: codex app-server daemon restart. Esto no confirma que Companion gestione la configuración de OpenTelemetry.",
+		"O servidor em segundo plano do Codex também precisa recarregar suas configurações. Quando for conveniente, execute: codex app-server daemon restart. Isso não confirma que o Companion gerencia as configurações de OpenTelemetry.",
 	},
 	"restart_required": {
 		"Restart the Codex app to start capturing its sessions: it was already open when capture was set up and reads its settings only when it starts. Quit Codex (⌘Q), then open it again.",

@@ -370,6 +370,7 @@ export const sessionKeys = {
   onNote: (slug: string, noteId: string) => ["sessions", slug, "note", noteId] as const,
   summary: (slug: string, query: object) => ["sessions", slug, "summary", query] as const,
   rhythm: (slug: string, id: string, buckets: number) => ["sessions", slug, "detail", id, "rhythm", buckets] as const,
+  contentsRoot: (slug: string, id: string) => ["sessions", slug, "detail", id, "contents"] as const,
   contents: (slug: string, id: string, filters: object) => ["sessions", slug, "detail", id, "contents", filters] as const,
   // A body never changes under its digest, so these are cached for good.
   contentBody: (slug: string, id: string, contentId: string, sha256: string, offset: number) =>

@@ -9648,7 +9648,7 @@
         "work": "Trabalho no Backplane",
         "failures": "Falhas"
       },
-      "you": "Você",
+      "you": "Prompt",
       "beforeFirstPrompt": "Antes do primeiro prompt",
       "turnLabel": "Turno das {{time}}",
       "running": "Em andamento",
@@ -9666,17 +9666,17 @@
         "failed": "Falhou",
         "exit": "Código {{code}}",
         "running": "Em andamento",
-        "unknown": "Nenhum resultado capturado"
+        "unknown": "Resultado não informado"
       },
       "showDetails": "Mostrar detalhes de {{name}}",
       "detail": {
         "error": "Erro",
-        "output": "Saída",
+        "output": "Saída nos eventos da chamada",
         "callId": "Id da chamada",
         "loading": "Carregando a chamada…",
         "loadError": "Não foi possível carregar esta chamada.",
-        "outputStayed": "A saída ficou no seu dispositivo.",
-        "noOutput": "A chamada não produziu saída.",
+        "outputStayed": "A saída não foi incluída nestes eventos da chamada.",
+        "noOutput": "Nenhuma saída registrada nestes eventos da chamada.",
         "copyOutput": "Copiar saída",
         "copied": "Copiado",
         "truncated": "Mostrando os primeiros 16 KB"
@@ -9756,7 +9756,7 @@
         "boardName": "quadro {{board}}"
       },
       "captured": {
-        "title": "O que foi capturado",
+        "title": "Nível de captura",
         "levels": {
           "metadata": "Metadados",
           "standard": "Padrão",
@@ -9764,25 +9764,25 @@
           "rich": "Rico"
         },
         "levelMeter": "Nível de captura: {{level}}",
-        "legacy": "Capturada antes de os níveis serem registrados",
+        "legacy": "O nível de captura não foi registrado",
         "sent": {
-          "metadata": "Quais ferramentas rodaram, quando e por quanto tempo",
-          "standard": "Prompts, comandos e argumentos de ferramentas",
-          "full": "Prompts, comandos, argumentos e saída de ferramentas até 16 KB",
-          "rich": "Prompts, respostas, a saída completa das ferramentas, edições e imagens anexadas"
+          "metadata": "Permite nomes de ferramentas, horários e duração",
+          "standard": "Permite prompts, comandos e argumentos de ferramentas",
+          "full": "Permite prompts, comandos, argumentos e saída limitada de ferramentas",
+          "rich": "Permite prompts, respostas, saída de ferramentas, edições e imagens anexadas"
         },
         "kept": {
-          "metadata": "Prompts, comandos e saídas ficaram no seu dispositivo",
-          "standard": "A saída das ferramentas e as respostas do agente ficaram no seu dispositivo",
-          "full": "As respostas do agente ficaram no seu dispositivo",
-          "rich": "O que está fora da pasta vinculada ficou no seu dispositivo"
+          "metadata": "Este nível exclui o conteúdo de prompts, comandos e saídas",
+          "standard": "Este nível exclui a saída de ferramentas e as respostas do agente",
+          "full": "Este nível exclui as respostas da transcrição do agente",
+          "rich": "A disponibilidade da fonte, as exclusões e os limites de armazenamento continuam se aplicando"
         },
-        "coverage": "Cobertura",
-        "coverageFull": "Nenhuma lacuna de captura reportada",
+        "coverage": "Cobertura de eventos",
+        "coverageFull": "Nenhuma rejeição de evento informada",
         "coverageUsageOnly": "Só uso",
-        "coverageGaps_one": "{{count}} registro não foi capturado",
-        "coverageGaps_many": "{{count}} registros não foram capturados",
-        "coverageGaps_other": "{{count}} registros não foram capturados",
+        "coverageGaps_one": "{{count}} evento foi rejeitado",
+        "coverageGaps_many": "{{count}} eventos foram rejeitados",
+        "coverageGaps_other": "{{count}} eventos foram rejeitados",
         "folder": "Pasta"
       },
       "subagents": {
@@ -9844,7 +9844,7 @@
       "overlapNote": "o tempo dos subagentes se sobrepõe e é contado uma vez",
       "legend": {
         "label": "Legenda",
-        "prompt": "Seus prompts",
+        "prompt": "Prompts",
         "tool": "Ferramentas",
         "file": "Edições de arquivos",
         "work": "Trabalho no Backplane",
@@ -10085,7 +10085,7 @@
       "retry": "Tentar de novo",
       "copyLink": "Copiar o link deste item",
       "labels": {
-        "you": "Você",
+        "you": "Prompt",
         "agent": "Agente",
         "reasoning": "Raciocínio",
         "summary": "Resumo",
@@ -10172,7 +10172,25 @@
         "alt": "Imagem anexada, {{size}}"
       },
       "download": "Baixar",
-      "downloading": "Baixando…"
+      "downloading": "Baixando…",
+      "emptyRich": "Nenhum conteúdo capturado foi recebido para esta sessão.",
+      "call": {
+        "inspect": "Inspecionar conteúdo capturado",
+        "title": "Conteúdo capturado",
+        "loading": "Carregando conteúdo capturado…",
+        "loadError": "Não foi possível carregar o conteúdo capturado.",
+        "unavailable": "Este conteúdo capturado não está mais disponível.",
+        "empty": "No momento, nenhum conteúdo capturado está vinculado a esta chamada.",
+        "loaded_one": "{{count}} registro carregado para esta chamada",
+        "loaded_other": "{{count}} registros carregados para esta chamada",
+        "loaded_many": "{{count}} registros carregados para esta chamada",
+        "nativeHidden_one": "{{count}} registro bruto oculto",
+        "nativeHidden_other": "{{count}} registros brutos ocultos",
+        "nativeHidden_many": "{{count}} registros brutos ocultos",
+        "showNative": "Mostrar registros brutos",
+        "hideNative": "Ocultar registros brutos",
+        "showImage": "Mostrar imagem"
+      }
     },
     "evidence": {
       "inspect": "Inspecionar evidências",

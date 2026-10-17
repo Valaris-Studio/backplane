@@ -4,6 +4,8 @@
 import { Outlet, useParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { RouteFallback } from "@/components/layout/RouteFallback";
+import { useCompanionEnabled } from "@/features/sessions/api/use-sessions";
+import { SessionRealtimeOwner } from "@/features/sessions/components/SessionRealtimeOwner";
 import { useWorkspace } from "@/features/workspaces/api/use-workspace";
 import { WorkspaceResolvedProvider } from "@/features/workspaces/hooks/use-workspace-resolved";
 import { WorkspaceNotFoundPage } from "./WorkspaceNotFoundPage";
@@ -24,9 +26,13 @@ import { WorkspaceNotFoundPage } from "./WorkspaceNotFoundPage";
 export function WorkspaceLayout() {
   const { slug } = useParams<{ slug: string }>();
   const { data, isError } = useWorkspace(slug);
+  const companionEnabled = useCompanionEnabled() === true;
 
   return (
     <WorkspaceResolvedProvider resolved={Boolean(data)}>
+      {slug && data && !isError && companionEnabled ? (
+        <SessionRealtimeOwner key={slug} slug={slug} />
+      ) : null}
       <AppShell>
         {isError ? (
           <WorkspaceNotFoundPage />

@@ -4,7 +4,7 @@
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Check, Coins, Cpu, Eye, GitFork, Link2, Lock, Pencil, ShieldCheck } from "lucide-react";
+import { Coins, Cpu, Eye, GitFork, Info, Link2, Lock, Pencil, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useBoards } from "@/features/kanban/api/use-boards";
@@ -250,7 +250,7 @@ export function CapturePanel({ session }: { session: AgentSession }) {
       : t("sessions.rail.captured.coverageFull");
 
   return (
-    <RailPanel icon={ShieldCheck} title={t("sessions.rail.captured.title")}>
+    <RailPanel icon={SlidersHorizontal} title={t("sessions.rail.captured.title")}>
       {level ? (
         <>
           <p className="text-[0.88rem] font-bold">{t(`sessions.rail.captured.levels.${level}`)}</p>
@@ -268,7 +268,7 @@ export function CapturePanel({ session }: { session: AgentSession }) {
           </div>
           <ul className="grid gap-1 text-[0.82rem]">
             <li className="flex items-start gap-2">
-              <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-[color:var(--color-success-foreground)]" />
+              <Info aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               {t(`sessions.rail.captured.sent.${level}`)}
             </li>
             <li className="flex items-start gap-2 text-muted-foreground">

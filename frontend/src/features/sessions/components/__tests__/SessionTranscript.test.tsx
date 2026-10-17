@@ -10,20 +10,23 @@ import i18n from "@/i18n/config";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import type { WebSocketEvent } from "@/lib/websocket";
+import { WebSocketContext } from "@/providers/WebSocketProvider";
 import type { AgentSession, SessionContent, SessionContentPage } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { formatBytes, formatClock } from "../../utils/format";
 import { SessionDetailPage } from "../SessionDetailPage";
+import { SessionRealtimeOwner } from "../SessionRealtimeOwner";
 
-const socket = vi.hoisted(() => ({ handlers: new Map<string, (event: WebSocketEvent) => void>() }));
-
-vi.mock("@/hooks/use-websocket", () => ({
-  useWebSocketEvent: (pattern: string, callback: (event: WebSocketEvent) => void) => {
-    socket.handlers.set(pattern, callback);
-  },
-  useWebSocket: () => ({ status: "connected" as const, subscribe: () => () => {} }),
-}));
+type SessionSubscriber = (event: WebSocketEvent) => void;
+const socket = { handlers: new Map<string, Set<SessionSubscriber>>() };
+const subscribe = (pattern: string, callback: SessionSubscriber) => {
+  const handlers = socket.handlers.get(pattern) ?? new Set<SessionSubscriber>();
+  socket.handlers.set(pattern, handlers);
+  handlers.add(callback);
+  return () => { handlers.delete(callback); };
+};
+const socketContext = { status: "connected" as const, subscribe };
 
 // Read at run time from the repository: the frontend also builds on its own,
 // where contracts/ is absent.
@@ -51,7 +54,7 @@ interface ContentServer {
 interface ServeOptions {
   session?: Partial<AgentSession>;
   pages?: SessionContentPage[];
-  list?: () => Response;
+  list?: () => Response | Promise<Response>;
 }
 
 function serveSession(options: ServeOptions = {}): ContentServer {
@@ -101,9 +104,11 @@ function serveBody(requests: ContentServer, id: string, text: string, pageBytes 
 
 function renderSession(queryClient?: QueryClient) {
   return renderWithProviders(
-    <Routes>
-      <Route path="/:slug/sessions/:sessionId" element={<SessionDetailPage />} />
-    </Routes>,
+    <WebSocketContext.Provider value={socketContext}>
+      <Routes>
+        <Route path="/:slug/sessions/:sessionId" element={<><SessionRealtimeOwner slug={SLUG} /><SessionDetailPage /></>} />
+      </Routes>
+    </WebSocketContext.Provider>,
     { routerProps: { initialEntries: [`/${SLUG}/sessions/${SESSION_ID}`] }, queryClient },
   );
 }
@@ -123,16 +128,16 @@ function entryNames(list: HTMLElement) {
 }
 
 async function emitSessionUpdate(reason: string, ownerId = ME) {
-  const handler = socket.handlers.get("agent_session.*");
-  if (!handler) throw new Error("the session page does not listen for agent_session events");
-  act(() =>
-    handler({
+  const handlers = socket.handlers.get("agent_session.*");
+  if (!handlers?.size) throw new Error("the workspace owner does not listen for agent_session events");
+  act(() => {
+    for (const handler of [...handlers]) handler({
       event: "agent_session.updated",
       timestamp: new Date().toISOString(),
       event_id: `evt-${reason}`,
       payload: { owner_id: ownerId, session_id: SESSION_ID, workspace_id: "ws-1", reason },
-    }),
-  );
+    });
+  });
   await act(() => vi.advanceTimersByTimeAsync(PAST_DEBOUNCE_MS));
 }
 
@@ -160,9 +165,11 @@ describe("Transcript — the contract's content page", () => {
     renderSession();
 
     const list = await transcript();
-    expect(entryNames(list)).toEqual(["Attachment", "You", "Claude Code", "Tool call", "Attachment", "Instructions", "Tool call", "Attachment"]);
-    expect(within(entry(list, "You")).getByText("Add a retry with exponential backoff to the uploader and keep the tests green.")).toBeInTheDocument();
+    expect(entryNames(list)).toEqual(["Attachment", "Prompt", "Claude Code", "Tool call", "Attachment", "Instructions", "Tool call", "Attachment"]);
+    expect(within(entry(list, "Prompt")).getByText("Add a retry with exponential backoff to the uploader and keep the tests green.")).toBeInTheDocument();
     expect(within(entry(list, "Instructions")).getByText("CLAUDE.md")).toBeInTheDocument();
+    expect(within(entry(list, "Prompt")).getByRole("checkbox", { name: /^Select Prompt, source item/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("combobox", { name: "Jump to loaded content" })).getByRole("option", { name: /^Prompt ·/ })).toBeInTheDocument();
   });
 
   it("gives each item a stable anchor and copies its link", async () => {
@@ -205,6 +212,42 @@ describe("Transcript — the contract's content page", () => {
   });
 });
 
+describe("Transcript — observed rich content availability", () => {
+  it("does not infer rich emptiness for legacy levels or native-only content", async () => {
+    const requests = serveSession({ session: { capture_levels: [] }, pages: [contentPage([])] });
+    const first = renderSession();
+    await waitFor(() => expect(requests.listRequests).toHaveLength(1));
+    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
+    first.unmount();
+    serveSession({ pages: [contentPage([makeContent({ id: "only-native", channel: "native_record", preview: { text: "SYNTHETIC_NATIVE", truncated: false } })])] });
+    renderSession();
+    expect(await screen.findByText("Only raw records were captured. Choose Everything to see them.")).toBeInTheDocument();
+    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
+    expect(screen.queryByText("SYNTHETIC_NATIVE")).not.toBeInTheDocument();
+  });
+
+  it("does not call a pending rich metadata request empty", async () => {
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { release = resolve; });
+    const requests = serveSession({ list: () => pending });
+    renderSession();
+    await waitFor(() => expect(requests.listRequests).toHaveLength(1));
+    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
+    await act(async () => release(HttpResponse.json(contentPage([makeContent()]))));
+    await transcript();
+    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
+  });
+
+  it.each([{ capture_levels: ["rich"] }, { capture_levels: ["rich", "standard"] }] satisfies { capture_levels: AgentSession["capture_levels"] }[])("explains an exhausted empty reader with historical levels $capture_levels without promising future content", async ({ capture_levels }) => {
+    const requests = serveSession({ session: { capture_levels }, pages: [contentPage([])] });
+    renderSession();
+    expect(await screen.findByText("No captured content was received for this session.")).toBeInTheDocument();
+    expect(requests.listRequests).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/complete tool output|content will arrive/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("Transcript — messages, tools and edits", () => {
   it("groups a call's input, output and edit under one expandable tool call", async () => {
     const user = userEvent.setup();
@@ -222,7 +265,7 @@ describe("Transcript — messages, tools and edits", () => {
     renderSession();
 
     const list = await transcript();
-    expect(entryNames(list)).toEqual(["You", "Tool call", "Claude Code"]);
+    expect(entryNames(list)).toEqual(["Prompt", "Tool call", "Claude Code"]);
 
     const tool = entry(list, "Tool call");
     const toggle = within(tool).getByRole("button", { name: /Tool call/ });
@@ -760,6 +803,7 @@ describe("Transcript — access", () => {
     renderSession();
 
     expect(await screen.findByText("You can't read this session's content.")).toBeInTheDocument();
+    expect(screen.queryByText("No captured content was received for this session.")).not.toBeInTheDocument();
   });
 
   it("offers a retry when the transcript fails to load", async () => {
