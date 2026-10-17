@@ -102,13 +102,19 @@ func TestCodexInstallSaysWhenTelemetryWasSkippedForAConflict(t *testing.T) {
 	h := newHarness(t)
 	h.connect(t)
 	codexHome := h.codexHome(t)
-	mustWrite(t, filepath.Join(codexHome, "config.toml"), "[otel.exporter.otlp-grpc]\nendpoint = \"http://collector:4317\"\n")
+	configPath := filepath.Join(codexHome, "config.toml")
+	const original = "[otel.exporter.otlp-grpc]\nendpoint = \"http://collector:4317\"\n"
+	mustWrite(t, configPath, original)
 	if err := h.run(t, "agents", "install", "codex"); err != nil {
 		t.Fatal(err)
 	}
 	output := h.stdout.String()
-	if !strings.Contains(output, `"telemetry": "skipped_conflict_existing_otel"`) || !strings.Contains(output, "already exports telemetry to another OpenTelemetry endpoint") {
+	if !strings.Contains(output, `"telemetry": "skipped_conflict_existing_otel"`) || !strings.Contains(output, "cannot confirm") || !strings.Contains(output, "left those settings unchanged") {
 		t.Fatalf("conflict not reported by install: %s", output)
+	}
+	unchanged, err := os.ReadFile(configPath)
+	if err != nil || string(unchanged) != original {
+		t.Fatalf("conflict changed exporter settings: %q, %v", unchanged, err)
 	}
 }
 

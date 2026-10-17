@@ -4,7 +4,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useCompanionEnabled, useSessionSummary } from "../api/use-sessions";
-import { useSessionRealtime } from "../api/use-session-realtime";
 import { useNow } from "../hooks/use-now";
 import { periodStart } from "../hooks/use-session-filters";
 
@@ -18,7 +17,6 @@ export function SessionsLiveCount({ slug }: { slug: string }) {
   const { t } = useTranslation();
   const enabled = useCompanionEnabled() === true;
   const now = useNow();
-  useSessionRealtime(slug);
   const query = useMemo(() => ({ since: new Date(periodStart("today", now)).toISOString(), root_only: true }), [now]);
   const summary = useSessionSummary(slug, query, enabled, LIVE_POLL_MS);
   const live = summary.data?.live_count ?? 0;

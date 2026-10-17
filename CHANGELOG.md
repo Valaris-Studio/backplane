@@ -33,6 +33,9 @@ keeps its own detailed per-tool history in
 
 #### Added
 
+- Inspect content linked to an individual captured call, with source and
+  coverage details, explicit raw-record and media controls, and independent
+  history loading.
 - Inspect the captured calls supporting a linked card or note, separately for
   changed and consulted work. Each call explains whether its relationship was
   matched exactly or by timing, with explicit earlier-history loading.
@@ -41,6 +44,11 @@ keeps its own detailed per-tool history in
 
 #### Changed
 
+- Capture-level descriptions explain policy limits; event coverage does not
+  imply that all content was collected. Prompt labels remain neutral about
+  who supplied the text.
+- Explicit evidence refresh updates loaded content previews while preserving
+  excerpt selection and reviewed note drafts.
 - Session pages explain how to connect Companion when capture is unavailable,
   including when older sessions fall outside the selected period.
 - Evidence counts describe loaded calls; filtered timelines no longer imply
@@ -49,6 +57,16 @@ keeps its own detailed per-tool history in
 
 #### Fixed
 
+- Session updates refresh each workspace once, including while its sidebar is
+  collapsed, so one event burst no longer starts competing requests for
+  loaded evidence.
+- Frontend image upgrades preserve inherited asset URLs until their recorded
+  expiry, even when deployments exceed the default five-release history cap.
+- Codex configuration-conflict guidance describes unconfirmed management of
+  OpenTelemetry settings and shows any separate restart requirement.
+- Companion recognizes Pi codemode output that was truncated into a spill
+  file without reading that file, and applies Metadata and Standard capture
+  limits to structured tool output.
 - Failed session-history checks remain distinct from an empty capture history.
 - Linked work opens in its authorized workspace. Unavailable targets hide
   retained titles and links, and losing session access cancels private reads

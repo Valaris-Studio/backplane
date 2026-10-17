@@ -5,8 +5,11 @@ package privacy
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 )
 
 // MaxFullToolOutputBytes bounds each tool-output string at the full level;
@@ -15,9 +18,9 @@ const MaxFullToolOutputBytes = 16 << 10
 
 const truncationMarker = " …[truncated]"
 
-// ReduceToolOutput applies the tool-output rule of level to the named
-// top-level members: standard replaces each with {bytes, sha256} of the raw
-// value; full and metadata leave them to SanitizeFor and ApplyContentLevel.
+// ReduceToolOutput replaces the named top-level members and structuredContent
+// with {bytes, sha256} of the raw value at Standard level. Full and Metadata
+// leave them to SanitizeFor and ApplyContentLevel.
 // It is idempotent, so a second pass keeps the original digest.
 func ReduceToolOutput(payload map[string]any, members []string, level ContentLevel) map[string]any {
 	if level != Standard {
@@ -26,6 +29,10 @@ func ReduceToolOutput(payload map[string]any, members []string, level ContentLev
 	out := make(map[string]any, len(payload))
 	for key, value := range payload {
 		out[key] = value
+		// Keep this Standard-only: naming it in ToolOutput would widen the Full/Rich string limit.
+		if key == "structuredContent" && !isOutputDescriptor(value) {
+			out[key] = OutputDescriptor(value)
+		}
 	}
 	for _, member := range members {
 		if value, present := out[member]; present && !isOutputDescriptor(value) {
@@ -53,9 +60,25 @@ func isOutputDescriptor(value any) bool {
 	if !ok || len(object) != 2 {
 		return false
 	}
-	_, hasBytes := object["bytes"]
-	_, hasHash := object["sha256"].(string)
-	return hasBytes && hasHash
+	digest, ok := object["sha256"].(string)
+	if !ok || len(digest) != sha256.Size*2 {
+		return false
+	}
+	if _, err := hex.DecodeString(digest); err != nil {
+		return false
+	}
+	// Descriptors start with an int; JSON readers return float64 or json.Number.
+	switch count := object["bytes"].(type) {
+	case int:
+		return count >= 0
+	case float64:
+		return count >= 0 && !math.IsInf(count, 0) && count == math.Trunc(count)
+	case json.Number:
+		byteCount, err := count.Int64()
+		return err == nil && byteCount >= 0
+	default:
+		return false
+	}
 }
 
 func serialized(value any) string {

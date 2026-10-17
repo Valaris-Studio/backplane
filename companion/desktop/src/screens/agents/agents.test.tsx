@@ -931,10 +931,28 @@ describe("OpenTelemetry conflict", () => {
   it("explains the conflict and offers Check again instead of Repair", async () => {
     await renderAgents({ status: withAgents([otelConflictAgent("codex_cli")]) });
     const codex = rowFor("Codex");
-    expect(codex).toHaveTextContent("Codex already sends telemetry to another OpenTelemetry endpoint");
+    expect(codex).toHaveTextContent("Companion can’t confirm that it manages the OpenTelemetry settings");
+    expect(codex).toHaveTextContent("It left those settings unchanged.");
+    expect(codex).not.toHaveTextContent(/another OpenTelemetry endpoint|sessions aren’t captured|Remove that exporter/);
     expect(within(codex).getByRole("button", { name: "Check again" })).toBeInTheDocument();
     expect(within(codex).queryByRole("button", { name: "Repair" })).toBeNull();
     expect(codex).not.toHaveTextContent("conflict_existing_otel");
+    expect(within(codex).queryByRole("list", { name: /How to restart/ })).toBeNull();
+  });
+
+  it.each(["restart_required", "daemon_restart_required"] as const)("keeps %s visible beside unconfirmed settings without promising capture", async (restart) => {
+    const conflict = otelConflictAgent("codex_cli");
+    await renderAgents({ status: withAgents([{ ...conflict, integration: { ...conflict.integration, problems: ["conflict_existing_otel", restart] } }]) });
+    const codex = rowFor("Codex");
+    expect(codex).toHaveTextContent("Companion can’t confirm that it manages the OpenTelemetry settings");
+    expect(codex).toHaveTextContent("It left those settings unchanged.");
+    expect(codex).toHaveTextContent("Codex also needs to reload its settings.");
+    expect(codex).toHaveTextContent("Restarting does not confirm that Companion manages the OpenTelemetry settings.");
+    const steps = within(codex).getByRole("list", { name: restart === "restart_required" ? "How to restart Codex" : "How to restart Codex’s app server" });
+    expect(steps).toHaveTextContent(restart === "restart_required" ? "Open Codex again." : "codex app-server daemon restart");
+    expect(codex).not.toHaveTextContent(/start capturing|sessions aren’t captured|another OpenTelemetry endpoint|Remove that exporter/);
+    expect(within(codex).queryByRole("button", { name: /^(Restart|Quit|Repair)/i })).toBeNull();
+    expect(within(codex).getByRole("button", { name: "Check again" })).toBeInTheDocument();
   });
 });
 

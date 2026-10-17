@@ -34,6 +34,13 @@ export function useRefreshSessionEvidence(slug: string, sessionId: string) {
         queryClient.refetchQueries({ queryKey: sessionKeys.links(slug, sessionId), exact: true }),
         queryClient.refetchQueries(callPages),
         queryClient.refetchQueries({ queryKey: workspaceKeys.all, exact: true }),
+        // Only mounted lists refresh now; visited closed inspectors stay stale
+        // until reopened. Body/file keys are outside this metadata prefix.
+        queryClient.invalidateQueries({
+          queryKey: sessionKeys.contentsRoot(slug, sessionId),
+          predicate: (query) => query.state.data !== undefined,
+          refetchType: "active",
+        }),
       ]);
       const authority = queryClient.getQueryState<AgentSession | null>(detailKey);
       if (!authority?.data || authority.status !== "success") return;

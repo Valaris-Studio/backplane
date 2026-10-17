@@ -14,12 +14,14 @@ function contentsPath(slug: string, sessionId: string) {
   return `/workspaces/${slug}/sessions/${sessionId}/contents`;
 }
 
-export function useSessionContents(slug: string, sessionId: string) {
+export function useSessionContents(slug: string, sessionId: string, callId?: string) {
+  const filters = { limit: CONTENT_PAGE_SIZE, ...(callId === undefined ? {} : { call_id: callId }) };
   return useInfiniteQuery({
-    queryKey: sessionKeys.contents(slug, sessionId, { limit: CONTENT_PAGE_SIZE }),
-    queryFn: async ({ pageParam }) => {
+    queryKey: sessionKeys.contents(slug, sessionId, filters),
+    queryFn: async ({ pageParam, signal }) => {
       const { data } = await api.get<SessionContentPage>(contentsPath(slug, sessionId), {
-        params: { limit: CONTENT_PAGE_SIZE, cursor: pageParam ?? undefined },
+        params: { ...filters, cursor: pageParam ?? undefined },
+        signal,
       });
       return data;
     },

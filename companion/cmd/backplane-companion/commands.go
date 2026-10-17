@@ -1205,17 +1205,21 @@ func (a *app) requiredAction(status agent.IntegrationStatus) string {
 	case status.State == agent.InvalidConfig:
 		return fmt.Sprintf(message("invalid_config", language), status.ConfigPath)
 	case containsString(status.Problems, agent.ProblemConflictExistingOTel):
-		return message(agent.ProblemConflictExistingOTel, language)
+		return strings.TrimSpace(message(agent.ProblemConflictExistingOTel, language) + " " + restartAction(status, language))
 	}
 	return restartAction(status, language)
 }
 
 func restartAction(status agent.IntegrationStatus, language string) string {
+	prefix := ""
+	if containsString(status.Problems, agent.ProblemConflictExistingOTel) {
+		prefix = "conflict_"
+	}
 	switch {
 	case containsString(status.Problems, agent.ProblemRestartRequired):
-		return message(agent.ProblemRestartRequired, language)
+		return message(prefix+agent.ProblemRestartRequired, language)
 	case containsString(status.Problems, agent.ProblemDaemonRestartRequired):
-		return message(agent.ProblemDaemonRestartRequired, language)
+		return message(prefix+agent.ProblemDaemonRestartRequired, language)
 	}
 	return ""
 }

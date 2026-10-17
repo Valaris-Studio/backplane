@@ -61,7 +61,7 @@ describe("Session rhythm", () => {
     expect(region).toHaveTextContent("1h 12m wall time");
     expect(region).toHaveTextContent("subagent time overlaps and is counted once");
     const legend = within(region).getByRole("list", { name: "Legend" });
-    for (const kind of ["Your prompts", "Tools", "File edits", "Backplane work", "Failures"]) {
+    for (const kind of ["Prompts", "Tools", "File edits", "Backplane work", "Failures"]) {
       expect(within(legend).getByText(kind)).toBeInTheDocument();
     }
   });

@@ -27,6 +27,7 @@ import { usePromptsHidden } from "../hooks/use-hide-prompts";
 import { formatBytes, formatClock } from "../utils/format";
 import { presentArgs } from "../utils/presenter";
 import { CallContentText } from "./PromptText";
+import { SessionCallContent } from "./SessionCallContent";
 import { WithheldChip } from "./WithheldChip";
 import { WorkChip } from "./WorkChip";
 
@@ -169,14 +170,12 @@ export function CallRow({ slug, sessionId, item, evidenceProvenance }: CallRowPr
               }
               className="max-md:hidden"
             />
-          ) : item.output === "none" && item.outcome !== "running" ? (
-            <span className="max-md:hidden">{t("sessions.timeline.noOutput")}</span>
           ) : null}
           {item.duration_ms !== null ? <span className="tabular-nums">{formatCallDuration(item.duration_ms)}</span> : null}
           <CallOutcome item={item} />
         </div>
       </div>
-      {expanded ? <CallDetailPanel id={panelId} slug={slug} sessionId={sessionId} item={item} /> : null}
+      {expanded ? <CallDetailPanel key={JSON.stringify([slug, sessionId, item.key, item.call_id])} id={panelId} slug={slug} sessionId={sessionId} item={item} /> : null}
     </li>
   );
 }
@@ -293,6 +292,7 @@ function CallDetailPanel({ id, slug, sessionId, item }: CallDetailPanelProps) {
           </>
         ) : null}
       </dl>
+      {item.call_id ? <SessionCallContent slug={slug} sessionId={sessionId} callId={item.call_id} /> : null}
     </div>
   );
 }

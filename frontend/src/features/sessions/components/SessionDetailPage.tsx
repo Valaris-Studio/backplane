@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import type { AgentSession } from "@/types/agent-session";
 import { useCompanionEnabled, useSession } from "../api/use-sessions";
 import { useRefreshSessionEvidence, type SessionWorkIdentity } from "../api/use-session-evidence";
-import { useSessionRealtime } from "../api/use-session-realtime";
 import { useNow } from "../hooks/use-now";
 import { formatTokens, formatUsd, formatWallTime, sessionTotalTokens, sessionWallSeconds } from "../utils/format";
 import { isUsageOnly } from "../utils/group-sessions";
@@ -84,7 +83,6 @@ function SessionDetail() {
   const { t } = useTranslation();
   const { slug = "", sessionId = "" } = useParams();
   const enabled = useCompanionEnabled() === true;
-  useSessionRealtime(slug);
   const session = useSession(slug, sessionId, enabled);
   const errorStatus = isApiError(session.error) ? session.error.status : 0;
   const accessLost = session.isError && [401, 403, 404].includes(errorStatus);

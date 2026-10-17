@@ -7,7 +7,7 @@ import { Download, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
-import type { SessionContent } from "@/types/agent-session";
+import type { ContentCoverage, SessionContent } from "@/types/agent-session";
 import { useContentBodyPages, useContentImage, useDownloadContent } from "../api/use-session-contents";
 import { usePromptsHidden } from "../hooks/use-hide-prompts";
 import { formatBytes } from "../utils/format";
@@ -39,7 +39,7 @@ function FailureNote({ error, onRetry }: { error: unknown; onRetry: () => void }
     <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.84rem] text-muted-foreground">
       {message}
       {failure === "storage" || failure === "failed" ? (
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" onClick={onRetry}>
           <RotateCw aria-hidden />
           {t("sessions.contents.retry")}
         </Button>
@@ -110,7 +110,7 @@ function TextContent({ slug, sessionId, content, prose, emphasis }: ContentBodyP
       {expandable ? (
         <div className="flex flex-wrap items-center gap-2">
           {offsets.length === 0 ? (
-            <Button variant="ghost" size="sm" onClick={() => setOffsets([0])}>
+            <Button variant="ghost" size="sm" className="max-sm:min-h-[44px]" onClick={() => setOffsets([0])}>
               {content.preview ? t("sessions.contents.body.showAll", { size: formatBytes(size) }) : t("sessions.contents.body.show")}
             </Button>
           ) : (
@@ -125,13 +125,14 @@ function TextContent({ slug, sessionId, content, prose, emphasis }: ContentBodyP
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="max-sm:min-h-[44px]"
                   onClick={() => setOffsets((current) => (current.includes(last.next_offset!) ? current : [...current, last.next_offset!]))}
                 >
                   {t("sessions.contents.body.loadMore", { shown: formatBytes(last.next_offset), total: formatBytes(last.total_bytes) })}
                 </Button>
               ) : null}
               {loaded.length ? (
-                <Button variant="ghost" size="sm" onClick={() => setOffsets([])}>
+                <Button variant="ghost" size="sm" className="max-sm:min-h-[44px]" onClick={() => setOffsets([])}>
                   {t("sessions.contents.body.showLess")}
                 </Button>
               ) : null}
@@ -198,12 +199,42 @@ function FileContent({ slug, sessionId, content }: Omit<ContentBodyProps, "prose
     <div className="grid gap-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <MediaFacts content={content} />
-        <Button variant="outline" size="sm" onClick={() => download.mutate()} disabled={download.isPending}>
+        <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" onClick={() => download.mutate()} disabled={download.isPending}>
           <Download aria-hidden />
           {download.isPending ? t("sessions.contents.downloading") : t("sessions.contents.download")}
         </Button>
       </div>
       {download.isError ? <FailureNote error={download.error} onRetry={() => download.mutate()} /> : null}
     </div>
+  );
+}
+
+export function CoverageNote({ item, showCaptured = false }: { item: SessionContent; showCaptured?: boolean }) {
+  const { t } = useTranslation();
+  if (item.coverage === "captured") return showCaptured ? <CoverageBadge coverage={item.coverage} /> : null;
+  const reason = item.coverage_reason;
+  const sized = item.coverage === "truncated" && reason && item.byte_count != null && item.original_byte_count != null;
+  const explanation =
+    reason === "secret_filter"
+      ? t("sessions.contents.reasons.secret_filter", { count: item.redaction.replacements })
+      : sized
+        ? t(`sessions.contents.reasonsSized.${reason}`, { kept: formatBytes(item.byte_count!), original: formatBytes(item.original_byte_count!) })
+        : reason
+          ? t(`sessions.contents.reasons.${reason}`)
+          : null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.84rem] text-muted-foreground">
+      <CoverageBadge coverage={item.coverage} />
+      {explanation ? <span>{explanation}</span> : null}
+    </p>
+  );
+}
+
+export function CoverageBadge({ coverage }: { coverage: ContentCoverage }) {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-[var(--radius-cap)] border border-dashed border-muted-foreground/45 px-1.5 py-px text-[0.76rem] font-semibold text-muted-foreground">
+      {t(`sessions.contents.coverage.${coverage}`)}
+    </span>
   );
 }

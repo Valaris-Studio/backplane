@@ -9582,7 +9582,7 @@
         "work": "Backplane work",
         "failures": "Failures"
       },
-      "you": "You",
+      "you": "Prompt",
       "beforeFirstPrompt": "Before the first prompt",
       "turnLabel": "Turn at {{time}}",
       "running": "Running",
@@ -9600,17 +9600,17 @@
         "failed": "Failed",
         "exit": "Exit {{code}}",
         "running": "Running",
-        "unknown": "No result captured"
+        "unknown": "Outcome not reported"
       },
       "showDetails": "Show details for {{name}}",
       "detail": {
         "error": "Error",
-        "output": "Output",
+        "output": "Output in call events",
         "callId": "Call id",
         "loading": "Loading the call…",
         "loadError": "Couldn't load this call.",
-        "outputStayed": "Output stayed on your device.",
-        "noOutput": "The call produced no output.",
+        "outputStayed": "Output was not included in these call events.",
+        "noOutput": "No output recorded in these call events.",
         "copyOutput": "Copy output",
         "copied": "Copied",
         "truncated": "Showing the first 16 KB"
@@ -9684,7 +9684,7 @@
         "boardName": "{{board}} board"
       },
       "captured": {
-        "title": "What was captured",
+        "title": "Capture level",
         "levels": {
           "metadata": "Metadata",
           "standard": "Standard",
@@ -9692,24 +9692,24 @@
           "rich": "Rich"
         },
         "levelMeter": "Capture level: {{level}}",
-        "legacy": "Captured before levels were recorded",
+        "legacy": "Capture level was not recorded",
         "sent": {
-          "metadata": "Which tools ran, when, and for how long",
-          "standard": "Prompts, commands and tool arguments",
-          "full": "Prompts, commands, arguments and tool output up to 16 KB",
-          "rich": "Prompts, replies, complete tool output, edits and attached images"
+          "metadata": "Allows tool names, timing and duration",
+          "standard": "Allows prompts, commands and tool arguments",
+          "full": "Allows prompts, commands, arguments and bounded tool output",
+          "rich": "Allows prompts, replies, tool output, edits and attached images"
         },
         "kept": {
-          "metadata": "Prompts, commands and output stayed on your device",
-          "standard": "Tool output and the agent's replies stayed on your device",
-          "full": "The agent's replies stayed on your device",
-          "rich": "Anything outside the bound folder stayed on your device"
+          "metadata": "This level excludes prompt, command and output content",
+          "standard": "This level excludes tool output and agent replies",
+          "full": "This level excludes replies from the agent’s transcript",
+          "rich": "Source availability, exclusions and storage limits still apply"
         },
-        "coverage": "Coverage",
-        "coverageFull": "No capture gaps reported",
+        "coverage": "Event coverage",
+        "coverageFull": "No event rejections reported",
         "coverageUsageOnly": "Usage only",
-        "coverageGaps_one": "{{count}} record wasn't captured",
-        "coverageGaps_other": "{{count}} records weren't captured",
+        "coverageGaps_one": "{{count}} event was rejected",
+        "coverageGaps_other": "{{count}} events were rejected",
         "folder": "Folder"
       },
       "subagents": {
@@ -9768,7 +9768,7 @@
       "overlapNote": "subagent time overlaps and is counted once",
       "legend": {
         "label": "Legend",
-        "prompt": "Your prompts",
+        "prompt": "Prompts",
         "tool": "Tools",
         "file": "File edits",
         "work": "Backplane work",
@@ -9998,7 +9998,7 @@
       "retry": "Try again",
       "copyLink": "Copy link to this item",
       "labels": {
-        "you": "You",
+        "you": "Prompt",
         "agent": "Agent",
         "reasoning": "Reasoning",
         "summary": "Summary",
@@ -10084,7 +10084,23 @@
         "alt": "Attached image, {{size}}"
       },
       "download": "Download",
-      "downloading": "Downloading…"
+      "downloading": "Downloading…",
+      "emptyRich": "No captured content was received for this session.",
+      "call": {
+        "inspect": "Inspect captured content",
+        "title": "Captured content",
+        "loading": "Loading captured content…",
+        "loadError": "Couldn't load captured content.",
+        "unavailable": "This captured content is no longer available.",
+        "empty": "No captured content is currently linked to this call.",
+        "loaded_one": "{{count}} record loaded for this call",
+        "loaded_other": "{{count}} records loaded for this call",
+        "nativeHidden_one": "{{count}} raw record hidden",
+        "nativeHidden_other": "{{count}} raw records hidden",
+        "showNative": "Show raw records",
+        "hideNative": "Hide raw records",
+        "showImage": "Show image"
+      }
     },
     "evidence": {
       "inspect": "Inspect evidence",

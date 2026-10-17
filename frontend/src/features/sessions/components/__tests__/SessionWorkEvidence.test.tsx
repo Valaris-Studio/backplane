@@ -76,7 +76,11 @@ function serveEvidence(overrides: Partial<Pick<EvidenceServer, "links" | "page" 
       return HttpResponse.json(await state.page(new URL(request.url).searchParams));
     }),
     http.get(`${ROOT}/links`, ({ request }) => { record(request); return HttpResponse.json(state.linksStatus === 200 ? { items: state.links } : { detail: "Synthetic links failure" }, { status: state.linksStatus }); }),
-    http.get(`${ROOT}/contents`, ({ request }) => { record(request); return HttpResponse.json(contentPage(state.contents)); }),
+    http.get(`${ROOT}/contents`, ({ request }) => {
+      record(request);
+      const callId = new URL(request.url).searchParams.get("call_id");
+      return HttpResponse.json(contentPage(callId ? state.contents.filter((item) => item.call_id === callId) : state.contents));
+    }),
     http.get(`${ROOT}/contents/:contentId/body`, ({ request, params }) => {
       record(request);
       return HttpResponse.json({ content_id: params.contentId, offset: 0, next_offset: null, total_bytes: new TextEncoder().encode(BODY).length, text: BODY });
@@ -358,7 +362,7 @@ describe("Session work evidence", () => {
     expect(state.requests.some(({ method }) => method !== "GET")).toBe(false);
   });
 
-  it("explicitly refreshes authority and already-loaded evidence without fetching content or scanning history", async () => {
+  it("explicitly refreshes authority and loaded metadata without fetching bodies or scanning history", async () => {
     const state = serveEvidence({
       contents: [makeContent({ id: "chosen", session_id: SESSION_ID })],
       page: (params) => params.get("cursor") === "older-work"
@@ -403,7 +407,9 @@ describe("Session work evidence", () => {
     expect(requests.some(({ path }) => path.endsWith(`/cards/${CARD_ID}`))).toBe(true);
     expect(requests.filter(({ path, params }) => path === `${ROOT}/calls` && params.get("filter") === "work").map(({ params }) => params.get("cursor"))).toEqual([null, "older-work"]);
     expect(requests.some(({ params }) => params.get("cursor") === "not-yet-loaded")).toBe(false);
-    expect(requests.some(({ path }) => path.includes("/contents"))).toBe(false);
+    expect(requests.filter(({ path }) => path.includes("/contents")).map(({ path, method, params }) => ({ path, method, callId: params.get("call_id"), cursor: params.get("cursor") }))).toEqual([
+      { path: `${ROOT}/contents`, method: "GET", callId: null, cursor: null },
+    ]);
     expect(requests.some(({ method }) => method !== "GET")).toBe(false);
     expect(within(reader).getByRole("checkbox")).toBeChecked();
   });
@@ -497,7 +503,7 @@ describe("Session work evidence", () => {
   });
 
   it("preserves a reviewed unknown-outcome handoff and its selected source through evidence navigation", async () => {
-    const chosen = makeContent({ id: "chosen", session_id: SESSION_ID, byte_count: new TextEncoder().encode(BODY).length });
+    const chosen = makeContent({ id: "chosen", session_id: SESSION_ID, call_id: EXACT.call_id, byte_count: new TextEncoder().encode(BODY).length });
     const state = serveEvidence({ contents: [chosen, makeContent({ id: "unselected", session_id: SESSION_ID, preview: { text: "PRIVATE_UNSELECTED_MARKER", truncated: false } })] });
     const user = userEvent.setup();
     renderDetail();
@@ -523,7 +529,13 @@ describe("Session work evidence", () => {
     const reviewedRequest = structuredClone(state.writes[0]);
     await user.click(within(dialog).getByRole("button", { name: "Hide for now" }));
     const requestsBefore = state.requests.length;
-    await inspect(user);
+    const workEvidence = await inspect(user);
+    await user.click(within(workEvidence).getByRole("button", { name: /^backplane · update_exact/ }));
+    await user.click(await within(workEvidence).findByRole("button", { name: "Inspect captured content" }));
+    const captured = await within(workEvidence).findByRole("region", { name: "Captured content" });
+    expect(await within(captured).findByText(chosen.preview!.text)).toBeInTheDocument();
+    expect(within(captured).queryByText("PRIVATE_UNSELECTED_MARKER")).not.toBeInTheDocument();
+    await user.click(within(workEvidence).getByRole("button", { name: /^backplane · update_exact/ }));
     await inspect(user, "Consulted");
     await user.click(screen.getByRole("button", { name: "Refresh evidence" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Refresh evidence" })).toHaveAttribute("aria-disabled", "false"));
@@ -538,6 +550,11 @@ describe("Session work evidence", () => {
     expect(within(dialog).getByRole("region", { name: "Note content" })).toHaveTextContent(BODY);
     expect(within(dialog).getByRole("region", { name: "Note content" })).not.toHaveTextContent("PRIVATE_UNSELECTED_MARKER");
     expect(state.writes).toEqual([reviewedRequest]);
-    expect(state.requests.slice(requestsBefore).some(({ method, path }) => method !== "GET" || path.includes("/contents"))).toBe(false);
+    const refreshed = state.requests.slice(requestsBefore);
+    expect(refreshed.some(({ method }) => method !== "GET")).toBe(false);
+    expect(refreshed.filter(({ path }) => path.includes("/contents")).map(({ path, params }) => ({ path, callId: params.get("call_id"), cursor: params.get("cursor") }))).toEqual([
+      { path: `${ROOT}/contents`, callId: EXACT.call_id, cursor: null },
+      { path: `${ROOT}/contents`, callId: null, cursor: null },
+    ]);
   });
 });
