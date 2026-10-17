@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import type { AgentSession, RhythmBucket, SessionRhythm } from "@/types/agent-session";
+import { useSessionReaderActive } from "../api/use-session-contents";
 import { useSessionRhythm } from "../api/use-sessions";
 import { usePromptsHidden } from "../hooks/use-hide-prompts";
 import { useNow } from "../hooks/use-now";
@@ -57,7 +58,8 @@ interface RhythmStripProps {
 export function RhythmStrip({ slug, session }: RhythmStripProps) {
   const { t } = useTranslation();
   const compact = useMediaQuery(COMPACT_LIST_QUERY);
-  const rhythm = useSessionRhythm(slug, session.id, compact ? PHONE_BUCKETS : DESKTOP_BUCKETS, true);
+  const active = useSessionReaderActive();
+  const rhythm = useSessionRhythm(slug, session.id, compact ? PHONE_BUCKETS : DESKTOP_BUCKETS, active);
 
   if (rhythm.isPending) return <Skeleton className="h-36 w-full" aria-hidden />;
   if (rhythm.isError) return <p className="text-sm text-muted-foreground">{t("sessions.rhythm.loadError")}</p>;

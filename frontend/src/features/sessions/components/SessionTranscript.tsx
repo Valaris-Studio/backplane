@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -11,7 +11,8 @@ import { isApiError } from "@/lib/api-error";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { AgentSession, ContentChannel, SessionContent } from "@/types/agent-session";
-import { useSessionContents } from "../api/use-session-contents";
+import { SessionReaderActive } from "../api/use-session-contents";
+import { useSessionWindow, type ContentWindowRequest } from "../api/use-session-window";
 import { transcriptEntries, type TranscriptEntry } from "../utils/contents";
 import type { ExcerptNoteDraft } from "../utils/excerpt-note";
 import { formatClock } from "../utils/format";
@@ -33,99 +34,187 @@ interface SessionTranscriptProps {
   headingRef?: RefCallback<HTMLHeadingElement>;
 }
 
-/** What rich capture kept of the session, in source order. Absent where nothing was captured. */
+/** What rich capture kept in one bounded, source-ordered window. */
 export function SessionTranscript({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
-  return <SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} headingRef={headingRef} />;
+  return <SessionReaderActive.Provider value={active}><SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} headingRef={headingRef} /></SessionReaderActive.Provider>;
 }
+
+const MAX_SELECTED_RECORDS = 1024;
 
 function SessionTranscriptReader({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
   const { t } = useTranslation();
   const headingId = useId();
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const anchor = location.hash.startsWith(ANCHOR_PREFIX) ? location.hash.slice(ANCHOR_PREFIX.length) : undefined;
   const [view, setView] = useState<View>("conversation");
   const [actionsHeight, setActionsHeight] = useState(0);
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [snapshots, setSnapshots] = useState<ReadonlyMap<string, SessionContent>>(() => new Map());
+  const selected = useMemo(() => new Set(snapshots.keys()), [snapshots]);
+  const selectedItems = useMemo(() => [...snapshots.values()], [snapshots]);
   const [draft, setDraft] = useState<ExcerptNoteDraft | null>(null);
-  const onSelect = (id: string, checked: boolean) => setSelected((current) => {
-    const next = new Set(current);
-    if (checked) next.add(id);
-    else next.delete(id);
-    return next;
-  });
-  const contents = useSessionContents(slug, session.id);
-  const items = useMemo(() => contents.data?.pages.flatMap((page) => page.items) ?? [], [contents.data]);
+  const contents = useSessionWindow(slug, session.id, active, anchor);
+  const items = contents.data?.items ?? [];
   const entries = useMemo(() => transcriptEntries(items, { includeRaw: view === "everything" }), [items, view]);
   const visibleItems = useMemo(() => items.filter((item) => view === "everything" || item.channel !== "native_record"), [items, view]);
-  const linked = useLinkedItem(items, entries, contents.isSuccess, active);
-  const hasSelectionOrDraft = selected.size > 0 || draft !== null;
+  const nativeCount = items.length - visibleItems.length;
+  const nativeTarget = view === "conversation" ? items.find((item) => item.id === anchor && item.channel === "native_record") : undefined;
+  const heading = useRef<HTMLHeadingElement | null>(null);
+  const setHeading = useCallback((element: HTMLHeadingElement | null) => { heading.current = element; headingRef?.(element); }, [headingRef]);
+  const observedHash = useRef(`${location.key}:${anchor ?? ""}`);
+  const focusedNavigation = useRef(0);
+  const failedAnchor = useRef<string | null>(null);
+  const pageScroll = useRef<{ id: string; top: number } | null>(null);
+  const focusedContent = useRef<string | null>(null);
+  const error = isApiError(contents.error) ? contents.error : null;
+  const refused = error?.status === 401 || error?.status === 403;
+  const unavailable = error?.status === 404 && error.errorCode === "content_not_found";
+  const hasMore = !!contents.data?.earlier_cursor || !!contents.data?.later_cursor;
+  const linkedItem = useLinkedItem(items, entries, contents.isSuccess && !contents.isPlaceholderData, active);
+  const unlocated = contents.legacy && linkedItem === "beyond";
 
-  if (contents.isPending && !hasSelectionOrDraft) return null;
-  if (contents.isPending || contents.isError) {
-    // A deleted session is the detail page's to explain.
-    if (isApiError(contents.error) && contents.error.status === 404 && !hasSelectionOrDraft) return null;
-    const refused = isApiError(contents.error) && contents.error.status === 403;
-    return (
-      <TranscriptFrame headingId={headingId} actionsHeight={actionsHeight}>
-        {hasSelectionOrDraft ? <SessionExcerpt key="excerpt" slug={slug} session={session} items={[]} selected={selected} hasMore={false} draft={draft} onDraftChange={setDraft} onClear={() => setSelected(new Set())} onActionsHeightChange={setActionsHeight} /> : null}
-        {contents.isError ? <div className="flex flex-col items-center gap-3 px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">
-          <p>{refused ? t("sessions.contents.refused") : t("sessions.contents.loadError")}</p>
-          {refused ? null : (
-            <Button variant="outline" size="sm" onClick={() => void contents.refetch()}>
-              <RotateCw aria-hidden />
-              {t("sessions.contents.retry")}
-            </Button>
-          )}
-        </div> : null}
-      </TranscriptFrame>
-    );
-  }
-  if (!items.length && !contents.hasNextPage && !hasSelectionOrDraft) {
-    if (!session.capture_levels?.includes("rich")) return null;
-    return <TranscriptFrame headingId={headingId} actionsHeight={actionsHeight}>
-      <p className="px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">{t("sessions.contents.emptyRich")}</p>
-    </TranscriptFrame>;
-  }
+  useEffect(() => {
+    const identity = `${location.key}:${anchor ?? ""}`;
+    if (observedHash.current === identity) return;
+    observedHash.current = identity;
+    if (anchor && (contents.isPlaceholderData || !items.some((item) => item.id === anchor))) contents.navigate({ mode: "anchor", anchor_id: anchor });
+  }, [anchor, location.key, items, contents.isPlaceholderData, contents.navigate]);
 
-  return (
-    <TranscriptFrame
-      headingId={headingId}
-      headingRef={items.length ? headingRef : undefined}
-      actionsHeight={actionsHeight}
-      controls={
-        <Segmented
-          className="ml-auto"
-          label={t("sessions.contents.filterLabel")}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "conversation", label: t("sessions.contents.filters.conversation") },
-            { value: "everything", label: t("sessions.contents.filters.everything") },
-          ]}
-        />
+  useEffect(() => {
+    if (!refused) return;
+    setSnapshots(new Map());
+    setDraft(null);
+  }, [refused]);
+
+  useEffect(() => {
+    if (!active) return;
+    const rememberFocus = () => {
+      const target = document.activeElement?.closest<HTMLElement>('[id^="content-"]');
+      focusedContent.current = target && items.some((item) => itemAnchor(item) === target.id) ? target.id : null;
+    };
+    const forgetDeliberateBlur = (event: FocusEvent) => {
+      const target = event.target;
+      if (event.relatedTarget !== null || !(target instanceof HTMLElement)) return;
+      // A removed control also loses focus; wait until its detach is observable.
+      queueMicrotask(() => {
+        if (target.isConnected && document.activeElement === document.body) focusedContent.current = null;
+      });
+    };
+    rememberFocus();
+    document.addEventListener("focusin", rememberFocus);
+    document.addEventListener("focusout", forgetDeliberateBlur);
+    return () => {
+      document.removeEventListener("focusin", rememberFocus);
+      document.removeEventListener("focusout", forgetDeliberateBlur);
+    };
+  }, [active, items]);
+
+  useEffect(() => {
+    if (!active) return;
+    const remember = () => {
+      const candidates = items.map((item) => document.getElementById(`content-${item.id}`)).filter((element): element is HTMLElement => !!element);
+      const visible = candidates.find((element) => element.getBoundingClientRect().bottom > 80);
+      pageScroll.current = visible ? { id: visible.id, top: visible.getBoundingClientRect().top } : null;
+    };
+    remember();
+    window.addEventListener("scroll", remember, { passive: true });
+    return () => window.removeEventListener("scroll", remember);
+  }, [active, items]);
+
+  useLayoutEffect(() => {
+    if (!active || contents.isPlaceholderData) return;
+    if (unavailable || unlocated) {
+      const identity = `${location.key}:${contents.navigation.request}`;
+      if (failedAnchor.current !== identity) {
+        failedAnchor.current = identity;
+        heading.current?.scrollIntoView?.({ block: "start" });
+        heading.current?.focus({ preventScroll: true });
       }
-    >
-      {visibleItems.length ? <LoadedContentNavigation session={session} items={visibleItems} hasMore={contents.hasNextPage} /> : null}
-      <SessionExcerpt key="excerpt" slug={slug} session={session} items={items} selected={selected} hasMore={contents.hasNextPage} draft={draft} onDraftChange={setDraft} onClear={() => setSelected(new Set())} onActionsHeightChange={setActionsHeight} />
-      {entries.length ? (
-        <ol aria-labelledby={headingId} className="flex flex-col">
-          {entries.map((entry) =>
-            entry.type === "call" ? (
-              <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} active={active} />
-            ) : (
-              <TranscriptMessage key={entry.item.id} slug={slug} session={session} item={entry.item} selected={selected} onSelect={onSelect} />
-            ),
-          )}
-        </ol>
-      ) : (
-        <p className="px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">{t("sessions.contents.onlyRaw")}</p>
-      )}
-      {contents.hasNextPage ? (
-        <div className="flex flex-col items-center gap-1 border-t border-border/60 py-2">
-          {linked === "beyond" ? <p className="text-[0.82rem] text-muted-foreground">{t("sessions.contents.notLoadedTarget")}</p> : null}
-          <Button variant="ghost" size="sm" onClick={() => void contents.fetchNextPage({ cancelRefetch: false })} disabled={contents.isFetching}>
-            {contents.isFetchingNextPage ? t("sessions.contents.loadingMore") : t("sessions.contents.loadMore")}
-          </Button>
-        </div>
-      ) : null}
+      focusedNavigation.current = contents.navigation.request;
+      return;
+    }
+    if (!contents.isSuccess) return;
+    if (contents.navigation.request > focusedNavigation.current) {
+      focusedNavigation.current = contents.navigation.request;
+      if (contents.navigation.mode !== "anchor") {
+        heading.current?.scrollIntoView?.({ block: "start" });
+        heading.current?.focus({ preventScroll: true });
+      }
+    } else {
+      if (focusedContent.current && document.activeElement === document.body) {
+        const retainedRecord = document.getElementById(focusedContent.current);
+        (retainedRecord ?? heading.current)?.focus({ preventScroll: true });
+        if (!retainedRecord) focusedContent.current = null;
+      }
+      if (pageScroll.current) {
+        const retained = document.getElementById(pageScroll.current.id);
+        const delta = retained ? retained.getBoundingClientRect().top - pageScroll.current.top : 0;
+        if (delta) window.scrollBy({ top: delta, behavior: "instant" });
+      }
+    }
+  }, [active, contents.dataUpdatedAt, contents.isSuccess, contents.isPlaceholderData, contents.navigation, unavailable, unlocated, location.key]);
+
+  function navigate(request: ContentWindowRequest) {
+    pageScroll.current = null;
+    if (location.hash) routerNavigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true, preventScrollReset: true });
+    contents.navigate(request);
+  }
+
+  function onSelect(id: string, checked: boolean) {
+    setSnapshots((current) => {
+      const next = new Map(current);
+      if (!checked) next.delete(id);
+      else if (current.size < MAX_SELECTED_RECORDS) {
+        const item = items.find((candidate) => candidate.id === id);
+        if (item) next.set(id, { ...item, preview: null });
+      }
+      return next;
+    });
+  }
+
+  const pending = contents.isFetching && (contents.isPending || contents.isPlaceholderData);
+  return (
+    <TranscriptFrame headingId={headingId} headingRef={setHeading} actionsHeight={actionsHeight}
+      controls={<Segmented className="ml-auto" label={t("sessions.contents.filterLabel")} value={view} onChange={setView}
+        options={[{ value: "conversation", label: t("sessions.contents.filters.conversation") }, { value: "everything", label: t("sessions.contents.filters.everything") }]} />}>
+      <div className="grid gap-2 border-b border-border/60 px-[var(--card-padding)] py-3">
+        <nav aria-label={t("sessions.contents.window.label")} className="flex flex-wrap items-center gap-1">
+          <Button variant="ghost" size="sm" className="max-sm:min-h-[44px]" disabled={pending || (contents.unsupported && !contents.legacy)} onClick={() => navigate({ mode: "beginning" })}>{t("sessions.contents.window.beginning")}</Button>
+          {!contents.legacy ? <>
+            <Button variant="ghost" size="sm" className="max-sm:min-h-[44px]" disabled={pending || contents.unsupported} onClick={() => navigate({ mode: "latest" })}>{t("sessions.contents.window.latest")}</Button>
+            <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" disabled={pending || !contents.data?.earlier_cursor} onClick={() => navigate({ mode: "earlier", cursor: contents.data!.earlier_cursor! })}>{t("sessions.contents.window.earlier")}</Button>
+          </> : null}
+          <Button variant="outline" size="sm" className="max-sm:min-h-[44px]" disabled={pending || !contents.data?.later_cursor} onClick={() => navigate({ mode: "later", cursor: contents.data!.later_cursor! })}>{t("sessions.contents.window.later")}</Button>
+        </nav>
+        <p role="status" className="text-xs tabular-nums text-muted-foreground">{pending ? t("sessions.contents.window.loading") : items.length ? t("sessions.contents.window.range", { count: items.length, start: formatClock(items[0]!.occurred_at), end: formatClock(items.at(-1)!.occurred_at) }) : t("sessions.contents.window.scope")}</p>
+        {contents.legacy ? <p className="text-xs text-muted-foreground">{t("sessions.contents.window.beginningScope")}</p> : null}
+        {items.length ? <p className="text-xs text-muted-foreground">{t("sessions.contents.window.scope")}</p> : null}
+        {nativeCount ? <p className="text-xs text-muted-foreground">{t("sessions.contents.window.nativeHidden", { count: nativeCount })}</p> : null}
+        {snapshots.size >= MAX_SELECTED_RECORDS ? <p role="status" className="text-sm text-muted-foreground">{t("sessions.contents.window.selectionLimit")}</p> : null}
+      </div>
+      {nativeTarget ? <div id={itemAnchor(nativeTarget)} tabIndex={-1} className="grid scroll-mt-[calc(var(--topbar-height)+1rem)] gap-1 border-b border-border/60 px-[var(--card-padding)] py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        <p className="font-semibold">{t("sessions.contents.labels.native_record")}</p>
+        <p className="text-muted-foreground">{t("sessions.contents.source.reference", { source: t(`sessions.contents.source.${nativeTarget.source.kind}`), order: nativeTarget.source.order })}</p>
+        <CoverageNote item={nativeTarget} />
+      </div> : null}
+      {contents.changed ? <p role="status" className="border-b border-border px-[var(--card-padding)] py-3 text-sm">{t("sessions.contents.window.changed")}</p> : null}
+      {contents.unsupported && !contents.legacy ? <div className="grid justify-items-start gap-3 px-[var(--card-padding)] py-6 text-sm">
+        <p>{t("sessions.contents.window.unsupported")}</p>
+        <Button variant="outline" size="sm" onClick={contents.readBeginningFallback}>{t("sessions.contents.window.beginningFallback")}</Button>
+      </div> : unavailable ? <p role="status" className="px-[var(--card-padding)] py-6 text-sm">{t("sessions.contents.window.unavailable")}</p> : contents.isError && !contents.changed ? <div className="grid justify-items-start gap-3 px-[var(--card-padding)] py-6 text-sm text-muted-foreground">
+        <p>{t(refused ? "sessions.contents.refused" : "sessions.contents.loadError")}</p>
+        {!refused ? <Button variant="outline" size="sm" onClick={() => void contents.refetch()}><RotateCw aria-hidden />{t("sessions.contents.retry")}</Button> : null}
+      </div> : null}
+      {unlocated ? <p role="status" className="px-[var(--card-padding)] py-3 text-sm">{t("sessions.contents.window.anchorUnlocated")}</p> : null}
+      <SessionExcerpt key="excerpt" slug={slug} session={session} items={selectedItems} selected={selected} hasMore={hasMore} loadedCount={items.length} revalidateSources active={active} draft={draft} onDraftChange={setDraft} onClear={() => setSnapshots(new Map())} onActionsHeightChange={setActionsHeight} />
+      {!refused && !unavailable ? <div aria-busy={pending}>
+        {visibleItems.length ? <LoadedContentNavigation session={session} items={visibleItems} hasMore={hasMore} /> : null}
+        {entries.length ? <ol aria-labelledby={headingId} className="flex flex-col">
+          {entries.map((entry) => entry.type === "call"
+            ? <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} active={active && !contents.isPlaceholderData} />
+            : <TranscriptMessage key={entry.item.id} slug={slug} session={session} item={entry.item} selected={selected} onSelect={onSelect} />)}
+        </ol> : contents.isSuccess ? <p className="px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">{t(items.length ? "sessions.contents.onlyRaw" : "sessions.contents.emptyRich")}</p> : null}
+      </div> : null}
     </TranscriptFrame>
   );
 }
@@ -180,15 +269,15 @@ function TranscriptFrame({ headingId, headingRef, actionsHeight, controls, child
 
 /**
  * Focuses the item a `#content-<id>` link names once it is loaded. Release one
- * does not page ahead for it: "beyond" says to load more.
+ * uses a bounded anchor request when the item is outside the current window.
  */
 function useLinkedItem(items: SessionContent[], entries: TranscriptEntry[], loaded: boolean, active: boolean): "none" | "shown" | "beyond" {
   const { hash, key } = useLocation();
   const target = hash.startsWith(ANCHOR_PREFIX) ? hash.slice(ANCHOR_PREFIX.length) : null;
   const present = !!target && items.some((item) => item.id === target);
   // Grouped parts belong to TranscriptCall, which knows when its panel is open.
-  const visible = !!target && entries.some((entry) => entry.type === "message" && entry.item.id === target);
-  const appliedNavigation = useRef<{ key: string; target: string } | null>(null);
+  const visible = !!target && (entries.some((entry) => entry.type === "message" && entry.item.id === target) || items.some((item) => item.id === target && item.channel === "native_record"));
+  const appliedNavigation = useRef<{ key: string; target: string; element: HTMLElement } | null>(null);
 
   useEffect(() => {
     if (!visible || !target) {
@@ -196,13 +285,12 @@ function useLinkedItem(items: SessionContent[], entries: TranscriptEntry[], load
       return;
     }
     // A compact tab return must not replay a link that already moved focus.
-    if (!active || (appliedNavigation.current?.key === key && appliedNavigation.current.target === target)) return;
     const element = document.getElementById(`content-${target}`);
-    if (!element) return;
+    if (!active || !loaded || !element || (appliedNavigation.current?.key === key && appliedNavigation.current.element === element)) return;
     element.scrollIntoView?.({ block: "start" });
     element.focus({ preventScroll: true });
-    appliedNavigation.current = { key, target };
-  }, [active, visible, target, key]);
+    appliedNavigation.current = { key, target, element };
+  }, [active, loaded, visible, target, key, entries]);
 
   if (!target || !loaded) return "none";
   return present ? "shown" : "beyond";

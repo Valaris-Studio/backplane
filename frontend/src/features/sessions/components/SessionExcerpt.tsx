@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { AgentSession, SessionContent } from "@/types/agent-session";
 import { ExcerptTooLarge, useSessionExcerpt } from "../api/use-session-excerpt";
+import { useSelectedSessionContent } from "../api/use-selected-session-content";
 import { canExcerpt } from "../utils/excerpt";
 import { excerptNoteDocument, EXCERPT_NOTE_MAX_ITEMS, type ExcerptNoteDraft } from "../utils/excerpt-note";
+import { selectedSourceFingerprint } from "../utils/selected-content";
 import { ExcerptNoteDialog } from "./ExcerptNoteDialog";
 
 export function ExcerptCheckbox({ item, selected, onSelect }: {
@@ -29,33 +31,50 @@ export function ExcerptCheckbox({ item, selected, onSelect }: {
   />;
 }
 
-export function SessionExcerpt({ slug, session, items, selected, hasMore, draft, onDraftChange, onClear, onActionsHeightChange }: {
+export function SessionExcerpt({ slug, session, items, selected, hasMore, draft, onDraftChange, onClear, onActionsHeightChange, revalidateSources = false, active = true, loadedCount }: {
   slug: string; session: AgentSession; items: SessionContent[]; selected: ReadonlySet<string>; hasMore: boolean; onClear: () => void;
   draft: ExcerptNoteDraft | null; onDraftChange: (draft: ExcerptNoteDraft | null) => void;
   onActionsHeightChange?: (height: number) => void;
+  revalidateSources?: boolean; active?: boolean; loadedCount?: number;
 }) {
   const { t } = useTranslation();
   const privacyId = useId();
   const selectedItems = items.filter((item) => selected.has(item.id));
-  const unavailable = selectedItems.length !== selected.size || selectedItems.some((item) => !canExcerpt(item));
-  // A refresh may change coverage while the body request is in flight.
-  const fingerprint = JSON.stringify([slug, session.id, session.title, session.harness_display_name, selectedItems, [...selected]]);
+  const missingSelection = selectedItems.length !== selected.size || selectedItems.some((item) => !canExcerpt(item));
+  const fingerprint = selectedSourceFingerprint(slug, session, selectedItems);
+  const validation = useSelectedSessionContent(slug, session, selectedItems, revalidateSources && active);
+  const unavailable = missingSelection || (revalidateSources && (validation.changed || validation.isError));
+  const fingerprintRef = useRef(fingerprint);
+  fingerprintRef.current = fingerprint;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const mounted = useRef(true);
+  const validating = useRef(false);
+  const disclosureGeneration = useRef(0);
+  const [isValidating, setIsValidating] = useState(false);
   const [requestedFingerprint, setRequestedFingerprint] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const actions = useRef<HTMLDivElement>(null);
-  const { mutate, reset, data, error, isPending } = useSessionExcerpt();
-  const open = requestedFingerprint !== null && requestedFingerprint === fingerprint && !unavailable;
+  const { mutate, reset, data, error, isPending } = useSessionExcerpt(slug, session.id);
+  const open = active && requestedFingerprint !== null && requestedFingerprint === fingerprint && !unavailable;
   const close = useCallback(() => {
+    disclosureGeneration.current += 1;
+    validating.current = false;
+    setIsValidating(false);
     controller.current?.abort();
     controller.current = null;
     setRequestedFingerprint(null);
     reset();
   }, [reset]);
 
+  useEffect(() => { if (!active) close(); }, [active, close]);
   useEffect(() => {
     if (requestedFingerprint !== null && !open) close();
   }, [requestedFingerprint, open, close]);
-  useEffect(() => () => { controller.current?.abort(); }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; disclosureGeneration.current += 1; controller.current?.abort(); };
+  }, []);
   useLayoutEffect(() => {
     const element = actions.current;
     if (!element || !onActionsHeightChange) return;
@@ -69,12 +88,43 @@ export function SessionExcerpt({ slug, session, items, selected, hasMore, draft,
     return () => observer.disconnect();
   }, [onActionsHeightChange]);
 
-  function preview() {
+  async function freshSelection(): Promise<SessionContent[] | null> {
+    if (missingSelection || !active) return null;
+    const expected = fingerprint;
+    const generation = disclosureGeneration.current;
+    const fresh = revalidateSources ? await validation.validate() : selectedItems;
+    return mounted.current && activeRef.current && fingerprintRef.current === expected && disclosureGeneration.current === generation ? fresh : null;
+  }
+
+  async function preview() {
+    if (validating.current) return;
+    const generation = ++disclosureGeneration.current;
+    validating.current = true;
+    setIsValidating(true);
+    const fresh = await freshSelection();
+    if (!mounted.current || disclosureGeneration.current !== generation) return;
+    validating.current = false;
+    setIsValidating(false);
+    if (!fresh) return;
     controller.current?.abort();
     const next = new AbortController();
     controller.current = next;
     setRequestedFingerprint(fingerprint);
-    mutate({ slug, session, items: selectedItems, signal: next.signal, t });
+    mutate({ slug, session, items: fresh, signal: next.signal, t });
+  }
+
+  async function share() {
+    if (!data || !open || validating.current) return;
+    const generation = ++disclosureGeneration.current;
+    validating.current = true;
+    setIsValidating(true);
+    const fresh = await freshSelection();
+    if (!mounted.current || disclosureGeneration.current !== generation) return;
+    validating.current = false;
+    setIsValidating(false);
+    if (!fresh || fingerprintRef.current !== requestedFingerprint) return;
+    onDraftChange({ fingerprint, session, bodies: data.bodies, document: excerptNoteDocument(slug, session, data.bodies, t) });
+    close();
   }
 
   async function copy() {
@@ -99,17 +149,20 @@ export function SessionExcerpt({ slug, session, items, selected, hasMore, draft,
 
   return <>
     <div ref={actions} className="sticky top-[calc(var(--topbar-height)+0.5rem)] z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 bg-[color:var(--color-surface-1)] px-[var(--card-padding)] py-2">
-      <p className="min-w-0 flex-1 basis-full text-sm tabular-nums sm:basis-auto" aria-live="polite">{t("sessions.contents.excerpt.count", { selected: selected.size, loaded: items.length })}</p>
+      <p className="min-w-0 flex-1 basis-full text-sm tabular-nums sm:basis-auto" aria-live="polite">{t(loadedCount === undefined ? "sessions.contents.excerpt.count" : "sessions.contents.excerpt.windowCount", { selected: selected.size, loaded: loadedCount ?? items.length, count: loadedCount ?? items.length })}</p>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {selected.size > 0 ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={draft !== null} onClick={onClear}>{t("sessions.contents.excerpt.clear")}</Button> : null}
-        <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={!selected.size || unavailable || draft !== null} onClick={preview}>{t("sessions.contents.excerpt.preview")}</Button>
+        <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={!selected.size || missingSelection || (revalidateSources && validation.changed) || draft !== null || isValidating} onClick={() => void preview()}>{t("sessions.contents.excerpt.preview")}</Button>
       </div>
-      {draft ? <ExcerptNoteDialog draft={draft} stale={unavailable || draft.fingerprint !== fingerprint} onDiscard={() => onDraftChange(null)} /> : null}
+      {isValidating ? <p role="status" className="basis-full text-xs text-muted-foreground">{t("sessions.contents.excerpt.validating")}</p> : null}
+      {draft ? <ExcerptNoteDialog draft={draft} stale={missingSelection || (revalidateSources && validation.changed) || draft.fingerprint !== fingerprint}
+        sourceCheckFailed={revalidateSources && validation.isError} onRecheckSources={revalidateSources ? freshSelection : undefined} onDiscard={() => onDraftChange(null)}
+        beforeFirstSave={revalidateSources ? async () => (await freshSelection()) !== null && fingerprintRef.current === draft.fingerprint : undefined} /> : null}
     </div>
     <div className="grid gap-2 border-b border-border/60 px-[var(--card-padding)] py-3">
       <p className="text-xs text-muted-foreground">{t("sessions.contents.excerpt.excludedAttachments")}</p>
-      {hasMore ? <p className="text-xs text-muted-foreground">{t("sessions.contents.excerpt.moreItems")}</p> : null}
-      {unavailable && !draft ? <p role="alert" className="text-sm text-destructive">{t("sessions.contents.excerpt.unavailable")}</p> : null}
+      {hasMore ? <p className="text-xs text-muted-foreground">{t(revalidateSources ? "sessions.contents.excerpt.moreWindows" : "sessions.contents.excerpt.moreItems")}</p> : null}
+      {unavailable && !draft ? <p role="alert" className="text-sm text-destructive">{t(validation.isError ? "sessions.contents.excerpt.validationFailed" : "sessions.contents.excerpt.unavailable")}</p> : null}
     </div>
     {open ? <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
       <DialogContent className="max-w-3xl max-sm:[&>button]:min-h-[44px] max-sm:[&>button]:min-w-[44px]" aria-describedby={privacyId}>
@@ -125,11 +178,7 @@ export function SessionExcerpt({ slug, session, items, selected, hasMore, draft,
           <Button variant="ghost" onClick={close}>{t("sessions.contents.excerpt.cancel")}</Button>
           <Button variant="outline" onClick={() => void copy()} disabled={data === undefined || isPending || !!error}><Copy aria-hidden />{t("sessions.contents.excerpt.copy")}</Button>
           <Button onClick={download} disabled={data === undefined || isPending || !!error}><Download aria-hidden />{t("sessions.contents.excerpt.download")}</Button>
-          <Button variant="outline" disabled={data === undefined || isPending || !!error || selectedItems.length > EXCERPT_NOTE_MAX_ITEMS || draft !== null} onClick={() => {
-            if (!data || !open) return;
-            onDraftChange({ fingerprint, session, bodies: data.bodies, document: excerptNoteDocument(slug, session, data.bodies, t) });
-            close();
-          }}>{t("sessions.contents.excerpt.note.share")}</Button>
+          <Button variant="outline" disabled={data === undefined || isPending || isValidating || !!error || selectedItems.length > EXCERPT_NOTE_MAX_ITEMS || draft !== null} onClick={() => void share()}>{t("sessions.contents.excerpt.note.share")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog> : null}

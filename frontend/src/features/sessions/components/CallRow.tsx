@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { LinkProvenance, SessionCallItem, WithheldField } from "@/types/agent-session";
+import { useSessionReaderActive } from "../api/use-session-contents";
 import { useSessionCall } from "../api/use-sessions";
 import { callError, callOutput, formatCallDuration, OUTPUT_DISPLAY_LIMIT } from "../utils/call-content";
 import { usePromptsHidden } from "../hooks/use-hide-prompts";
@@ -218,7 +219,8 @@ interface CallDetailPanelProps {
 
 function CallDetailPanel({ id, slug, sessionId, item }: CallDetailPanelProps) {
   const { t } = useTranslation();
-  const detail = useSessionCall(slug, sessionId, item.key, true);
+  const active = useSessionReaderActive();
+  const detail = useSessionCall(slug, sessionId, item.key, active);
   const promptsHidden = usePromptsHidden();
   const [copied, setCopied] = useState(false);
   const events = detail.data?.events ?? [];

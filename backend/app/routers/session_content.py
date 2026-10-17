@@ -18,8 +18,13 @@ from app.schemas.session_content import (
     ContentBodyPage,
     ContentChannel,
     ContentPage,
+    ContentWindow,
+    ContentWindowMode,
+    SelectedContentMetadata,
+    SelectedContentRequest,
 )
 from app.services.session_content import AgentSessionContentService, download_name
+from app.services.session_content_cursor import MAX_WINDOW_CURSOR_LENGTH
 from app.services.storage.local import STORED_FILE_CSP
 
 router = APIRouter(
@@ -55,6 +60,42 @@ async def list_session_contents(
         channel=channel,
         call_id=call_id,
         event_id=event_id,
+    )
+
+
+@router.get("/window", response_model=ContentWindow)
+async def get_session_content_window(
+    session_id: uuid.UUID,
+    mode: ContentWindowMode = "latest",
+    cursor: str | None = Query(None, min_length=1, max_length=MAX_WINDOW_CURSOR_LENGTH),
+    anchor_id: uuid.UUID | None = None,
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """A bounded metadata and preview window, in durable source order.
+    Replay `window_cursor` with `refresh` to retain the original range;
+    late insertions exceeding 100 records require deliberate navigation."""
+    return await AgentSessionContentService(db).content_window(
+        ctx.workspace.id,
+        ctx.user.id,
+        session_id,
+        mode=mode,
+        cursor=cursor,
+        anchor_id=anchor_id,
+    )
+
+
+@router.post("/metadata", response_model=SelectedContentMetadata)
+async def get_selected_content_metadata(
+    session_id: uuid.UUID,
+    data: SelectedContentRequest,
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Revalidate selected records in source order, without previews or bodies.
+    Unavailable IDs identify only requested records absent from this session."""
+    return await AgentSessionContentService(db).selected_metadata(
+        ctx.workspace.id, ctx.user.id, session_id, data.content_ids
     )
 
 

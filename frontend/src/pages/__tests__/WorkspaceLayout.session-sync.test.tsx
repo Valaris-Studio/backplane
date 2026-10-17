@@ -11,6 +11,7 @@ import { sessionKeys, workspaceKeys } from "@/lib/query-keys";
 import type { WebSocketEvent } from "@/lib/websocket";
 import { WebSocketContext } from "@/providers/WebSocketProvider";
 import { ME, callPage, contentPage, makeCall, makeContent, makeSession } from "@/features/sessions/__tests__/fixtures";
+import { contentWindowResponse } from "@/features/sessions/__tests__/window-fixtures";
 import { SessionDetailPage } from "@/features/sessions/components/SessionDetailPage";
 import { MySessionsPage } from "@/features/sessions/components/MySessionsPage";
 import { WorkspaceLayout } from "../WorkspaceLayout";
@@ -61,18 +62,21 @@ function serve(options: { enabled?: boolean; holdModes?: boolean; holdWorkspace?
     pending: [] as ReturnType<typeof deferred>[],
     urls: [] as string[],
     contents: [] as { callId: string | null; cursor: string | null }[],
+    windows: [] as { mode: string | null; cursor: string | null }[],
     unexpected: [] as string[],
     signals: [] as AbortSignal[],
   };
   if (state.workspaceGate) releases.push(state.workspaceGate.resolve);
   if (state.modesGate) releases.push(state.modesGate.resolve);
   const interceptor = api.interceptors.request.use((config) => {
-    if (config.url?.endsWith(`/sessions/${SESSION}/contents`) && config.signal) state.signals.push(config.signal as AbortSignal);
+    if ((config.url?.endsWith(`/sessions/${SESSION}/contents`) || config.url?.endsWith(`/sessions/${SESSION}/contents/window`)) && config.signal) state.signals.push(config.signal as AbortSignal);
     return config;
   });
   releases.push(() => { api.interceptors.request.eject(interceptor); });
   const session = makeSession({ id: SESSION, title: TITLE, capture_levels: ["rich"] });
   const call = makeCall({ key: "call-key", name: "Grep", call_id: CALL });
+  const readerContent = makeContent({ id: "reader-content", session_id: SESSION, call_id: null, preview: { text: "Private reader preview", truncated: false } });
+  const exactContent = makeContent({ id: "call-content", session_id: SESSION, call_id: CALL, preview: { text: "Exact call preview", truncated: false } });
   server.use(http.get("/api/*", async ({ request }) => {
     const url = new URL(request.url), path = url.pathname;
     state.urls.push(path + url.search);
@@ -91,13 +95,17 @@ function serve(options: { enabled?: boolean; holdModes?: boolean; holdWorkspace?
     else if (path === `${SESSION_ROOT}/calls`) data = callPage([call]);
     else if (path === `${SESSION_ROOT}/calls/call-key`) data = { key: call.key, events: [] };
     else if (path === `${SESSION_ROOT}/links` || path === `${SESSION_ROOT}/children`) data = { items: [] };
-    else if (path === CONTENTS) {
+    else if (path === CONTENTS || path === `${CONTENTS}/window`) {
       const callId = url.searchParams.get("call_id");
-      state.contents.push({ callId, cursor: url.searchParams.get("cursor") });
+      const isWindow = path === `${CONTENTS}/window`;
+      if (isWindow) state.windows.push({ mode: url.searchParams.get("mode"), cursor: url.searchParams.get("cursor") });
+      else state.contents.push({ callId, cursor: url.searchParams.get("cursor") });
       if (state.holdContents) {
         const pending = deferred(); state.pending.push(pending); releases.push(pending.resolve); await pending.promise;
       }
-      data = contentPage([makeContent({ id: callId ? "call-content" : "reader-content", session_id: SESSION, call_id: callId, preview: { text: callId ? "Exact call preview" : "Private reader preview", truncated: false } })]);
+      const page = contentPage([callId ? exactContent : readerContent]);
+      if (isWindow) return contentWindowResponse([page], url.searchParams);
+      data = page;
     } else if (path === `${SESSION_ROOT}/usage`) data = { items: [], price_table_version: "fixture" };
     else if (path === `${SESSION_ROOT}/rhythm`) data = { start: session.started_at, end: session.ended_at, live: false, bucket_seconds: 60, buckets: [], idle_spans: [], children: [], capture_gaps: 0 };
     else if (/\/sessions\/summary$/.test(path)) data = { session_count: 1, live_count: 0, wall_duration_seconds: 10, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0, reasoning_tokens: 0, cost_api_equivalent_usd: null, cost_spend_usd: null, cost_complete: false };
@@ -166,28 +174,52 @@ afterEach(() => {
 });
 
 describe("WorkspaceLayout session event ownership", () => {
-  it("coalesces one owner burst into one reader and one exact-call refetch without cancellation", async () => {
+  it("coalesces owner bursts into only the active peer reader, preserving exact-call scope and pinned windows without cancellation", async () => {
     const state = serve(), queryClient = client(), user = userEvent.setup();
     renderWorkspace(queryClient);
     await screen.findByRole("heading", { name: TITLE });
+    await user.click(screen.getByRole("tab", { name: "Transcript" }));
+    await screen.findByText("Private reader preview");
+    await settled(queryClient);
+    expect(state.windows).toEqual([{ mode: "latest", cursor: null }]);
+    await user.click(screen.getByRole("tab", { name: "Timeline" }));
     await user.click(screen.getByRole("button", { name: /^Grep/ }));
     await user.click(screen.getByRole("button", { name: "Inspect captured content" }));
     await screen.findByText("Exact call preview");
     await settled(queryClient);
     expect(state.unexpected).toEqual([]);
-    const initial = state.contents.length, signals = state.signals.length;
+    const initial = state.contents.length, signals = state.signals.length, windows = state.windows.length;
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setTimeout", "clearTimeout"] });
     state.holdContents = true;
     emit(ME, 20);
     await debounce();
-    await waitFor(() => expect(state.pending).toHaveLength(2));
-    expect(state.signals.slice(signals).map((signal) => signal.aborted)).toEqual([false, false]);
+    await waitFor(() => expect(state.pending).toHaveLength(1));
+    expect(state.signals.slice(signals).map((signal) => signal.aborted)).toEqual([false]);
+    expect(state.windows).toHaveLength(windows);
     state.holdContents = false;
     state.pending.splice(0).forEach((pending) => pending.resolve());
     await settled(queryClient);
-    expect(state.contents.slice(initial)).toEqual([{ callId: null, cursor: null }, { callId: CALL, cursor: null }]);
+    expect(state.contents.slice(initial)).toEqual([{ callId: CALL, cursor: null }]);
+    const timedUser = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await timedUser.click(screen.getByRole("tab", { name: "Transcript" }));
+    await settled(queryClient);
+    expect(state.windows.slice(windows)).toEqual([{ mode: "refresh", cursor: expect.any(String) }]);
+    const pinned = state.windows.at(-1)!;
+    const beforeWindowBurst = state.windows.length, beforeCallBurst = state.contents.length, beforeSignals = state.signals.length;
+    state.holdContents = true;
+    emit(ME, 20);
+    await debounce();
+    await waitFor(() => expect(state.pending).toHaveLength(1));
+    expect(state.windows.slice(beforeWindowBurst)).toEqual([pinned]);
+    expect(state.contents).toHaveLength(beforeCallBurst);
+    expect(state.signals.slice(beforeSignals).map((signal) => signal.aborted)).toEqual([false]);
+    state.holdContents = false;
+    state.pending.splice(0).forEach((pending) => pending.resolve());
+    await settled(queryClient);
+    expect(screen.getByText("Private reader preview")).toBeVisible();
     expect(state.urls.some((url) => /\/contents\/[^/]+\/(?:body|download)/.test(url))).toBe(false);
     expect(sessionSubscribers()).toBe(1);
+    expect(state.unexpected).toEqual([]);
   });
 
   it("retains one owner across detail, list, collapse and off-session navigation while invalidating inactive history only", async () => {

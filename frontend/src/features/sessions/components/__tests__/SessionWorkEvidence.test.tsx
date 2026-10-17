@@ -1,13 +1,14 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import { sessionKeys } from "@/lib/query-keys";
 import type { AgentSession, CallWorkRef, SessionCallPage, SessionContent, SessionWorkLink } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeCall, makeContent, makeSession, makeTurn, minutesAgo, stubAuthModes } from "../../__tests__/fixtures";
+import { contentWindowResponse, selectedMetadata } from "../../__tests__/window-fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
 import { SessionDetailPage } from "../SessionDetailPage";
 
@@ -76,6 +77,15 @@ function serveEvidence(overrides: Partial<Pick<EvidenceServer, "links" | "page" 
       return HttpResponse.json(await state.page(new URL(request.url).searchParams));
     }),
     http.get(`${ROOT}/links`, ({ request }) => { record(request); return HttpResponse.json(state.linksStatus === 200 ? { items: state.links } : { detail: "Synthetic links failure" }, { status: state.linksStatus }); }),
+    http.get(`${ROOT}/contents/window`, ({ request }) => {
+      record(request);
+      return contentWindowResponse([contentPage(state.contents)], new URL(request.url).searchParams);
+    }),
+    http.post(`${ROOT}/contents/metadata`, async ({ request }) => {
+      record(request);
+      const { content_ids } = await request.json() as { content_ids: string[] };
+      return HttpResponse.json(selectedMetadata(state.contents, content_ids));
+    }),
     http.get(`${ROOT}/contents`, ({ request }) => {
       record(request);
       const callId = new URL(request.url).searchParams.get("call_id");
@@ -124,6 +134,8 @@ function renderDetail(hash = "") {
 }
 
 async function inspect(user: ReturnType<typeof userEvent.setup>, relation = "Changed") {
+  const details = screen.queryByRole("tab", { name: "Session details" });
+  if (details && !screen.queryByRole("button", { name: `Inspect ${relation} evidence for ${TITLE}` })) await user.click(details);
   await user.click(await screen.findByRole("button", { name: `Inspect ${relation} evidence for ${TITLE}` }));
   return screen.findByRole("region", { name: `Evidence for ${TITLE}` });
 }
@@ -159,6 +171,8 @@ function responsiveViewport(initialWidth: number) {
     for (const { target } of queries.values()) target.dispatchEvent(new Event("change"));
   };
 }
+
+beforeEach(() => { responsiveViewport(1440); });
 
 beforeAll(() => {
   const rect = { top: 0, right: 0, bottom: 0, left: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
@@ -318,18 +332,31 @@ describe("Session work evidence", () => {
     expect(callNames(evidence)).toEqual(["backplane · read_consulted"]);
   });
 
-  it.each(["empty", "pending", "unavailable", "forbidden"])("does not offer reader navigation when content is %s", async (mode) => {
-    serveEvidence();
+  it.each(["empty", "pending", "unavailable", "forbidden"])("reaches the reader frame from evidence and explains %s capture", async (mode) => {
+    const state = serveEvidence();
     const pending = deferred<Response>();
-    if (mode === "pending") server.use(http.get(`${ROOT}/contents`, () => pending.promise));
-    if (mode === "unavailable") server.use(http.get(`${ROOT}/contents`, () => HttpResponse.json({ detail: "Capture unavailable" }, { status: 404 })));
-    if (mode === "forbidden") server.use(http.get(`${ROOT}/contents`, () => HttpResponse.json({ detail: "Capture refused" }, { status: 403 })));
+    if (mode === "pending") server.use(http.get(`${ROOT}/contents/window`, () => pending.promise));
+    if (mode === "unavailable") server.use(http.get(`${ROOT}/contents/window`, () => HttpResponse.json({ detail: "Capture unavailable", error_code: "content_not_found" }, { status: 404 })));
+    if (mode === "forbidden") server.use(http.get(`${ROOT}/contents/window`, () => HttpResponse.json({ detail: "Capture refused", error_code: "forbidden" }, { status: 403 })));
     const user = userEvent.setup();
     renderDetail();
     const evidence = await inspect(user);
     expect(await within(evidence).findByText("2 matching calls loaded")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Read captured content" })).not.toBeInTheDocument();
-    if (mode === "pending") await act(async () => pending.resolve(HttpResponse.json(contentPage([]))));
+    expect(state.requests.filter(({ path }) => path.includes("/contents"))).toEqual([]);
+    await user.click(within(evidence).getByRole("button", { name: "Read captured content" }));
+    if (mode === "forbidden") {
+      await waitFor(() => expect(screen.queryByRole("region", { name: "Transcript" })).not.toBeInTheDocument());
+      expect(screen.queryByRole("heading", { name: "Review retry evidence" })).not.toBeInTheDocument();
+    } else {
+      const reader = await screen.findByRole("region", { name: "Transcript" });
+      expect(reader).toBeVisible();
+      if (mode === "pending") {
+        expect(within(reader).getByRole("status")).toHaveTextContent("Loading captured records");
+        await act(async () => pending.resolve(contentWindowResponse([contentPage([])])));
+      }
+      if (mode === "unavailable") expect(await within(reader).findByText("Linked record unavailable")).toBeInTheDocument();
+      else expect(await within(reader).findByText("No captured content was received for this session.")).toBeInTheDocument();
+    }
   });
 
   it("switches compact tabs without losing the reader hash, view, or selection and focuses real destinations", async () => {
@@ -339,12 +366,16 @@ describe("Session work evidence", () => {
     const user = userEvent.setup();
     renderDetail("#content-chosen");
     const reader = await screen.findByRole("region", { name: "Transcript" });
-    const entry = document.getElementById("content-chosen")!;
+    const entry = await waitFor(() => {
+      const target = document.getElementById("content-chosen");
+      expect(target).toBeInTheDocument();
+      return target!;
+    });
     await waitFor(() => expect(entry).toHaveFocus());
     await user.click(within(reader).getByRole("button", { name: "Everything" }));
     await user.click(within(entry).getByRole("checkbox"));
     const contentRequests = state.requests.filter(({ path }) => path.includes("/contents")).length;
-    await user.click(screen.getByRole("tab", { name: "Linked work" }));
+    await user.click(screen.getByRole("tab", { name: "Session details" }));
     const evidence = await inspect(user);
     expect(screen.getByRole("tab", { name: "Timeline" })).toHaveAttribute("aria-selected", "true");
     const heading = within(evidence).getByRole("heading", { name: `Evidence for ${TITLE}` });
@@ -371,8 +402,9 @@ describe("Session work evidence", () => {
     });
     const user = userEvent.setup();
     renderDetail();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
     const reader = await screen.findByRole("region", { name: "Transcript" });
-    await user.click(within(reader).getByRole("checkbox"));
+    await user.click(await within(reader).findByRole("checkbox"));
     const evidence = await inspect(user);
     await user.click(await within(evidence).findByRole("button", { name: "Load earlier calls" }));
     expect(await within(evidence).findByText("2 matching calls loaded")).toBeInTheDocument();
@@ -407,10 +439,11 @@ describe("Session work evidence", () => {
     expect(requests.some(({ path }) => path.endsWith(`/cards/${CARD_ID}`))).toBe(true);
     expect(requests.filter(({ path, params }) => path === `${ROOT}/calls` && params.get("filter") === "work").map(({ params }) => params.get("cursor"))).toEqual([null, "older-work"]);
     expect(requests.some(({ params }) => params.get("cursor") === "not-yet-loaded")).toBe(false);
-    expect(requests.filter(({ path }) => path.includes("/contents")).map(({ path, method, params }) => ({ path, method, callId: params.get("call_id"), cursor: params.get("cursor") }))).toEqual([
-      { path: `${ROOT}/contents`, method: "GET", callId: null, cursor: null },
-    ]);
+    expect(requests.filter(({ path }) => path.includes("/contents"))).toEqual([]);
     expect(requests.some(({ method }) => method !== "GET")).toBe(false);
+    await user.click(within(evidence).getByRole("button", { name: "Read captured content" }));
+    await waitFor(() => expect(state.requests.slice(requestsBefore).filter(({ path }) => path === `${ROOT}/contents/window`)).toHaveLength(1));
+    await waitFor(() => expect(state.requests.slice(requestsBefore).filter(({ path }) => path === `${ROOT}/contents/metadata`)).toHaveLength(1));
     expect(within(reader).getByRole("checkbox")).toBeChecked();
   });
 
@@ -506,9 +539,11 @@ describe("Session work evidence", () => {
     const chosen = makeContent({ id: "chosen", session_id: SESSION_ID, call_id: EXACT.call_id, byte_count: new TextEncoder().encode(BODY).length });
     const state = serveEvidence({ contents: [chosen, makeContent({ id: "unselected", session_id: SESSION_ID, preview: { text: "PRIVATE_UNSELECTED_MARKER", truncated: false } })] });
     const user = userEvent.setup();
-    renderDetail();
+    const { client } = renderDetail();
+    await user.click(await screen.findByRole("tab", { name: "Transcript" }));
     const reader = await screen.findByRole("region", { name: "Transcript" });
     await user.click(within(reader).getByRole("button", { name: "Everything" }));
+    await waitFor(() => expect(document.getElementById("content-chosen")).toBeInTheDocument());
     await user.click(within(document.getElementById("content-chosen")!).getByRole("checkbox"));
     await user.click(within(reader).getByRole("button", { name: "Preview excerpt" }));
     const preview = await screen.findByRole("dialog", { name: "Selected excerpt" });
@@ -550,11 +585,13 @@ describe("Session work evidence", () => {
     expect(within(dialog).getByRole("region", { name: "Note content" })).toHaveTextContent(BODY);
     expect(within(dialog).getByRole("region", { name: "Note content" })).not.toHaveTextContent("PRIVATE_UNSELECTED_MARKER");
     expect(state.writes).toEqual([reviewedRequest]);
+    await waitFor(() => expect(client.isFetching()).toBe(0));
     const refreshed = state.requests.slice(requestsBefore);
-    expect(refreshed.some(({ method }) => method !== "GET")).toBe(false);
-    expect(refreshed.filter(({ path }) => path.includes("/contents")).map(({ path, params }) => ({ path, callId: params.get("call_id"), cursor: params.get("cursor") }))).toEqual([
-      { path: `${ROOT}/contents`, callId: EXACT.call_id, cursor: null },
-      { path: `${ROOT}/contents`, callId: null, cursor: null },
+    expect(refreshed.filter(({ method }) => method !== "GET").map(({ path }) => path)).toEqual([`${ROOT}/contents/metadata`]);
+    expect(refreshed.filter(({ path }) => path.includes("/contents")).map(({ path, method, params }) => ({ path, method, callId: params.get("call_id"), mode: params.get("mode") }))).toEqual([
+      { path: `${ROOT}/contents`, method: "GET", callId: EXACT.call_id, mode: null },
+      { path: `${ROOT}/contents/window`, method: "GET", callId: null, mode: "refresh" },
+      { path: `${ROOT}/contents/metadata`, method: "POST", callId: null, mode: null },
     ]);
   });
 });

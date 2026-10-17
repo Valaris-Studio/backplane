@@ -9615,7 +9615,13 @@
         "label": "Secciones de la sesión",
         "timeline": "Línea de tiempo",
         "linkedWork": "Trabajo vinculado",
-        "cost": "Costo"
+        "cost": "Costo",
+        "transcript": "Transcripción",
+        "details": "Detalles de la sesión"
+      },
+      "accessLost": {
+        "title": "Sesión no disponible",
+        "description": "Ya no puedes consultar esta sesión. Vuelve a tus sesiones para continuar."
       }
     },
     "banners": {
@@ -9999,7 +10005,7 @@
         "selectItem": "Seleccionar {{channel}}, elemento de origen {{order}}",
         "moreItems": "Hay más elementos en la transcripción. Carga más para poder seleccionarlos.",
         "excludedAttachments": "Los adjuntos y el contenido binario no se incluyen.",
-        "unavailable": "Algunos elementos seleccionados ya no están disponibles. Borra la selección y elige de nuevo.",
+        "unavailable": "Algunas fuentes seleccionadas cambiaron o no están disponibles. Borra la selección y elige de nuevo.",
         "tooLarge": "Esta selección supera el límite de texto de 2 MiB. Selecciona menos elementos e inténtalo de nuevo.",
         "failed": "No se pudo leer la selección completa. Cancela e inténtalo de nuevo, o elige otros elementos.",
         "privacy": "Revisa el texto exacto antes de copiarlo o descargarlo. Esto crea un archivo privado; no publica la sesión ni da acceso a nadie.",
@@ -10045,7 +10051,7 @@
           "cardVisibility": "Vincular una tarjeta organiza la nota; no restringe quién puede leerla.",
           "snapshot": "Tu sesión sigue siendo privada. La nota es una copia independiente; eliminar la sesión no la eliminará.",
           "review": "Revisa y edita exactamente lo que se guardará. Los cuerpos capturados comienzan como texto literal; los cambios son tu selección editorial. No se pueden subir archivos en este borrador local.",
-          "sourceChanged": "La fuente seleccionada cambió o no está disponible. Cierra este borrador y vuelve a seleccionar los elementos.",
+          "sourceChanged": "Las fuentes seleccionadas cambiaron o no están disponibles. Tu borrador se conserva. Compruébalas de nuevo o descarta este borrador para volver a elegir las fuentes.",
           "tooMany": "Una nota compartida admite hasta 256 elementos seleccionados. Reduce la selección para compartir; copiar y descargar localmente siguen disponibles.",
           "tooLarge": "El documento revisado supera los 16 MiB. Acorta el borrador antes de guardarlo.",
           "invalidDocument": "El documento no está disponible. Cierra este borrador y crea otra vista previa.",
@@ -10061,8 +10067,18 @@
           "saving": "Guardando la nota revisada. Cerrar este diálogo no cancela la solicitud.",
           "saved": "Nota guardada.",
           "hide": "Ocultar por ahora",
-          "revise": "Revisar borrador"
-        }
+          "revise": "Revisar borrador",
+          "resumeDraft": "Retomar borrador de nota",
+          "discard": "Descartar borrador",
+          "recheck": "Comprobar de nuevo",
+          "sourceCheckFailed": "No se pudieron comprobar las fuentes seleccionadas. Tu borrador se conserva. Vuelve a comprobarlas antes de guardar."
+        },
+        "moreWindows": "La selección se conserva al pasar de un intervalo a otro.",
+        "validating": "Comprobando las fuentes seleccionadas…",
+        "validationFailed": "No se pudieron comprobar las fuentes seleccionadas. Actualiza o reintenta antes de previsualizar o compartir.",
+        "windowCount_one": "Selección: {{selected}} · {{loaded}} registro en esta vista",
+        "windowCount_other": "Selección: {{selected}} · {{loaded}} registros en esta vista",
+        "windowCount_many": "Selección: {{selected}} · {{loaded}} registros en esta vista"
       },
       "title": "Transcripción",
       "navigation": {
@@ -10190,6 +10206,28 @@
         "showNative": "Mostrar registros sin procesar",
         "hideNative": "Ocultar registros sin procesar",
         "showImage": "Mostrar imagen"
+      },
+      "window": {
+        "label": "Registros capturados",
+        "latest": "Más recientes",
+        "beginning": "Inicio",
+        "earlier": "Registros anteriores",
+        "later": "Registros posteriores",
+        "scope": "Esta vista contiene hasta 100 registros capturados. La captura puede estar incompleta.",
+        "changed": "Este intervalo cambió. Actualiza o elige otro intervalo para continuar.",
+        "unavailable": "Registro vinculado no disponible",
+        "unsupported": "La navegación a registros recientes no está disponible en este servidor",
+        "beginningFallback": "Leer desde el inicio",
+        "loading": "Cargando registros capturados…",
+        "nativeHidden_one": "Hay {{count}} registro sin procesar oculto en esta vista. Elige Todo para inspeccionarlo.",
+        "nativeHidden_other": "Hay {{count}} registros sin procesar ocultos en esta vista. Elige Todo para inspeccionarlos.",
+        "nativeHidden_many": "Hay {{count}} registros sin procesar ocultos en esta vista. Elige Todo para inspeccionarlos.",
+        "selectionLimit": "Puedes mantener seleccionados hasta 1.024 registros. Deselecciona uno para elegir otro.",
+        "range_one": "{{count}} registro capturado · {{start}}–{{end}}",
+        "range_other": "{{count}} registros capturados · {{start}}–{{end}}",
+        "beginningScope": "Lectura en el orden de origen en este servidor.",
+        "anchorUnlocated": "El registro vinculado no está entre los registros cargados.",
+        "range_many": "{{count}} registros capturados · {{start}}–{{end}}"
       }
     },
     "evidence": {

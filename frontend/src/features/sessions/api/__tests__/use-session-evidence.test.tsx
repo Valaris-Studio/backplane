@@ -12,7 +12,9 @@ import type { CallFilter, SessionCallPage } from "@/types/agent-session";
 import { SLUG, callPage, contentPage, makeCall, makeContent, makeSession } from "../../__tests__/fixtures";
 import { useRefreshSessionEvidence } from "../use-session-evidence";
 import { useSession, useSessionCalls, useSessionLinks } from "../use-sessions";
-import { useContentBodyPages, useSessionContents } from "../use-session-contents";
+import { contentWindowResponse } from "../../__tests__/window-fixtures";
+import { useSessionWindow } from "../use-session-window";
+import { useContentBodyPages } from "../use-session-contents";
 
 const SESSION_ID = "session-refresh-variants";
 const ROOT = `/api/workspaces/${SLUG}/sessions/${SESSION_ID}`;
@@ -29,7 +31,7 @@ function EvidenceReader() {
   useSession(SLUG, SESSION_ID, true);
   useSessionLinks(SLUG, SESSION_ID, true);
   useWorkspaces();
-  const contents = useSessionContents(SLUG, SESSION_ID);
+  const contents = useSessionWindow(SLUG, SESSION_ID, true);
   useContentBodyPages(SLUG, SESSION_ID, CONTENT, [0]);
   const calls = useSessionCalls(SLUG, SESSION_ID, filter, true);
   const evidence = useRefreshSessionEvidence(SLUG, SESSION_ID);
@@ -37,18 +39,18 @@ function EvidenceReader() {
     <button onClick={() => setFilter("all")}>Show all calls</button>
     <button onClick={() => setFilter("failures")}>Show failures</button>
     <button onClick={() => void calls.fetchNextPage()} disabled={calls.isFetching || !calls.hasNextPage}>Load earlier calls</button>
-    <button onClick={() => void contents.fetchNextPage()} disabled={contents.isFetching || !contents.hasNextPage}>Load more captured metadata</button>
-    <output aria-label="Captured previews">{contents.data?.pages.flatMap((page) => page.items.map((item) => item.preview?.text)).join(", ")}</output>
+    <button onClick={() => contents.navigate({ mode: "earlier", cursor: contents.data!.earlier_cursor! })} disabled={contents.isFetching || !contents.data?.earlier_cursor}>Earlier captured metadata</button>
+    <output aria-label="Captured previews">{contents.data?.items.map((item) => item.preview?.text).join(", ")}</output>
     <button onClick={() => void evidence.refresh()} disabled={evidence.refreshing}>Refresh evidence</button>
     <output aria-label="Recorded work references">{calls.data?.pages.flatMap((page) => page.items.flatMap((item) => item.work_refs.map((ref) => ref.title))).join(", ")}</output>
   </>;
 }
 
 function serve() {
-  const state = { retracted: false, requests: [] as { path: string; filter: string | null; cursor: string | null }[] };
+  const state = { retracted: false, requests: [] as { path: string; filter: string | null; cursor: string | null; mode: string | null }[] };
   const record = (request: Request) => {
     const url = new URL(request.url);
-    state.requests.push({ path: url.pathname, filter: url.searchParams.get("filter"), cursor: url.searchParams.get("cursor") });
+    state.requests.push({ path: url.pathname, filter: url.searchParams.get("filter"), cursor: url.searchParams.get("cursor"), mode: url.searchParams.get("mode") });
   };
   server.use(
     http.get(ROOT, ({ request }) => { record(request); return HttpResponse.json(makeSession({ id: SESSION_ID })); }),
@@ -72,12 +74,11 @@ function serve() {
       });
       return HttpResponse.json(callPage([item], [], older ? `not-loaded-${filter}` : `older-${filter}`));
     }),
-    http.get(`${ROOT}/contents`, ({ request }) => {
+    http.get(`${ROOT}/contents/window`, ({ request }) => {
       record(request);
-      const older = new URL(request.url).searchParams.has("cursor");
-      return HttpResponse.json(contentPage([{ ...CONTENT, id: older ? "older-content" : CONTENT.id,
+      return contentWindowResponse([false, true].map((older) => contentPage([{ ...CONTENT, id: older ? "older-content" : CONTENT.id,
         preview: { text: `${state.retracted ? "CURRENT" : "PREVIOUS"}_${older ? "OLDER" : "FIRST"}_PREVIEW`, truncated: false },
-      }], older ? "not-loaded-content" : "older-content"));
+      }])), new URL(request.url).searchParams);
     }),
     http.get(`${ROOT}/contents/${CONTENT.id}/body`, ({ request }) => { record(request); return HttpResponse.json({ content_id: CONTENT.id, text: "Private captured body", offset: 0, next_offset: null, total_bytes: 21 }); }),
   );
@@ -85,7 +86,7 @@ function serve() {
 }
 
 describe("Explicit evidence refresh across retained timeline filters", () => {
-  it.each(["all", "failures"] as const)("withdraws stale work refs from active %s and the other retained filter while refreshing loaded metadata without scanning or rereading bodies", async (activeFilter) => {
+  it.each(["all", "failures"] as const)("refreshes active %s and its pinned reader, leaving other filters stale until revisited without scanning or rereading bodies", async (activeFilter) => {
     const state = serve();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 5 * 60_000 } } });
     clients.push(client);
@@ -101,8 +102,8 @@ describe("Explicit evidence refresh across retained timeline filters", () => {
     if (activeFilter === "all") await user.click(screen.getByRole("button", { name: "Show all calls" }));
     await waitFor(() => expect(client.isFetching()).toBe(0));
     expect(screen.getByLabelText("Recorded work references")).toHaveTextContent(TITLE);
-    await user.click(screen.getByRole("button", { name: "Load more captured metadata" }));
-    await waitFor(() => expect(screen.getByLabelText("Captured previews")).toHaveTextContent("PREVIOUS_OLDER_PREVIEW"));
+    await user.click(screen.getByRole("button", { name: "Earlier captured metadata" }));
+    await waitFor(() => expect(screen.getByLabelText("Captured previews")).toHaveTextContent("PREVIOUS_FIRST_PREVIEW"));
     await waitFor(() => expect(client.isFetching()).toBe(0));
     const before = state.requests.length;
     state.retracted = true;
@@ -112,23 +113,30 @@ describe("Explicit evidence refresh across retained timeline filters", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Refresh evidence" })).toBeEnabled());
 
     expect(screen.getByLabelText("Recorded work references")).not.toHaveTextContent(TITLE);
-    for (const filter of ["all", "failures"] as const) {
-      const cached = client.getQueryData<InfiniteData<SessionCallPage>>(sessionKeys.calls(SLUG, SESSION_ID, filter));
-      expect(cached?.pageParams).toEqual([null, `older-${filter}`]);
-      expect(cached?.pages.flatMap((page) => page.items.flatMap((item) => item.work_refs))).toEqual([]);
-    }
+    const inactiveFilter = activeFilter === "all" ? "failures" : "all";
+    const activeCache = client.getQueryData<InfiniteData<SessionCallPage>>(sessionKeys.calls(SLUG, SESSION_ID, activeFilter));
+    expect(activeCache?.pageParams).toEqual([null, `older-${activeFilter}`]);
+    expect(activeCache?.pages.flatMap((page) => page.items.flatMap((item) => item.work_refs))).toEqual([]);
+    expect(client.getQueryState(sessionKeys.calls(SLUG, SESSION_ID, inactiveFilter))?.isInvalidated).toBe(true);
     const refreshed = state.requests.slice(before);
     expect(refreshed.filter(({ path }) => path === `${ROOT}/calls`).map(({ filter, cursor }) => `${filter}:${cursor ?? "newest"}`).sort()).toEqual([
-      "all:newest", "all:older-all", "failures:newest", "failures:older-failures",
+      `${activeFilter}:newest`, `${activeFilter}:older-${activeFilter}`,
     ]);
     expect(client.getQueryState(sessionKeys.calls(SLUG, SESSION_ID, "work"))).toBeUndefined();
     expect(refreshed.some(({ cursor }) => cursor?.startsWith("not-loaded-"))).toBe(false);
-    expect(refreshed.filter(({ path }) => path.includes("/contents")).map(({ path, cursor }) => ({ path, cursor }))).toEqual([
-      { path: `${ROOT}/contents`, cursor: null }, { path: `${ROOT}/contents`, cursor: "older-content" },
+    expect(refreshed.filter(({ path }) => path.includes("/contents")).map(({ path, mode }) => ({ path, mode }))).toEqual([
+      { path: `${ROOT}/contents/window`, mode: "refresh" },
     ]);
     expect(refreshed[0]?.path).toBe(ROOT);
     expect(screen.getByLabelText("Captured previews")).toHaveTextContent("CURRENT_FIRST_PREVIEW");
-    expect(screen.getByLabelText("Captured previews")).toHaveTextContent("CURRENT_OLDER_PREVIEW");
+    expect(screen.getByLabelText("Captured previews")).not.toHaveTextContent("CURRENT_OLDER_PREVIEW");
     expect(screen.getByLabelText("Captured previews")).not.toHaveTextContent("PREVIOUS_");
+    await user.click(screen.getByRole("button", { name: inactiveFilter === "all" ? "Show all calls" : "Show failures" }));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.getByLabelText("Recorded work references")).not.toHaveTextContent(TITLE);
+    const recovered = client.getQueryData<InfiniteData<SessionCallPage>>(sessionKeys.calls(SLUG, SESSION_ID, inactiveFilter));
+    expect(recovered?.pageParams).toEqual([null, `older-${inactiveFilter}`]);
+    expect(recovered?.pages.flatMap((page) => page.items.flatMap((item) => item.work_refs))).toEqual([]);
+    expect(state.requests.slice(before).filter(({ path }) => path === `${ROOT}/contents/${CONTENT.id}/body`)).toEqual([]);
   });
 });

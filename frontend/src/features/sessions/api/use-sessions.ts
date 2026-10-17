@@ -142,10 +142,10 @@ export function useSession(slug: string, sessionId: string, enabled: boolean) {
   // Parent links also read session authority. Denial clears that session's
   // private evidence regardless of which detail route is currently mounted.
   useEffect(() => {
-    if (session.isError && isApiError(session.error) && [401, 403, 404].includes(session.error.status)) {
+    if (session.data === null || (session.isError && isApiError(session.error) && [401, 403, 404].includes(session.error.status))) {
       forgetContent(slug, sessionId);
     }
-  }, [session.isError, session.error, forgetContent, slug, sessionId]);
+  }, [session.data, session.isError, session.error, forgetContent, slug, sessionId]);
   return session;
 }
 

@@ -3,6 +3,8 @@
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
+from starlette.datastructures import MutableHeaders
+from starlette.types import Message, Receive, Scope, Send
 
 from app.exceptions import ValidationError
 
@@ -17,16 +19,24 @@ class PrivateRoute(APIRoute):
 
     cache_control = "no-store"
 
+    async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async def private_send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message)["Cache-Control"] = self.cache_control
+            await send(message)
+
+        # Exception handlers render inside the route's ASGI app, after the
+        # request handler below has raised. Stamp their responses too.
+        await super().handle(scope, receive, private_send)
+
     def get_route_handler(self):
         handler = super().get_route_handler()
 
         async def private_handler(request):
             try:
-                response = await handler(request)
+                return await handler(request)
             except RequestValidationError:
                 raise ValidationError("Invalid request") from None
-            response.headers["Cache-Control"] = self.cache_control
-            return response
 
         return private_handler
 
