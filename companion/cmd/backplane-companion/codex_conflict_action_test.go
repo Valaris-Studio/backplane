@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valaris/backplane/companion/internal/agent"
+	"github.com/Valaris-Studio/backplane/companion/internal/agent"
 )
 
 func TestRequiredActionSeparatesUnconfirmedOTelSettingsFromRestart(t *testing.T) {

@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valaris/backplane/companion/internal/inbox"
-	"github.com/valaris/backplane/companion/internal/policy"
-	"github.com/valaris/backplane/companion/internal/privacy"
+	"github.com/Valaris-Studio/backplane/companion/internal/inbox"
+	"github.com/Valaris-Studio/backplane/companion/internal/policy"
+	"github.com/Valaris-Studio/backplane/companion/internal/privacy"
 )
 
 func TestPiStructuredContentThroughPinnedBeacon(t *testing.T) {

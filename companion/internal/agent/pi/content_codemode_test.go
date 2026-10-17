@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valaris/backplane/companion/internal/agent"
-	"github.com/valaris/backplane/companion/internal/policy"
-	"github.com/valaris/backplane/companion/internal/privacy"
-	"github.com/valaris/backplane/companion/internal/richcapture"
+	"github.com/Valaris-Studio/backplane/companion/internal/agent"
+	"github.com/Valaris-Studio/backplane/companion/internal/policy"
+	"github.com/Valaris-Studio/backplane/companion/internal/privacy"
+	"github.com/Valaris-Studio/backplane/companion/internal/richcapture"
 )
 
 func TestCodemodeSpillMarksOnlyKnownSourceTruncation(t *testing.T) {
