@@ -3,9 +3,12 @@
 
 import { useEffect, useRef } from "react";
 import type { WebSocketEvent } from "@/lib/websocket";
-import { useWebSocketContext } from "@/providers/WebSocketProvider";
+import {
+  useWebSocketContext,
+  type WebSocketContextValue,
+} from "@/providers/WebSocketProvider";
 
-export function useWebSocket() {
+export function useWebSocket(): WebSocketContextValue {
   const ctx = useWebSocketContext();
   if (!ctx) {
     return {

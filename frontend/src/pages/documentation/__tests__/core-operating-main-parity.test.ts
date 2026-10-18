@@ -157,13 +157,16 @@ describe("core and operating documentation parity with main", () => {
     expect(source).not.toContain("default 24-hour window");
   });
 
-  it("documents the observer's real default chip semantics and expandable payloads", () => {
+  it("documents the observer's received coverage and bounded diagnostic payloads", () => {
     const source = section("operating-the-observer-panel.tsx");
 
-    expect(source).toMatch(/no chip[\s\S]*four agentic namespaces/i);
+    expect(source).toMatch(/every retained authorized domain frame[\s\S]*unknown namespaces/i);
     expect(source).toMatch(/All[\s\S]*clears[\s\S]*filters/i);
     expect(source).toContain("99+");
     expect(source).toMatch(/expand[\s\S]*JSON payload/i);
+    expect(source).toMatch(/Pause freezes[\s\S]*capture continues/i);
+    expect(source).toMatch(/does not replay[\s\S]*never received/i);
+    expect(source).not.toContain("Every click in the app should produce a visible event");
   });
 
   it("documents exact-match webhook subscriptions and delivery health", () => {

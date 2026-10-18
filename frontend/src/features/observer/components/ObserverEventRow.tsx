@@ -5,17 +5,17 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { WebSocketEvent } from "@/lib/websocket";
 import { formatRelative } from "@/lib/date-format";
 import {
   busNamespaceOf,
   namespaceOf,
   type ObserverNamespace,
 } from "../hooks/useObserverEvents";
+import type { ObserverFrame } from "../utils/projectObserverFrame";
 import { summarizePayload } from "../utils/summarizePayload";
 
 interface ObserverEventRowProps {
-  event: WebSocketEvent;
+  event: ObserverFrame;
   /** Re-render tick so the live feed's relative timestamps stay current. */
   now: number;
 }
@@ -36,6 +36,7 @@ export function ObserverEventRow({ event, now }: ObserverEventRowProps) {
   const ns = namespaceOf(event.event);
   const variant = ns ? NAMESPACE_VARIANT[ns] : "outline";
   const summary = summarizePayload(event.payload);
+  const { redacted, truncated } = event.projection;
   // `now` is a render-tick: when the panel advances it, this row recomputes its
   // relative timestamp against the current clock. Read once so intent is clear.
   void now;
@@ -78,16 +79,33 @@ export function ObserverEventRow({ event, now }: ObserverEventRowProps) {
             {formatRelative(event.timestamp, { withSeconds: true })}
           </span>
         </div>
-        {summary ? (
-          <span className="truncate text-xs text-muted-foreground">
-            {summary}
+        {summary || redacted || truncated ? (
+          <span className="flex min-w-0 items-center gap-1.5">
+            {redacted ? (
+              <Badge variant="warning" className="px-1.5 py-0 text-[0.6rem]">
+                {t("observer.projection.redacted")}
+              </Badge>
+            ) : null}
+            {truncated ? (
+              <Badge variant="outline" className="px-1.5 py-0 text-[0.6rem]">
+                {t("observer.projection.truncated")}
+              </Badge>
+            ) : null}
+            <span className="truncate text-xs text-muted-foreground">
+              {summary}
+            </span>
           </span>
         ) : null}
       </button>
       {open ? (
-        <pre className="max-h-48 overflow-auto bg-muted/30 px-3 py-2 text-[0.7rem] text-muted-foreground">
-          {JSON.stringify(event.payload, null, 2)}
-        </pre>
+        <div className="bg-muted/30 px-3 py-2">
+          <p className="mb-1 text-[0.65rem] text-muted-foreground">
+            {t("observer.projection.disclosure")}
+          </p>
+          <pre className="max-h-48 overflow-auto text-[0.7rem] text-muted-foreground">
+            {JSON.stringify(event.payload, null, 2)}
+          </pre>
+        </div>
       ) : null}
     </li>
   );

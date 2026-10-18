@@ -242,20 +242,20 @@ describe("ObserverPanel (docked top-bar surface)", () => {
     expect(clear.parentElement).toHaveAttribute("aria-describedby");
   });
 
-  it("surfaces the 'firehose' intro copy in the hover tooltip over the title", async () => {
+  it("explains the tab-scoped received-event window in the title tooltip", async () => {
     renderPanel();
     openPanel();
     const title = screen.getByRole("heading", { level: 2, name: /observer/i });
     fireEvent.mouseEnter(title.parentElement!);
     const tooltip = await screen.findByRole("tooltip");
     // RichTooltip key ui.tooltips.chrome.observerPanel.intro summary
-    expect(tooltip).toHaveTextContent(/firehose of platform events/i);
+    expect(tooltip).toHaveTextContent(/received by this (browser )?tab/i);
   });
 });
 
 // The retired /:slug/events "Event Inspector" page was the same WS stream at a
 // bigger size. Its four unique affordances now live here (card 43fcab09):
-// whole-bus capture behind an "other" chip, text search, event_id on the row,
+// whole-bus capture with an "other" filter, text search, event_id on the row,
 // and a shown/total/cap counter.
 describe("ObserverPanel absorbs the Event Inspector's affordances", () => {
   function rows() {
@@ -270,17 +270,17 @@ describe("ObserverPanel absorbs the Event Inspector's affordances", () => {
     });
     openPanel();
 
-    // Default view stays agentic-only: the unknown-namespace event is buffered
-    // but not shown until the operator asks for it.
-    expect(screen.getByTestId("observer-event-list").textContent).not.toContain(
+    expect(screen.getByTestId("observer-event-list").textContent).toContain(
       "workspace.updated",
     );
+    expect(screen.getByTestId("observer-event-list").textContent).toContain("card.created");
 
     const otherChip = screen.getByRole("button", { name: /^other$/i });
     fireEvent.click(otherChip);
     expect(screen.getByTestId("observer-event-list").textContent).toContain(
       "workspace.updated",
     );
+    expect(screen.getByTestId("observer-event-list").textContent).not.toContain("card.created");
   });
 
   it("hides the 'other' chip until non-agentic traffic has actually been seen", () => {
@@ -302,19 +302,15 @@ describe("ObserverPanel absorbs the Event Inspector's affordances", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the default view agentic-only while still buffering the rest", () => {
-    // Without the counter assertion this test cannot tell "the unknown event
-    // was buffered and filtered out of the default view" (the new behavior)
-    // from "the unknown event was discarded by the hook" (the old behavior) —
-    // both render exactly one row.
+  it("shows every retained namespace in the default All view", () => {
     renderPanel();
     act(() => {
       lastCallback?.(makeEvent("card.created", 1));
       lastCallback?.(makeEvent("workspace.updated", 2));
     });
     openPanel();
-    expect(rows().length).toBe(1);
-    expect(screen.getByTestId("observer-counts").textContent).toMatch(/\b2\b/);
+    expect(rows().length).toBe(2);
+    expect(screen.getByTestId("observer-counts").textContent).toMatch(/2 of 2/);
   });
 
   it("filters rows by a search term matching the event type", () => {
@@ -381,14 +377,12 @@ describe("ObserverPanel absorbs the Event Inspector's affordances", () => {
     });
     openPanel();
 
-    // 3 buffered (whole bus), 2 shown (agentic default view).
     const counter = screen.getByTestId("observer-counts");
-    expect(counter.textContent).toMatch(/2/);
-    expect(counter.textContent).toMatch(/3/);
+    expect(counter.textContent).toMatch(/3 of 3/);
 
     fireEvent.change(screen.getByLabelText(/search events by type or id/i), {
       target: { value: "card." },
     });
-    expect(screen.getByTestId("observer-counts").textContent).toMatch(/1/);
+    expect(screen.getByTestId("observer-counts").textContent).toMatch(/1 of 3/);
   });
 });

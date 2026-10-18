@@ -118,8 +118,8 @@ curl.exe -fsSO https://storage.googleapis.com/backplane-artifacts/runner/v0.8.8/
       <p>
         Create or move one well-scoped card into the first stage's discover
         column type. Watch stdout, the card detail, runner activity, execution
-        history, and the Observer Panel. The Observer currently covers card,
-        column, agent, execution, approval, and activity event namespaces.
+        history, and the Observer Panel. The Observer shows authorized domain frames
+        received by this tab; an absent frame alone does not prove that an action failed.
       </p>
       <ImportantNote title="Eligibility and movement are lifecycle decisions">
         The backend next-assignment endpoint applies column, role, scope, and

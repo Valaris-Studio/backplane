@@ -65,8 +65,8 @@ export const ES_UNDER_THE_HOOD = {
       " le sigue porque contiene el tablero, la función de arrastrar y soltar y el panel de detalles de la tarjeta.",
     "There is no Redux. There is no Zustand for server state. React Query v5 is the uniform substrate. Shared domain query-key factories live in":
       "No hay Redux. No hay Zustand para el estado del servidor. React Query v5 es la base uniforme. Las factorías compartidas de query keys del dominio viven en",
-    "; a few composed inbox and local file preview keys stay beside their callers. The AppShell renders the sidebar, topbar, outlet, and the floating ObserverPanel; workspace routing lives in a single":
-      "; algunas keys compuestas del inbox y de la vista previa de archivos locales permanecen junto a sus consumidores. AppShell renderiza la barra lateral, la barra superior, el outlet y el ObserverPanel flotante; el enrutamiento del espacio de trabajo vive en un único",
+    "; a few composed inbox and local file preview keys stay beside their callers. The AppShell renders the sidebar, topbar, outlet, and the top-bar ObserverPanel; workspace routing lives in a single":
+      "; algunas keys compuestas del inbox y de la vista previa de archivos locales permanecen junto a sus consumidores. AppShell renderiza la barra lateral, la barra superior, el outlet y el ObserverPanel de la barra superior; el enrutamiento del espacio de trabajo vive en un único",
     "MCP: the cross-LLM integration point":
       "MCP: el punto de integración entre LLMs",
     "The Model Context Protocol is an Anthropic-led protocol that lets an LLM host — Claude Code, Claude Desktop, Cursor, Codex CLI, a custom Go runner — discover and call external tools over a negotiated capability surface. The Backplane MCP server wraps the backend REST API and exposes platform operations as MCP tools. Whatever an agent wants to do programmatically against Backplane — list cards, claim one, move it, create a note, request approval — it does via one of the MCP tools (the full tool census, drift-guarded in CI).":

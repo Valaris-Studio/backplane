@@ -89,11 +89,9 @@ export function IntroductionQuickTour() {
       </p>
 
       <ProTip title="Watch the Observer panel during your first run">
-        The floating Observer panel (admin-only, draggable, remembers its
-        position) streams every card, agent, execution, and approval event in
-        real time. The first time you run a pipeline end-to-end, open it. You
-        will see more about what the platform is doing in thirty seconds of
-        scrolling events than in any diagram we could draw for you.
+        The Observer opens from the eye in the top bar for workspace owners and admins.
+        It shows authorized frames received by this tab, including unfamiliar namespaces
+        under All. Use it alongside durable History and execution records when checking a run.
       </ProTip>
 
       <h2 id="approval-if-needed">Approval, if the stage demands one</h2>

@@ -126,7 +126,7 @@ export function UnderTheHoodArchitectureOverview() {
         <code>src/lib/query-keys.ts</code>; a few composed inbox and local file
         preview keys stay beside their callers. The AppShell renders the
         sidebar, topbar, outlet,
-        and the floating ObserverPanel; workspace routing lives in a single{" "}
+        and the top-bar ObserverPanel; workspace routing lives in a single{" "}
         <code>App.tsx</code>.
       </p>
 

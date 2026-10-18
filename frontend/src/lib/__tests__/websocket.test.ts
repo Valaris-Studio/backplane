@@ -282,6 +282,19 @@ describe("WebSocketService", () => {
     expect(handler2).toHaveBeenCalledTimes(1);
   });
 
+  it("replaces the server subscription set with empty after the final unsubscribe", () => {
+    const svc = new WebSocketService("http://localhost:8000", "ws-1");
+    svc.connect();
+    latestMock().simulateOpen();
+    const ws = latestMock();
+    const unsubscribe = svc.subscribe("*", () => {});
+    expect(lastSentPatterns(ws)).toEqual(["*"]);
+
+    unsubscribe();
+
+    expect(lastSentPatterns(ws)).toEqual([]);
+  });
+
   it("re-sends the surviving set after a remount churn so card.* is never clobbered", () => {
     // Reproduces the exact production sequence: board-health owns card.*, the
     // board view remounts (drops then re-adds its own card.* handler), and a
@@ -543,6 +556,33 @@ describe("WebSocketService", () => {
     expect(handler).not.toHaveBeenCalledWith(
       expect.objectContaining({ event: "card.stale" }),
     );
+  });
+
+  it("ignores queued open, domain, denial and close callbacks after disconnect", () => {
+    const svc = new WebSocketService("http://localhost:8000", "ws-old");
+    const onDomain = vi.fn();
+    const onDenied = vi.fn();
+    svc.subscribe("*", onDomain);
+    svc.onSubscriptionDenied(onDenied);
+    svc.connect();
+    const stale = latestMock();
+    stale.simulateOpen();
+    svc.disconnect();
+    const sentBeforeLateCallbacks = stale.sent.length;
+
+    stale.simulateOpen();
+    stale.simulateMessage(makeEvent({ event_id: "stale-domain" }));
+    stale.onmessage?.({ data: JSON.stringify({
+      type: "subscription_denied", patterns: ["*"], error_code: "admin_required",
+    }) } as MessageEvent);
+    stale.simulateClose(1006);
+    vi.advanceTimersByTime(60_000);
+
+    expect(onDomain).not.toHaveBeenCalled();
+    expect(onDenied).not.toHaveBeenCalled();
+    expect(stale.sent).toHaveLength(sentBeforeLateCallbacks);
+    expect(svc.status).toBe("disconnected");
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 
   it("caps reconnect delay at RECONNECT_MAX (30s)", () => {

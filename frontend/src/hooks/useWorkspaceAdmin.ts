@@ -3,6 +3,7 @@
 
 import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 import { useMembers } from "@/features/members/api/use-members";
+import { isApiError } from "@/lib/api-error";
 
 // `/api/me` does not leak workspace role — we cross-reference the workspace
 // member list by email to discover the caller's role in this workspace.
@@ -29,5 +30,9 @@ export function useWorkspaceAdmin(slug: string) {
     membership: myMembership,
     isLoading: meQuery.isLoading || membersQuery.isLoading,
     isError: meQuery.isError || membersQuery.isError,
+    // Cached membership survives a failed refetch. An authoritative denial
+    // must clear private diagnostic state even if the socket is already gone.
+    accessLost: [meQuery.error, membersQuery.error].some((error) =>
+      isApiError(error) && [401, 403, 404].includes(error.status)),
   };
 }

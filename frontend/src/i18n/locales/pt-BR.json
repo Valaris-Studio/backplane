@@ -6038,10 +6038,10 @@
         },
         "connectionStatus": {
           "connected": {
-            "summary": "A conexão WebSocket em tempo real está íntegra. O quadro, o Observador e a visão geral dos Runners são atualizados em tempo real."
+            "summary": "O WebSocket está conectado. A aceitação de assinaturas e a cobertura de entrega são separadas; consulte o Observador para ver padrões recusados e mensagens recebidas."
           },
           "connecting": {
-            "summary": "Reconectando à plataforma. As atualizações em tempo real ficam brevemente pausadas; os eventos recentes serão reproduzidos quando a conexão for restabelecida.",
+            "summary": "Reconectando à plataforma. Eventos perdidos não são reproduzidos; as visualizações correspondentes consultam novamente o estado persistente após reconectar.",
             "callouts": [
               {
                 "variant": "info",
@@ -6065,7 +6065,7 @@
         },
         "observerPanel": {
           "intro": {
-            "summary": "Fluxo completo de eventos da plataforma, ao vivo pelo barramento de eventos do espaço de trabalho. Restrito a administradores por decisão deliberada. É temporário e mantido na memória: mostra os 1000 eventos mais recentes, não persiste nada e é limpo ao recarregar. Cartão, Runner, Execução e Aprovação aparecem por padrão; o seletor Outros aparece quando o barramento transporta qualquer outro tipo de evento.",
+            "summary": "Mensagens de domínio autorizadas recebidas por esta aba desde o início da captura. Proprietários e administradores podem inspecionar o buffer limitado em memória. Todos inclui namespaces desconhecidos. Recarregar, trocar de workspace ou perder acesso limpa o buffer.",
             "links": [
               {
                 "label": "Histórico armazenado",
@@ -6074,13 +6074,13 @@
             ]
           },
           "pause": {
-            "summary": "Interrompe a adição de novos eventos à lista. As linhas já visíveis permanecem; eventos recebidos são descartados, não armazenados em buffer. Retome para voltar a acompanhar o fluxo."
+            "summary": "Congela a lista exibida enquanto a captura limitada continua. Novas chegadas pendentes e remoções são contadas. Retomar mostra as mensagens ainda retidas."
           },
           "clear": {
-            "summary": "Esvazia a lista de eventos. É útil ao procurar um ciclo específico quando o registro já avançou. Não pode ser desfeito; os eventos continuam no servidor, mas o painel não busca novamente o histórico."
+            "summary": "Limpa o buffer desta aba, suas contagens e o horário de início da captura. Não é possível desfazer. Use Histórico ou registros de execução persistentes como evidência salva; este painel não reproduz eventos anteriores."
           },
           "namespaceFilter": {
-            "summary": "Restringe o fluxo a um ou mais namespaces de eventos. Os seletores são cumulativos: escolha Cartão + Runner para ver ambos e clique em Todos para remover todos os filtros."
+            "summary": "Filtra a lista exibida por namespace. Selecione vários chips para combiná-los; Todos limpa os filtros de namespace e inclui os desconhecidos. A captura continua de forma independente."
           }
         }
       },
@@ -8067,15 +8067,44 @@
     },
     "empty": {
       "title": "Ainda não há eventos",
-      "hint": "Os eventos da plataforma em tempo real aparecem aqui quando os Runners executam ciclos."
+      "hint": "Os eventos que esta aba recebe aparecem aqui conforme chegam. Nada anterior é reproduzido.",
+      "filteredTitle": "Nenhum evento corresponde ao filtro atual",
+      "filteredHint_one": "{{count}} evento recebido está oculto pelo filtro de namespace ou de busca.",
+      "filteredHint_many": "{{count}} de eventos recebidos estão ocultos pelo filtro de namespace ou de busca.",
+      "filteredHint_other": "{{count}} eventos recebidos estão ocultos pelo filtro de namespace ou de busca.",
+      "clearFilters": "Limpar filtros"
     },
-    "disconnected": "Reconectando…",
-    "triggerAria": "Observador, {{count}} novos eventos",
     "search": {
       "placeholder": "Buscar tipo ou ID do evento…",
       "label": "Buscar eventos por tipo ou ID"
     },
-    "counts": "Exibindo {{shown}} de {{total}} no buffer (limite de {{max}})"
+    "counts": "Exibindo {{shown}} de {{total}} no buffer (limite de {{max}})",
+    "triggerAria_one": "Observador, {{count}} evento não visto",
+    "triggerAria_many": "Observador, {{count}} de eventos não vistos",
+    "triggerAria_other": "Observador, {{count}} eventos não vistos",
+    "diagnostics": {
+      "label": "Diagnóstico da conexão",
+      "reconnecting": "Reconectando…",
+      "lastPing": "Último ping do servidor: {{time}}",
+      "noPing": "Nenhum ping do servidor recebido ainda",
+      "gap": "A conexão caiu após o início da captura. Podem faltar eventos desse intervalo, e eles não serão reenviados.",
+      "wildcardDenied": "O servidor recusou a assinatura de todos os eventos desta aba. A lista mantida pode estar incompleta.",
+      "accessRevoked": "O servidor encerrou o acesso desta aba aos eventos do espaço de trabalho. Os eventos capturados foram apagados.",
+      "paused_one": "Pausado. {{count}} evento novo fica retido até você retomar.",
+      "paused_many": "Pausado. {{count}} de eventos novos ficam retidos até você retomar.",
+      "paused_other": "Pausado. {{count}} eventos novos ficam retidos até você retomar.",
+      "evicted_one": "{{count}} evento mais antigo foi removido para respeitar os limites de captura.",
+      "evicted_many": "{{count}} eventos mais antigos foram removidos para respeitar os limites de captura.",
+      "evicted_other": "{{count}} eventos mais antigos foram removidos para respeitar os limites de captura."
+    },
+    "scope": {
+      "since": "Recebido por esta aba desde {{time}}"
+    },
+    "projection": {
+      "redacted": "Oculto",
+      "truncated": "Truncado",
+      "disclosure": "Projeção de diagnóstico, não o conteúdo exato: valores com aparência de credencial são ocultados e valores grandes são encurtados. Texto livre ainda pode conter dados sensíveis."
+    }
   },
   "rolesGlossary": {
     "title": "Funções",
