@@ -51,7 +51,11 @@ from app.services.session_content_ingest import (
     SessionContentIngest,
 )
 from app.services.agent_usage import AgentUsageService
-from app.services.session_events import Invalidation, session_updated
+from app.services.session_events import (
+    Invalidation,
+    queue_after_commit,
+    session_updated,
+)
 from app.services.session_history_cutoff import (
     MAX_CLOCK_SKEW,
     deleted_history_of,
@@ -659,7 +663,7 @@ class AgentSessionIngestService:
         await self.usage.record(
             session, [(raw_by_id[event.event_id], event) for event in new_events]
         )
-        await self.links.link_session_calls(
+        linked = await self.links.link_session_calls(
             session,
             {
                 event.native_tool_call_id
@@ -667,11 +671,14 @@ class AgentSessionIngestService:
                 if event.native_tool_call_id
             },
         )
-        await self.links.correlate_session_calls(
+        correlated = await self.links.correlate_session_calls(
             session,
             {signature_by_id[event_id] for event_id in new_ids} - {None},
             record.captured_at,
         )
+        # Queued inside this record's savepoint: a rejected record drops its
+        # retractions' refreshes with the rest of its changes.
+        queue_after_commit(self.db, linked | correlated)
         return session, declared
 
     async def _replayed_contents(

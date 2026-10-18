@@ -719,7 +719,7 @@ async def test_forget_rich_readies_the_database_for_the_previous_release():
     owner, workspace, installation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     sessions = [uuid.uuid4() for _ in CAPTURE_LEVELS_ROLLBACK]
     try:
-        _alembic(scratch, "upgrade", "head")
+        _alembic(scratch, "upgrade", "119")
         async with engine.begin() as connection:
             await _insert_previous_release_rows(
                 connection, owner, workspace, installation
@@ -757,7 +757,7 @@ async def test_forget_rich_readies_the_database_for_the_previous_release():
                 == "agent_session_contents"
             )
         # Rolling forward runs 119 again over the objects it kept.
-        _alembic(scratch, "upgrade", "head")
+        _alembic(scratch, "upgrade", "119")
         async with engine.begin() as connection:
             assert (
                 await connection.scalar(text("SELECT version_num FROM alembic_version"))

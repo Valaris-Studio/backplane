@@ -426,14 +426,14 @@ async def test_migration_121_round_trips_on_postgresql():
                   "('execution_context_bindings', 'execution_context_receipts')")
     engine = create_async_engine(scratch)
     try:
-        _alembic(scratch, "upgrade", "head")
+        _alembic(scratch, "upgrade", "121")
         async with engine.connect() as connection:
             assert await connection.scalar(tables) == 2
         _alembic(scratch, "downgrade", "120")
         async with engine.connect() as connection:
             assert await connection.scalar(tables) == 0
             assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "120"
-        _alembic(scratch, "upgrade", "head")
+        _alembic(scratch, "upgrade", "121")
         async with engine.connect() as connection:
             assert await connection.scalar(tables) == 2
             assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "121"

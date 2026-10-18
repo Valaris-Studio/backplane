@@ -33,7 +33,7 @@ export const session: AgentSession = {
   capture_gaps: 0, display_state: "ended", ended_reason: "session_end_event", idle_since: null, activity_event_count: 14,
   coverage: "activity", capture_levels: ["rich"], link_count: 2, child_count: 0, link_preview: [],
 };
-const work = (provenance: "exact" | "correlated", relation: "changed" | "consulted") => ({ entity_type: "card", entity_id: cardId, workspace_id: workspace.id, board_id: boardId, relation, provenance });
+export const work = (provenance: "exact" | "correlated", relation: "changed" | "consulted") => ({ entity_type: "card", entity_id: cardId, workspace_id: workspace.id, board_id: boardId, relation, provenance });
 const calls = [
   { key: "exact", call_id: exactCallId, name: "update_card", mcp_tool: "update_card", work_refs: [work("exact", "changed")] },
   { key: "correlated", call_id: "correlated-call", name: "get_card", mcp_tool: "get_card", work_refs: [work("correlated", "consulted")] },
@@ -58,12 +58,16 @@ export const records: SessionContent[] = Array.from({ length: 10_001 }, (_, inde
 export interface RequestReceipt {
   path: string; method: string; query: string; mode: string | null; callId: string | null;
   cursor: string | null; status?: number; returned?: number; bytes?: number; ids?: string[]; payload?: string;
+  startedAt: number;
 }
 export interface WindowFixture {
   requests: RequestReceipt[]; failures: string[]; unexpected: string[]; subscriptions: string[];
   authorityStatus: number; metadataStatus: number; unavailableIds: Set<string>;
   holdWindow: boolean; holdBody: boolean; held: (() => void)[]; inflight: number;
   socket?: WebSocketRoute; saveStatus: number;
+  calls: typeof calls; links: ReturnType<typeof work>[];
+  socketsOpened: number; socketLedger: { kind: string; at: number; connection: number; payload?: unknown }[];
+  eventBurst: (count: number, ownerId: string) => void; disconnect: () => Promise<void>;
   release: () => void; ownerBurst: (count: number) => void;
 }
 
@@ -95,10 +99,22 @@ export async function installWindowFixture(page: Page, locale = "en"): Promise<W
   const state: WindowFixture = {
     requests: [], failures: [], unexpected: [], subscriptions: [], authorityStatus: 200, metadataStatus: 200,
     unavailableIds: new Set(), holdWindow: false, holdBody: false, held: [], inflight: 0, saveStatus: 503,
+    calls: structuredClone(calls), links: [work("exact", "changed"), work("correlated", "consulted")],
+    socketsOpened: 0, socketLedger: [],
     release() { state.holdWindow = false; state.holdBody = false; state.held.splice(0).forEach((resolve) => resolve()); },
-    ownerBurst(count) {
+    ownerBurst(count) { state.eventBurst(count, "owner"); },
+    eventBurst(count, ownerId) {
       assert(state.socket, "The real AppShell must subscribe before an event burst");
-      for (let index = 0; index < count; index += 1) state.socket.send(JSON.stringify({ event: "agent_session.updated", timestamp: stamp, event_id: `synthetic-${index}`, payload: { owner_id: "owner", session_id: sessionId } }));
+      for (let index = 0; index < count; index += 1) {
+        const frame = { event: "agent_session.updated", timestamp: stamp, event_id: `synthetic-${state.socketLedger.length}`, payload: { owner_id: ownerId, session_id: sessionId } };
+        state.socketLedger.push({ kind: "event", at: Date.now(), connection: state.socketsOpened, payload: frame });
+        state.socket.send(JSON.stringify(frame));
+      }
+    },
+    async disconnect() {
+      assert(state.socket, "The real AppShell must connect before interruption");
+      state.socketLedger.push({ kind: "disconnect", at: Date.now(), connection: state.socketsOpened });
+      await state.socket.close({ code: 1012, reason: "Synthetic missed-event recovery" });
     },
   };
   await page.addInitScript((language) => {
@@ -111,9 +127,16 @@ export async function installWindowFixture(page: Page, locale = "en"): Promise<W
   await page.routeWebSocket("**/ws/workspaces/**", (socket) => {
     assert.equal(new URL(socket.url()).pathname, `/ws/workspaces/${slug}/events`);
     state.socket = socket;
+    state.socketsOpened += 1;
+    state.subscriptions = [];
+    const connection = state.socketsOpened;
+    state.socketLedger.push({ kind: "connected", at: Date.now(), connection });
     socket.onMessage((message) => {
       const frame = JSON.parse(String(message));
-      if (Array.isArray(frame.subscribe)) state.subscriptions = frame.subscribe;
+      if (Array.isArray(frame.subscribe)) {
+        state.subscriptions = frame.subscribe;
+        state.socketLedger.push({ kind: "subscribe", at: Date.now(), connection, payload: frame.subscribe });
+      }
     });
   });
   await page.route("**/*", (route) => {
@@ -129,7 +152,7 @@ export async function installWindowFixture(page: Page, locale = "en"): Promise<W
     // Vite also serves modules from src/features/*/api/. Those are source
     // assets, not application requests; the same fixture supports built HTML.
     if (!path.startsWith("/api/")) return route.fallback();
-    const receipt: RequestReceipt = { path, method, query: url.search, mode: url.searchParams.get("mode"), cursor: url.searchParams.get("cursor"), callId: url.searchParams.get("call_id") };
+    const receipt: RequestReceipt = { path, method, query: url.search, mode: url.searchParams.get("mode"), cursor: url.searchParams.get("cursor"), callId: url.searchParams.get("call_id"), startedAt: Date.now() };
     state.requests.push(receipt); state.inflight += 1;
     try {
       assert(!request.headers().authorization && !request.headers().cookie, "Synthetic requests must carry no credentials");
@@ -157,13 +180,13 @@ export async function installWindowFixture(page: Page, locale = "en"): Promise<W
         else if (path === `/api/workspaces/${slug}/boards/${boardId}`) value = { ...board, columns: [{ id: "synthetic-todo", name: "Synthetic to do", cards: [card] }] };
         else if (path === `/api/workspaces/${slug}/boards/${boardId}/cards`) value = [card];
         else if (path === `/api/workspaces/${slug}/boards/${boardId}/cards/${cardId}`) value = card;
-        else if (path === sessionPath) { status = state.authorityStatus; value = status === 200 ? session : { detail: "Synthetic session access denied" }; }
-        else if (path === `${sessionPath}/calls`) value = { items: calls, turns: [{ turn_index: 1, started_at: stamp, ended_at: session.ended_at, call_count: calls.length, failure_count: 0, reasoning_count: 0 }], next_cursor: null };
+        else if (path === sessionPath) { status = state.authorityStatus; value = status === 200 ? { ...session, link_count: state.links.length } : { detail: "Synthetic session access denied" }; }
+        else if (path === `${sessionPath}/calls`) value = { items: state.calls, turns: [{ turn_index: 1, started_at: stamp, ended_at: session.ended_at, call_count: state.calls.length, failure_count: 0, reasoning_count: 0 }], next_cursor: null };
         else if (path.startsWith(`${sessionPath}/calls/`)) {
-          const call = calls.find((item) => item.key === decodeURIComponent(path.split("/").at(-1)!));
+          const call = state.calls.find((item) => item.key === decodeURIComponent(path.split("/").at(-1)!));
           assert(call, "Unknown call");
           value = { key: call.key, events: [] };
-        } else if (path === `${sessionPath}/links`) value = { items: [work("exact", "changed"), work("correlated", "consulted")].map((item) => ({ ...item, first_seen_at: stamp, last_seen_at: stamp, invocation_count: 1 })) };
+        } else if (path === `${sessionPath}/links`) value = { items: state.links.map((item) => ({ ...item, first_seen_at: stamp, last_seen_at: stamp, invocation_count: 1 })) };
         else if (path === `${sessionPath}/children`) value = { items: [] };
         else if (path === `${contentsPath}/window`) {
           if (state.holdWindow) await new Promise<void>((resolve) => state.held.push(resolve));

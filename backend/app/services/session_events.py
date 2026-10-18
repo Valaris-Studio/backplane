@@ -5,17 +5,25 @@
 
 Services return these as intents; routers publish them from a background task,
 which runs only after the request's transaction committed and its response was
-sent, so a rolled-back write never announces anything.
+sent, so a rolled-back write never announces anything. Work-link changes are
+made inside transactions and savepoints their caller owns, so their intents
+are queued with that transaction instead (`queue_after_commit`).
 """
 
 import logging
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.committed_events import queue_until_commit
 
 logger = logging.getLogger(__name__)
 
 AGENT_SESSION_UPDATED = "agent_session.updated"
 COMPANION_INSTALLATION_UPDATED = "companion_installation.updated"
+LINKS_CHANGED = "links"
 
 
 @dataclass(frozen=True)
@@ -36,6 +44,34 @@ def session_updated(session, reason: str) -> Invalidation:
             ("reason", reason),
         ),
     )
+
+
+def owner_links_changed(owner_id: uuid.UUID, workspace_id: uuid.UUID) -> Invalidation:
+    # For another workspace whose cards and notes list the owner's sessions:
+    # it learns only that the owner's links changed, never which session or
+    # which source workspace.
+    return Invalidation(
+        AGENT_SESSION_UPDATED,
+        workspace_id,
+        (
+            ("owner_id", str(owner_id)),
+            ("workspace_id", str(workspace_id)),
+            ("reason", LINKS_CHANGED),
+        ),
+    )
+
+
+def queue_after_commit(db: AsyncSession, invalidations: Iterable[Invalidation]) -> None:
+    """Publish once the outer transaction commits, each at most once per
+    transaction however many matches and retractions produced it."""
+    for invalidation in invalidations:
+        queue_until_commit(
+            db,
+            invalidation.event_type,
+            dict(invalidation.payload),
+            invalidation.workspace_id,
+            coalesce_key=invalidation,
+        )
 
 
 def installation_updated(

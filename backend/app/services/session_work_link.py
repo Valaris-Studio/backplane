@@ -17,8 +17,17 @@ from app.core.time import as_utc
 from app.models.agent_session import AgentSession
 from app.models.mcp_invocation import MCPInvocation
 from app.repositories.session_work_link import SessionWorkLinkRepository
+from app.services.session_events import (
+    LINKS_CHANGED,
+    Invalidation,
+    owner_links_changed,
+    session_updated,
+)
 
 logger = logging.getLogger(__name__)
+
+Refreshes = frozenset[Invalidation]
+NO_REFRESHES: Refreshes = frozenset()
 
 # Harness clocks and the MCP server's clock disagree a little, and an MCP
 # receipt may describe a call that straddles the first or last captured event.
@@ -80,6 +89,11 @@ class SessionWorkLinkService:
     invocation competes for it and no invocation claims it by native id. These
     matches are `correlated`; an exact claim on the same call evicts them, and
     any ambiguity links nothing.
+
+    Each entry point returns the refreshes its changes call for: every session
+    whose matches it claimed or released, including older sessions it
+    retracted, and every other workspace whose cards and notes list them. The
+    caller queues them with its own transaction.
     """
 
     def __init__(self, db: AsyncSession):
@@ -94,48 +108,50 @@ class SessionWorkLinkService:
 
     async def link_session_calls(
         self, session: AgentSession, native_call_ids: set[str]
-    ) -> None:
+    ) -> Refreshes:
         if not native_call_ids:
-            return
+            return NO_REFRESHES
         await self.repo.serialize_call_matching(
             session.owner_id, _lock_keys({session.harness}, native_call_ids)
         )
+        refreshes = set()
         for invocation in await self.repo.human_invocations_for_calls(
             session.owner_id, session.harness, native_call_ids
         ):
-            await self._reconcile(invocation)
+            refreshes |= await self._reconcile(invocation)
+        return frozenset(refreshes)
 
-    async def link_invocation(self, invocation: MCPInvocation) -> None:
+    async def link_invocation(self, invocation: MCPInvocation) -> Refreshes:
         if _correlatable(invocation):
             await self.repo.serialize_call_matching(
                 invocation.owner_id, {CORRELATION_LOCK}
             )
-            await self._correlate(invocation)
-            return
+            return await self._correlate(invocation)
         if (
             invocation.agent_id is not None
             or not invocation.harness
             or not invocation.native_call_id
         ):
-            return
+            return NO_REFRESHES
         await self.repo.serialize_call_matching(
             invocation.owner_id,
             _lock_keys({invocation.harness}, {invocation.native_call_id}),
         )
-        await self._reconcile(invocation)
+        return await self._reconcile(invocation)
 
     async def correlate_session_calls(
         self, session: AgentSession, signatures: set[str], captured_at: datetime
-    ) -> None:
+    ) -> Refreshes:
         """Newly captured calls may be the one match of an invocation already
         recorded, or a second candidate that makes an earlier match ambiguous."""
         if (
             not signatures
             or harness_family(session.harness) not in CORRELATED_HARNESSES
         ):
-            return
+            return NO_REFRESHES
         await self.repo.serialize_call_matching(session.owner_id, {CORRELATION_LOCK})
         captured_at = as_utc(captured_at)
+        refreshes = set()
         for invocation in await self.repo.correlatable_invocations(
             session.owner_id,
             session.harness,
@@ -143,9 +159,10 @@ class SessionWorkLinkService:
             completed_from=captured_at - CORRELATION_WINDOW,
         ):
             if _signatures(invocation) & signatures:
-                await self._correlate(invocation)
+                refreshes |= await self._correlate(invocation)
+        return frozenset(refreshes)
 
-    async def _correlate(self, invocation: MCPInvocation) -> None:
+    async def _correlate(self, invocation: MCPInvocation) -> Refreshes:
         signatures = _signatures(invocation)
         calls = {
             (session_id, call_id): (signature, captured_at)
@@ -166,8 +183,8 @@ class SessionWorkLinkService:
                     len(calls),
                 )
             if previous is not None:
-                await self._retract(invocation)
-            return
+                return await self._retract(invocation)
+            return NO_REFRESHES
         [((session_id, call_id), (signature, captured_at))] = calls.items()
         rivals = [
             other
@@ -185,17 +202,22 @@ class SessionWorkLinkService:
                 invocation.id,
                 len(rivals),
             )
+            refreshes = set()
             for contender in [invocation, *rivals]:
                 if await self.repo.correlated_match(contender.id) is not None:
-                    await self._retract(contender)
-            return
+                    refreshes |= await self._retract(contender)
+            return frozenset(refreshes)
+        refreshes = set()
         if previous is not None and previous != (session_id, call_id):
-            await self._retract(invocation)
+            refreshes |= await self._retract(invocation)
         session = await self.repo.session(session_id)
         if session is not None:
-            await self._materialize(session, invocation, correlated_call=call_id)
+            refreshes |= await self._materialize(
+                session, invocation, correlated_call=call_id
+            )
+        return frozenset(refreshes)
 
-    async def _reconcile(self, invocation: MCPInvocation) -> None:
+    async def _reconcile(self, invocation: MCPInvocation) -> Refreshes:
         candidates = [
             session
             for session in await self.repo.sessions_with_call(
@@ -204,15 +226,15 @@ class SessionWorkLinkService:
             if _within_window(session, invocation)
         ]
         if len(candidates) == 1:
-            await self._materialize(candidates[0], invocation)
-            return
+            return await self._materialize(candidates[0], invocation)
         if len(candidates) > 1:
             logger.warning(
                 "ambiguous native call match invocation=%s sessions=%d",
                 invocation.id,
                 len(candidates),
             )
-            await self._retract(invocation)
+            return await self._retract(invocation)
+        return NO_REFRESHES
 
     async def _relations(self, invocation: MCPInvocation):
         return [
@@ -223,13 +245,30 @@ class SessionWorkLinkService:
             for entity in await self.repo.consulted_entities(invocation)
         ]
 
+    async def _refreshes(self, session: AgentSession, relations) -> Refreshes:
+        """The session's own views, and each other workspace where the owner
+        can still see one of the call's targets: its cards and notes list the
+        owner's sessions from every workspace."""
+        refreshes = {session_updated(session, LINKS_CHANGED)}
+        for workspace_id, entity_type, entity_id, _ in relations:
+            if workspace_id == session.workspace_id:
+                continue
+            target_refresh = owner_links_changed(session.owner_id, workspace_id)
+            if target_refresh in refreshes:
+                continue
+            if await self.repo.target_visible_to(
+                session.owner_id, workspace_id, entity_type, entity_id
+            ):
+                refreshes.add(target_refresh)
+        return frozenset(refreshes)
+
     async def _materialize(
         self,
         session: AgentSession,
         invocation: MCPInvocation,
         *,
         correlated_call: str | None = None,
-    ) -> None:
+    ) -> Refreshes:
         correlated = correlated_call is not None
         call_id = correlated_call if correlated else invocation.native_call_id
         if not await self.repo.claim_match(
@@ -239,10 +278,9 @@ class SessionWorkLinkService:
             provenance="correlated" if correlated else "exact",
             call_id=call_id,
         ):
-            return
-        for workspace_id, entity_type, entity_id, relation in await self._relations(
-            invocation
-        ):
+            return NO_REFRESHES
+        relations = await self._relations(invocation)
+        for workspace_id, entity_type, entity_id, relation in relations:
             exists, board_id = await self.repo.entity_board(
                 workspace_id, entity_type, entity_id
             )
@@ -258,29 +296,37 @@ class SessionWorkLinkService:
                 seen_at=as_utc(invocation.started_at),
                 correlated=correlated,
             )
+        # Even when no target survives to link: the match alone changes what
+        # the session's calls show.
+        refreshes = set(await self._refreshes(session, relations))
         if not correlated:
             # The call is now claimed by its own id; whatever was correlated
             # to it re-evaluates, and no longer sees it as a candidate.
             if harness_family(session.harness) not in CORRELATED_HARNESSES:
-                return
+                return frozenset(refreshes)
             # Callers already hold it; taken again (re-entrant) so no path
             # can read the guesses without it.
             await self.repo.serialize_call_matching(
                 invocation.owner_id, {CORRELATION_LOCK}
             )
             for guess in await self.repo.correlated_claims_on(session.id, call_id):
-                await self._correlate(guess)
+                refreshes |= await self._correlate(guess)
+        return frozenset(refreshes)
 
     # Known read-only edges of withdrawal, accepted as they are: it re-reads the
     # invocation's Activity and consultations at withdrawal time rather than
     # what was linked, and a later event that widens a session's time window
     # does not re-evaluate candidates that were outside it before.
-    async def _retract(self, invocation: MCPInvocation) -> None:
+    async def _retract(self, invocation: MCPInvocation) -> Refreshes:
         released = await self.repo.release_matches(invocation.id)
         if not released:
-            return
+            return NO_REFRESHES
         relations = await self._relations(invocation)
+        refreshes = set()
         for session_id, provenance in released:
+            session = await self.repo.session(session_id)
+            if session is not None:
+                refreshes |= await self._refreshes(session, relations)
             for _, entity_type, entity_id, relation in relations:
                 await self.repo.discount_link(
                     session_id=session_id,
@@ -289,3 +335,4 @@ class SessionWorkLinkService:
                     relation=relation,
                     correlated=provenance == "correlated",
                 )
+        return frozenset(refreshes)

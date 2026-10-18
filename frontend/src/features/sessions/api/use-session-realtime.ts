@@ -1,14 +1,14 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient, type Query } from "@tanstack/react-query";
 import { useDomainSync } from "@/hooks/useDomainSync";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { sessionKeys } from "@/lib/query-keys";
 import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 
-// agent_session.updated reaches every member's socket with ids only; act only
-// on our own sessions, and coalesce an agent's event bursts into one refetch.
+// Keep the owner check as defense in depth and coalesce capture bursts.
 const SESSION_EVENT_DEBOUNCE_MS = 2000;
 
 // Body pages and files are keyed by their digest, so no event changes them.
@@ -24,11 +24,48 @@ export function changeable(query: Pick<Query, "queryKey">): boolean {
 
 export function useSessionRealtime(slug: string) {
   const { data: me } = useCurrentUser();
+  const queryClient = useQueryClient();
+  const { status } = useWebSocket();
+  const pendingOwnerIdsRef = useRef(new Set<string>());
   useDomainSync("agent_session", sessionKeys.all(slug), {
     debounceMs: SESSION_EVENT_DEBOUNCE_MS,
-    filter: (event) => !!me && event.payload.owner_id === me.id,
+    filter: (event) => {
+      const ownerId = event.payload.owner_id;
+      if (!me) {
+        if (typeof ownerId === "string" && ownerId.length > 0) {
+          pendingOwnerIdsRef.current.add(ownerId);
+        }
+        return false;
+      }
+      return ownerId === me.id;
+    },
     predicate: changeable,
   });
+
+  // The bus does not replay missed events. Recover mutable evidence after a
+  // reconnect without rereading digest-addressed bodies or files.
+  const hasConnectedRef = useRef(status === "connected");
+  const previousStatusRef = useRef(status);
+  const pendingRecoveryRef = useRef(false);
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = status;
+    if (status !== "connected") return;
+    if (hasConnectedRef.current && previousStatus !== "connected") {
+      pendingRecoveryRef.current = true;
+    }
+    hasConnectedRef.current = true;
+    if (!me) return;
+    const ownsPendingEvent = pendingOwnerIdsRef.current.has(me.id);
+    pendingOwnerIdsRef.current.clear();
+    if (pendingRecoveryRef.current || ownsPendingEvent) {
+      pendingRecoveryRef.current = false;
+      void queryClient.invalidateQueries({
+        queryKey: sessionKeys.all(slug),
+        predicate: changeable,
+      });
+    }
+  }, [status, me, queryClient, slug]);
 }
 
 // Session detail descendants include private call previews as well as bodies.

@@ -11,6 +11,8 @@ or root) open when it was queued:
 - Root commit dispatches the remaining events, in queue order, once.
 - Root rollback, a failed commit, or closing the session drops everything, so
   nothing leaks into a later transaction on a reused session.
+- Events queued with the same `coalesce_key` dispatch once, at the first one's
+  place. Events without a key are all dispatched, duplicates included.
 
 The bus stays best-effort: a crash between commit and dispatch loses the event.
 """
@@ -20,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Hashable
 from dataclasses import dataclass
 
 from sqlalchemy import event
@@ -51,6 +54,7 @@ class _DeferredEvent:
     event_type: str
     payload: dict
     workspace_id: uuid.UUID
+    coalesce_key: Hashable | None
 
 
 def _boundary(session: Session) -> SessionTransaction | None:
@@ -98,15 +102,34 @@ async def _publish_in_order(
 
 
 def queue_until_commit(
-    db: AsyncSession, event_type: str, payload: dict, workspace_id: uuid.UUID
+    db: AsyncSession,
+    event_type: str,
+    payload: dict,
+    workspace_id: uuid.UUID,
+    *,
+    coalesce_key: Hashable | None = None,
 ) -> None:
     session = db.sync_session
     owner = _boundary(session)
     if owner is None:
         raise RuntimeError(f"{event_type} must be queued inside a transaction")
     session.info.setdefault(_DEFERRED, []).append(
-        _DeferredEvent(owner, event_type, payload, workspace_id)
+        _DeferredEvent(owner, event_type, payload, workspace_id, coalesce_key)
     )
+
+
+def _without_repeats(events: list[_DeferredEvent]) -> list[_DeferredEvent]:
+    # Only at root commit, once rollbacks have pruned the queue: dropping a
+    # repeat earlier could keep a copy whose savepoint later rolls back.
+    seen: set[Hashable] = set()
+    kept = []
+    for pending in events:
+        if pending.coalesce_key is not None:
+            if pending.coalesce_key in seen:
+                continue
+            seen.add(pending.coalesce_key)
+        kept.append(pending)
+    return kept
 
 
 @event.listens_for(Session, "after_commit")
@@ -131,7 +154,7 @@ def _promote_or_dispatch(session: Session) -> None:
         logger.warning("no event loop to publish %d committed event(s)", len(deferred))
         return
     by_workspace: dict[uuid.UUID, list[_DeferredEvent]] = {}
-    for pending in deferred:
+    for pending in _without_repeats(deferred):
         by_workspace.setdefault(pending.workspace_id, []).append(pending)
     for workspace_id, events in by_workspace.items():
         _dispatch_after_previous(loop, workspace_id, events)
