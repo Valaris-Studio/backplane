@@ -3,7 +3,7 @@
 
 import { CompletionContextWarning } from "@/features/kanban/components/CompletionContextWarning";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Download, Hash, Info, Link2, Pin, PinOff, Trash2 } from "lucide-react";
 import { useDeleteNote, useUpdateNote } from "../api/use-notes";
@@ -59,6 +59,12 @@ export function NoteEditor({
   const [pinned, setPinned] = useState(source.pinned);
   const [idCopied, setIdCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const previousSource = useRef<{
+    note: Note;
+    slug: string;
+    open: boolean;
+    isBodyAuthoritative: boolean;
+  } | null>(null);
   const updateNote = useUpdateNote(slug, boardId);
   const deleteNote = useDeleteNote(slug, boardId);
 
@@ -68,15 +74,23 @@ export function NoteEditor({
     setPinned(source.pinned);
   }, [source]);
 
-  // Keyed on `open` as well as the note: NoteList keeps this component mounted
-  // across a close and hands back the same react-query object on reopen, so a
-  // note-only key would never refire and the sheet would reopen on a stale
-  // draft. Deliberately one-way — resetting as `open` flips false would snap
-  // the still-visible sheet back to pre-save values during the exit tween.
   useEffect(() => {
-    if (!open) return;
-    resetDraft();
-  }, [resetDraft, open]);
+    const previous = previousSource.current;
+    previousSource.current = { note: source, slug, open, isBodyAuthoritative };
+    if (!open || (previous?.note === source && previous.slug === slug &&
+        previous.open === open && previous.isBodyAuthoritative === isBodyAuthoritative)) return;
+
+    // A detail refetch can change pin metadata while this draft is unsaved.
+    // Compare with the prior saved copy before deciding to adopt the new one.
+    const wasClean = previous !== null &&
+      title.trim() === previous.note.title && content === previous.note.content;
+    if (!previous || !previous.open || previous.note.id !== source.id ||
+        previous.slug !== slug || (!previous.isBodyAuthoritative && isBodyAuthoritative) || wasClean) {
+      resetDraft();
+    } else {
+      setPinned(source.pinned);
+    }
+  }, [source, slug, open, isBodyAuthoritative, title, content, resetDraft]);
 
   // Save only activates when title/content diverge from the persisted note —
   // pin saves through its own immediate mutation, so it's excluded (mirrors
@@ -101,8 +115,7 @@ export function NoteEditor({
     onDiscard: resetDraft,
   });
 
-  // `source` does NOT refresh while the sheet stays open. Track pin locally so
-  // a second toggle sends the opposite value instead of re-sending the first.
+  // Track accepted pin changes before the detail refetch arrives.
   function handleTogglePin() {
     const next = !pinned;
     updateNote.mutate(

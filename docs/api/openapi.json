@@ -17458,6 +17458,68 @@
         "x-surface": "public"
       }
     },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/publication-revision": {
+      "get": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "Get Board Note Publication Revision",
+        "operationId": "get_board_note_publication_revision_api_workspaces__slug__boards__board_id__notes__note_id__publication_revision_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePublicationRevisionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
     "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/append": {
       "post": {
         "tags": [
@@ -38100,6 +38162,99 @@
         ],
         "title": "NoteFormat",
         "description": "Wire format for a single note read. `prosemirror` (default) returns the\nstored canonical PM JSON; `markdown` serializes it back to CommonMark."
+      },
+      "NotePublicationRevisionRead": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "no_record",
+              "revision_not_recorded",
+              "unsupported_version",
+              "recorded"
+            ],
+            "title": "Status"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "revision_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Version"
+          },
+          "published_revision_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Revision Sha256"
+          },
+          "current_revision_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revision Sha256"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "matches",
+                  "differs",
+                  "unavailable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison"
+          },
+          "comparison_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "current_note_too_large"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "NotePublicationRevisionRead",
+        "description": "How the saved note compares with the revision its publisher saved.\n\n`recorded_at` is set whenever a save receipt exists, as the saving\ntransaction's database time rather than its commit. `revision_version` is\nalso set for `unsupported_version`, naming it; the digests and comparison\nonly for `recorded`. `matches` means canonically equal now, not never\nedited."
       },
       "NoteRead": {
         "properties": {

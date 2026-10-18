@@ -1351,6 +1351,27 @@
       "loadFailed": "Não foi possível carregar esta nota.",
       "back": "Voltar às notas",
       "retry": "Tentar novamente"
+    },
+    "publicationRevision": {
+      "action": "Revisão da publicação",
+      "matches": "Corresponde à revisão publicada",
+      "differs": "Difere da revisão publicada",
+      "noRecord": "Nenhum registro de publicação",
+      "revisionNotRecorded": "A revisão publicada não foi registrada",
+      "unsupportedVersion": "A versão da revisão publicada não é compatível",
+      "currentNoteTooLarge": "A nota salva é grande demais para comparar",
+      "loadError": "Não foi possível carregar a revisão publicada",
+      "accessLost": "A revisão publicada está indisponível ou o acesso foi perdido",
+      "savedNoteScope": "Compara a nota salva, não as alterações não salvas.",
+      "fieldScope": "Inclui título, conteúdo, tipo e estado de fixação. Exclui links de cartões e datas e horas.",
+      "recordedAt": "Registrada em",
+      "details": "Detalhes",
+      "version": "Versão da revisão",
+      "publishedDigest": "Revisão publicada",
+      "currentDigest": "Revisão salva atual",
+      "checkAgain": "Verificar novamente",
+      "loading": "Verificando a revisão publicada…",
+      "retry": "Tentar novamente"
     }
   },
   "channels": {

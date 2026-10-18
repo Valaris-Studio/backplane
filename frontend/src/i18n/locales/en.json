@@ -1326,6 +1326,27 @@
       "loadFailed": "Couldn't load this note.",
       "back": "Back to notes",
       "retry": "Retry"
+    },
+    "publicationRevision": {
+      "action": "Publication revision",
+      "matches": "Matches publication revision",
+      "differs": "Differs from publication revision",
+      "noRecord": "No publication record",
+      "revisionNotRecorded": "Publication revision was not recorded",
+      "unsupportedVersion": "Publication revision version is not supported",
+      "currentNoteTooLarge": "The saved note is too large to compare",
+      "loadError": "Could not load publication revision",
+      "accessLost": "Publication revision is unavailable or access was lost",
+      "savedNoteScope": "Compares the saved note, not unsaved edits.",
+      "fieldScope": "Includes title, content, kind and pin state. Excludes card links and timestamps.",
+      "recordedAt": "Recorded at",
+      "details": "Details",
+      "version": "Revision version",
+      "publishedDigest": "Published revision",
+      "currentDigest": "Current saved revision",
+      "checkAgain": "Check again",
+      "loading": "Checking publication revision…",
+      "retry": "Retry"
     }
   },
   "channels": {

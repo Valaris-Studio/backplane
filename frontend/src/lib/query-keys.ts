@@ -46,6 +46,8 @@ export const noteKeys = {
   // served a body that a (possibly trimmed) list response put in the cache.
   detail: (slug: string, noteId: string) =>
     ["note-detail", slug, noteId] as const,
+  publicationRevision: (slug: string, boardId: string, noteId: string, ownerId?: string) =>
+    ["note-publication-revision", slug, boardId, noteId, ...(ownerId ? [ownerId] : [])] as const,
 };
 
 export const activityKeys = {

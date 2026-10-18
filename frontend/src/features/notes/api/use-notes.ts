@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { noteKeys } from "@/lib/query-keys";
 import { useDomainSync } from "@/hooks/useDomainSync";
 import type { Note, NoteCreate, NoteUpdate } from "@/types/note";
+import { invalidateNotePublicationRevision } from "./use-note-publication-revision";
 
 function getBasePath(slug: string, boardId?: string) {
   return boardId
@@ -78,7 +79,7 @@ export function useUpdateNote(slug: string, boardId?: string) {
       );
       return data;
     },
-    onSuccess: (_data, { noteId }) => {
+    onSuccess: (savedNote, { noteId }) => {
       queryClient.invalidateQueries({ queryKey: getQueryKey(slug, boardId) });
       // Card link/unlink must refresh every card-scoped list on this board
       // (both the old and the new card). Today the byBoard invalidation above
@@ -94,6 +95,10 @@ export function useUpdateNote(slug: string, boardId?: string) {
       // The editor reads its body from the detail key, which the list
       // invalidation above does not cover.
       queryClient.invalidateQueries({ queryKey: noteKeys.detail(slug, noteId) });
+      const publicationBoardId = boardId ?? savedNote.board_id;
+      if (publicationBoardId) {
+        void invalidateNotePublicationRevision(queryClient, slug, publicationBoardId, noteId);
+      }
     },
   });
 }
@@ -104,8 +109,11 @@ export function useDeleteNote(slug: string, boardId?: string) {
     mutationFn: async (noteId: string) => {
       await api.delete(`${getBasePath(slug, boardId)}/${noteId}`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, noteId) => {
       queryClient.invalidateQueries({ queryKey: getQueryKey(slug, boardId) });
+      if (boardId) {
+        void invalidateNotePublicationRevision(queryClient, slug, boardId, noteId);
+      }
     },
   });
 }

@@ -40,10 +40,12 @@ from app.schemas.notes.note import (
     Finding,
     NoteAppend,
     NoteCreate,
+    NotePublicationRevisionRead,
     NoteSectionReplace,
     NoteUpdate,
 )
 from app.services.activity import ActivityService
+from app.services.agents.context_manifest import note_revision
 from app.services.notes.content_serializer import prosemirror_to_markdown
 from app.services.notes.content_text import extract_plain_text
 from app.services.kanban.freeze_guard import assert_board_not_frozen
@@ -75,6 +77,14 @@ _UI_VALIDATION_MARKER_PATTERN = re.compile(
     r"^\s*validation:\s*requires-ui-validation\s*$", re.IGNORECASE | re.MULTILINE
 )
 NEEDS_UI_VALIDATION_LABEL = "needs-ui-validation"
+
+# The note_revision algorithm a receipt's digest was made with: v1 is the one
+# its digest domain names. A digest of any other version is never compared
+# with today's algorithm.
+PUBLISHED_NOTE_REVISION_VERSION = 1
+# A lowercase hex sha256, as note_revision writes it. CHAR(64) space-pads
+# anything shorter, which then fails this too.
+_SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
 def derive_approved(
@@ -321,7 +331,12 @@ class NoteService:
             max_total_bytes=EXCERPT_SOURCE_BYTES_LIMIT,
         )
         note = await self._insert_note(workspace_id, data, user_id, board_id)
-        await receipts.complete(receipt_id, note.id)
+        await receipts.complete(
+            receipt_id,
+            note.id,
+            published_note_revision_sha256=note_revision(note),
+            published_note_revision_version=PUBLISHED_NOTE_REVISION_VERSION,
+        )
         return note, True
 
     async def _replay(
@@ -591,6 +606,103 @@ class NoteService:
                 update={"content": prosemirror_to_markdown(note.content)}
             )
         return read
+
+    async def get_note_publication_revision(
+        self,
+        *,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID,
+        note_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> NotePublicationRevisionRead:
+        """Compare the saved note with the revision its publisher saved, for
+        that publisher alone. Reads no captured source, so the source's
+        deletion or a lost source membership changes nothing here."""
+        await self._authorize_publication_reader(workspace_id, user_id)
+        # The receipt before the note: a delete between the two reads then
+        # answers 404, never a no_record for a note that had one.
+        publication = await NoteSaveReceiptRepository(self.db).get_publication(
+            user_id, note_id
+        )
+        scope = await self.note_repo.get_scope(note_id)
+        # Someone else's note answers like a missing one, so the answer never
+        # shows whether they published it.
+        if (
+            scope is None
+            or scope.workspace_id != workspace_id
+            or scope.board_id != board_id
+            or scope.created_by != user_id
+        ):
+            raise ResourceNotFoundError("Note not found")
+        if publication is None:
+            return NotePublicationRevisionRead(status="no_record")
+        recorded_at = publication.created_at
+        published_sha256 = publication.published_note_revision_sha256
+        version = publication.published_note_revision_version
+        if version is None:
+            return NotePublicationRevisionRead(
+                status="revision_not_recorded", recorded_at=recorded_at
+            )
+        # Before the digest check: what a digest of another version looks
+        # like, or whether it has one at all, is that version's to define.
+        if version != PUBLISHED_NOTE_REVISION_VERSION:
+            return NotePublicationRevisionRead(
+                status="unsupported_version",
+                recorded_at=recorded_at,
+                revision_version=version,
+            )
+        if published_sha256 is None or not _SHA256_HEX_PATTERN.fullmatch(
+            published_sha256
+        ):
+            return NotePublicationRevisionRead(
+                status="revision_not_recorded", recorded_at=recorded_at
+            )
+
+        recorded = {
+            "status": "recorded",
+            "recorded_at": recorded_at,
+            "revision_version": version,
+            "published_revision_sha256": published_sha256,
+        }
+        current = await self.note_repo.get_revision_fields(
+            note_id, content_byte_limit=REVIEWED_DOCUMENT_BYTES_LIMIT
+        )
+        if current is None:
+            raise ResourceNotFoundError("Note not found")
+        if current.content is None:
+            # Never a digest of a prefix: a partial body would compare as differs.
+            return NotePublicationRevisionRead(
+                **recorded,
+                comparison="unavailable",
+                comparison_reason="current_note_too_large",
+            )
+        current_sha256 = note_revision(current)
+        return NotePublicationRevisionRead(
+            **recorded,
+            current_revision_sha256=current_sha256,
+            comparison="matches" if current_sha256 == published_sha256 else "differs",
+        )
+
+    async def _authorize_publication_reader(
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+    ) -> None:
+        """The person themselves, still a member of the destination. Unlike
+        publishing, a viewer role or a frozen board still reads, as it does
+        the note itself."""
+        # Both keys resolve to the publisher, so their user id alone would
+        # pass for the publisher's.
+        if (
+            current_agent_id.get() is not None
+            or current_api_key_installation_id.get() is not None
+        ):
+            raise ForbiddenError(
+                "Only the note's publisher can inspect its publication"
+            )
+        membership = await WorkspaceMemberRepository(self.db).get_membership(
+            workspace_id, user_id
+        )
+        if membership is None:
+            raise ForbiddenError("Not a member of this workspace")
 
     async def update_note(
         self,

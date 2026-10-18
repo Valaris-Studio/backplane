@@ -28,11 +28,14 @@ from app.models.agent_session import AgentSession
 from app.models.companion import CompanionInstallation, CompanionProjectMapping
 from app.models.kanban.board import Board
 from app.models.notes.note import Note
+from app.models.notes.save_receipt import NoteSaveReceipt
 from app.models.notifications.notification import Notification
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.companion import InstallationCreate, MappingCreate
+from app.schemas.notes.note import NoteCreate, NoteRead
 from app.services.companion import CompanionService
+from app.services.notes.note import NoteService
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.rich_capture import (
     RICH_SINCE,
@@ -40,6 +43,7 @@ from tests.rich_capture import (
     integration_leg_unavailable,
     rich_record,
 )
+from tests.routers.agents.context_receipts_support import note_revision
 
 pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("content_storage")]
 
@@ -214,11 +218,14 @@ async def pg():
         )
         assert listed.status_code == 200, listed.text
         yield {
+            "engine": engine,
             "factory": factory,
             "client": client,
             "injector": injector,
             "events": events,
             "workspace_id": workspace_id,
+            "board_id": board_id,
+            "owner_id": owner_id,
             "reader_id": reader_id,
             "notes_url": f"/api/workspaces/{slug}/boards/{board_id}/notes",
             "source": {
@@ -317,6 +324,20 @@ async def receipt_count(env) -> int:
         )
 
 
+async def assert_durable_publication_revision(env, saved):
+    async with env["factory"]() as observer:
+        receipt = await observer.scalar(
+            select(NoteSaveReceipt).where(
+                NoteSaveReceipt.note_id == uuid.UUID(saved["id"])
+            )
+        )
+        assert receipt is not None
+        assert getattr(receipt, "published_note_revision_sha256", None) == note_revision(
+            saved
+        ), "The winning publication revision must be committed with its receipt"
+        assert getattr(receipt, "published_note_revision_version", None) == 1
+
+
 ONE_SAVE = {"notes": 1, "activities": 1, "mentions": 1}
 NOTHING = {"notes": 0, "activities": 0, "mentions": 0}
 
@@ -342,6 +363,7 @@ async def test_concurrent_identical_retries_save_exactly_once(pg):
     assert len(await settled_note_events(pg)) == 1
     assert len([e for e in pg["events"] if e.event_type == "notification.created"]) == 1
     assert await receipt_count(pg) == 1
+    await assert_durable_publication_revision(pg, responses[0].json())
 
 
 async def test_a_conflicting_payload_race_has_one_winner(pg):
@@ -370,6 +392,7 @@ async def test_a_conflicting_payload_race_has_one_winner(pg):
     assert len(await settled_note_events(pg)) == 1
     assert len([e for e in pg["events"] if e.event_type == "notification.created"]) == 1
     assert await receipt_count(pg) == 1
+    await assert_durable_publication_revision(pg, saved[0].json())
 
 
 @pytest.mark.parametrize(
@@ -394,6 +417,7 @@ async def test_a_failure_mid_save_leaves_no_rows_and_no_events(pg, table):
     assert len(await settled_note_events(pg)) == 1
     assert len([e for e in pg["events"] if e.event_type == "notification.created"]) == 1
     assert await receipt_count(pg) == 1
+    await assert_durable_publication_revision(pg, recovered.json())
 
 
 async def test_the_receipt_key_is_unique_per_principal_and_request_id(pg):
@@ -443,3 +467,112 @@ async def test_the_receipt_key_is_unique_per_principal_and_request_id(pg):
         for key in unique_keys
         for principal in principal_columns
     ), (unique_keys, principal_columns)
+
+
+async def test_savepoint_rollback_keeps_only_the_surviving_publication_and_events(pg):
+    async with pg["factory"]() as writer:
+        async with writer.begin():
+            note, created = await NoteService(writer).save_note(
+                pg["workspace_id"], NoteCreate.model_validate(excerpt_save(pg)),
+                pg["owner_id"], pg["board_id"],
+            )
+            assert created
+            saved = NoteRead.model_validate(note).model_dump(mode="json")
+            async with writer.begin_nested() as discarded:
+                await NoteService(writer).save_note(
+                    pg["workspace_id"],
+                    NoteCreate.model_validate(excerpt_save(pg, title="Discarded publication")),
+                    pg["owner_id"], pg["board_id"],
+                )
+                await discarded.rollback()
+            assert await durable(pg) == NOTHING
+            assert await receipt_count(pg) == 0
+            assert await settled_note_events(pg) == []
+        assert await durable(pg) == ONE_SAVE
+        assert await receipt_count(pg) == 1
+        events = await settled_note_events(pg)
+        assert [item.payload["entity_id"] for item in events] == [saved["id"]]
+        assert len([item for item in pg["events"] if item.event_type == "notification.created"]) == 1
+        await assert_durable_publication_revision(pg, saved)
+
+
+@pytest.mark.parametrize("size,character", [
+    (16 << 20, "a"),
+    ((16 << 20) + 1, "a"),
+    ((16 << 20) + 1, "é"),
+], ids=["exact-bound", "one-byte-over", "utf8-byte-bound"])
+async def test_current_revision_bounds_utf8_body_transfer_at_the_database(pg, size, character):
+    created = await pg["client"].post(pg["notes_url"], json=excerpt_save(pg))
+    assert created.status_code == 201, created.text
+    saved = created.json()
+    prefix = "PUBLICATION_BODY_TRANSFER_"
+    remaining = size - len(prefix.encode())
+    body = prefix + character * (remaining // len(character.encode()))
+    body += "a" * (size - len(body.encode()))
+    assert len(body.encode()) == size
+    async with pg["factory"].begin() as writer:
+        await writer.execute(update(Note).where(Note.id == uuid.UUID(saved["id"])).values(content=body))
+    transferred = []
+
+    def observe(connection, cursor, statement, parameters, context, executemany):
+        if cursor.description is None:
+            return
+        assert hasattr(cursor, "_rows"), "The observer requires buffered asyncpg results"
+        for row in cursor._rows:
+            for value in row:
+                if isinstance(value, str) and prefix in value:
+                    transferred.append(len(value.encode()))
+
+    event.listen(pg["engine"].sync_engine, "after_cursor_execute", observe)
+    try:
+        inspected = await pg["client"].get(
+            f"{pg['notes_url']}/{saved['id']}/publication-revision"
+        )
+    finally:
+        event.remove(pg["engine"].sync_engine, "after_cursor_execute", observe)
+    assert inspected.status_code == 200, inspected.text
+    result = inspected.json()
+    assert result["status"] == "recorded"
+    assert result["published_revision_sha256"] == note_revision(saved)
+    if size > 16 << 20:
+        assert transferred == [], "Oversized note bytes must never leave the database"
+        assert result["comparison"] == "unavailable"
+        assert result["comparison_reason"] == "current_note_too_large"
+        assert result["current_revision_sha256"] is None
+    else:
+        assert size in transferred, "The bounded comparison must actually inspect the saved body"
+        assert result["comparison"] == "differs"
+        assert result["comparison_reason"] is None
+        assert result["current_revision_sha256"] == note_revision({**saved, "content": body})
+
+
+async def test_receipts_written_with_only_previous_release_columns_remain_readable(pg):
+    created = await pg["client"].post(pg["notes_url"], json=excerpt_save(pg))
+    assert created.status_code == 201, created.text
+    saved = created.json()
+    async with pg["factory"].begin() as writer:
+        previous = (await writer.execute(text("""
+            SELECT user_id, client_request_id, workspace_id, board_id,
+                   card_id, fingerprint, note_id, created_at
+            FROM note_save_receipts WHERE note_id = :note_id
+        """), {"note_id": uuid.UUID(saved["id"])})).mappings().one()
+        await writer.execute(text("DELETE FROM note_save_receipts WHERE note_id = :note_id"), {
+            "note_id": uuid.UUID(saved["id"]),
+        })
+        await writer.execute(text("""
+            INSERT INTO note_save_receipts
+                (id, user_id, client_request_id, workspace_id, board_id,
+                 card_id, fingerprint, note_id, created_at)
+            VALUES
+                (:id, :user_id, :client_request_id, :workspace_id, :board_id,
+                 :card_id, :fingerprint, :note_id, :created_at)
+        """), {"id": uuid.uuid4(), **previous})
+    assert await receipt_count(pg) == 1
+    assert await durable(pg) == ONE_SAVE
+    inspected = await pg["client"].get(f"{pg['notes_url']}/{saved['id']}/publication-revision")
+    assert inspected.status_code == 200, inspected.text
+    result = inspected.json()
+    assert result["status"] == "revision_not_recorded"
+    assert result["recorded_at"] is not None
+    for field in ("revision_version", "published_revision_sha256", "current_revision_sha256", "comparison", "comparison_reason"):
+        assert result[field] is None

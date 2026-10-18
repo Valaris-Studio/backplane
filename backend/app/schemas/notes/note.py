@@ -5,7 +5,7 @@ import json
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 from app.core.json_response import UTCModel
@@ -313,3 +313,28 @@ class CardVerdictRead(UTCModel):
     # to the legacy decision string ('approve' → True) when findings is NULL.
     # See app.services.notes.note.derive_approved for the predicate.
     approved: bool
+
+
+PublicationRevisionStatus = Literal[
+    "no_record", "revision_not_recorded", "unsupported_version", "recorded"
+]
+PublicationRevisionComparison = Literal["matches", "differs", "unavailable"]
+PublicationRevisionComparisonReason = Literal["current_note_too_large"]
+
+
+class NotePublicationRevisionRead(UTCModel):
+    """How the saved note compares with the revision its publisher saved.
+
+    `recorded_at` is set whenever a save receipt exists, as the saving
+    transaction's database time rather than its commit. `revision_version` is
+    also set for `unsupported_version`, naming it; the digests and comparison
+    only for `recorded`. `matches` means canonically equal now, not never
+    edited."""
+
+    status: PublicationRevisionStatus
+    recorded_at: datetime | None = None
+    revision_version: int | None = None
+    published_revision_sha256: str | None = None
+    current_revision_sha256: str | None = None
+    comparison: PublicationRevisionComparison | None = None
+    comparison_reason: PublicationRevisionComparisonReason | None = None

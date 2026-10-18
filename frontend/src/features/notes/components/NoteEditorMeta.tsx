@@ -7,9 +7,11 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { useBoard } from "@/features/kanban/api/use-boards";
 import { useMembers } from "@/features/members/api/use-members";
 import { formatAbsolute, formatRelativeShort } from "@/lib/date-format";
+import { isApiError } from "@/lib/api-error";
 import type { Note, NoteFinding } from "@/types/note";
 import { NoteCardLinkControl } from "./NoteCardLinkControl";
 import { NoteKindBadge } from "./NoteKindBadge";
+import { NotePublicationRevision } from "./NotePublicationRevision";
 
 const FINDING_SEVERITY_VARIANT: Record<
   NoteFinding["severity"],
@@ -33,7 +35,8 @@ interface NoteEditorMetaProps {
  */
 export function NoteEditorMeta({ note, slug }: NoteEditorMetaProps) {
   const { t } = useTranslation();
-  const { data: members } = useMembers(slug);
+  const { data: members, error: membersError } = useMembers(slug);
+  const destinationAccessLost = isApiError(membersError) && [401, 403, 404].includes(membersError.status);
   // The note stores only card_id; the board detail (columns → cards, one
   // cached fetch) resolves it to a human title. Disabled when there's no card
   // link — passing "" keeps the hook order stable while skipping the query.
@@ -80,6 +83,8 @@ export function NoteEditorMeta({ note, slug }: NoteEditorMetaProps) {
           {t("collection.updatedAt", { value: formatRelativeShort(note.updated_at) })}
         </span>
       </div>
+
+      {!destinationAccessLost && <NotePublicationRevision note={note} slug={slug} />}
 
       {note.findings?.length ? (
         <div className="rounded-[var(--radius-md)] border border-border/60 bg-muted/20 p-3">
