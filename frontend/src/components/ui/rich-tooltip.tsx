@@ -51,6 +51,7 @@ type RichTooltipProps = {
   i18nKey?: string;
   children: React.ReactNode;
   side?: Side;
+  avoidCollisions?: boolean;
   className?: string;
 };
 
@@ -262,6 +263,7 @@ export function RichTooltip({
   i18nKey,
   children,
   side = "top",
+  avoidCollisions = false,
   className,
 }: RichTooltipProps) {
   const fromI18n = useTooltipContent(i18nKey);
@@ -285,11 +287,12 @@ export function RichTooltip({
   const popupId = React.useId();
   const triggerRef = React.useRef<HTMLSpanElement | null>(null);
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
+  const tooltipRef = React.useRef<HTMLDivElement | null>(null);
   const { slug } = useParams<{ slug: string }>();
 
   const [hoverOpen, setHoverOpen] = React.useState(false);
   const [expandedOpen, setExpandedOpen] = React.useState(false);
-  const [position, setPosition] = React.useState<FixedPosition | null>(null);
+  const [position, setPosition] = React.useState<FixedPosition>({ top: 0, left: 0 });
 
   const hoverTooltipOpen = hoverOpen && !expandedOpen && Boolean(resolvedSummary);
 
@@ -297,10 +300,34 @@ export function RichTooltip({
   // itself via CSS flex and does not need an anchor position.
   React.useLayoutEffect(() => {
     if (!hoverTooltipOpen) return;
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPosition(anchorFor(rect, side));
-  }, [hoverTooltipOpen, side]);
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const next = anchorFor(rect, side);
+      const tooltip = tooltipRef.current;
+      if (avoidCollisions && tooltip) {
+        // Preserve the chosen side's CSS transform, then shift only the
+        // viewport overflow. This matches TooltipContent's collision behavior.
+        const bounds = tooltip.getBoundingClientRect();
+        const left = next.left + bounds.left - (Number.parseFloat(tooltip.style.left) || 0);
+        const top = next.top + bounds.top - (Number.parseFloat(tooltip.style.top) || 0);
+        next.left += Math.max(8, Math.min(left, window.innerWidth - bounds.width - 8)) - left;
+        next.top += Math.max(8, Math.min(top, window.innerHeight - bounds.height - 8)) - top;
+      }
+      setPosition((previous) => previous.top === next.top && previous.left === next.left ? previous : next);
+    };
+    updatePosition();
+    if (!avoidCollisions) return;
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePosition);
+    if (tooltipRef.current) observer?.observe(tooltipRef.current);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      observer?.disconnect();
+    };
+  }, [hoverTooltipOpen, side, avoidCollisions]);
 
 
   React.useEffect(() => {
@@ -376,13 +403,15 @@ export function RichTooltip({
 
   const showTooltip = hoverOpen && !expandedOpen && Boolean(resolvedSummary);
   const canPortal = typeof document !== "undefined";
-  const popoverStyle = position
-    ? { position: "fixed" as const, top: position.top, left: position.left }
-    : { display: "none" as const };
+  const popoverStyle = {
+    position: "fixed" as const, top: position.top, left: position.left,
+    ...(avoidCollisions ? { maxWidth: "min(20rem, calc(100vw - 16px))", maxHeight: "calc(100vh - 16px)", overflow: "auto" } : {}),
+  };
 
   const tooltipNode = showTooltip && canPortal ? (
     <div
       id={popupId}
+      ref={tooltipRef}
       role="tooltip"
       style={popoverStyle}
       className={cn(

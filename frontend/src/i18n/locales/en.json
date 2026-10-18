@@ -5999,10 +5999,10 @@
         },
         "connectionStatus": {
           "connected": {
-            "summary": "Live WebSocket connection is healthy. The board, Observer, and runner overview update in real time."
+            "summary": "The WebSocket is connected. Subscription acceptance and delivery coverage are separate; check the Observer for denied patterns and received frames."
           },
           "connecting": {
-            "summary": "Reconnecting to the platform. Live updates are briefly paused; recent events will replay once the socket is back.",
+            "summary": "Reconnecting to the platform. Missed events are not replayed; affected views refetch their durable state after reconnect.",
             "callouts": [
               {
                 "variant": "info",
@@ -6026,7 +6026,7 @@
         },
         "observerPanel": {
           "intro": {
-            "summary": "Firehose of platform events, live from the workspace event bus. Admin-only by deliberate choice. In-memory and ephemeral: the most recent 1000 events, nothing persisted, cleared on reload. Card/Runner/Execution/Approval show by default; the Other chip appears when the bus carries anything else.",
+            "summary": "Authorized domain frames received by this tab since capture began. Owners and admins can inspect the bounded in-memory buffer. All includes unknown namespaces. Reload, workspace change or access loss clears it.",
             "links": [
               {
                 "label": "Stored history",
@@ -6035,13 +6035,13 @@
             ]
           },
           "pause": {
-            "summary": "Stops appending new events to the list. Already-visible rows stay; incoming events are dropped on the floor, not buffered. Resume to start tailing again."
+            "summary": "Freezes the displayed list while bounded capture continues. Pending arrivals and evictions are counted. Resume shows frames still retained."
           },
           "clear": {
-            "summary": "Empties the event list. Useful when you're hunting a specific tick and the log has scrolled past it. Cannot be undone — events live on the server, but the panel doesn't re-fetch history."
+            "summary": "Clears this tab's buffer, counts and capture-start time. This cannot be undone. Use durable History or execution records for saved evidence; this panel does not replay events."
           },
           "namespaceFilter": {
-            "summary": "Narrows the stream to one or more event namespaces. Chips are additive — pick Card + Runner to see both, click All to drop every filter."
+            "summary": "Filters the displayed list by namespace. Select multiple chips to combine them; All clears namespace filters and includes unknown namespaces. Capture continues independently."
           }
         }
       },
@@ -8026,15 +8026,40 @@
     },
     "empty": {
       "title": "No events yet",
-      "hint": "Live platform events appear here when runners tick."
+      "hint": "Events this tab receives appear here as they arrive. Nothing from before is replayed.",
+      "filteredTitle": "No events match the current filter",
+      "filteredHint_one": "{{count}} received event is hidden by the namespace or search filter.",
+      "filteredHint_other": "{{count}} received events are hidden by the namespace or search filter.",
+      "clearFilters": "Clear filters"
     },
-    "disconnected": "Reconnecting…",
-    "triggerAria": "Observer, {{count}} new events",
     "search": {
       "placeholder": "Search event type or id…",
       "label": "Search events by type or id"
     },
-    "counts": "Showing {{shown}} of {{total}} buffered (cap {{max}})"
+    "counts": "Showing {{shown}} of {{total}} buffered (cap {{max}})",
+    "triggerAria_one": "Observer, {{count}} unseen event",
+    "triggerAria_other": "Observer, {{count}} unseen events",
+    "diagnostics": {
+      "label": "Connection diagnostics",
+      "reconnecting": "Reconnecting…",
+      "lastPing": "Last server ping: {{time}}",
+      "noPing": "No server ping received yet",
+      "gap": "The connection dropped after capture started. Events may be missing from this gap and will not be replayed.",
+      "wildcardDenied": "The server refused this tab's all-events subscription. The retained list may be incomplete.",
+      "accessRevoked": "The server ended this tab's access to workspace events. Captured events were cleared.",
+      "paused_one": "Paused. {{count}} new event is held back until you resume.",
+      "paused_other": "Paused. {{count}} new events are held back until you resume.",
+      "evicted_one": "{{count}} older event was removed to stay within capture limits.",
+      "evicted_other": "{{count}} older events were removed to stay within capture limits."
+    },
+    "scope": {
+      "since": "Received by this tab since {{time}}"
+    },
+    "projection": {
+      "redacted": "Redacted",
+      "truncated": "Truncated",
+      "disclosure": "Diagnostic projection, not the exact payload: credential-like values are redacted and large values are shortened. Free text can still contain sensitive data."
+    }
   },
   "rolesGlossary": {
     "title": "Roles",

@@ -173,8 +173,8 @@ export const ES_INTRODUCTION = {
       " en el bus de WebSocket. Los observadores ven el trabajo en vivo: las tarjetas se mueven, aparecen comentarios y los tokens y el costo se acumulan en el registro de ejecución.",
     "Watch the Observer panel during your first run":
       "Observa el panel del observador durante tu primera ejecución",
-    "The floating Observer panel (admin-only, draggable, remembers its position) streams every card, agent, execution, and approval event in real time. The first time you run a pipeline end-to-end, open it. You will see more about what the platform is doing in thirty seconds of scrolling events than in any diagram we could draw for you.":
-      "El panel flotante del observador, disponible solo para administradores, arrastrable y capaz de recordar su posición, transmite en tiempo real todos los eventos de tarjetas, agentes, ejecuciones y aprobaciones. Ábrelo la primera vez que ejecutes un pipeline de extremo a extremo. En treinta segundos recorriendo eventos entenderás mejor lo que hace la plataforma que con cualquier diagrama que pudiéramos dibujar.",
+    "The Observer opens from the eye in the top bar for workspace owners and admins. It shows authorized frames received by this tab, including unfamiliar namespaces under All. Use it alongside durable History and execution records when checking a run.":
+      "Los propietarios y administradores del espacio de trabajo abren el Observador desde el ojo de la barra superior. Muestra mensajes autorizados recibidos por esta pestaña, incluidos los namespaces desconocidos en Todos. Úsalo junto con Historial y los registros de ejecución persistentes para comprobar una ejecución.",
     "Approval, if the stage demands one":
       "Aprobación, si la etapa la exige",
     "If the stage declares an approval gate — say, because the work category is ":

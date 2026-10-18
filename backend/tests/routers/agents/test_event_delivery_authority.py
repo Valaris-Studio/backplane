@@ -5,6 +5,7 @@
 
 import json
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 import websockets
@@ -18,6 +19,7 @@ from tests.routers.agents.event_authority_support import (
     _wire_case_fixture,  # noqa: F401
     db_engine,  # noqa: F401
 )
+from tests.test_agent_sessions import FIXTURE_EVENTS, record
 
 pytestmark = [pytest.mark.slow, pytest.mark.timeout(40)]
 UNSAFE = ["*.*", "?*", "execution.?*", "[e]xecution.*", "execution*",
@@ -169,6 +171,142 @@ async def test_private_internal_and_workspace_filters_survive_authority_checks(w
     assert not any(e.get("payload", {}).get("marker") == marker for e in owner.frames + foreign.frames)
     assert all(not client.events("agent.restart_probe") and not client.events("agent.restart_ack")
                for client in [human, agent, owner, foreign])
+
+
+async def test_private_mutations_reach_owner_but_not_another_admin_or_linked_agent(wire_case):
+    f = wire_case
+    await f.member_role("admin")
+    member = await f.case.http.post(
+        f"/api/workspaces/{f.case.workspace['slug']}/members",
+        json={"email": "outsider@example.test", "role": "admin"},
+        headers=f.case.headers["curator"],
+    )
+    assert member.status_code == 201, member.text
+    human = await f.connect("session", ["*"])
+    other_admin = await f.connect("outsider", ["*"])
+    agent = await f.connect("agent", ["*"])
+
+    installations = "/api/me/companion/installations"
+    enrollment = await f.case.http.post(
+        installations,
+        json={"installation_id": str(uuid.uuid4()), "name": "Private capture device",
+              "platform": "linux-amd64"},
+        headers=f.case.headers["session"],
+    )
+    assert enrollment.status_code == 201, enrollment.text
+    installation = enrollment.json()
+    mapping = await f.case.http.post(
+        f"{installations}/{installation['installation_id']}/mappings",
+        json={"workspace_id": f.case.workspace["id"], "board_id": f.case.board_id,
+              "root_path": "/synthetic/project", "content_level": "standard"},
+        headers=f.case.headers["session"],
+    )
+    assert mapping.status_code == 201, mapping.text
+    native_session = "private-observer-session-" + uuid.uuid4().hex
+    captured = record(FIXTURE_EVENTS[:1], mapping.json()["id"], session=native_session)
+    captured["captured_at"] = datetime.now(timezone.utc).isoformat()
+    captured["events"][0]["timestamp"] = captured["captured_at"]
+    captured["events"][0]["message"] = "PRIVATE_OBSERVER_CAPTURE_BODY"
+    ingest = await f.case.http.post(
+        "/api/companion/ingest", json={"records": [captured]},
+        headers={"Authorization": "Bearer " + installation["device_token"]},
+    )
+    assert ingest.status_code == 200, ingest.text
+    assert ingest.json()["acknowledged"] == [captured["capture_id"]]
+    assert ingest.json()["rejected"] == []
+    received_session = await human.until(lambda e: e.get("event") == "agent_session.updated")
+    session_payload = received_session["payload"]
+    assert set(session_payload) == {"owner_id", "session_id", "workspace_id", "reason"}
+    assert session_payload["owner_id"] == f.case.recipient_id
+    assert session_payload["workspace_id"] == f.case.workspace["id"]
+    # The positive side is a committed capture, not a synthetic event injection.
+    stored = await f.case.http.get(
+        f"/api/workspaces/{f.case.workspace['slug']}/sessions/{session_payload['session_id']}",
+        headers=f.case.headers["session"],
+    )
+    assert stored.status_code == 200, stored.text
+    assert stored.json()["native_session_id"] == native_session
+
+    renamed = await f.case.http.patch(
+        f"{installations}/{installation['installation_id']}",
+        json={"name": "PRIVATE_OBSERVER_DEVICE_NAME"}, headers=f.case.headers["session"],
+    )
+    assert renamed.status_code == 200, renamed.text
+    device_event = await human.until(lambda e: e.get("event") == "companion_installation.updated")
+    assert device_event["payload"] == {
+        "owner_id": f.case.recipient_id, "installation_id": installation["installation_id"],
+        "reason": "renamed",
+    }
+
+    board_path = f"/api/workspaces/{f.case.workspace['slug']}/boards/{f.case.board_id}"
+    participant = await f.case.http.post(
+        f"{board_path}/cards/{f.case.card_id}/participants",
+        json={"user_id": f.case.recipient_id, "role": "hero"},
+        headers=f.case.headers["curator"],
+    )
+    assert participant.status_code == 201, participant.text
+    notification = await human.until(lambda e: e.get("event") == "notification.created")
+    assert notification["payload"]["recipient_user_id"] == f.case.recipient_id
+    assert notification["payload"]["category"] == "card_participant_changed"
+    assert notification["payload"]["link"]["card_id"] == f.case.card_id
+
+    # FIFO barriers prove both unauthorized observers processed the mutation
+    # sequence; a timeout with no frames would also pass on a broken connection.
+    await f.barrier([human, other_admin, agent])
+    for observer in [human, other_admin]:
+        assert not any(e.get("type") == "subscription_denied" for e in observer.frames)
+        assert any(e["payload"].get("entity_id") == f.case.card_id
+                   for e in observer.events("activity.card.updated"))
+    private_names = {"agent_session.updated", "companion_installation.updated", "notification.created"}
+    assert not any(e.get("event") in private_names for e in other_admin.frames)
+    assert not any(e.get("event") in private_names - {"notification.created"} for e in agent.frames)
+    for observer in [human, other_admin, agent]:
+        wire = json.dumps(observer.frames)
+        for secret in [installation["device_token"], installation["token_prefix"], native_session,
+                       "PRIVATE_OBSERVER_CAPTURE_BODY", "PRIVATE_OBSERVER_DEVICE_NAME"]:
+            assert secret not in wire
+
+
+@pytest.mark.parametrize("request_wildcard", [False, True], ids=["wildcard-absent", "wildcard-denied"])
+async def test_real_domain_mutations_and_notifications_keep_named_subscriptions(wire_case, request_wildcard):
+    f = wire_case
+    patterns = ["activity.note.*", "activity.resource.*", "notification.created"]
+    reader = await f.connect("session", [*patterns, *(["*"] if request_wildcard else [])])
+    board_path = f"/api/workspaces/{f.case.workspace['slug']}/boards/{f.case.board_id}"
+    card_path = f"{board_path}/cards/{f.case.card_id}"
+    participant = await f.case.http.post(
+        f"{card_path}/participants", json={"user_id": f.case.recipient_id, "role": "hero"},
+        headers=f.case.headers["curator"],
+    )
+    assert participant.status_code == 201, participant.text
+    card = await f.case.http.patch(
+        card_path, json={"title": "Named subscription card"}, headers=f.case.headers["curator"],
+    )
+    assert card.status_code == 200, card.text
+    note = await f.case.http.post(
+        f"{board_path}/notes", json={"title": "Named subscription note", "content": "Body stays in the note"},
+        headers=f.case.headers["curator"],
+    )
+    assert note.status_code == 201, note.text
+    resource = await f.case.http.post(
+        f"{board_path}/resources", json={"name": "Named subscription folder", "resource_type": "folder"},
+        headers=f.case.headers["curator"],
+    )
+    assert resource.status_code == 201, resource.text
+    await f.barrier([reader])
+
+    for name, entity_id in [("card.updated", f.case.card_id),
+                            ("activity.note.created", note.json()["id"]),
+                            ("activity.resource.created", resource.json()["id"])]:
+        assert any(e["payload"].get("entity_id") == entity_id for e in reader.events(name)), name
+    notifications = reader.events("notification.created")
+    assert notifications, "The real participant/card mutations must produce the recipient's live push"
+    assert all(e["payload"]["recipient_user_id"] == f.case.recipient_id for e in notifications)
+    denied = [e for e in reader.frames if e.get("type") == "subscription_denied"]
+    assert bool(denied) is request_wildcard
+    if request_wildcard:
+        assert denied[0]["patterns"] == ["*"]
+    assert reader.closed is None
 
 
 @pytest.mark.parametrize("malformation", ["extra", "missing", "ordinal_bool", "ordinal_zero", "ordinal_negative",

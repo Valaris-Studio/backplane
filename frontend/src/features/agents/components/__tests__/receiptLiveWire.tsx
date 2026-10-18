@@ -8,6 +8,7 @@ import { useExecution } from "@/features/agents/hooks/useAgentMetrics";
 import { useReceiptHistoryState } from "@/features/agents/hooks/useExecutionContextReceipts";
 import type { ContextReceipt, Execution } from "@/features/agents/api/agents";
 import { ExecutionPromptPanel } from "@/features/agents/components/ExecutionPromptPanel";
+import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WebSocketProvider } from "@/providers/WebSocketProvider";
 import type { WebSocketEvent } from "@/lib/websocket";
@@ -103,6 +104,8 @@ const EXECUTION: Execution = {
 };
 
 function PromptReader() {
+  // AppShell normally supplies the current identity before its socket opens.
+  useCurrentUser();
   const execution = useExecution(SLUG, EXECUTION_ID);
   const history = useReceiptHistoryState(`${SLUG}/${EXECUTION_ID}`);
   const { status } = useWebSocket();
@@ -116,6 +119,7 @@ export function renderReceiptReader() {
   const calls = { executions: 0, lists: 0, details: [] as string[] };
   const state = { rows: [receipt(2), receipt(1)], detailStatus: 200, listStatus: 200 };
   server.use(
+    http.get("/api/me", () => HttpResponse.json({ id: "receipt-reader", name: "Receipt reader", email: "reader@example.test", avatar_url: null })),
     http.get(BASE, () => {
       calls.executions++;
       return HttpResponse.json({ ...EXECUTION, context_receipt_count: state.rows.length });

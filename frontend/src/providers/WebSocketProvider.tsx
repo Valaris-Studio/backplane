@@ -4,21 +4,26 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useLayoutEffect,
+  useSyncExternalStore,
   useMemo,
   useRef,
   useState,
   useCallback,
   type ReactNode,
 } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
+import { meKeys } from "@/lib/query-keys";
+import { isApiError } from "@/lib/api-error";
+import type { CurrentUser } from "@/features/notifications/api/use-current-user";
 import {
   WebSocketService,
   type ConnectionStatus,
   type WebSocketEvent,
 } from "@/lib/websocket";
 
-interface WebSocketContextValue {
+export interface WebSocketContextValue {
   status: ConnectionStatus;
   subscribe: (
     eventPattern: string,
@@ -30,6 +35,10 @@ interface WebSocketContextValue {
    * this context may omit it (read as "nothing denied").
    */
   deniedPatterns?: ReadonlySet<string>;
+  /** Server keepalive pings by receipt time. Optional for test doubles. */
+  onHeartbeat?: (handler: (receivedAt: number) => void) => () => void;
+  /** The server closed the connection because this principal lost access. */
+  onAccessRevoked?: (handler: () => void) => () => void;
 }
 
 const NO_DENIED_PATTERNS: ReadonlySet<string> = new Set();
@@ -55,6 +64,18 @@ function extractWorkspaceSlug(pathname: string): string | null {
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const slug = extractWorkspaceSlug(pathname);
+  const queryClient = useContext(QueryClientContext);
+  const subscribeIdentity = useCallback((changed: () => void) =>
+    queryClient?.getQueryCache().subscribe(changed) ?? (() => {}), [queryClient]);
+  const readIdentity = useCallback(() => {
+    // Observe the existing identity cache without another /me request. The
+    // socket-only provider can also be used without an application query cache.
+    if (!queryClient) return undefined;
+    const identity = queryClient.getQueryState<CurrentUser>(meKeys.me());
+    if (isApiError(identity?.error) && [401, 403, 404].includes(identity.error.status)) return null;
+    return identity?.data?.id ?? null;
+  }, [queryClient]);
+  const principalId = useSyncExternalStore(subscribeIdentity, readIdentity, readIdentity);
   const serviceRef = useRef<WebSocketService | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [deniedPatterns, setDeniedPatterns] =
@@ -62,15 +83,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   // Bumped each time a new service is created so child effects re-subscribe.
   const [serviceEpoch, setServiceEpoch] = useState(0);
 
-  useEffect(() => {
-    if (!slug) return;
+  useLayoutEffect(() => {
+    setDeniedPatterns(NO_DENIED_PATTERNS);
+    if (!slug || principalId === null) return;
 
     const baseURL = import.meta.env.VITE_API_URL || window.location.origin;
     const service = new WebSocketService(baseURL, slug);
     serviceRef.current = service;
     setServiceEpoch((e) => e + 1);
 
-    setDeniedPatterns(NO_DENIED_PATTERNS);
     const unsubStatus = service.onStatusChange((next) => {
       setStatus(next);
       // The server decides denials per connection, and every new connection
@@ -87,12 +108,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     service.connect();
 
     return () => {
+      // Disconnect while still listening: its final "disconnected" must reach
+      // `status`, or leaving the workspace keeps reporting the old "connected".
+      service.disconnect();
       unsubStatus();
       unsubDenied();
-      service.disconnect();
       serviceRef.current = null;
     };
-  }, [slug]);
+    // A socket is authenticated at its handshake. Retire it before the new
+    // principal's consumers mount; clearing only their buffers is insufficient.
+  }, [slug, principalId]);
 
   const subscribe = useCallback(
     (
@@ -105,9 +130,23 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     [serviceEpoch],
   );
 
+  const onHeartbeat = useCallback(
+    (handler: (receivedAt: number) => void): (() => void) =>
+      serviceRef.current?.onHeartbeat(handler) ?? (() => {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [serviceEpoch],
+  );
+
+  const onAccessRevoked = useCallback(
+    (handler: () => void): (() => void) =>
+      serviceRef.current?.onAccessRevoked(handler) ?? (() => {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [serviceEpoch],
+  );
+
   const value = useMemo<WebSocketContextValue>(
-    () => ({ status, subscribe, deniedPatterns }),
-    [status, subscribe, deniedPatterns],
+    () => ({ status, subscribe, deniedPatterns, onHeartbeat, onAccessRevoked }),
+    [status, subscribe, deniedPatterns, onHeartbeat, onAccessRevoked],
   );
 
   return (

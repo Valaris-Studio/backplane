@@ -6026,10 +6026,10 @@
         },
         "connectionStatus": {
           "connected": {
-            "summary": "La conexión WebSocket en vivo está sana. El tablero, el Observador y la vista de runners se actualizan en tiempo real."
+            "summary": "El WebSocket está conectado. La aceptación de suscripciones y la cobertura de entrega son independientes; consulta el Observador para ver patrones rechazados y mensajes recibidos."
           },
           "connecting": {
-            "summary": "Reconectando con la plataforma. Las actualizaciones en vivo se pausan brevemente; los eventos recientes se reproducirán cuando vuelva el socket.",
+            "summary": "Reconectando con la plataforma. Los eventos perdidos no se reproducen; las vistas correspondientes vuelven a consultar el estado persistente al reconectar.",
             "callouts": [
               {
                 "variant": "info",
@@ -6053,7 +6053,7 @@
         },
         "observerPanel": {
           "intro": {
-            "summary": "Manguera de eventos de la plataforma, en vivo desde el bus de eventos del espacio de trabajo. Solo para administradores, por decisión deliberada. En memoria y efímero: los últimos 1000 eventos, no se almacena nada y se limpia al recargar. Tarjeta/Runner/Ejecución/Aprobación se muestran por defecto; el chip Otros aparece cuando el bus lleva algo más.",
+            "summary": "Mensajes de dominio autorizados recibidos por esta pestaña desde el inicio de captura. Propietarios y administradores pueden inspeccionar el búfer limitado en memoria. Todos incluye namespaces desconocidos. Recargar, cambiar de espacio de trabajo o perder acceso lo vacía.",
             "links": [
               {
                 "label": "Historial almacenado",
@@ -6062,13 +6062,13 @@
             ]
           },
           "pause": {
-            "summary": "Deja de añadir eventos nuevos a la lista. Las filas ya visibles se quedan; los entrantes caen al suelo, no se bufferizan. Reanuda para volver a seguir el stream."
+            "summary": "Congela la lista mostrada mientras continúa la captura limitada. Cuenta las llegadas pendientes y las eliminaciones. Reanudar muestra los mensajes aún retenidos."
           },
           "clear": {
-            "summary": "Vacía la lista de eventos. Útil cuando buscas un tick específico y el log ya pasó. No se puede deshacer — los eventos viven en el servidor, pero el panel no re-consulta el historial."
+            "summary": "Vacía el búfer de esta pestaña, sus contadores y la hora de inicio de captura. No se puede deshacer. Usa Historial o registros de ejecución persistentes como evidencia guardada; este panel no reproduce eventos pasados."
           },
           "namespaceFilter": {
-            "summary": "Restringe el stream a uno o varios namespaces de eventos. Los chips se suman — elige Tarjeta + Runner para ver ambos, pulsa Todos para quitar todos los filtros."
+            "summary": "Filtra la lista mostrada por namespace. Selecciona varios chips para combinarlos; Todos borra los filtros de namespace e incluye los desconocidos. La captura continúa de forma independiente."
           }
         }
       },
@@ -8067,15 +8067,44 @@
     },
     "empty": {
       "title": "Sin eventos aún",
-      "hint": "Los eventos en vivo de la plataforma aparecen aquí cuando los runners actúan."
+      "hint": "Los eventos que recibe esta pestaña aparecen aquí a medida que llegan. No se reproduce nada anterior.",
+      "filteredTitle": "Ningún evento coincide con el filtro actual",
+      "filteredHint_one": "{{count}} evento recibido está oculto por el filtro de namespace o de búsqueda.",
+      "filteredHint_many": "{{count}} de eventos recibidos están ocultos por el filtro de namespace o de búsqueda.",
+      "filteredHint_other": "{{count}} eventos recibidos están ocultos por el filtro de namespace o de búsqueda.",
+      "clearFilters": "Quitar filtros"
     },
-    "disconnected": "Reconectando…",
-    "triggerAria": "Observer, {{count}} eventos nuevos",
     "search": {
       "placeholder": "Buscar tipo de evento o id…",
       "label": "Buscar eventos por tipo o id"
     },
-    "counts": "Mostrando {{shown}} de {{total}} en búfer (límite {{max}})"
+    "counts": "Mostrando {{shown}} de {{total}} en búfer (límite {{max}})",
+    "triggerAria_one": "Observador, {{count}} evento sin ver",
+    "triggerAria_many": "Observador, {{count}} de eventos sin ver",
+    "triggerAria_other": "Observador, {{count}} eventos sin ver",
+    "diagnostics": {
+      "label": "Diagnóstico de la conexión",
+      "reconnecting": "Reconectando…",
+      "lastPing": "Último ping del servidor: {{time}}",
+      "noPing": "Aún no llegó ningún ping del servidor",
+      "gap": "La conexión se cortó después de iniciar la captura. Pueden faltar eventos de ese intervalo y no se volverán a enviar.",
+      "wildcardDenied": "El servidor rechazó la suscripción a todos los eventos de esta pestaña. La lista retenida puede estar incompleta.",
+      "accessRevoked": "El servidor cerró el acceso de esta pestaña a los eventos del espacio de trabajo. Se borraron los eventos capturados.",
+      "paused_one": "En pausa. {{count}} evento nuevo queda retenido hasta que reanudes.",
+      "paused_many": "En pausa. {{count}} de eventos nuevos quedan retenidos hasta que reanudes.",
+      "paused_other": "En pausa. {{count}} eventos nuevos quedan retenidos hasta que reanudes.",
+      "evicted_one": "Se quitó {{count}} evento antiguo para respetar los límites de captura.",
+      "evicted_many": "Se quitaron {{count}} eventos antiguos para respetar los límites de captura.",
+      "evicted_other": "Se quitaron {{count}} eventos antiguos para respetar los límites de captura."
+    },
+    "scope": {
+      "since": "Recibido por esta pestaña desde {{time}}"
+    },
+    "projection": {
+      "redacted": "Oculto",
+      "truncated": "Recortado",
+      "disclosure": "Proyección de diagnóstico, no el contenido exacto: los valores con aspecto de credencial se ocultan y los valores grandes se acortan. El texto libre aún puede contener datos sensibles."
+    }
   },
   "rolesGlossary": {
     "title": "Roles",

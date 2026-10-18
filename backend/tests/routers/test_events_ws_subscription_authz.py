@@ -213,6 +213,18 @@ class TestSubscribeFrameHandling:
         manager.update_subscriptions.assert_awaited_once_with(conn, [])
 
 
+    @pytest.mark.asyncio
+    async def test_empty_subscribe_frame_clears_the_last_subscription_without_denial(self):
+        websocket = AsyncMock()
+        manager = AsyncMock()
+        conn = _conn(role=WorkspaceRole.admin)
+
+        await _apply_subscribe_frame(websocket, conn, [], manager=manager)
+
+        manager.update_subscriptions.assert_awaited_once_with(conn, [])
+        websocket.send_json.assert_not_awaited()
+
+
 class TestThroughTheRealSocket:
     """End-to-end over the actual WS route.
 

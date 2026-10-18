@@ -11,6 +11,7 @@ import { server, http, HttpResponse } from "@/test/msw-server";
 import { boardLoopKeys } from "@/lib/query-keys";
 import { useBoardLoop, useBoardLoopSync, type BoardLoopConfig } from "../../api/use-board-loop";
 import type { CompletionPolicy } from "@/types/completion";
+import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 import { WebSocketProvider } from "@/providers/WebSocketProvider";
 import { TemplateBoundView } from "../loop-template/TemplateBoundView";
 
@@ -31,6 +32,8 @@ type LoopWrite = Partial<Omit<BoardLoopConfig, "template">> & { expected_version
 // The real parent passes the GET /loop result back into the bound view. Keeping
 // that subscription here catches a new config version paired with stale slots.
 function LiveBoundView() {
+  // This isolated consumer supplies the same identity query as AppShell.
+  useCurrentUser();
   const { data: config } = useBoardLoop(SLUG, BOARD, true);
   useBoardLoopSync(SLUG, BOARD, BOARD);
   if (!config?.template) return null;
@@ -73,6 +76,7 @@ function fixture(refresh: "ready" | "pending" | "error" = "ready") {
     diff_available: config.template!.version === 1,
   });
   server.use(
+    http.get("/api/me", () => HttpResponse.json({ id: "loop-reader", name: "Loop reader", email: "reader@example.test", avatar_url: null })),
     http.get(LOOP_URL, () => HttpResponse.json(config)),
     http.get(`${LOOP_URL}/binding`, () => {
       bindingReads++;

@@ -106,6 +106,7 @@ describe("ConnectionStatusIndicator", () => {
     renderWithProviders(<ConnectionStatusIndicator />);
     await user.tab();
     const tooltip = await screen.findByRole("tooltip");
-    expect(tooltip).toHaveTextContent(/live websocket connection is healthy/i);
+    expect(tooltip).toHaveTextContent(/the websocket is connected/i);
+    expect(tooltip).toHaveTextContent(/subscription acceptance and delivery coverage are separate/i);
   });
 });

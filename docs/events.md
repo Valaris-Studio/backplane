@@ -1,6 +1,6 @@
 # Event Taxonomy
 
-Reference catalog of every event emitted on Backplane's internal event bus. Payloads and semantics were extracted from the backend publish sites and the frontend/runner subscribers — not from any design doc.
+Reference catalog of domain event families on Backplane's internal event bus. Publication, authorized socket delivery and local display are separate stages; an absent Observer row does not establish which stage omitted an event.
 
 ## Overview
 
@@ -207,7 +207,19 @@ Emitted by the in-app notification channel via a deferred, after-commit publish 
 
 Payload (`backend/app/services/notifications/channels.py:49-64`): `{notification_id, recipient_user_id, category, workspace_id, unread_delta, link}`.
 
-**Per-user targeting**: unlike every other event (which is workspace-broadcast), `notification.created` is delivered only to the socket whose `user_id` matches the payload's `recipient_user_id`. `ConnectionManager._should_deliver` (`backend/app/services/events/connection_manager.py:70-82`) special-cases this event type; all other events pass through to every workspace subscriber unchanged. It is published under the recipient's `workspace_id`, so without this filter it would fan out to every socket on that workspace.
+**Per-user targeting**: `notification.created` is delivered only to the socket whose `user_id` matches `recipient_user_id`. Admin role does not bypass this recipient check. It is one of several private event families; the workspace subscription alone never grants access to all frames.
+
+### Other private and scoped families
+
+| Family | Delivery boundary and purpose |
+|---|---|
+| `api_key.first_used` | Targeted by `user_id`; no raw API key is published. |
+| `agent_session.*` | Identifier-only capture refresh signals targeted by `owner_id`; another admin and the owner's linked agent cannot receive them. |
+| `companion_installation.*` | Identifier-only device refresh signals targeted by `owner_id`, with the same human-owner boundary as captured sessions. |
+| `timeline.preparation.updated` | Preparation refresh signal; `use-timeline-history.ts` subscribes directly and resolves the authorized generation through the API. |
+| `board.loop_updated`, `completion.updated` | Loop and completion-candidate refresh signals consumed by their ordinary live views. |
+
+The server rechecks current membership, role, credential and linked-agent authority before each delivery. Internal `agent.restart_probe` and `agent.restart_ack` frames never reach clients. Exact `execution.context_receipt_created` is the body-free member-readable exception to the privileged execution namespace. Current event type and payload, not a permissive subscription spelling, determine authorization.
 
 ## Thin-payload contract (postgres overflow)
 
@@ -234,7 +246,8 @@ After the socket is accepted, the client declares what it wants with a frame:
 {"subscribe": ["card.*", "column.*"]}
 ```
 
-The set is **replaced**, not merged, on every such frame — the browser client
+The set is **replaced**, not merged, on every such frame, including an empty
+`{"subscribe": []}` to remove the final subscription. The browser client
 (`frontend/src/lib/websocket.ts`) therefore always sends its *entire* registered
 pattern set, and `{"unsubscribe": [...]}` is handled by re-sending the survivors.
 
@@ -330,4 +343,33 @@ Event patterns that appear only in tests (`card.stale`, `card.tick`, `agent.tick
 - Provider: `WebSocketProvider` (`frontend/src/providers/WebSocketProvider.tsx`) opens a single WS to `/ws/workspaces/{slug}/events` and multiplexes subscriptions.
 - Low-level: `useWebSocketEvent(pattern, callback)` from `@/hooks/use-websocket`. `pattern` follows backend `fnmatch` rules — e.g. `"card.*"`, `"approval.*"`, `"cost.threshold_crossed"`, `"*"`.
 - High-level (preferred for React-Query consumers): `useDomainSync(domain, queryKey, options?)` from `@/hooks/useDomainSync`. Listens on `${domain}.*` and invalidates (or patches, via `patch`) the given key on a trailing debounce to coalesce bursts; a `filter` scopes handling to events for one board. See `docs/caching-policy.md` for the patch-or-scoped-invalidate policy.
-- The Observer panel (`frontend/src/features/observer/hooks/useObserverEvents.ts`) subscribes to `*` and filters to the `card|agent|execution|approval` namespaces for its event log.
+- The owner/admin Observer subscribes to `*`. **All** displays every retained authorized domain frame, including unknown namespaces. Namespace and event-type/ID filters affect display, not capture. Ordinary consumers retain their own named subscriptions; the Observer is not required for their delivery.
+
+## Observer diagnostic boundary
+
+Coverage means **Received by this tab since …**. The panel is an in-memory,
+per-tab diagnostic window, not event persistence, replay or proof of committed
+state. Clear, workspace change, access loss, sign-out and reload reset it.
+Connection state, subscription denial, active filters, paused display, local
+eviction and an empty capture have distinct meanings. A connected socket does
+not prove that every requested pattern was accepted.
+
+Pause freezes the displayed rows while bounded capture continues. Resume shows
+the frames still retained; pending and eviction counts explain the difference.
+Arrivals during pause remain unseen even while the panel is open.
+The active buffer is limited to 1000 frames and 4 MiB of projected UTF-8 data,
+with at most 16 KiB per frame. A paused display may retain another 4 MiB, so
+the settled live and display buffers contain at most 8 MiB of distinct projected
+data. This is not a bound on total JavaScript heap or transient render work.
+The last transport ping describes this tab, not agent health.
+Projection bounds depth and breadth and redacts
+known credential fields, bearer strings and tokenized URL queries before
+retention. Expanded payloads disclose truncation/redaction. This does not
+guarantee that arbitrary free text contains no sensitive information. A thin
+payload stays thin: the panel fetches no additional bodies to fill it.
+
+The bus offers no replay across disconnects and cannot report an exact missing
+event count. Some actions never publish a domain event, private events may be
+withheld, and generic activity signals can precede transaction commit. Use
+durable History, Timeline and execution records to establish committed state;
+use server publication/delivery evidence when investigating a missing frame.

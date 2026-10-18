@@ -23,6 +23,13 @@ export interface SubscriptionDenial {
 type EventHandler = (event: WebSocketEvent) => void;
 type StatusHandler = (status: ConnectionStatus) => void;
 type DenialHandler = (denial: SubscriptionDenial) => void;
+type HeartbeatHandler = (receivedAt: number) => void;
+type AccessRevokedHandler = () => void;
+
+// The server closes an accepted socket with these when the credential (4001) or
+// the workspace membership (4002) is revoked. Handshake rejections never reach
+// the browser with these codes; they surface as 1006.
+const ACCESS_REVOKED_CLOSE_CODES = new Set([4001, 4002]);
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
@@ -30,6 +37,9 @@ export class WebSocketService {
   private handlers: Map<string, Set<EventHandler>> = new Map();
   private statusHandlers: Set<StatusHandler> = new Set();
   private denialHandlers: Set<DenialHandler> = new Set();
+  private heartbeatHandlers: Set<HeartbeatHandler> = new Set();
+  private accessRevokedHandlers: Set<AccessRevokedHandler> = new Set();
+  private lastHeartbeatAt: number | null = null;
   private _status: ConnectionStatus = "disconnected";
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,7 +69,9 @@ export class WebSocketService {
       if (this.ws !== ws) return; // stale — replaced by a newer connection
       this.reconnectAttempt = 0;
       this.setStatus("connected");
-      this.sendSubscriptions();
+      // A fresh connection starts with no server subscriptions; an empty set
+      // would replace nothing.
+      if (this.handlers.size > 0) this.sendSubscriptions();
     };
 
     ws.onmessage = (e: MessageEvent) => {
@@ -68,6 +80,10 @@ export class WebSocketService {
         const frame = JSON.parse(e.data);
         if (frame?.type === "subscription_denied") {
           this.notifyDenial(frame);
+          return;
+        }
+        if (frame?.type === "ping") {
+          this.notifyHeartbeat();
           return;
         }
         this.routeEvent(frame as WebSocketEvent);
@@ -82,6 +98,7 @@ export class WebSocketService {
         this.setStatus("disconnected");
         return;
       }
+      if (ACCESS_REVOKED_CLOSE_CODES.has(e.code)) this.notifyAccessRevoked();
       this.scheduleReconnect();
     };
 
@@ -108,11 +125,15 @@ export class WebSocketService {
     this.setStatus("disconnected");
   }
 
-  /** Re-subscribe all registered patterns on reconnect / new connection. */
+  /**
+   * Send the full pattern set. The server REPLACES its set with each frame, so
+   * an empty set is meaningful: it retires the last remaining subscription.
+   */
   private sendSubscriptions(): void {
-    const patterns = Array.from(this.handlers.keys());
-    if (patterns.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ subscribe: patterns }));
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({ subscribe: Array.from(this.handlers.keys()) }),
+      );
     }
   }
 
@@ -169,6 +190,33 @@ export class WebSocketService {
     });
   }
 
+  /** Server keepalive pings; a new listener first gets the last one seen. */
+  onHeartbeat(handler: HeartbeatHandler): () => void {
+    this.heartbeatHandlers.add(handler);
+    if (this.lastHeartbeatAt !== null) handler(this.lastHeartbeatAt);
+    return () => {
+      this.heartbeatHandlers.delete(handler);
+    };
+  }
+
+  private notifyHeartbeat(): void {
+    const receivedAt = Date.now();
+    this.lastHeartbeatAt = receivedAt;
+    this.heartbeatHandlers.forEach((handler) => handler(receivedAt));
+  }
+
+  /** Listen for the server closing this connection because access was revoked. */
+  onAccessRevoked(handler: AccessRevokedHandler): () => void {
+    this.accessRevokedHandlers.add(handler);
+    return () => {
+      this.accessRevokedHandlers.delete(handler);
+    };
+  }
+
+  private notifyAccessRevoked(): void {
+    this.accessRevokedHandlers.forEach((handler) => handler());
+  }
+
   onStatusChange(handler: StatusHandler): () => void {
     this.statusHandlers.add(handler);
     return () => {
@@ -195,9 +243,9 @@ export class WebSocketService {
   }
 
   private routeEvent(event: WebSocketEvent): void {
-    // The backend sends {type:'ping'} keepalive control frames (~30s) that have
-    // no 'event' field. They are not domain events — drop them before routing,
-    // or a '*' subscriber doing event.event.startsWith(...) crashes on undefined.
+    // Control frames ({type:'ping'} keepalives, ~30s) have no 'event' field.
+    // They are not domain events — drop any that reach here before routing, or a
+    // '*' subscriber doing event.event.startsWith(...) crashes on undefined.
     if (typeof event.event !== "string") return;
 
     this.handlers.forEach((handlerSet, pattern) => {

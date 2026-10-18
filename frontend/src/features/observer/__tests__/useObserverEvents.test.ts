@@ -82,7 +82,7 @@ describe("useObserverEvents", () => {
     );
   });
 
-  it("does not append when paused", () => {
+  it("freezes displayed events while paused and catches up on resume", () => {
     const { result } = renderHook(() => useObserverEvents());
 
     act(() => result.current.pause());
@@ -94,8 +94,42 @@ describe("useObserverEvents", () => {
     expect(result.current.events).toHaveLength(0);
 
     act(() => result.current.resume());
+    expect(result.current.events.map((event) => event.event)).toEqual(["card.created"]);
     act(() => lastCallback?.(makeEvent("agent.tick")));
-    expect(result.current.events).toHaveLength(1);
+    expect(result.current.events.map((event) => event.event)).toEqual([
+      "agent.tick", "card.created",
+    ]);
+  });
+
+  it("keeps paused capture bounded while the displayed snapshot stays stable", () => {
+    const { result } = renderHook(() => useObserverEvents({ bufferMax: 3 }));
+    act(() => lastCallback?.(makeEvent("card.tick", 0)));
+    act(() => result.current.pause());
+
+    act(() => {
+      for (let i = 1; i <= 5; i++) lastCallback?.(makeEvent("card.tick", i));
+    });
+
+    expect(result.current.events.map((event) => event.event_id)).toEqual(["card.tick-0"]);
+    act(() => result.current.resume());
+    expect(result.current.events.map((event) => event.event_id)).toEqual([
+      "card.tick-5", "card.tick-4", "card.tick-3",
+    ]);
+  });
+
+  it("clear during pause discards both the frozen snapshot and pending captured arrivals", () => {
+    const { result } = renderHook(() => useObserverEvents());
+    act(() => lastCallback?.(makeEvent("card.tick", 0)));
+    act(() => result.current.pause());
+    act(() => lastCallback?.(makeEvent("card.tick", 1)));
+
+    act(() => result.current.clear());
+    act(() => result.current.resume());
+
+    expect(result.current.events).toEqual([]);
+    expect(result.current.unreadCount).toBe(0);
+    act(() => lastCallback?.(makeEvent("card.tick", 1)));
+    expect(result.current.events.map((event) => event.event_id)).toEqual(["card.tick-1"]);
   });
 
   it("clears the buffer", () => {

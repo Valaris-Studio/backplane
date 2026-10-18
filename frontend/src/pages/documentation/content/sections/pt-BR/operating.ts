@@ -119,74 +119,22 @@ export const PT_BR_OPERATING = {
       "O ícone de pausa em um cartão kanban e o motivo Aguardando prompt não provam que o runner está com problema. Eles registram que o runner encontrou o cartão, mas não recebeu conteúdo de prompt para aquela função e etapa. Corrija o prompt em Pipeline e verifique a próxima execução em Atividade.",
   },
   "the-observer-panel": {
-    "The observer is the eye icon in the top bar. Click it and a sheet slides in from the right streaming WebSocket events live. It is mounted once per workspace session — as soon as you have a ":
-      "O Observador é o ícone de olho na barra superior. Ao clicar, uma folha desliza pela direita e transmite eventos WebSocket ao vivo. Ele é montado uma vez por sessão do espaço de trabalho; assim que existe um ",
-    " in the URL, the icon is there — and the icon badges an unread count while the sheet is closed, capped visually at ":
-      " na URL, o ícone aparece e exibe um selo com a quantidade de itens não lidos enquanto a folha está fechada, limitada visualmente a ",
-    ". It used to be a free-floating draggable window whose x/y lived in ":
-      ". Antes, ele era uma janela flutuante e arrastável cujas coordenadas x/y ficavam em ",
-    "; that is gone, and the stale":
-      "; esse comportamento foi removido, e a entrada obsoleta ",
-    " entry is evicted on mount.":
-      " é eliminada durante a montagem.",
-    "Observer sheet docked to the right edge showing a live stream of events with namespace chips, a search box, and a buffered counter":
-      "Folha do Observador acoplada à borda direita, mostrando um fluxo de eventos ao vivo com chips de namespace, campo de busca e contador do buffer",
-    "The panel is the fastest way to answer 'did the backend actually fire that event' without opening DevTools.":
-      "O painel é a maneira mais rápida de responder 'o backend realmente disparou esse evento?' sem abrir o DevTools.",
-    "Right-side sheet roughly 420px wide, docked flush to the viewport edge, with a dark-surface background.":
-      "Folha do lado direito, com cerca de 420 px de largura, acoplada à borda da viewport e com fundo escuro.",
-    "Header reads 'Observer' with a pause button (showing two vertical bars) and a clear button (trash icon).":
-      "O cabeçalho mostra 'Observador', um botão de pausa com duas barras verticais e um botão de limpar com ícone de lixeira.",
-    "Filter chip row with no chip selected by default: 'All', 'Card', 'Runner', 'Execution', 'Approval', and — only after such traffic is seen — 'Other'.":
-      "Linha de chips de filtro sem nenhum selecionado por padrão: 'Todos', 'Cartão', 'Runner', 'Execução', 'Aprovação' e, somente após esse tráfego aparecer, 'Outros'.",
-    "Below the chips, a search input reading 'Search event type or id…' and a muted counter 'Showing 24 of 137 buffered (cap 1000)'.":
-      "Abaixo dos chips, um campo de busca com o texto 'Buscar tipo ou id do evento…' e um contador discreto 'Exibindo 24 de 137 no buffer (limite 1000)'.",
-    "Event list below showing rows in reverse-chronological order: 'card.moved  a1f3c2d4  12s ago', 'execution.started  9b7e1a05  14s ago', 'agent.heartbeat_received  4c2d8f61  16s ago'.":
-      "A lista de eventos abaixo mostra as linhas em ordem cronológica inversa: 'card.moved  a1f3c2d4  há 12 s', 'execution.started  9b7e1a05  há 14 s', 'agent.heartbeat_received  4c2d8f61  há 16 s'.",
-    "Each row carries a namespace badge, raw event type, full mono event_id, and relative timestamp; selecting it expands the JSON payload.":
-      "Cada linha contém um selo de namespace, o tipo raw do evento, o event_id completo em fonte monoespaçada e um horário relativo; selecioná-la expande o payload JSON.",
-    "What streams through it": "O que passa pelo painel",
-    "The panel subscribes to ": "O painel assina ",
-    " and buffers the whole bus — the most recent 1000 events — but, with no chip selected, shows only four agentic namespaces by default:":
-      " e mantém no buffer todo o barramento, limitado aos 1000 eventos mais recentes, mas, sem nenhum chip selecionado, exibe por padrão apenas quatro namespaces agênticos:",
-    ", and": ", e",
-    ". Everything else the bus carries is one chip away: an ":
-      ". Todo o restante transportado pelo barramento fica a um chip de distância: o chip ",
-    Other: "Outros",
-    " chip appears as soon as non-agentic traffic lands, so a namespace nobody enumerated in advance is still diagnosable here rather than invisible platform-wide.":
-      " aparece assim que chega tráfego não relacionado a agentes. Dessa forma, um namespace que ninguém previu continua diagnosticável aqui, em vez de ficar invisível em toda a plataforma.",
-    "The namespace chips are toggleable and additive. ":
-      "Os chips de namespace podem ser ativados ou desativados e combinados. ",
-    All: "Todos",
-    "clears the selected filters and returns to the default four-namespace view; it does not change the panel into an unfiltered whole-bus view. The search box narrows the list by event type or ":
-      "limpa os filtros selecionados e retorna à visualização padrão de quatro namespaces; não transforma o painel em uma visualização sem filtros de todo o barramento. O campo de busca restringe a lista pelo tipo de evento ou por um trecho do ",
-    "substring, and the counter beside it reads ":
-      ", e o contador ao lado mostra ",
-    "shown of buffered": "exibidos de armazenados no buffer",
-    "against the cap. Selecting a row expands its raw JSON payload. Pause freezes the list at its current state without unsubscribing, so you can inspect a frame without events scrolling off — events arriving while paused are dropped, not queued. Clear empties the buffer without touching the subscription.":
-      "em relação ao limite. Selecionar uma linha expande seu payload JSON raw. Pausar congela a lista no estado atual sem cancelar a assinatura, permitindo inspecionar um quadro sem que os eventos saiam da tela; os eventos que chegam durante a pausa são descartados, não enfileirados. Limpar esvazia o buffer sem alterar a assinatura.",
-    "The buffer is in-memory and live-only: nothing is persisted and a reload starts empty. The stored audit trail is ":
-      "O buffer existe apenas em memória e em tempo real: nada é persistido, e uma recarga começa com a lista vazia. A trilha de auditoria armazenada fica em ",
-    ", which is a different surface answering a different question.":
-      ", uma interface distinta que responde a outra pergunta.",
-    "When to reach for it": "Quando recorrer a ele",
-    "Three situations where it earns its keep:":
-      "Três situações em que ele se mostra especialmente útil:",
-    "Verifying a mutation actually broadcast. If you changed a card and the board didn't update in another tab, first question is \"did the event fire at all?\" The panel answers that in under a second.":
-      "Verificar se uma mutação realmente foi transmitida. Se você alterou um cartão e o quadro não foi atualizado em outra aba, a primeira pergunta é: \"o evento chegou a ser disparado?\" O painel responde em menos de um segundo.",
-    "Tracing a pipeline run end-to-end. Watch the":
-      "Rastrear uma execução do pipeline de ponta a ponta. Observe a sequência",
-    " sequence line up in real time.": " se alinhar em tempo real.",
-    "Spotting noisy subscribers. If the panel shows the same event repeating, someone is publishing in a loop.":
-      "Identificar assinantes ruidosos. Se o painel mostra o mesmo evento repetidamente, alguém está publicando em loop.",
-    "Keep it open during smoke tests": "Mantenha-o aberto durante smoke tests",
-    "When you are walking through a new pipeline or a fresh runner, open the sheet on your second monitor and leave it open. Every click in the app should produce a visible event, and any click that doesn't is interesting. It turns \"did that work?\" into \"I can see it worked\" — faster than tailing server logs, and available to anyone on the team without shell access.":
-      "Ao percorrer um pipeline novo ou testar um Runner recém-configurado, abra a folha no segundo monitor e deixe-a aberta. Cada clique no aplicativo deve produzir um evento visível; qualquer clique que não produza é relevante. Isso transforma \"funcionou?\" em \"consigo ver que funcionou\": é mais rápido do que acompanhar logs do servidor e está disponível para qualquer pessoa da equipe sem acesso ao shell.",
-    "Admin-only, deliberately": "Somente para administradores, de propósito",
-    "The panel is mounted for every user but gated behind":
-      "O painel é montado para todos os usuários, mas fica protegido por",
-    ". Non-admins get no trigger icon at all — not a placeholder, nothing. And the client gate is only the UX half: the events socket rejects observer-grade subscription patterns from non-admins server-side, so hand-opening it gains nothing. This is on purpose — the bus carries actor IDs, payloads, and change JSON for every mutation in the workspace, which is a perfectly reasonable audit surface for an admin and a mildly uncomfortable privacy surface for a regular member. If we ever need a member-safe observer view, it will be a separate, filtered feed. Until then: admin gate.":
-      ". Pessoas sem perfil de administrador não veem nenhum ícone para abrir o painel: nem um placeholder. E o bloqueio no cliente é apenas metade da experiência; no servidor, o socket de eventos rejeita padrões de assinatura próprios do Observador para quem não é administrador, então abri-lo manualmente não oferece acesso adicional. Isso é intencional: o barramento transporta IDs de atores, payloads e JSON de alterações de cada mutação no espaço de trabalho. É uma superfície de auditoria adequada para um administrador, mas uma superfície de privacidade desconfortável para um membro comum. Se um dia precisarmos de uma visão segura para membros, ela será um fluxo separado e filtrado. Até lá, o acesso permanece restrito a administradores.",
+    "Observer panel with received events, capture start time and diagnostic controls": "Painel do Observador com eventos recebidos, horário de início da captura e controles de diagnóstico",
+    "A bounded view of frames received by this tab, not a saved event log.": "Uma visualização limitada das mensagens recebidas por esta aba, não um registro de eventos salvo.",
+    "The panel shows All, namespace filters, search, pause and clear controls, plus connection, denial and eviction details.": "O painel mostra Todos, filtros de namespace, busca, pausa e limpeza, além de detalhes de conexão, recusa e remoção de eventos.",
+    "Open the eye in the top bar to inspect WebSocket frames received by this tab. The Observer is available to workspace owners and admins. Its closed-panel badge counts retained unseen events, capped visually at 99+.": "Abra o olho na barra superior para inspecionar as mensagens WebSocket recebidas por esta aba. O Observador está disponível para proprietários e administradores do workspace. O selo do painel fechado conta eventos retidos ainda não vistos, com limite visual de 99+.",
+    "What this tab received": "O que esta aba recebeu",
+    "Received by this tab since marks the start of the current buffer. All clears the namespace filters and shows every retained authorized domain frame, including unknown namespaces. Namespace chips and the event-type or ID search narrow that view without changing capture.": "Recebido por esta aba desde indica o início do buffer atual. Todos limpa os filtros de namespace e mostra todas as mensagens de domínio autorizadas e retidas, incluindo namespaces desconhecidos. Os chips de namespace e a busca por tipo ou ID do evento filtram a visualização sem alterar a captura.",
+    "Select a row to expand its diagnostic JSON payload. Known credential fields, bearer text and tokenized URL queries are redacted before retention. Oversized or deeply nested values are truncated and labeled. This is a bounded diagnostic projection; arbitrary free text can still be sensitive. No extra entity bodies are fetched to fill missing payloads.": "Selecione uma linha para expandir seu payload JSON de diagnóstico. Campos conhecidos de credenciais, tokens bearer e consultas de URL com tokens são ocultados antes da retenção. Valores grandes demais ou profundamente aninhados são truncados e identificados. É uma projeção de diagnóstico limitada; texto livre ainda pode ser sensível. Nenhum conteúdo adicional de entidades é buscado para completar payloads.",
+    "The live buffer retains at most 1000 events and 4 MiB of projected UTF-8 data, with at most 16 KiB per frame. Pausing can retain a second 4 MiB display snapshot, for up to 8 MiB of distinct projected data. These are data limits, not total browser memory limits. Older frames are evicted when a limit is reached. Eviction counts describe this local buffer, not events lost elsewhere.": "O buffer ativo retém no máximo 1000 eventos e 4 MiB de dados UTF-8 projetados, com até 16 KiB por mensagem. Ao pausar, uma segunda cópia da visualização pode reter até 4 MiB, totalizando até 8 MiB de dados projetados distintos. Esses limites se aplicam aos dados, não à memória total do navegador. As mensagens mais antigas são removidas quando um limite é atingido. A contagem de remoções descreve este buffer local, não eventos perdidos em outros pontos.",
+    "Pause, clear and reconnect": "Pausar, limpar e reconectar",
+    "Pause freezes the displayed list while bounded capture continues. New arrivals remain unseen while paused, even with the panel open. Pending arrivals and evictions remain visible as counts. Resume shows the frames still retained. Arrivals while the panel is open and unpaused are treated as seen.": "Pausar congela a lista exibida enquanto a captura limitada continua. Novas chegadas permanecem não vistas durante a pausa, mesmo com o painel aberto. Novas chegadas pendentes e remoções continuam visíveis como contagens. Retomar mostra as mensagens ainda retidas. Chegadas com o painel aberto e sem pausa são consideradas vistas.",
+    "Clear empties the buffer and resets its counts and capture-start time. Switching workspace, losing access, signing out or reloading also starts a fresh buffer. Data is held only in memory in this tab; it is not a saved log.": "Limpar esvazia o buffer e reinicia suas contagens e o horário de início da captura. Trocar de workspace, perder acesso, sair ou recarregar também inicia um novo buffer. Os dados ficam apenas na memória desta aba; não são um registro salvo.",
+    "Connection status and subscription denial are separate from the event list. A connected socket does not prove every subscription was accepted. Its last ping describes this tab’s transport, not agent health. A filtered empty list does not mean no frames arrived. Disconnected intervals are gaps: the bus does not replay them, and the panel cannot count events it never received.": "O estado da conexão e a recusa de assinaturas são separados da lista de eventos. Um socket conectado não prova que todas as assinaturas foram aceitas. Seu último ping descreve o transporte desta aba, não a saúde dos agentes. Uma lista vazia por filtros não significa que nenhuma mensagem chegou. Intervalos desconectados são lacunas: o barramento não os reproduz, e o painel não pode contar eventos que nunca recebeu.",
+    "Check delivery, then the durable record": "Confira a entrega e depois o registro persistente",
+    "Use the Observer to correlate received event IDs and types with an action. Absence alone cannot distinguish an unpublished event, an authorization filter or a delivery gap. Use History, Timeline and execution records to verify committed state; every click is not guaranteed to publish an event.": "Use o Observador para relacionar IDs e tipos de eventos recebidos com uma ação. A ausência, por si só, não distingue um evento não publicado, um filtro de autorização ou uma lacuna de entrega. Use Histórico, Timeline e registros de execução para verificar o estado confirmado; não há garantia de que cada clique publique um evento.",
+    "Admin access does not grant private-event access": "Acesso de administrador não concede acesso a eventos privados",
+    "The server checks current authority before delivery. Another person's captured-session, device and notification events remain private even from another admin. Internal control frames are intentionally unavailable. Ordinary live updates and notifications use their own subscriptions and continue without the Observer wildcard.": "O servidor verifica a autorização atual antes da entrega. Eventos de sessões capturadas, dispositivos e notificações de outra pessoa continuam privados mesmo para outro administrador. Mensagens internas de controle são intencionalmente indisponíveis. Atualizações ao vivo e notificações comuns usam suas próprias assinaturas e continuam sem o curinga do Observador.",
   },
   "activity-history-and-audit-logs": {
     "Recorded platform mutations write durable ":
