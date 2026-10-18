@@ -774,6 +774,12 @@ export const ES_CORE_CONCEPTS = {
       "Los recursos binarios referenciados como medios en lugar de incrustados, y los modos por archivo para que un script incluido pueda ser ejecutable, están ambos en la hoja de ruta. Hasta entonces, la convención de invocación mediante intérprete descrita arriba es la vía admitida.",
   },
   notes: {
+    "Checking a published handoff":
+      "Comprobar una nota de traspaso publicada",
+    "If you published a board note from a captured session, open Publication revision in its editor to compare the saved note with the revision recorded at publication. This check is private to the publisher and leaves unsaved edits untouched. Details shows the recorded time, version and digests.":
+      "Si publicaste una nota de tablero desde una sesión capturada, abre Revisión de publicación en su editor para comparar la nota guardada con la revisión registrada al publicarla. Esta comprobación es privada para quien publicó la nota y no modifica los cambios sin guardar. Detalles muestra la fecha de registro, la versión y los resúmenes criptográficos.",
+    "The comparison covers title, content, kind and pin state; card links and timestamps are excluded. Restoring those fields can match again after edits. A match does not establish source fidelity, truth or human approval. Ordinary notes have no publication record, older publications may have no recorded revision, and saved content over 16 MiB cannot be compared. Check again refreshes the result.":
+      "La comparación incluye título, contenido, tipo y estado de fijación; excluye enlaces a tarjetas y marcas de tiempo. Restaurar esos campos puede producir una coincidencia después de editarlos. Una coincidencia no demuestra fidelidad a la fuente, veracidad ni aprobación humana. Las notas ordinarias no tienen registro de publicación, las publicaciones antiguas pueden carecer de revisión registrada y el contenido guardado de más de 16 MiB no se puede comparar. Volver a comprobar actualiza el resultado.",
     "A ":
       "Una ",
     "note":

@@ -4,7 +4,7 @@
 import uuid
 from typing import Literal
 
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import LargeBinary, Row, String, case, cast, func, or_, select
 
 from app.models.notes.note import Note
 from app.models.user import User
@@ -12,6 +12,17 @@ from app.repositories.base import BaseRepository
 
 NoteOrderBy = Literal["updated_at", "created_at", "title", "author"]
 SortDirection = Literal["asc", "desc"]
+
+
+def stored_bytes(dialect_name: str, column):
+    """The text's stored size in bytes, never its character count: UTF-8
+    bytes on a UTF-8 database."""
+    if dialect_name == "postgresql":
+        # Answered from a TOASTed value's header without detoasting it.
+        return func.octet_length(column)
+    # SQLite before 3.43 has no octet_length; a BLOB cast keeps the text's
+    # encoded bytes, so its length counts them.
+    return func.length(cast(column, LargeBinary))
 
 
 class NoteRepository(BaseRepository[Note]):
@@ -45,6 +56,35 @@ class NoteRepository(BaseRepository[Note]):
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_scope(self, note_id: uuid.UUID) -> Row | None:
+        """Where the note lives and who wrote it, without loading its body."""
+        return (
+            await self.db.execute(
+                select(Note.workspace_id, Note.board_id, Note.created_by).where(
+                    Note.id == note_id
+                )
+            )
+        ).first()
+
+    async def get_revision_fields(
+        self, note_id: uuid.UUID, *, content_byte_limit: int
+    ) -> Row | None:
+        """The fields note_revision digests, read in one statement so its size
+        test and its body share a snapshot. `content` is None, and never leaves
+        the database, when the stored body is over `content_byte_limit`."""
+        content_bytes = stored_bytes(self.db.get_bind().dialect.name, Note.content)
+        within_limit = content_bytes <= content_byte_limit
+        return (
+            await self.db.execute(
+                select(
+                    Note.title,
+                    Note.kind,
+                    Note.pinned,
+                    case((within_limit, Note.content)).label("content"),
+                ).where(Note.id == note_id)
+            )
+        ).first()
 
     async def count_workspace_notes(self, workspace_id: uuid.UUID) -> int:
         result = await self.db.execute(

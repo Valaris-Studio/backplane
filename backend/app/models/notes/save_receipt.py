@@ -4,7 +4,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CHAR, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import CHAR, DateTime, ForeignKey, SmallInteger, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,15 @@ class NoteSaveReceipt(Base, UUIDMixin):
         ForeignKey("notes.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    # The note as saved, digested by the versioned note_revision algorithm and
+    # never rewritten by a replay. Both NULL on receipts from before migration
+    # 123, and on any a 122 replica writes during the rollout.
+    published_note_revision_sha256: Mapped[str | None] = mapped_column(
+        CHAR(64), nullable=True
+    )
+    published_note_revision_version: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

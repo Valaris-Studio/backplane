@@ -51,6 +51,10 @@ export function CoreConceptsNotes() {
         conversion is a read-time projection — nothing stored changes.
       </p>
 
+      <h2 id="checking-a-published-handoff">Checking a published handoff</h2>
+      <p>If you published a board note from a captured session, open Publication revision in its editor to compare the saved note with the revision recorded at publication. This check is private to the publisher and leaves unsaved edits untouched. Details shows the recorded time, version and digests.</p>
+      <p>The comparison covers title, content, kind and pin state; card links and timestamps are excluded. Restoring those fields can match again after edits. A match does not establish source fidelity, truth or human approval. Ordinary notes have no publication record, older publications may have no recorded revision, and saved content over 16 MiB cannot be compared. Check again refreshes the result.</p>
+
       <h2 id="editing-over-mcp">Editing a note over MCP</h2>
       <p>
         <code>create_note</code> takes a <code>title</code> and an optional{" "}

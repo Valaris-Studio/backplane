@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.private_route import PrivateRoute
 from app.core.workspace import (
     WorkspaceContext,
     get_workspace,
@@ -22,6 +23,7 @@ from app.schemas.notes.note import (
     NoteAppend,
     NoteCreate,
     NoteFormat,
+    NotePublicationRevisionRead,
     NoteRead,
     NoteSectionReplace,
     NoteSummary,
@@ -197,6 +199,30 @@ async def get_board_note(
         as_markdown=format == NoteFormat.markdown,
         reader_id=ctx.user.id,
     )
+
+
+async def get_board_note_publication_revision(
+    note_id: uuid.UUID,
+    board_id: uuid.UUID = Depends(resolve_board_id),
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    service = NoteService(db)
+    return await service.get_note_publication_revision(
+        workspace_id=ctx.workspace.id,
+        board_id=board_id,
+        note_id=note_id,
+        user_id=ctx.user.id,
+    )
+
+
+router.add_api_route(
+    "/{note_id}/publication-revision",
+    get_board_note_publication_revision,
+    methods=["GET"],
+    response_model=NotePublicationRevisionRead,
+    route_class_override=PrivateRoute,
+)
 
 
 @router.put("/{note_id}", response_model=NoteRead)

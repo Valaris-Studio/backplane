@@ -772,6 +772,12 @@ export const PT_BR_CORE_CONCEPTS = {
       "Ativos binários referenciados como mídia em vez de embutidos, e modos por arquivo para que um script incluído possa ser executável, estão ambos no roteiro. Até lá, a convenção de invocação por interpretador descrita acima é o caminho suportado.",
   },
   notes: {
+    "Checking a published handoff":
+      "Verificar uma nota de passagem publicada",
+    "If you published a board note from a captured session, open Publication revision in its editor to compare the saved note with the revision recorded at publication. This check is private to the publisher and leaves unsaved edits untouched. Details shows the recorded time, version and digests.":
+      "Se você publicou uma nota de quadro a partir de uma sessão capturada, abra Revisão da publicação no editor para comparar a nota salva com a revisão registrada na publicação. Essa verificação é privada para quem publicou a nota e mantém as alterações não salvas. Detalhes mostra a data do registro, a versão e os resumos criptográficos.",
+    "The comparison covers title, content, kind and pin state; card links and timestamps are excluded. Restoring those fields can match again after edits. A match does not establish source fidelity, truth or human approval. Ordinary notes have no publication record, older publications may have no recorded revision, and saved content over 16 MiB cannot be compared. Check again refreshes the result.":
+      "A comparação inclui título, conteúdo, tipo e estado de fixação; exclui links de cartões e datas e horas. Restaurar esses campos pode produzir uma correspondência após edições. Uma correspondência não comprova fidelidade à fonte, veracidade nem aprovação humana. Notas comuns não têm registro de publicação, publicações antigas podem não ter uma revisão registrada e conteúdo salvo acima de 16 MiB não pode ser comparado. Verificar novamente atualiza o resultado.",
     "A ":
       "Uma ",
     "note":

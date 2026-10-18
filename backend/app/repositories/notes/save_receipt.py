@@ -3,7 +3,7 @@
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import Row, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notes.save_receipt import NoteSaveReceipt
@@ -56,9 +56,38 @@ class NoteSaveReceiptRepository:
             .execution_options(populate_existing=True)
         )
 
-    async def complete(self, receipt_id: uuid.UUID, note_id: uuid.UUID) -> None:
+    async def complete(
+        self,
+        receipt_id: uuid.UUID,
+        note_id: uuid.UUID,
+        *,
+        published_note_revision_sha256: str,
+        published_note_revision_version: int,
+    ) -> None:
         await self.db.execute(
             update(NoteSaveReceipt)
             .where(NoteSaveReceipt.id == receipt_id)
-            .values(note_id=note_id)
+            .values(
+                note_id=note_id,
+                published_note_revision_sha256=published_note_revision_sha256,
+                published_note_revision_version=published_note_revision_version,
+            )
         )
+
+    async def get_publication(
+        self, user_id: uuid.UUID, note_id: uuid.UUID
+    ) -> Row | None:
+        """When and as what revision this person published the note; never the
+        request id, fingerprint or destination."""
+        return (
+            await self.db.execute(
+                select(
+                    NoteSaveReceipt.created_at,
+                    NoteSaveReceipt.published_note_revision_sha256,
+                    NoteSaveReceipt.published_note_revision_version,
+                ).where(
+                    NoteSaveReceipt.user_id == user_id,
+                    NoteSaveReceipt.note_id == note_id,
+                )
+            )
+        ).first()
