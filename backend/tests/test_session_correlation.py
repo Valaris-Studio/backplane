@@ -3,21 +3,24 @@
 
 """Fuzzy linking of Pi MCP calls that carry no native call id."""
 
+import asyncio
 import copy
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.call_correlation import CORRELATION_WINDOW, arguments_fingerprint
+from app.core.event_bus import event_bus
 from app.core.harness import native_call_key
 from app.models.agent_session import (
     AgentSessionEvent,
     AgentSessionInvocation,
     SessionWorkLink,
 )
-from app.models.workspace import WorkspaceMember, WorkspaceRole
+from app.models.notes.note import Note
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.repositories.session_work_link import SessionWorkLinkRepository
 from app.services.session_work_link import CORRELATION_LOCK
 from tests.test_agent_sessions import (
@@ -152,6 +155,289 @@ async def all_links(db_session):
             select(SessionWorkLink).execution_options(populate_existing=True)
         )
     )
+
+
+@pytest.fixture
+def session_refreshes(test_workspace):
+    received = []
+
+    async def receive(event):
+        received.append(event)
+
+    unsubscribe = event_bus.subscribe(
+        receive,
+        workspace_id=test_workspace.id,
+        event_pattern="agent_session.updated",
+    )
+    try:
+        yield received
+    finally:
+        unsubscribe()
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("exact", [False, True])
+async def test_late_receipt_refreshes_linked_session_only_after_commit(
+    client,
+    device_client,
+    db_session,
+    test_user,
+    test_workspace,
+    test_board,
+    test_card,
+    session_refreshes,
+    exact,
+):
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    await upload(
+        device_client,
+        token,
+        [pi_record([pi_tool_event("valaris_get_card", ARGS)], mapping_id)],
+    )
+    captured_session_id = await session_id(client)
+    invocation_id = uuid.uuid4()
+    await work_under_invocation(client, test_board, test_card, invocation_id)
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    session_refreshes.clear()
+
+    await record_invocation(
+        client,
+        pi_outcome(
+            invocation_id,
+            native_call_id=PI_CALL if exact else None,
+            arguments_fingerprint=None if exact else arguments_fingerprint(ARGS),
+        ),
+    )
+    found = await links(client, captured_session_id)
+    assert set(found) == {("card", "changed"), ("card", "consulted")}
+    await asyncio.sleep(0.01)
+    assert session_refreshes == [], "Uncommitted relationship was announced"
+
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    assert len(session_refreshes) == 1, "Late receipt left the open session stale"
+    [refresh] = session_refreshes
+    assert refresh.payload["session_id"] == captured_session_id
+    assert refresh.payload["owner_id"] == str(test_user.id)
+    assert refresh.workspace_id == test_workspace.id
+    assert set(refresh.payload) <= {"session_id", "owner_id", "workspace_id", "reason"}
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("exact", [False, True])
+async def test_new_candidate_refreshes_older_session_after_retracting_its_links(
+    client,
+    device_client,
+    db_session,
+    test_workspace,
+    test_board,
+    test_card,
+    session_refreshes,
+    exact,
+):
+    token_a, mapping_a = await enroll(client, test_workspace, test_board, root="/a")
+    token_b, mapping_b = await enroll(client, test_workspace, test_board, root="/b")
+    await pi_call_with_work(
+        client,
+        test_board,
+        test_card,
+        native_call_id=PI_CALL if exact else None,
+        arguments_fingerprint=None if exact else arguments_fingerprint(ARGS),
+    )
+    await upload(
+        device_client,
+        token_a,
+        [pi_record([pi_tool_event("valaris_get_card", ARGS)], mapping_a)],
+    )
+    older_session_id = await session_id(client)
+    assert len(await links(client, older_session_id)) == 2
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    session_refreshes.clear()
+
+    await upload(
+        device_client,
+        token_b,
+        [
+            pi_record(
+                [
+                    pi_tool_event(
+                        "valaris_get_card",
+                        ARGS,
+                        call_id=PI_CALL if exact else "toolu_b",
+                    )
+                ],
+                mapping_b,
+            )
+        ],
+    )
+    assert await links(client, older_session_id) == {}
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    assert older_session_id in {
+        event.payload["session_id"] for event in session_refreshes
+    }, "Retraction refreshed the new capture but left the older session stale"
+
+
+@pytest.mark.slow
+async def test_competing_receipt_refreshes_retracted_correlated_session(
+    client,
+    device_client,
+    db_session,
+    test_workspace,
+    test_board,
+    test_card,
+    session_refreshes,
+):
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    await upload(
+        device_client,
+        token,
+        [pi_record([pi_tool_event("valaris_get_card", ARGS)], mapping_id)],
+    )
+    captured_session_id = await session_id(client)
+    await pi_call_with_work(client, test_board, test_card)
+    assert len(await links(client, captured_session_id)) == 2
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    session_refreshes.clear()
+
+    await pi_call_with_work(client, test_board, test_card)
+    assert await links(client, captured_session_id) == {}
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    assert [event.payload["session_id"] for event in session_refreshes] == [
+        captured_session_id
+    ]
+
+
+@pytest.mark.slow
+async def test_exact_replacement_refreshes_once_and_duplicate_retry_stays_silent(
+    client,
+    device_client,
+    db_session,
+    test_workspace,
+    test_board,
+    test_card,
+    session_refreshes,
+):
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    await upload(
+        device_client,
+        token,
+        [pi_record([pi_tool_event("valaris_get_card", ARGS)], mapping_id)],
+    )
+    captured_session_id = await session_id(client)
+    await pi_call_with_work(client, test_board, test_card)
+    exact_id = uuid.uuid4()
+    await work_under_invocation(client, test_board, test_card, exact_id)
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    session_refreshes.clear()
+
+    exact = pi_outcome(exact_id, native_call_id=PI_CALL, arguments_fingerprint=None)
+    await record_invocation(client, exact)
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    found = await links(client, captured_session_id)
+    assert {item["provenance"] for item in found.values()} == {"exact"}
+    assert {item["invocation_count"] for item in found.values()} == {1}
+    assert len(session_refreshes) == 1, "Exact replacement must coalesce its retraction"
+    assert session_refreshes[0].payload["session_id"] == captured_session_id
+
+    await record_invocation(client, exact)
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    assert len(session_refreshes) == 1, "A no-op receipt replayed the refresh"
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("target_visible", [False, True])
+async def test_cross_workspace_target_refresh_never_exposes_private_session(
+    client,
+    device_client,
+    db_session,
+    test_user,
+    test_workspace,
+    test_board,
+    target_visible,
+):
+    target = Workspace(
+        name="Synthetic target workspace",
+        slug="target-evidence",
+        created_by=test_user.id,
+    )
+    db_session.add(target)
+    await db_session.flush()
+    db_session.add(
+        WorkspaceMember(
+            workspace_id=target.id, user_id=test_user.id, role=WorkspaceRole.owner
+        )
+    )
+    note = Note(workspace_id=target.id, created_by=test_user.id, title="Private note")
+    db_session.add(note)
+    await db_session.flush()
+    token, mapping_id = await enroll(client, test_workspace, test_board)
+    await upload(
+        device_client,
+        token,
+        [pi_record([pi_tool_event("valaris_get_card", ARGS)], mapping_id)],
+    )
+    captured_session_id = await session_id(client)
+    invocation_id = uuid.uuid4()
+    response = await client.get(
+        f"/api/workspaces/{target.slug}/notes/{note.id}",
+        headers={"X-Backplane-Invocation-ID": str(invocation_id)},
+    )
+    assert response.status_code == 200, response.text
+    if not target_visible:
+        await db_session.execute(
+            delete(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == target.id,
+                WorkspaceMember.user_id == test_user.id,
+            )
+        )
+    await db_session.commit()
+    await asyncio.sleep(0.01)
+    target_events = []
+
+    async def receive(event):
+        target_events.append(event)
+
+    unsubscribe = event_bus.subscribe(
+        receive, workspace_id=target.id, event_pattern="agent_session.updated"
+    )
+    try:
+        await record_invocation(
+            client,
+            pi_outcome(
+                invocation_id, native_call_id=PI_CALL, arguments_fingerprint=None
+            ),
+        )
+        await db_session.commit()
+        await asyncio.sleep(0.01)
+        found = await links(client, captured_session_id)
+        if not target_visible:
+            assert found == {}
+            assert target_events == [], "Access loss still announced a target refresh"
+            return
+        assert set(found) == {("note", "consulted")}
+        assert (
+            len(target_events) == 1
+        ), "Linked target in another workspace stayed stale"
+        [refresh] = target_events
+        assert refresh.payload == {
+            "owner_id": str(test_user.id),
+            "workspace_id": str(target.id),
+            "reason": "links",
+        }
+        assert refresh.workspace_id == target.id
+        assert captured_session_id not in str(refresh.payload)
+        assert str(test_workspace.id) not in str(refresh.payload)
+        assert note.title not in str(refresh.payload)
+    finally:
+        unsubscribe()
 
 
 # --- the fingerprint contract --------------------------------------------------

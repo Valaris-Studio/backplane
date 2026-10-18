@@ -20,6 +20,7 @@ from app.models.kanban.board import Board
 from app.models.kanban.card import Card
 from app.models.mcp_invocation import MCPConsultation, MCPInvocation
 from app.models.notes.note import Note
+from app.models.workspace import WorkspaceMember
 from app.repositories.dialect_insert import conflict_aware_insert
 
 # Only human (non-agent) invocations are linked, and their Activity rows and
@@ -305,6 +306,26 @@ class SessionWorkLinkRepository:
             )
         ).first()
         return row is not None, row.board_id if row else None
+
+    async def target_visible_to(
+        self,
+        owner_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        entity_type: str,
+        entity_id: uuid.UUID,
+    ) -> bool:
+        """Whether the owner still belongs to the workspace and the card or
+        note still exists there, the same test that makes a link visible."""
+        exists, _ = await self.entity_board(workspace_id, entity_type, entity_id)
+        if not exists:
+            return False
+        member = await self.db.scalar(
+            select(WorkspaceMember.user_id).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == owner_id,
+            )
+        )
+        return member is not None
 
     async def upsert_link(
         self,

@@ -11,6 +11,7 @@ from app.core.auth import current_agent_id
 from app.exceptions import ConflictError, ResourceNotFoundError, ValidationError
 from app.repositories.mcp_invocation import MCPInvocationRepository
 from app.schemas.mcp_invocation import MCPInvocationCreate
+from app.services.session_events import queue_after_commit
 from app.services.session_work_link import SessionWorkLinkService
 
 
@@ -93,7 +94,10 @@ class MCPInvocationService:
             existing = await self.repo.get(data.id, owner_id, agent_id)
             await self._visible(existing, owner_id, agent)
             if inserted is not None:
-                await SessionWorkLinkService(self.db).link_invocation(existing)
+                refreshes = await SessionWorkLinkService(self.db).link_invocation(
+                    existing
+                )
+                queue_after_commit(self.db, refreshes)
         if existing.payload_hash != digest:
             raise ConflictError("Invocation ID already has a different outcome")
         return existing
