@@ -122,10 +122,15 @@ export function createMentionSuggestionPlugin(
 
     state: {
       init: () => ({ active: false, range: null, query: "" }),
-      apply(_tr, _prev, _oldState, newState) {
+      apply(tr, previous, _oldState, newState) {
         const match = findMentionMatch(newState);
         if (!match) return { active: false, range: null, query: "" };
-        return { active: true, range: match.range, query: match.query };
+        // Dismiss the matched token, not just its React picker. Unrelated view
+        // updates must not reopen it; editing or leaving the token may do so.
+        const dismissed = tr.getMeta(mentionPluginKey) === "dismiss" ||
+          (!previous.active && previous.range?.from === match.range.from &&
+            previous.range.to === match.range.to && previous.query === match.query);
+        return { active: !dismissed, range: match.range, query: match.query };
       },
     },
 
@@ -162,7 +167,11 @@ export function createMentionSuggestionPlugin(
       handleKeyDown(_view, event) {
         const state = mentionPluginKey.getState(_view.state);
         if (!state?.active) return false;
-        return renderer.onKeyDown(event);
+        const consumed = renderer.onKeyDown(event);
+        if (consumed && event.key === "Escape") {
+          _view.dispatch(_view.state.tr.setMeta(mentionPluginKey, "dismiss"));
+        }
+        return consumed;
       },
     },
   });

@@ -6,6 +6,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { isInaccessible } from "@testing-library/react";
 import type { JsonBodyType } from "msw";
 import { Link, Route, Routes } from "react-router-dom";
+import { ContextLink } from "@/components/shared/ContextLink";
 import i18n from "@/i18n/config";
 import { api } from "@/lib/api";
 import { sessionKeys } from "@/lib/query-keys";
@@ -13,6 +14,7 @@ import type { WebSocketEvent } from "@/lib/websocket";
 import { WebSocketContext } from "@/providers/WebSocketProvider";
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { renderBrowserNavigationRouter } from "@/test/navigation-router";
 import type { SessionContent } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeCall, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { SessionDetailPage } from "../SessionDetailPage";
@@ -80,7 +82,7 @@ function serveReader(initial: SessionContent[] = [record(1), record(2)]) {
     bodies: [] as string[],
     downloads: [] as string[],
     writes: [] as Record<string, unknown>[],
-    windowResponse: null as null | ((params: URLSearchParams) => Response | Promise<Response>),
+    windowResponse: null as null | ((params: URLSearchParams) => Response | undefined | Promise<Response | undefined>),
     metadataResponse: null as null | ((ids: string[]) => Response | Promise<Response>),
     saveResponse: (payload: Record<string, unknown>): Response => HttpResponse.json({
       id: "note-reader", workspace_id: "ws-1", board_id: BOARD, card_id: null,
@@ -134,7 +136,7 @@ function serveReader(initial: SessionContent[] = [record(1), record(2)]) {
       const params = new URL(request.url).searchParams;
       state.windows.push(params); state.reads.push("window");
       if (state.windowError) return responseError(state.windowError.status, state.windowError.code);
-      return state.windowResponse ? state.windowResponse(params) : windowPage(params);
+      return (await state.windowResponse?.(params)) ?? windowPage(params);
     }),
     http.get(CONTENTS, ({ request }) => {
       const params = new URL(request.url).searchParams;
@@ -204,32 +206,46 @@ function actionButton(container: HTMLElement, name: string) {
   return button;
 }
 
-async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2) {
+async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2, signal?: AbortSignal) {
   await screen.findByText(`Captured record ${order}`);
+  signal?.throwIfAborted();
   await user.click(recordCheckbox(order));
+  signal?.throwIfAborted();
   const excerptActions = screen.getByText(/^Selected: \d+ · /).parentElement!;
   await user.click(actionButton(excerptActions, "Preview excerpt"));
+  signal?.throwIfAborted();
   const preview = await screen.findByRole("dialog", { name: "Selected excerpt" });
+  signal?.throwIfAborted();
   await waitFor(() => expect(actionButton(preview, "Share as note")).toBeEnabled(), { container: preview });
+  signal?.throwIfAborted();
   await user.click(actionButton(preview, "Share as note"));
+  signal?.throwIfAborted();
   const dialog = await screen.findByRole("dialog", { name: "Share as note" });
+  signal?.throwIfAborted();
   const workspaceField = within(dialog).getByText("Workspace", { selector: "label" });
   await user.selectOptions(within(workspaceField).getByRole("combobox", { name: "Workspace" }), SLUG);
+  signal?.throwIfAborted();
   const boardField = within(dialog).getByText("Board", { selector: "label" });
   await within(boardField).findByRole("option", { name: "Reader review" });
+  signal?.throwIfAborted();
   await user.selectOptions(within(boardField).getByRole("combobox", { name: "Board" }), BOARD);
+  signal?.throwIfAborted();
   await user.clear(within(dialog).getByRole("textbox", { name: "Note title" }));
+  signal?.throwIfAborted();
   await user.paste("Owner reviewed handoff");
+  signal?.throwIfAborted();
   await waitFor(() => expect(actionButton(dialog, "Save note")).toBeEnabled(), { container: dialog });
+  signal?.throwIfAborted();
   return dialog;
 }
 
-async function editDraftBody(dialog: HTMLElement) {
+async function editDraftBody(dialog: HTMLElement, signal?: AbortSignal) {
   const editor = await waitFor(() => {
     const current = within(dialog).getByRole("region", { name: "Note content" }).querySelector<HTMLElement>('[contenteditable="true"]');
     expect(current).not.toBeNull();
     return current!;
   });
+  signal?.throwIfAborted();
   const paragraph = editor.querySelector("p")!;
   editor.focus();
   const range = document.createRange(); range.selectNodeContents(paragraph); range.collapse(false);
@@ -239,8 +255,10 @@ async function editDraftBody(dialog: HTMLElement) {
     types: ["text/html", "text/plain"], items: [], files: [],
     getData: (type: string) => type === "text/html" ? "<strong>OWNER REVIEWED CONTEXT</strong>" : type === "text/plain" ? "OWNER REVIEWED CONTEXT" : "",
   } });
-  await act(async () => { editor.dispatchEvent(paste); });
+  await act(async () => { signal?.throwIfAborted(); editor.dispatchEvent(paste); });
+  signal?.throwIfAborted();
   await waitFor(() => expect(editor.textContent).toContain("OWNER REVIEWED CONTEXT"));
+  signal?.throwIfAborted();
 }
 
 function responsiveViewport(initial: number) {
@@ -264,10 +282,14 @@ function responsiveViewport(initial: number) {
   };
 }
 
-async function openTranscript(user: ReturnType<typeof userEvent.setup>) {
+async function openTranscript(user: ReturnType<typeof userEvent.setup>, signal?: AbortSignal) {
   await screen.findByRole("heading", { name: session.title! });
+  signal?.throwIfAborted();
   await user.click(screen.getByRole("tab", { name: "Transcript" }));
-  return screen.findByRole("region", { name: "Transcript" });
+  signal?.throwIfAborted();
+  const frame = await screen.findByRole("region", { name: "Transcript" });
+  signal?.throwIfAborted();
+  return frame;
 }
 
 async function settled(client: QueryClient) { await waitFor(() => expect(client.isFetching()).toBe(0)); }
@@ -295,6 +317,76 @@ beforeEach(async () => { listeners.clear(); await i18n.changeLanguage("en"); });
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("bounded session reader navigation", () => {
+  it("restores an earlier window, view and selection after canonical shared work and browser Back", async () => {
+    const rows = Array.from({ length: 301 }, (_, index) => record(index + 1));
+    rows[150] = record(151, { channel: "native_record" });
+    const state = serveReader(rows);
+    const origin = `/${SLUG}/sessions/${SESSION}`;
+    const sharedWork = `/${SLUG}/boards/${BOARD}/kanban?card=card-reader`;
+    const { router, client } = renderBrowserNavigationRouter([
+      { path: origin, element: <main>
+        <SessionTranscript slug={SLUG} session={session} />
+        <ContextLink id="reader-shared-work" to={sharedWork}>Open related card</ContextLink>
+      </main> },
+      { path: `/${SLUG}/boards/${BOARD}/kanban`, element: <main><h1>Related shared card</h1></main> },
+    ], origin);
+    clients.push(client);
+    const user = userEvent.setup();
+    await screen.findByText("Captured record 301");
+    await user.click(screen.getByRole("button", { name: "Earlier records" }));
+    await screen.findByText("Captured record 150");
+    await user.click(recordCheckbox(150));
+    await user.click(screen.getByRole("button", { name: "Everything" }));
+    await screen.findByText("Captured record 151");
+    await settled(client);
+    const originalWindow = visibleIds();
+    expect(originalWindow).toEqual(Array.from({ length: 100 }, (_, index) => `content-${contentId(index + 102)}`));
+    expect(recordCheckbox(150)).toBeChecked();
+
+    // jsdom has no layout. Supply the initiating control's offsets to exercise
+    // the provider's real anchor-offset/focus restoration after route unmount.
+    let returning = false;
+    const bounds = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.id !== "reader-shared-work") return bounds.call(this);
+      const top = returning ? 272 : 112;
+      return { x: 0, y: top, top, bottom: top + 44, left: 0, right: 200, width: 200, height: 44, toJSON: () => ({}) };
+    });
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    const originKey = router.state.location.key;
+    const link = screen.getByRole("link", { name: "Open related card" });
+    expect(link).toHaveAttribute("href", sharedWork);
+    await user.click(link);
+    await screen.findByRole("heading", { name: "Related shared card" });
+    expect(screen.queryByRole("heading", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(sharedWork);
+    expect(window.history.state.usr).toEqual({ bpReturn: { v: 1, originKey, originIdx: 0 } });
+
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => { release = resolve; });
+    state.windowResponse = async () => { await ready; return undefined; };
+    returning = true;
+    scrollBy.mockClear();
+    try {
+      await act(async () => { window.history.back(); });
+      await waitFor(() => expect(router.state.location.key).toBe(originKey));
+      await waitFor(() => expect(state.windows).toHaveLength(3));
+      expect(screen.queryByText("Captured record 150")).not.toBeInTheDocument();
+      await act(async () => { release(); });
+      await settled(client);
+      expect(visibleIds()).toEqual(originalWindow);
+      expect(screen.getByRole("button", { name: "Everything" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("Captured record 151")).toBeVisible();
+      expect(recordCheckbox(150)).toBeChecked();
+      expect(screen.getByRole("link", { name: "Open related card" })).toHaveFocus();
+      expect(scrollBy).toHaveBeenCalledWith({ top: 160, behavior: "instant" });
+      expect(screen.queryByText("Captured record 301")).not.toBeInTheDocument();
+      expect(state.bodies).toEqual([]);
+      expect(state.downloads).toEqual([]);
+      expect(state.legacy).toEqual([]);
+    } finally { release(); }
+  });
+
   it.each([375, 1024, 1440])("offers peer readers and roving keyboard tabs at %spx without hidden reader controls", async (width) => {
     responsiveViewport(width); serveReader(); renderReader();
     const user = userEvent.setup();
@@ -599,43 +691,66 @@ describe("selected evidence is independent from the current window", () => {
     } finally { release(responseError(404, "content_not_found")); }
   });
 
-  it("replays an unknown save exactly after disjoint navigation, tab changes and metadata failure", async () => {
+  it("replays an unknown save exactly after disjoint navigation, tab changes and metadata failure", async (context) => {
     const resize = responsiveViewport(1440);
     const state = serveReader(Array.from({ length: 201 }, (_, index) => record(index + 1)));
     const saved = state.saveResponse;
     state.saveResponse = () => HttpResponse.error();
-    const { client } = renderReader(); const user = userEvent.setup();
+    const { client, container, unmount } = renderReader(); const user = userEvent.setup();
+    // Do not let an expired unknown-save journey resume into the next fixture.
+    context.onTestFinished(() => { unmount(); client.clear(); });
+    const view = within(container);
     await screen.findByRole("heading", { name: session.title! });
-    const refreshEvidence = screen.getByRole("button", { name: "Refresh evidence" });
-    const frame = await openTranscript(user);
-    const tabs = within(screen.getByRole("tablist", { name: "Session sections" }));
+    context.signal.throwIfAborted();
+    const refreshEvidence = actionButton(container, "Refresh evidence");
+    const frame = await openTranscript(user, context.signal);
+    context.signal.throwIfAborted();
+    const tabs = within(view.getByRole("tablist", { name: "Session sections" }));
     const windowNavigation = within(frame).getByRole("navigation", { name: "Captured records" });
     const excerptActions = within(frame).getByText(/^Selected: \d+ · /).parentElement!;
-    const dialog = await prepareNote(user, 201); await editDraftBody(dialog);
+    const dialog = await prepareNote(user, 201, context.signal);
+    context.signal.throwIfAborted();
+    await editDraftBody(dialog, context.signal);
+    context.signal.throwIfAborted();
     await user.click(actionButton(dialog, "Save note"));
+    context.signal.throwIfAborted();
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    context.signal.throwIfAborted();
     expect(state.writes).toHaveLength(1);
     const frozen = structuredClone(state.writes[0]!);
     expect(frozen.title).toBe("Owner reviewed handoff"); expect(String(frozen.content)).toContain("OWNER REVIEWED CONTEXT");
     await user.click(actionButton(dialog, "Hide for now"));
+    context.signal.throwIfAborted();
     await user.click(actionButton(windowNavigation, "Beginning"));
-    await screen.findByText("Captured record 1");
+    context.signal.throwIfAborted();
+    await view.findByText("Captured record 1");
+    context.signal.throwIfAborted();
     expect(screen.queryByText("Captured record 201")).not.toBeInTheDocument();
     await user.click(tabs.getByRole("tab", { name: "Timeline" }));
+    context.signal.throwIfAborted();
     act(() => resize(375));
     await user.click(tabs.getByRole("tab", { name: "Session details" }));
+    context.signal.throwIfAborted();
     await user.click(tabs.getByRole("tab", { name: "Transcript" }));
+    context.signal.throwIfAborted();
     await settled(client);
+    context.signal.throwIfAborted();
     state.metadataStatus = 404;
-    await user.click(refreshEvidence); await settled(client);
+    await user.click(refreshEvidence);
+    context.signal.throwIfAborted();
+    await settled(client);
+    context.signal.throwIfAborted();
     await user.click(actionButton(excerptActions, "Resume note save"));
+    context.signal.throwIfAborted();
     const resumed = screen.getByRole("dialog", { name: "Share as note" });
     expect(within(resumed).getByRole("textbox", { name: "Note title" })).toHaveValue("Owner reviewed handoff");
     expect(within(resumed).getByRole("region", { name: "Note content" })).toHaveTextContent("OWNER REVIEWED CONTEXT");
     const validations = state.metadata.length;
     state.saveResponse = saved;
     await user.click(actionButton(resumed, "Retry save"));
+    context.signal.throwIfAborted();
     await within(resumed).findByRole("link", { name: "Open note" });
+    context.signal.throwIfAborted();
     expect(state.writes).toEqual([frozen, frozen]);
     expect(state.metadata).toHaveLength(validations);
     expect(state.bodies).toEqual([contentId(201)]);

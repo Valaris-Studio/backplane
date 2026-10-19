@@ -493,7 +493,7 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(state.mutations).toEqual([{ method: "POST", path: NOTE_PATH }]);
   });
 
-  it("does not mutate when an edited draft is cancelled with Escape", async () => {
+  it("requires explicit Discard after Escape on an edited draft and never mutates", async () => {
     const state = serve();
     renderWithProviders(<SessionTranscript slug={SLUG} session={sourceSession} />);
     const user = userEvent.setup();
@@ -501,6 +501,10 @@ describe("explicit excerpt publication through the session reader", () => {
     await destination(user, dialog);
     await user.type(within(dialog).getByRole("textbox", { name: "Note title" }), " edited");
     await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.getByTestId("unsaved-changes-prompt")).toBeVisible());
+    expect(screen.getByRole("dialog", { name: "Share as note" })).toBeInTheDocument();
+    expect(state.writes).toEqual([]);
+    await user.click(screen.getByTestId("unsaved-changes-discard"));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Share as note" })).not.toBeInTheDocument());
     expect(state.writes).toEqual([]);
     expect(state.mutations).toEqual([]);

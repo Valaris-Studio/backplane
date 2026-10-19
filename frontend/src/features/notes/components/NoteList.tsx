@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Loader2, Pin, Plus, StickyNote } from "lucide-react";
 import { CreateNoteDialog } from "./CreateNoteDialog";
 import { NoteCard } from "./NoteCard";
@@ -97,8 +97,10 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
   const reducedMotion = useReducedMotion();
   const gridRef = useRef<HTMLDivElement>(null);
   const compact = Boolean(boardId);
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const noteParam = searchParams.get(NOTE_SEARCH_PARAM);
+  const previousNoteParam = useRef(noteParam);
 
   const authorById = useMemo(() => {
     const map = new Map<string, string>();
@@ -247,16 +249,22 @@ export function NoteList({ slug, boardId, isFrozen = false }: NoteListProps) {
         next.delete(NOTE_SEARCH_PARAM);
         return next;
       },
-      { replace: true },
+      { replace: true, state: location.state },
     );
-  }, [setSearchParams]);
+  }, [setSearchParams, location.state]);
 
   useEffect(() => {
+    const previous = previousNoteParam.current;
+    previousNoteParam.current = noteParam;
     if (noteParam && fullSelectedNote?.id === noteParam) {
       setSelectedNoteId(noteParam);
       setEditorOpen(true);
+    } else if (!noteParam && previous && selectedNoteId === previous) {
+      // A save can refresh the detail before the approved URL close commits.
+      // Follow removal of that deep link even if the refresh reopened it.
+      setEditorOpen(false);
     }
-  }, [noteParam, fullSelectedNote]);
+  }, [noteParam, fullSelectedNote, selectedNoteId]);
 
   // Closing the editor must also drop the ?note= param, else the deep-link
   // effect re-opens it on the next render. Leaves other params untouched.

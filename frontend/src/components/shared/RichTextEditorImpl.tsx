@@ -158,6 +158,17 @@ export function RichTextEditor({
       onChange(JSON.stringify(editor.getJSON()));
     },
     editorProps: {
+      handleDOMEvents: {
+        keydown: (view, event) => {
+          if (event.key !== "Escape" || event.isComposing || view.composing) return false;
+          // ProseMirror prevents every Escape by default. Run the editor's
+          // handlers once, then let an unconsumed Escape reach the host guard.
+          if (view.someProp("handleKeyDown", (handler) => handler(view, event))) {
+            event.preventDefault();
+          }
+          return true;
+        },
+      },
       attributes: {
         class: "tiptap-editor focus:outline-none",
       },

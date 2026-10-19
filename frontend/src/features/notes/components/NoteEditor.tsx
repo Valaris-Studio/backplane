@@ -5,6 +5,8 @@ import { CompletionContextWarning } from "@/features/kanban/components/Completio
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
+import { useNavigationGuard } from "@/providers/NavigationGuardProvider";
 import { Check, Download, Hash, Info, Link2, Pin, PinOff, Trash2 } from "lucide-react";
 import { useDeleteNote, useUpdateNote } from "../api/use-notes";
 import { downloadNoteMarkdown } from "../utils/noteToMarkdown";
@@ -46,6 +48,7 @@ export function NoteEditor({
   isBodyAuthoritative = true,
 }: NoteEditorProps) {
   const { t } = useTranslation();
+  const location = useLocation();
   // `note` is the LIST object — fine for the metadata strip, but its `content`
   // is a browse payload we must not edit or save back. The body comes from the
   // single-note GET; while that is in flight the draft is provisional, so every
@@ -59,12 +62,13 @@ export function NoteEditor({
   const [pinned, setPinned] = useState(source.pinned);
   const [idCopied, setIdCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const approvedClose = useRef(false);
   const previousSource = useRef<{
     note: Note;
     slug: string;
     open: boolean;
     isBodyAuthoritative: boolean;
-  } | null>(null);
+  }>({ note: source, slug, open, isBodyAuthoritative });
   const updateNote = useUpdateNote(slug, boardId);
   const deleteNote = useDeleteNote(slug, boardId);
 
@@ -77,14 +81,13 @@ export function NoteEditor({
   useEffect(() => {
     const previous = previousSource.current;
     previousSource.current = { note: source, slug, open, isBodyAuthoritative };
-    if (!open || (previous?.note === source && previous.slug === slug &&
+    if (!open || (previous.note === source && previous.slug === slug &&
         previous.open === open && previous.isBodyAuthoritative === isBodyAuthoritative)) return;
 
     // A detail refetch can change pin metadata while this draft is unsaved.
     // Compare with the prior saved copy before deciding to adopt the new one.
-    const wasClean = previous !== null &&
-      title.trim() === previous.note.title && content === previous.note.content;
-    if (!previous || !previous.open || previous.note.id !== source.id ||
+    const wasClean = title.trim() === previous.note.title && content === previous.note.content;
+    if (!previous.open || previous.note.id !== source.id ||
         previous.slug !== slug || (!previous.isBodyAuthoritative && isBodyAuthoritative) || wasClean) {
       resetDraft();
     } else {
@@ -100,16 +103,47 @@ export function NoteEditor({
   const saveDisabled =
     updateNote.isPending || !title.trim() || !isDirty || !isBodyAuthoritative;
 
-  function handleSave() {
-    updateNote.mutate(
-      { noteId: note.id, title: title.trim(), content },
-      { onSuccess: () => onOpenChange(false) },
-    );
+  function closeApproved() {
+    // A successful save or the modal's Discard already authorized this close.
+    // Its URL update can run before React commits the cleared dirty state.
+    approvedClose.current = true;
+    onOpenChange(false);
+    queueMicrotask(() => { approvedClose.current = false; });
   }
+
+  function saveDraft(closeAfterSave: boolean): Promise<boolean> {
+    return new Promise((resolve) => {
+      updateNote.mutate(
+        { noteId: note.id, title: title.trim(), content },
+        {
+          onSuccess: () => {
+            if (closeAfterSave) closeApproved();
+            resolve(true);
+          },
+          onError: () => resolve(false),
+        },
+      );
+    });
+  }
+
+  function handleSave() {
+    void saveDraft(true);
+  }
+
+  useNavigationGuard({
+    isDirty: open && isDirty,
+    canSave: !saveDisabled,
+    save: () => saveDraft(false),
+    discard: resetDraft,
+    leavesScope: (next) => !approvedClose.current && (
+      next.pathname !== location.pathname ||
+      new URLSearchParams(next.search).get("note") !== new URLSearchParams(location.search).get("note")
+    ),
+  });
 
   const guard = useUnsavedChangesGuard({
     isDirty,
-    onClose: () => onOpenChange(false),
+    onClose: closeApproved,
     onSave: handleSave,
     canSave: !saveDisabled,
     onDiscard: resetDraft,

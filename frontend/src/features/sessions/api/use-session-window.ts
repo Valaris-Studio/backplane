@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isApiError } from "@/lib/api-error";
 import { sessionKeys } from "@/lib/query-keys";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import type { AgentSession, SessionContentPage, SessionContentWindow, SessionContentWindowMode } from "@/types/agent-session";
 import { useForgetSessionContent } from "./use-session-realtime";
 import { retryServerErrors } from "./use-sessions";
@@ -16,16 +17,26 @@ export interface ContentWindowRequest {
   anchor_id?: string;
 }
 
+interface RetainedWindow {
+  cursor?: string;
+  legacy: boolean;
+}
+
 export function useSessionWindow(slug: string, sessionId: string, active: boolean, initialAnchor?: string) {
   const queryClient = useQueryClient();
   const forgetContent = useForgetSessionContent();
-  const [navigation, setNavigation] = useState<ContentWindowRequest & { request: number }>(() => ({
+  const returnNavigation = useReturnNavigation();
+  const viewKey = `session-reader-window:${slug}/${sessionId}`;
+  const [retainedWindow] = useState(() => returnNavigation?.readView<RetainedWindow>(viewKey));
+  const [navigation, setNavigation] = useState<Omit<ContentWindowRequest, "mode"> & { mode: SessionContentWindowMode; request: number }>(() => retainedWindow ? {
+    mode: retainedWindow.legacy ? "beginning" : "refresh", cursor: retainedWindow.cursor, request: 0,
+  } : {
     mode: initialAnchor ? "anchor" : "latest", anchor_id: initialAnchor, request: 0,
-  }));
+  });
   const [changed, setChanged] = useState(false);
   const parked = useRef(false);
   const [unsupported, setUnsupported] = useState(false);
-  const [legacy, setLegacy] = useState(false);
+  const [legacy, setLegacy] = useState(retainedWindow?.legacy ?? false);
   const key = sessionKeys.contentWindow(slug, sessionId, navigation);
   const query = useQuery({
     queryKey: key,
@@ -49,6 +60,7 @@ export function useSessionWindow(slug: string, sessionId: string, active: boolea
       } catch (error) {
         if (!signal.aborted && isApiError(error)) {
           if ([401, 403].includes(error.status)) {
+            returnNavigation?.forget();
             queryClient.setQueryData(sessionKeys.detail(slug, sessionId), null);
             forgetContent(slug, sessionId);
           }
@@ -73,6 +85,16 @@ export function useSessionWindow(slug: string, sessionId: string, active: boolea
     placeholderData: (previous) => previous,
     meta: { explicitSessionRefresh: () => { parked.current = false; setChanged(false); } },
   });
+
+  useEffect(() => {
+    if (!query.data || query.isPlaceholderData || query.isError) return;
+    // Keep only the server's bounded-window identity. Return reauthorizes and
+    // reloads that exact window; private record bodies never enter view memory.
+    returnNavigation?.writeView(viewKey, {
+      cursor: legacy ? navigation.cursor : query.data.window_cursor,
+      legacy,
+    });
+  }, [query.data, query.isPlaceholderData, query.isError, returnNavigation, viewKey, legacy, navigation.cursor]);
 
   useEffect(() => {
     if (!active) void queryClient.cancelQueries({ queryKey: key, exact: true, predicate: (candidate) => !candidate.isActive() });

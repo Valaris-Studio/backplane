@@ -1,12 +1,14 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Link, useLocation, useNavigationType, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, RotateCw, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ReturnLink } from "@/components/shared/ContextLink";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { isApiError } from "@/lib/api-error";
@@ -32,13 +34,14 @@ export function SessionDetailPage() {
   const { slug = "" } = useParams();
   return (
     <div className="flex flex-col gap-[var(--page-section-gap)]">
-      <Link
+      <ReturnLink
         to={`/${slug}/sessions`}
+        returnLabel={<><ChevronLeft aria-hidden className="size-4" />{t("navigation.returnToPrevious")}</>}
         className="inline-flex w-fit items-center gap-1 rounded-[var(--radius-cap)] text-sm font-semibold text-foreground/75 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ChevronLeft aria-hidden className="size-4" />
         {t("sessions.detail.back")}
-      </Link>
+      </ReturnLink>
       <CompanionGate>
         <SessionDetail />
       </CompanionGate>
@@ -82,12 +85,17 @@ export function SessionDetailSkeleton() {
 function SessionDetail() {
   const { t } = useTranslation();
   const { slug = "", sessionId = "" } = useParams();
+  const location = useLocation();
+  const returnNavigation = useReturnNavigation();
   const enabled = useCompanionEnabled() === true;
   const session = useSession(slug, sessionId, enabled);
   const errorStatus = isApiError(session.error) ? session.error.status : 0;
   const accessLost = session.isError && [401, 403, 404].includes(errorStatus);
   const gone = accessLost && errorStatus === 404;
   const retainSession = !!session.data && (!session.isError || errorStatus === 0 || errorStatus === 408 || errorStatus === 429 || errorStatus >= 500);
+  useLayoutEffect(() => {
+    if (accessLost || session.data === null) returnNavigation?.forget(location.pathname);
+  }, [accessLost, session.data, returnNavigation, location.pathname]);
   if (session.isPending) return <SessionDetailSkeleton />;
   if (gone) return <SessionNotFound />;
   if (session.data === null && !session.isError) return <SessionNotFound accessLost />;
@@ -122,9 +130,28 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
   const { t } = useTranslation();
   const compact = !useMediaQuery("(min-width: 1280px)");
   const location = useLocation();
-  const [tab, setTab] = useState<ReaderTab>(() => location.hash.startsWith("#content-") ? "transcript" : "timeline");
-  useEffect(() => { if (location.hash.startsWith("#content-")) setTab("transcript"); }, [location.hash, location.key]);
-  useEffect(() => { if (!compact && tab === "details") setTab("timeline"); }, [compact, tab]);
+  const navigationType = useNavigationType();
+  const returnNavigation = useReturnNavigation();
+  const tabKey = `session-reader-tab:${slug}/${session.id}`;
+  const [tab, setTabState] = useState<ReaderTab>(() => returnNavigation?.readView<ReaderTab>(tabKey) ?? (location.hash.startsWith("#content-") ? "transcript" : "timeline"));
+  const setTab = useCallback((next: ReaderTab) => {
+    returnNavigation?.writeView(tabKey, next);
+    setTabState(next);
+  }, [returnNavigation, tabKey]);
+  const tabEntry = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (tabEntry.current === location.key) return;
+    const replacingEntry = tabEntry.current !== null && navigationType === "REPLACE";
+    tabEntry.current = location.key;
+    // REPLACE keeps this reader mounted but creates a new history entry key.
+    if (replacingEntry) {
+      returnNavigation?.writeView(tabKey, tab);
+      return;
+    }
+    const retainedTab = returnNavigation?.readView<ReaderTab>(tabKey);
+    setTab(retainedTab ?? (location.hash.startsWith("#content-") ? "transcript" : "timeline"));
+  }, [location.hash, location.key, navigationType, returnNavigation, tabKey, tab, setTab]);
+  useEffect(() => { if (!compact && tab === "details") setTab("timeline"); }, [compact, tab, setTab]);
   const [selectedWork, setSelectedWork] = useState<SessionWorkIdentity | null>(null);
   const [timelineTarget, setTimelineTarget] = useState<HTMLElement | null>(null);
   const [readerTarget, setReaderTarget] = useState<HTMLHeadingElement | null>(null);

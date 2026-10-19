@@ -36,16 +36,7 @@ function Dialog({
 }) {
   const titleId = React.useId();
 
-  React.useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onOpenChange, open]);
+
 
   return (
     <DialogContext.Provider value={{ open, onOpenChange, titleId }}>
@@ -222,6 +213,7 @@ const DialogContentImpl = React.forwardRef<
   // dialog not existing yet.)
   const armInitialFocus = useFocusTrap(contentRef, open, {
     deferInitialFocus: true,
+    onEscape: () => onOpenChange(false),
   });
 
   // Lazily seeded from storage so a reopened dialog restores the operator's

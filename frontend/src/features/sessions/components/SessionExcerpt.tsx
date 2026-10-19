@@ -16,6 +16,7 @@ import { useSelectedSessionContent } from "../api/use-selected-session-content";
 import { canExcerpt } from "../utils/excerpt";
 import { excerptNoteDocument, EXCERPT_NOTE_MAX_ITEMS, type ExcerptNoteDraft } from "../utils/excerpt-note";
 import { selectedSourceFingerprint } from "../utils/selected-content";
+import { useHandoffDraft, type HandoffDraftController } from "../hooks/use-handoff-drafts";
 import { ExcerptNoteDialog } from "./ExcerptNoteDialog";
 
 export function ExcerptCheckbox({ item, selected, onSelect }: {
@@ -31,13 +32,18 @@ export function ExcerptCheckbox({ item, selected, onSelect }: {
   />;
 }
 
-export function SessionExcerpt({ slug, session, items, selected, hasMore, draft, onDraftChange, onClear, onActionsHeightChange, revalidateSources = false, active = true, loadedCount }: {
+export function SessionExcerpt({ slug, session, items, selected, hasMore, draft, onDraftChange, onClear, onActionsHeightChange, revalidateSources = false, active = true, loadedCount, handoff: retainedHandoff }: {
   slug: string; session: AgentSession; items: SessionContent[]; selected: ReadonlySet<string>; hasMore: boolean; onClear: () => void;
   draft: ExcerptNoteDraft | null; onDraftChange: (draft: ExcerptNoteDraft | null) => void;
   onActionsHeightChange?: (height: number) => void;
   revalidateSources?: boolean; active?: boolean; loadedCount?: number;
+  handoff?: HandoffDraftController;
 }) {
   const { t } = useTranslation();
+  const fallbackHandoff = useHandoffDraft(slug, session.id);
+  const handoff = retainedHandoff ?? fallbackHandoff;
+  const [completedDraft, setCompletedDraft] = useState<ExcerptNoteDraft | null>(null);
+  const displayedDraft = draft ?? completedDraft;
   const privacyId = useId();
   const selectedItems = items.filter((item) => selected.has(item.id));
   const missingSelection = selectedItems.length !== selected.size || selectedItems.some((item) => !canExcerpt(item));
@@ -123,8 +129,32 @@ export function SessionExcerpt({ slug, session, items, selected, hasMore, draft,
     validating.current = false;
     setIsValidating(false);
     if (!fresh || fingerprintRef.current !== requestedFingerprint) return;
-    onDraftChange({ fingerprint, session, bodies: data.bodies, document: excerptNoteDocument(slug, session, data.bodies, t) });
+    const nextDraft = {
+      fingerprint, session,
+      // The reviewed document contains the text; publication only needs the
+      // exact source identities afterward, not a second body copy.
+      bodies: data.bodies.map(({ item }) => ({ item: { ...item, preview: null }, text: "" })),
+      document: excerptNoteDocument(slug, session, data.bodies, t),
+    };
+    if (!handoff.setDraft(nextDraft)) {
+      toast.error(t("sessions.contents.excerpt.note.capacity"));
+      return;
+    }
+    setCompletedDraft(null);
+    onDraftChange(nextDraft);
     close();
+  }
+
+  function discardDraft() {
+    setCompletedDraft(null);
+    handoff.setDraft(null);
+    onDraftChange(null);
+  }
+
+  function completeDraft() {
+    if (draft) setCompletedDraft({ ...draft, document: "", bodies: [] });
+    handoff.setDraft(null);
+    onDraftChange(null);
   }
 
   async function copy() {
@@ -151,13 +181,13 @@ export function SessionExcerpt({ slug, session, items, selected, hasMore, draft,
     <div ref={actions} className="sticky top-[calc(var(--topbar-height)+0.5rem)] z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 bg-[color:var(--color-surface-1)] px-[var(--card-padding)] py-2">
       <p className="min-w-0 flex-1 basis-full text-sm tabular-nums sm:basis-auto" aria-live="polite">{t(loadedCount === undefined ? "sessions.contents.excerpt.count" : "sessions.contents.excerpt.windowCount", { selected: selected.size, loaded: loadedCount ?? items.length, count: loadedCount ?? items.length })}</p>
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        {selected.size > 0 ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={draft !== null} onClick={onClear}>{t("sessions.contents.excerpt.clear")}</Button> : null}
-        <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={!selected.size || missingSelection || (revalidateSources && validation.changed) || draft !== null || isValidating} onClick={() => void preview()}>{t("sessions.contents.excerpt.preview")}</Button>
+        {selected.size > 0 ? <Button variant="ghost" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={displayedDraft !== null} onClick={onClear}>{t("sessions.contents.excerpt.clear")}</Button> : null}
+        <Button variant="outline" size="sm" className="max-sm:min-h-[44px] max-sm:min-w-[44px]" disabled={!selected.size || missingSelection || (revalidateSources && validation.changed) || displayedDraft !== null || isValidating} onClick={() => void preview()}>{t("sessions.contents.excerpt.preview")}</Button>
       </div>
       {isValidating ? <p role="status" className="basis-full text-xs text-muted-foreground">{t("sessions.contents.excerpt.validating")}</p> : null}
-      {draft ? <ExcerptNoteDialog draft={draft} stale={missingSelection || (revalidateSources && validation.changed) || draft.fingerprint !== fingerprint}
-        sourceCheckFailed={revalidateSources && validation.isError} onRecheckSources={revalidateSources ? freshSelection : undefined} onDiscard={() => onDraftChange(null)}
-        beforeFirstSave={revalidateSources ? async () => (await freshSelection()) !== null && fingerprintRef.current === draft.fingerprint : undefined} /> : null}
+      {displayedDraft ? <ExcerptNoteDialog draft={displayedDraft} handoff={handoff} onComplete={completeDraft} stale={missingSelection || (revalidateSources && validation.changed) || displayedDraft.fingerprint !== fingerprint}
+        sourceCheckFailed={revalidateSources && validation.isError} onRecheckSources={revalidateSources ? freshSelection : undefined} onDiscard={discardDraft}
+        beforeFirstSave={revalidateSources ? async () => (await freshSelection()) !== null && fingerprintRef.current === displayedDraft.fingerprint : undefined} /> : null}
     </div>
     <div className="grid gap-2 border-b border-border/60 px-[var(--card-padding)] py-3">
       <p className="text-xs text-muted-foreground">{t("sessions.contents.excerpt.excludedAttachments")}</p>

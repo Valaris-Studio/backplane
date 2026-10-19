@@ -222,10 +222,8 @@ describe("CardDetailSheet — column change persistence", () => {
       cardId: "card-1",
       column_id: "col-2",
     });
-    // The field PATCH must NOT carry column_id (backend ignores it; /move owns
-    // the move).
-    expect(updateMutate).toHaveBeenCalledTimes(1);
-    expect(updateMutate.mock.calls[0]![0]).not.toHaveProperty("column_id");
+    // A column-only move has no field changes to persist.
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 
   it("does not call move when the column is unchanged", async () => {

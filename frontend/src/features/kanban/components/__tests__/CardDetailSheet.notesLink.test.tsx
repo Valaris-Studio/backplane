@@ -6,7 +6,9 @@
 // (sourced from useNotes(slug, boardId), i.e. the unpaginated board list, NOT
 // the paginated browse list) and a per-row "Unlink note" button.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup } from "@testing-library/react";
+import type { Editor } from "@tiptap/core";
 import { gsap } from "gsap";
 import {
   renderWithProviders,
@@ -187,6 +189,18 @@ beforeEach(() => {
     },
   );
   updateNoteMutate.mockReset();
+});
+
+afterEach(async () => {
+  // TipTap destroys editors on a deferred timer after React unmounts. Keep
+  // their real DOM handles before cleanup and await destruction while jsdom exists.
+  const editors = Array.from(
+    document.querySelectorAll<HTMLElement & { editor?: Editor }>(".tiptap"),
+  ).flatMap((element) => element.editor ? [element.editor] : []);
+  cleanup();
+  await waitFor(() => {
+    for (const editor of editors) expect(editor.isDestroyed).toBe(true);
+  });
 });
 
 describe("CardDetailSheet — link note picker", () => {

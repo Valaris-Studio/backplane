@@ -13,6 +13,7 @@ type Props = {
   open: boolean;
   /** false ⇒ Save is withheld; the draft cannot be persisted as it stands. */
   canSave: boolean;
+  pending?: boolean;
   onSave: () => void;
   onDiscard: () => void;
   onKeepEditing: () => void;
@@ -28,6 +29,7 @@ type Props = {
 export function UnsavedChangesPrompt({
   open,
   canSave,
+  pending = false,
   onSave,
   onDiscard,
   onKeepEditing,
@@ -72,6 +74,7 @@ export function UnsavedChangesPrompt({
               variant="destructive"
               size="sm"
               onClick={onDiscard}
+              disabled={pending}
               data-testid="unsaved-changes-discard"
             >
               {t("unsavedChanges.discard")}
@@ -80,6 +83,7 @@ export function UnsavedChangesPrompt({
               <Button
                 size="sm"
                 onClick={onSave}
+                disabled={pending}
                 data-testid="unsaved-changes-save"
               >
                 {t("unsavedChanges.save")}

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { buildEntityLink } from "../entity-link";
+import { buildEntityLink, type EntityRef } from "../entity-link";
 
 const slug = "acme";
 
@@ -62,5 +62,45 @@ describe("buildEntityLink", () => {
     expect(buildEntityLink({ type: "card", slug })).toBeNull(); // missing id+boardId
     expect(buildEntityLink({ type: "execution", slug })).toBeNull(); // missing id
     expect(buildEntityLink({ type: "pr", slug })).toBeNull(); // missing url
+  });
+});
+
+// The boundary also consumes references decoded from server records. These
+// cases exercise runtime behavior while the destination union is extended.
+function destination(ref: unknown) { return buildEntityLink(ref as EntityRef); }
+
+describe("continuity destinations", () => {
+  it("links a session and exact content without copying private origin metadata", () => {
+    expect(destination({ type: "session", slug, id: "session-1" })).toEqual({ href: "/acme/sessions/session-1", external: false });
+    expect(destination({ type: "session", slug, id: "session-1", contentId: "content-19" })).toEqual({ href: "/acme/sessions/session-1#content-content-19", external: false });
+  });
+
+  it.each([undefined, "board-1"])("links an exact resource using its authorized scope (board: %s)", (boardId) => {
+    expect(destination({ type: "resource", slug, id: "resource-51", boardId })).toEqual({
+      href: boardId ? "/acme/boards/board-1/resources?resource=resource-51" : "/acme/resources?resource=resource-51", external: false,
+    });
+  });
+
+  it("shares board-wide event identity without a private replay generation", () => {
+    expect(destination({ type: "timeline", slug, boardId: "board-1", eventSequence: 451, generation: "private-generation", returnTo: "/acme/sessions/private-source?q=private-query" })).toEqual({
+      href: "/acme/boards/board-1/timeline?at=451", external: false,
+    });
+  });
+
+  it("rejects incomplete exact destinations instead of guessing another entity or event", () => {
+    for (const ref of [
+      { type: "session", slug }, { type: "resource", slug },
+      { type: "timeline", slug, eventSequence: 451 },
+      { type: "timeline", slug, boardId: "board-1", eventSequence: -1 },
+      { type: "timeline", slug, boardId: "board-1", eventSequence: "today" },
+    ]) expect(destination(ref)).toBeNull();
+  });
+
+  it("ignores source details and return URLs on shared card, note and resource references", () => {
+    for (const type of ["card", "note", "resource"]) {
+      const resolved = destination({ type, slug, id: "target", boardId: "board-1", returnTo: "https://external.example/private", originId: "private-session", title: "Private title", query: "Private query", snippet: "Private body" });
+      expect(resolved).not.toBeNull();
+      expect(resolved!.href).not.toMatch(/private|return|origin|external/i);
+    }
   });
 });

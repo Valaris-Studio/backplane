@@ -109,6 +109,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Resolve copy comparison baseline
+        env:
+          I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'HEAD^' }}
+        run: |
+          # A rewritten push can leave its before commit outside fetched refs.
+          if ! git cat-file -e "${I18N_COPY_BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$I18N_COPY_BASE_SHA"
+          fi
+          git rev-parse --verify "${I18N_COPY_BASE_SHA}^{commit}" >/dev/null
       - uses: pnpm/action-setup@v4
         with:
           version: 11.5.1

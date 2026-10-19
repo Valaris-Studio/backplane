@@ -10121,7 +10121,9 @@
           "resumeDraft": "Retomar borrador de nota",
           "discard": "Descartar borrador",
           "recheck": "Comprobar de nuevo",
-          "sourceCheckFailed": "No se pudieron comprobar las fuentes seleccionadas. Tu borrador se conserva. Vuelve a comprobarlas antes de guardar."
+          "sourceCheckFailed": "No se pudieron comprobar las fuentes seleccionadas. Tu borrador se conserva. Vuelve a comprobarlas antes de guardar.",
+          "memoryOnly": "Este borrador se conserva en esta pestaña mientras navegas. Se pierde al recargarla o cerrarla.",
+          "capacity": "Esta pestaña ha alcanzado su límite de borradores. Finaliza o descarta otro borrador, borra una selección que no uses o acorta este borrador."
         },
         "moreWindows": "La selección se conserva al pasar de un intervalo a otro.",
         "validating": "Comprobando las fuentes seleccionadas…",
@@ -10306,5 +10308,9 @@
       "sessionTotals": "Totales de la sesión",
       "loaded_many": "{{count}} llamadas coincidentes cargadas"
     }
+  },
+  "navigation": {
+    "returnToPrevious": "Volver a la vista anterior",
+    "previousViewUnavailable": "La vista anterior ya no está disponible. Usa la página superior para continuar."
   }
 }
