@@ -23,6 +23,7 @@ from app.schemas.notes.note import (
     NoteAppend,
     NoteCreate,
     NoteFormat,
+    NotePublicationPresenceRead,
     NotePublicationRevisionRead,
     NoteRead,
     NoteSectionReplace,
@@ -30,6 +31,7 @@ from app.schemas.notes.note import (
     NoteUpdate,
 )
 from app.routers.notes.list_options import build_list_options
+from app.routers.notes.history import board_router as history_router
 from app.services.notes.note import NoteService
 
 router = APIRouter(
@@ -201,6 +203,29 @@ async def get_board_note(
     )
 
 
+async def get_board_note_publication_presence(
+    note_id: uuid.UUID,
+    board_id: uuid.UUID = Depends(resolve_board_id),
+    ctx: WorkspaceContext = Depends(get_workspace),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    return await NoteService(db).get_note_publication_presence(
+        workspace_id=ctx.workspace.id,
+        board_id=board_id,
+        note_id=note_id,
+        user_id=ctx.user.id,
+    )
+
+
+router.add_api_route(
+    "/{note_id}/publication-revision/presence",
+    get_board_note_publication_presence,
+    methods=["GET"],
+    response_model=NotePublicationPresenceRead,
+    route_class_override=PrivateRoute,
+)
+
+
 async def get_board_note_publication_revision(
     note_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
@@ -274,3 +299,6 @@ async def delete_board_note(
 ):
     service = NoteService(db)
     await service.delete_note(note_id, ctx.workspace.id, actor_id=ctx.user.id, board_id=board_id)
+
+
+router.include_router(history_router)

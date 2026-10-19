@@ -44,4 +44,4 @@ def test_alembic_revision_ids_are_unique_and_have_one_head():
     assert not missing, f"missing Alembic parent revisions: {sorted(missing)}"
 
     heads = set(revisions) - referenced_parents
-    assert heads == {"123"}, f"expected Alembic head 123, got {sorted(heads)}"
+    assert heads == {"125"}, f"expected Alembic head 125, got {sorted(heads)}"

@@ -48,6 +48,8 @@ export const noteKeys = {
     ["note-detail", slug, noteId] as const,
   publicationRevision: (slug: string, boardId: string, noteId: string, ownerId?: string) =>
     ["note-publication-revision", slug, boardId, noteId, ...(ownerId ? [ownerId] : [])] as const,
+  publicationPresence: (slug: string, boardId: string, noteId: string, ownerId?: string) =>
+    ["note-publication-revision", slug, boardId, noteId, ...(ownerId ? [ownerId] : []), "presence"] as const,
 };
 
 export const activityKeys = {

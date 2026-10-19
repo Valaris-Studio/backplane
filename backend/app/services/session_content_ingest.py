@@ -33,6 +33,7 @@ from app.schemas.session_content import (
 )
 from app.services.rich_capture import effective_capture, grants_bodies
 from app.services.session_history_cutoff import MAX_CLOCK_SKEW
+from app.services.session_search_index import SessionSearchIndexWriter
 
 JSON_MEDIA_TYPES = frozenset({"application/json"})
 NDJSON_MEDIA_TYPES = frozenset({"application/x-ndjson"})
@@ -199,6 +200,7 @@ class SessionContentIngest:
         bodies_granted = grants_bodies(mapping, installation)
         level = effective_capture(mapping, installation).effective_content_level
         now = datetime.now(timezone.utc)
+        accepted_inline = []
         for item in record.contents:
             if cutoff is not None and as_utc(item.occurred_at) <= cutoff:
                 declared.acks.append(self._ack(record, item, "dropped"))
@@ -238,6 +240,8 @@ class SessionContentIngest:
                     session.content_bytes += size
                     declared.reserved += size
                     self._accept_body(content, item, now)
+                    if content.state == "available":
+                        accepted_inline.append(content)
             if server_coverage is not None:
                 content.state = "recorded"
                 content.coverage, content.coverage_reason = server_coverage
@@ -247,6 +251,10 @@ class SessionContentIngest:
             declared.stored += 1
             declared.acks.append(ack_of(content, record.capture_id))
         await self.db.flush()
+        # Searchable in the same transaction as the bodies themselves.
+        await SessionSearchIndexWriter(self.db).index_new_contents(
+            session, accepted_inline
+        )
         return declared
 
     async def _generation(self, installation, record: RichCaptureRecord):

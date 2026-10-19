@@ -52,6 +52,7 @@ from app.services.session_content_ingest import (
     upload_slot,
 )
 from app.services.session_events import Invalidation, session_updated
+from app.services.session_search_index import SessionSearchIndexWriter
 from app.core.session_content_keys import (
     body_key,
     content_prefix,
@@ -78,11 +79,15 @@ _IMAGE_SIGNATURES = {
 class Finalized:
     """Finalize's answer, the invalidations to publish, and stored objects to
     delete once the transaction committed (never under its row locks; each is
-    also queued, so a failed delete is retried by the purge)."""
+    also queued, so a failed delete is retried by the purge). Text bodies it
+    made available are indexed after commit too, outside its locks; each is
+    recorded pending in the settlement, so one that fails stays reported
+    pending rather than silently unsearchable."""
 
     answer: "ContentUploadState | UploadRefusal"
     invalidations: list[Invalidation]
     leftovers: list[str]
+    index_content_ids: tuple[uuid.UUID, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -424,8 +429,10 @@ class SessionContentUploadService:
         content.storage_backend = self.store.backend
         content.storage_key = body_key(content)
         content.available_at = now
-        if content.media_type in TEXT_MEDIA_TYPES:
+        is_text = content.media_type in TEXT_MEDIA_TYPES
+        if is_text:
             content.preview = preview_of(body)
+            await SessionSearchIndexWriter(self.db).mark_pending(content)
         # Staging is deleted after commit, and queued in case that fails.
         await self.repo.queue_deletions(
             self.store.backend, [staging_prefix(content)], now
@@ -435,6 +442,7 @@ class SessionContentUploadService:
             upload_state(content),
             [session_updated(session, "content_available")],
             [staging_prefix(content)],
+            (content.id,) if is_text else (),
         )
 
     async def _record(self, session, content: AgentSessionContent, coverage) -> None:

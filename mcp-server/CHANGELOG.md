@@ -4,6 +4,18 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- `update_note` and its supported aliases commit content and metadata together
+  through the shared note-edit service. Optional expected revision/digest and
+  request IDs support conflict checks and safe retries; no-op edits create no
+  revision. Receipts distinguish the current revision from the applied edit.
+- Note edits require a backend with the atomic `/notes/{note_id}/edit` route.
+  Older backends return an error rather than falling back to separate writes.
+  Existing credentials, toolsets and allowlists remain applicable.
+
 ## [0.9.4] - 2026-10-15
 
 ### Security

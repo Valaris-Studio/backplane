@@ -67,10 +67,14 @@ function revisionPath(slug = SLUG, noteId = "published-note") {
   return `/api/workspaces/${slug}/boards/${BOARD}/notes/${noteId}/publication-revision`;
 }
 
+function presencePath(slug = SLUG, noteId = "published-note") {
+  return `${revisionPath(slug, noteId)}/presence`;
+}
+
 // Fallbacks keep the first regression about the absent action, not absent
 // catalog keys. The locale case separately requires real per-locale strings.
 const fallbackCopy = {
-  action: "Publication revision", matches: "Matches publication revision",
+  action: "Compare with original handoff", matches: "Matches publication revision",
   differs: "Differs from publication revision", noRecord: "No publication record",
   revisionNotRecorded: "Publication revision was not recorded",
   unsupportedVersion: "Publication revision version is not supported",
@@ -78,7 +82,7 @@ const fallbackCopy = {
   loadError: "Could not load publication revision", accessLost: "Publication revision is unavailable or access was lost",
   savedNoteScope: "Compares the saved note, not unsaved edits.",
   fieldScope: "Includes title, content, kind and pin state. Excludes card links and timestamps.",
-  recordedAt: "Recorded at", details: "Details", version: "Revision version",
+  recordedAt: "Recorded at", details: "Details",
   publishedDigest: "Published revision", currentDigest: "Current saved revision",
   checkAgain: "Check again", loading: "Checking publication revision…",
 };
@@ -121,7 +125,7 @@ function connection() {
   };
 }
 
-function setup(options: { note?: Note; userId?: string; identityPending?: boolean; response?: PublicationRevision; status?: number; allowPinUpdate?: boolean; workspaceRoute?: boolean } = {}) {
+function setup(options: { note?: Note; userId?: string; identityPending?: boolean; hasRecord?: boolean; presenceStatus?: number; response?: PublicationRevision; status?: number; allowPinUpdate?: boolean; workspaceRoute?: boolean } = {}) {
   const note = options.note ?? makeNote();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, refetchOnWindowFocus: false } } });
   clients.push(client);
@@ -130,7 +134,12 @@ function setup(options: { note?: Note; userId?: string; identityPending?: boolea
     identity.release();
     client.setQueryData(meKeys.me(), { ...OWNER, id: options.userId ?? OWNER.id });
   }
+  const defaultHasRecord = options.hasRecord ?? (options.response?.status !== "no_record");
   const state = {
+    hasRecord: defaultHasRecord,
+    presenceStatus: options.presenceStatus ?? 200,
+    presenceRequests: [] as string[],
+    presenceNextGate: null as ReturnType<typeof deferred> | null,
     response: options.response ?? recorded(), status: options.status ?? 200,
     revisionRequests: [] as string[], unexpected: [] as string[], routineRequests: [] as string[],
     pinUpdates: [] as unknown[],
@@ -140,6 +149,20 @@ function setup(options: { note?: Note; userId?: string; identityPending?: boolea
   };
   server.use(http.all("/api/*", async ({ request }) => {
     const path = new URL(request.url).pathname;
+    if (request.method === "GET" && path.endsWith("/publication-revision/presence")) {
+      state.presenceRequests.push(path);
+      const status = state.presenceStatus;
+      const hasRecord = state.hasRecord;
+      const gate = state.presenceNextGate;
+      state.presenceNextGate = null;
+      await gate?.ready;
+      return HttpResponse.json(
+        status === 200
+          ? { has_record: hasRecord, recorded_at: hasRecord ? RECORDED_AT : null }
+          : { detail: "Synthetic presence request rejected" },
+        { status },
+      );
+    }
     if (request.method === "GET" && path.endsWith("/publication-revision")) {
       state.revisionRequests.push(path);
       const response = structuredClone(state.response);
@@ -214,11 +237,35 @@ afterEach(async () => {
 });
 
 describe("NoteEditor publication revision — deliberate saved-note inspection", () => {
-  it("offers the publishing owner an explicit action and performs no revision read before it", async () => {
+  it("renders no comparison action for an ordinary UI or MCP note with no publication record", async () => {
+    const { state, client } = setup({
+      note: makeNote({ id: "ordinary-note", title: "Ordinary note" }),
+      hasRecord: false,
+      response: unavailable("no_record"),
+    });
+    await settled(client);
+    expect(screen.queryByRole("button", { name: /Compare with original handoff|Publication revision|Check original publication/i })).not.toBeInTheDocument();
+    expect(state.presenceRequests).toEqual([presencePath(SLUG, "ordinary-note")]);
+    expect(state.revisionRequests).toEqual([]);
+    expectReadOnly(state);
+  });
+
+  it("does not silently treat a failed presence query as 'no record' or prefetch the comparison body", async () => {
+    const { state, client } = setup({ presenceStatus: 503 });
+    await settled(client);
+    expect(state.presenceRequests).toEqual([presencePath()]);
+    expect(state.revisionRequests).toEqual([]);
+    expect(screen.queryByText(copy("noRecord"))).not.toBeInTheDocument();
+    expect(screen.getByText(copy("loadError"))).toBeVisible();
+    expectReadOnly(state);
+  });
+
+  it("offers the publishing owner an explicit Compare with original handoff action after presence check and performs no revision read before it", async () => {
     const { state, client } = setup();
     await settled(client);
+    expect(state.presenceRequests).toEqual([presencePath()]);
     expect(state.revisionRequests).toEqual([]);
-    const action = screen.getByRole("button", { name: "Publication revision" });
+    const action = screen.getByRole("button", { name: "Compare with original handoff" });
     expect(action).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(action);
     expect(await screen.findByText(copy("matches"))).toBeVisible();
@@ -230,22 +277,25 @@ describe("NoteEditor publication revision — deliberate saved-note inspection",
     const { state, client } = setup({ userId: "shared-note-recipient" });
     await settled(client);
     expect(screen.getByDisplayValue("Published handoff")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Publication revision" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Compare with original handoff|Publication revision/i })).not.toBeInTheDocument();
+    expect(state.presenceRequests).toEqual([]);
     expect(state.revisionRequests).toEqual([]);
     expectReadOnly(state);
   });
 
-  it("waits for current identity before offering the owner action without prefetching proof", async () => {
+  it("waits for current identity before checking presence or offering the owner action without prefetching proof", async () => {
     const { state, identity, client } = setup({ identityPending: true });
-    expect(screen.queryByRole("button", { name: "Publication revision" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Compare with original handoff|Publication revision/i })).not.toBeInTheDocument();
+    expect(state.presenceRequests).toEqual([]);
     expect(state.revisionRequests).toEqual([]);
     await act(async () => { identity.release(); });
-    expect(await screen.findByRole("button", { name: "Publication revision" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Compare with original handoff" })).toBeVisible();
     await settled(client);
+    expect(state.presenceRequests).toEqual([presencePath()]);
     expect(state.revisionRequests).toEqual([]);
   });
 
-  it("shows saved-note scope immediately and reveals hashes only through Details", async () => {
+  it("shows saved-note scope immediately and reveals hashes only through Details without a misleading revision-history counter", async () => {
     const { state } = setup({ response: recorded({ comparison: "differs", current_revision_sha256: DIFFERENT }) });
     await openPublication();
     expect(await screen.findByText(copy("differs"))).toBeVisible();
@@ -258,6 +308,7 @@ describe("NoteEditor publication revision — deliberate saved-note inspection",
     expect(screen.getByText(DIFFERENT, { exact: true })).toBeVisible();
     expect(screen.getByText(copy("fieldScope"))).toBeVisible();
     expect(screen.getByText(copy("recordedAt"), { exact: true })).toBeVisible();
+    expect(screen.queryByText("Revision version", { exact: true })).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/never edited|human.reviewed|model.used|approved analysis/i);
     expectReadOnly(state);
   });
@@ -284,7 +335,7 @@ describe("NoteEditor publication revision — deliberate saved-note inspection",
     ["unsupported version", { ...unavailable("unsupported_version"), revision_version: 99 }, "unsupportedVersion"],
     ["oversized current note", recorded({ current_revision_sha256: null, comparison: "unavailable", comparison_reason: "current_note_too_large" }), "currentNoteTooLarge"],
   ] as const)("distinguishes %s without claiming a match or a difference", async (_label, response, messageKey) => {
-    const { state } = setup({ response });
+    const { state } = setup({ hasRecord: true, response });
     await openPublication();
     expect(await screen.findByText(copy(messageKey))).toBeVisible();
     expect(screen.queryByText(copy("matches"))).not.toBeInTheDocument();
@@ -568,7 +619,7 @@ describe("NoteEditor publication revision — deliberate saved-note inspection",
     const dialog = screen.getByRole("dialog");
     const initialWidth = dialog.style.width;
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    const action = await screen.findByRole("button", { name: "Publication revision" });
+    const action = await screen.findByRole("button", { name: "Compare with original handoff" });
     action.focus();
     await user.keyboard("{Enter}");
     expect(await screen.findByText(copy("matches"))).toBeVisible();
@@ -584,6 +635,7 @@ describe("NoteEditor publication revision — deliberate saved-note inspection",
   it.each(SUPPORTED_LANGUAGES)("renders the real %s catalog with every publication state and detail translated", async (language) => {
     await i18n.changeLanguage(language);
     const { state } = setup();
+    expect(i18n.getResource("en", "translation", "notes.publicationRevision.action")).toBe("Compare with original handoff");
     await openPublication();
     expect(await screen.findByText(copy("matches"))).toBeVisible();
     for (const key of Object.keys(fallbackCopy) as CopyKey[]) {

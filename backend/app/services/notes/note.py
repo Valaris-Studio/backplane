@@ -40,6 +40,8 @@ from app.schemas.notes.note import (
     Finding,
     NoteAppend,
     NoteCreate,
+    NoteEdit,
+    NotePublicationPresenceRead,
     NotePublicationRevisionRead,
     NoteSectionReplace,
     NoteUpdate,
@@ -56,6 +58,11 @@ from app.services.mentions.notify import notify_new_mentions
 from app.services.reviews.stuck_loop import record_review_iteration
 from app.services.session_content import AgentSessionContentService
 from app.services.work_consultation import WorkConsultationService
+from app.core.mcp_invocation import current_mcp_invocation_id
+from app.models.notes.history import NoteMutationReceipt
+from app.repositories.notes.history import NoteHistoryRepository
+from app.services.notes.history_access import NoteHistoryAccess
+from app.services.notes.history_content import NoteHistoryContent, snapshot, revision_digest
 
 # Title produced by the Go reviewer client: "Review: {card_id} — {decision}".
 # Decision is the trailing token after the em-dash; \S+ is intentional — the
@@ -239,6 +246,7 @@ class NoteService:
         """(note, created): False when an excerpt save replays its receipt."""
         if data.excerpt_source is not None or data.client_request_id is not None:
             await self._authorize_excerpt_publisher(workspace_id, user_id)
+        await NoteHistoryAccess(self.db).authorize(workspace_id, user_id, write=True)
         await self._check_destination(workspace_id, board_id, data.card_id)
         if data.excerpt_source is None or data.client_request_id is None:
             return await self._insert_note(workspace_id, data, user_id, board_id), True
@@ -359,6 +367,7 @@ class NoteService:
         )
         if note is None:
             raise GoneError("The note saved by this request was deleted")
+        note.revision_digest = revision_digest(snapshot(note))
         return note
 
     async def _insert_note(
@@ -370,6 +379,7 @@ class NoteService:
     ) -> Note:
         content = await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, data.content)
         create_kwargs = dict(
+            history_revision=1,
             workspace_id=workspace_id,
             board_id=board_id,
             title=data.title,
@@ -400,6 +410,15 @@ class NoteService:
             await self._stamp_ui_validation_routing(
                 workspace_id, data.card_id, data.title, user_id
             )
+        actor = await NoteHistoryAccess(self.db).authorize(workspace_id, user_id, write=True)
+        note.history_revision = 1
+        await NoteHistoryContent(self.db).record(
+            note_id=note.id, revision=1, snapshot=snapshot(note),
+            capture_kind="creation", operation="create", changed_fields=list(snapshot(note)),
+            actor=actor, invocation_id=current_mcp_invocation_id.get(),
+        )
+        note.revision_digest = revision_digest(snapshot(note))
+        await self.db.flush()
         activity = ActivityService(self.db)
         # Enrich a card-scoped note's activity with card_id so the notification
         # generator can resolve the commented card without re-fetching the Note
@@ -570,12 +589,14 @@ class NoteService:
                 f"{candidates}",
                 error_code="ambiguous_prefix",
             )
+        matches[0].revision_digest = revision_digest(snapshot(matches[0]))
         return matches[0]
 
     async def get_note(self, note_id: uuid.UUID, workspace_id: uuid.UUID):
-        note = await self.note_repo.get_by_id(note_id)
+        note = await self.note_repo.get_current(note_id)
         if not note or note.workspace_id != workspace_id:
             raise ResourceNotFoundError("Note not found")
+        note.revision_digest = revision_digest(snapshot(note))
         return note
 
     async def get_note_read(
@@ -607,6 +628,39 @@ class NoteService:
             )
         return read
 
+    async def get_note_publication_presence(
+        self,
+        *,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID,
+        note_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> NotePublicationPresenceRead:
+        await self._authorize_publication_reader(workspace_id, user_id)
+        # Read only the receipt timestamp, then verify the note still exists.
+        # Ordinary opens must never load a body or calculate a fingerprint.
+        recorded_at = await NoteSaveReceiptRepository(self.db).get_publication_recorded_at(
+            user_id, note_id
+        )
+        await self._require_publication_note_scope(workspace_id, board_id, note_id, user_id)
+        return NotePublicationPresenceRead(
+            has_record=recorded_at is not None, recorded_at=recorded_at
+        )
+
+    async def _require_publication_note_scope(
+        self, workspace_id: uuid.UUID, board_id: uuid.UUID,
+        note_id: uuid.UUID, user_id: uuid.UUID,
+    ) -> None:
+        scope = await self.note_repo.get_scope(note_id)
+        # Other authors' notes are indistinguishable from missing notes.
+        if (
+            scope is None
+            or scope.workspace_id != workspace_id
+            or scope.board_id != board_id
+            or scope.created_by != user_id
+        ):
+            raise ResourceNotFoundError("Note not found")
+
     async def get_note_publication_revision(
         self,
         *,
@@ -624,16 +678,7 @@ class NoteService:
         publication = await NoteSaveReceiptRepository(self.db).get_publication(
             user_id, note_id
         )
-        scope = await self.note_repo.get_scope(note_id)
-        # Someone else's note answers like a missing one, so the answer never
-        # shows whether they published it.
-        if (
-            scope is None
-            or scope.workspace_id != workspace_id
-            or scope.board_id != board_id
-            or scope.created_by != user_id
-        ):
-            raise ResourceNotFoundError("Note not found")
+        await self._require_publication_note_scope(workspace_id, board_id, note_id, user_id)
         if publication is None:
             return NotePublicationRevisionRead(status="no_record")
         recorded_at = publication.created_at
@@ -704,222 +749,151 @@ class NoteService:
         if membership is None:
             raise ForbiddenError("Not a member of this workspace")
 
-    async def update_note(
-        self,
-        note_id: uuid.UUID,
-        workspace_id: uuid.UUID,
-        data: NoteUpdate,
-        actor_id: uuid.UUID | None = None,
-        board_id: uuid.UUID | None = None,
-    ):
-        note = await self.note_repo.get_by_id(note_id)
-        if not note or note.workspace_id != workspace_id:
+    async def update_note(self, note_id, workspace_id, data: NoteUpdate,
+                          actor_id=None, board_id=None):
+        return await self.edit_note(note_id, workspace_id,
+            NoteEdit(mode="replace", **data.model_dump(exclude_unset=True)), actor_id)
+
+    async def append_note(self, note_id, workspace_id, data: NoteAppend,
+                          actor_id=None, board_id=None):
+        return await self.edit_note(note_id, workspace_id,
+            NoteEdit(mode="append", content=data.content), actor_id)
+
+    async def replace_note_section(self, note_id, workspace_id, data: NoteSectionReplace,
+                                   actor_id=None, board_id=None):
+        return await self.edit_note(note_id, workspace_id,
+            NoteEdit(mode="section", **data.model_dump()), actor_id)
+
+    async def edit_note(self, note_id, workspace_id, data: NoteEdit,
+                        actor_id=None, *, board_id=None):
+        access = NoteHistoryAccess(self.db)
+        await access.note_scope(note_id, workspace_id, actor_id, board_id=board_id, write=True)
+        # Populate existing is essential: a waiter may already have loaded the
+        # old document into this session before the prior writer commits.
+        note = await self.note_repo.get_current(note_id, lock=True)
+        if note is None or note.workspace_id != workspace_id or (board_id is not None and note.board_id != board_id):
             raise ResourceNotFoundError("Note not found")
+        actor = await access.authorize(workspace_id, actor_id, write=True)
         if note.kind in IMMUTABLE_KINDS:
             raise ForbiddenError(f"Cannot modify a {note.kind} note")
-        # Gate on the LOADED note's board — the board_id param is untrusted.
         await assert_board_not_frozen(self.db, note.board_id)
-        # Prior content for the @mention diff — capture before the repo mutates
-        # the instance in place.
-        before_content = note.content
-        changed_fields = list(data.model_dump(exclude_unset=True).keys())
-        update_fields = data.model_dump(exclude_unset=True)
-        # Explicit null (clear) skips validation; only setting a link is guarded.
+        repo = NoteHistoryRepository(self.db)
+        principal = access.principal_key(actor_id)
+        intent = data.model_dump(mode="json", exclude_unset=True, exclude={"client_request_id"})
+        intent["mode"] = data.mode
+        fingerprint = hashlib.sha256(json.dumps(intent, sort_keys=True, ensure_ascii=False,
+                                               separators=(",", ":")).encode()).hexdigest()
+        if data.client_request_id is not None:
+            receipt = await repo.get_receipt(note_id, principal, data.client_request_id)
+            if receipt is not None:
+                if receipt.fingerprint != fingerprint:
+                    raise ConflictError("Request identity already used for another edit", error_code="client_request_conflict")
+                await access.authorize(workspace_id, actor_id, write=True)
+                note.revision_digest = revision_digest(snapshot(note))
+                note.applied_revision, note.changed, note.replayed = receipt.applied_revision, receipt.changed, True
+                return note
+        before = snapshot(note)
+        digest = revision_digest(before)
+        if ((data.expected_revision is not None and data.expected_revision != note.history_revision)
+                or (data.expected_digest is not None and data.expected_digest != digest)):
+            raise ConflictError("Note has changed", error_code="note_revision_conflict")
+        update_fields = data.model_dump(exclude_unset=True, include={"title", "content", "pinned", "card_id"})
         if update_fields.get("card_id") is not None:
-            # NoteUpdate carries no board_id today — the loaded note's own
-            # board is the only possible link scope.
-            await self._validate_card_link(
-                workspace_id, note.board_id, update_fields["card_id"]
-            )
-        # Only when `content` was actually sent — an unset content field means
-        # "leave the body alone", which must not blank the searchable text.
+            await self._validate_card_link(workspace_id, note.board_id, update_fields["card_id"])
+        if data.mode != "replace":
+            existing = json.loads(note.content) if note.content else {"type": "doc", "content": []}
+            blocks = existing.get("content") or []
+            incoming = json.loads(data.content).get("content") or []
+            if data.mode == "append":
+                merged = blocks + incoming
+            else:
+                anchor, end = _locate_section(blocks, data.anchor_heading)
+                merged = blocks[:anchor + 1] + incoming + blocks[end:]
+            update_fields["content"] = json.dumps({**existing, "content": merged})
         if "content" in update_fields:
-            update_fields["content"] = await MediaLinkCanonicalizer(self.db).rich_text(
-                workspace_id, update_fields["content"]
-            )
-            update_fields["content_text"] = extract_plain_text(update_fields["content"])
-        updated = await self.note_repo.update(note, **update_fields)
-        if actor_id and workspace_id:
-            activity = ActivityService(self.db)
-            await activity.record(
-                workspace_id=workspace_id,
-                actor_id=actor_id,
-                entity_type=ActivityEntityType.note,
-                entity_id=note_id,
-                action=ActivityAction.updated,
-                board_id=board_id,
-                summary=f"updated note '{updated.title}'",
-                message_key="activity.note.updated",
-                message_params={
-                    "note_title": updated.title,
-                    "fields": changed_fields,
-                },
-                changes={"fields": changed_fields},
-                publish_after_commit=True,
-            )
-            # @mention producer — only newly-added mentions fire (MEN-2).
-            await notify_new_mentions(
-                self.db,
-                workspace_id=workspace_id,
-                board_id=board_id,
-                actor_id=actor_id,
-                entity_type="note",
-                entity_id=note_id,
-                card_id=updated.card_id,
-                before_content=before_content,
-                after_content=updated.content,
-            )
-        return updated
-
-    async def append_note(
-        self,
-        note_id: uuid.UUID,
-        workspace_id: uuid.UUID,
-        data: NoteAppend,
-        actor_id: uuid.UUID | None = None,
-        board_id: uuid.UUID | None = None,
-    ):
-        """Splice new blocks onto the end of a note without rewriting it.
-
-        Both documents are already canonical ProseMirror by the time they get
-        here (the schema validator normalizes), so this is a list concatenation
-        of top-level blocks — the existing content is never re-parsed or
-        re-serialized from markdown, which is what made the full-body update
-        path risky for long pinned trackers.
-        """
-        note = await self.note_repo.get_by_id(note_id)
-        if not note or note.workspace_id != workspace_id:
-            raise ResourceNotFoundError("Note not found")
-        if note.kind in IMMUTABLE_KINDS:
-            raise ForbiddenError(f"Cannot modify a {note.kind} note")
-        await assert_board_not_frozen(self.db, note.board_id)
-
-        before_content = note.content
-        existing = (
-            json.loads(before_content) if before_content else {"type": "doc", "content": []}
-        )
-        appended = json.loads(data.content)
-        merged = {
-            **existing,
-            "content": (existing.get("content") or []) + (appended.get("content") or []),
-        }
-        merged_content = await MediaLinkCanonicalizer(self.db).rich_text(
-            workspace_id, json.dumps(merged)
-        )
-        updated = await self.note_repo.update(
-            note,
-            content=merged_content,
-            content_text=extract_plain_text(merged_content),
-        )
-
-        if actor_id and workspace_id:
-            await ActivityService(self.db).record(
-                workspace_id=workspace_id,
-                actor_id=actor_id,
-                entity_type=ActivityEntityType.note,
-                entity_id=note_id,
-                action=ActivityAction.updated,
-                board_id=board_id,
-                summary=f"appended to note '{updated.title}'",
-                message_key="activity.note.appended",
-                message_params={"note_title": updated.title},
-                changes={"fields": ["content"], "mode": "append"},
-                publish_after_commit=True,
-            )
-            # Only mentions inside the appended blocks are new — the prefix is
-            # unchanged by construction, so the diff naturally yields just those.
-            await notify_new_mentions(
-                self.db,
-                workspace_id=workspace_id,
-                board_id=board_id,
-                actor_id=actor_id,
-                entity_type="note",
-                entity_id=note_id,
-                card_id=updated.card_id,
-                before_content=before_content,
-                after_content=updated.content,
-            )
-        return updated
-
-    async def replace_note_section(
-        self,
-        note_id: uuid.UUID,
-        workspace_id: uuid.UUID,
-        data: NoteSectionReplace,
-        actor_id: uuid.UUID | None = None,
-        board_id: uuid.UUID | None = None,
-    ):
-        """Rewrite the body under one heading, leaving the rest of the note alone.
-
-        The other half of `append_note`: appending grows a tracker, this updates
-        a status *inside* one. Both avoid the full-body `update_note` round-trip
-        that risks mangling a long pinned document.
-
-        The anchor heading itself is kept — callers pass body content, and
-        replacing the heading would make the section unaddressable on the next
-        call. Unlike append, this is idempotent: replaying it converges.
-        """
-        note = await self.note_repo.get_by_id(note_id)
-        if not note or note.workspace_id != workspace_id:
-            raise ResourceNotFoundError("Note not found")
-        if note.kind in IMMUTABLE_KINDS:
-            raise ForbiddenError(f"Cannot modify a {note.kind} note")
-        await assert_board_not_frozen(self.db, note.board_id)
-
-        before_content = note.content
-        existing = (
-            json.loads(before_content) if before_content else {"type": "doc", "content": []}
-        )
-        blocks = existing.get("content") or []
-        anchor_index, section_end = _locate_section(blocks, data.anchor_heading)
-
-        replacement = json.loads(data.content).get("content") or []
-        merged = {
-            **existing,
-            "content": blocks[: anchor_index + 1] + replacement + blocks[section_end:],
-        }
-        merged_content = await MediaLinkCanonicalizer(self.db).rich_text(
-            workspace_id, json.dumps(merged)
-        )
-        updated = await self.note_repo.update(
-            note,
-            content=merged_content,
-            content_text=extract_plain_text(merged_content),
-        )
-
-        if actor_id and workspace_id:
-            await ActivityService(self.db).record(
-                workspace_id=workspace_id,
-                actor_id=actor_id,
-                entity_type=ActivityEntityType.note,
-                entity_id=note_id,
-                action=ActivityAction.updated,
-                board_id=board_id,
-                summary=f"replaced section '{data.anchor_heading.strip()}' in note '{updated.title}'",
-                message_key="activity.note.section_replaced",
-                message_params={
-                    "section_heading": data.anchor_heading.strip(),
-                    "note_title": updated.title,
-                },
-                changes={
-                    "fields": ["content"],
-                    "mode": "replace_section",
-                    "anchor_heading": data.anchor_heading.strip(),
-                },
-                publish_after_commit=True,
-            )
-            await notify_new_mentions(
-                self.db,
-                workspace_id=workspace_id,
-                board_id=board_id,
-                actor_id=actor_id,
-                entity_type="note",
-                entity_id=note_id,
-                card_id=updated.card_id,
-                before_content=before_content,
-                after_content=updated.content,
-            )
-        return updated
+            update_fields["content"] = await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, update_fields["content"])
+        # Exact final persisted state defines a change, not the submitted keys.
+        changed_fields = [key for key, value in update_fields.items() if before[key] != (str(value) if isinstance(value, uuid.UUID) else value)]
+        actor = await access.authorize(workspace_id, actor_id, write=True)
+        applied_revision = None
+        if changed_fields:
+            history = NoteHistoryContent(self.db)
+            latest = await repo.latest(note_id)
+            if latest is None or latest.revision_digest != digest:
+                note.history_revision += 1
+                latest = await history.record(note_id=note_id, revision=note.history_revision,
+                    snapshot=before, capture_kind="baseline" if latest is None else "gap_baseline",
+                    operation="capture", changed_fields=[], actor=None)
+            for key in changed_fields:
+                setattr(note, key, update_fields[key])
+            if "content" in changed_fields:
+                note.content_text = extract_plain_text(note.content)
+            note.history_revision += 1
+            applied_revision = note.history_revision
+            await history.record(note_id=note_id, revision=applied_revision,
+                snapshot=snapshot(note), capture_kind="edit", operation=data.mode,
+                changed_fields=changed_fields, actor=actor,
+                invocation_id=current_mcp_invocation_id.get(),
+                previous=latest, previous_content=before["content"])
+            await self.db.flush()
+            await self.db.refresh(note)
+            if actor_id is not None:
+                summary = f"updated note '{note.title}'"
+                if data.mode == "append":
+                    summary = f"appended to note '{note.title}'"
+                if data.mode == "section":
+                    summary = f"replaced section '{data.anchor_heading.strip()}' in note '{note.title}'"
+                changes = {"fields": changed_fields}
+                if data.mode != "replace":
+                    changes["mode"] = "replace_section" if data.mode == "section" else "append"
+                if data.mode == "section":
+                    changes["anchor_heading"] = data.anchor_heading.strip()
+                activity = ActivityService(self.db)
+                activity_context = {
+                    "workspace_id": workspace_id,
+                    "actor_id": actor_id,
+                    "entity_type": ActivityEntityType.note,
+                    "entity_id": note_id,
+                    "action": ActivityAction.updated,
+                    "board_id": note.board_id,
+                    "changes": changes,
+                    "publish_after_commit": True,
+                }
+                # Literal mode-specific contracts stay visible to the shared
+                # activity audit while mutation/history ownership stays unified.
+                if data.mode == "replace":
+                    await activity.record(
+                        **activity_context, summary=summary,
+                        message_key="activity.note.updated",
+                        message_params={"note_title": note.title, "fields": changed_fields},
+                    )
+                elif data.mode == "append":
+                    await activity.record(
+                        **activity_context, summary=summary,
+                        message_key="activity.note.appended",
+                        message_params={"note_title": note.title},
+                    )
+                else:
+                    await activity.record(
+                        **activity_context, summary=summary,
+                        message_key="activity.note.section_replaced",
+                        message_params={
+                            "section_heading": data.anchor_heading.strip(),
+                            "note_title": note.title,
+                        },
+                    )
+                await notify_new_mentions(self.db, workspace_id=workspace_id,
+                    board_id=note.board_id, actor_id=actor_id, entity_type="note",
+                    entity_id=note_id, card_id=note.card_id,
+                    before_content=before["content"], after_content=note.content)
+        if data.client_request_id is not None:
+            await repo.add_receipt(NoteMutationReceipt(note_id=note_id, principal_key=principal,
+                client_request_id=data.client_request_id, fingerprint=fingerprint,
+                applied_revision=applied_revision, changed=bool(changed_fields)))
+        await access.authorize(workspace_id, actor_id, write=True)
+        note.revision_digest = revision_digest(snapshot(note))
+        note.applied_revision, note.changed, note.replayed = applied_revision, bool(changed_fields), False
+        return note
 
     async def get_card_verdict(
         self, card_id: uuid.UUID, workspace_id: uuid.UUID
@@ -1009,7 +983,7 @@ class NoteService:
                 entity_type=ActivityEntityType.note,
                 entity_id=note_id,
                 action=ActivityAction.deleted,
-                board_id=board_id,
+                board_id=note.board_id,
                 summary=f"deleted note '{note.title}'",
                 message_key="activity.note.deleted",
                 message_params={"note_title": note.title},

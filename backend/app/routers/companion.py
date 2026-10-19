@@ -16,6 +16,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import database
 from app.core.auth import forbid_credential_management, get_current_user
 from app.core.companion_switch import require_companion_enabled
 from app.core.private_route import PrivateRoute
@@ -76,6 +77,7 @@ from app.services.session_content_upload import (
     UploadRefusal,
 )
 from app.services.session_events import publish_invalidations
+from app.services.session_search_index import SessionSearchObjectProcessor
 
 router = APIRouter(
     prefix="/api/me/companion/installations",
@@ -636,9 +638,16 @@ async def finalize_content(
     failure the upload is recorded as failed)."""
     service = SessionContentUploadService(db)
     finalized = await service.finalize(installation, content_id, data)
-    # Both run after the response, so only once the transaction committed.
+    # All run after the response, so only once the transaction committed.
     background.add_task(publish_invalidations, finalized.invalidations)
     background.add_task(service.delete_leftovers, finalized.leftovers)
+    # Last, so nothing above waits on reading a body back; it opens its own
+    # sessions, since this request's closes with the response.
+    for indexed_id in finalized.index_content_ids:
+        background.add_task(
+            SessionSearchObjectProcessor(database.async_session).process_source,
+            indexed_id,
+        )
     return _upload_answer(finalized.answer)
 
 

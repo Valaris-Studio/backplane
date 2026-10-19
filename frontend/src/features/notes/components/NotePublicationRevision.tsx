@@ -6,9 +6,10 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/notifications/api/use-current-user";
+import { isApiError } from "@/lib/api-error";
 import { formatAbsolute } from "@/lib/date-format";
 import type { Note } from "@/types/note";
-import { useNotePublicationRevision, type NotePublicationRevision } from "../api/use-note-publication-revision";
+import { useNotePublicationPresence, useNotePublicationRevision, type NotePublicationRevision } from "../api/use-note-publication-revision";
 
 function comparisonMessage(revision: NotePublicationRevision) {
   if (revision.status === "no_record") return "noRecord";
@@ -60,10 +61,6 @@ function PublicationRevisionResult({ slug, boardId, noteId, ownerId }: {
             <div id={detailsId} className="min-w-0 space-y-2 text-muted-foreground">
               <p>{t("notes.publicationRevision.fieldScope")}</p>
               <dl className="space-y-2">
-                {data.revision_version !== null && <div>
-                  <dt>{t("notes.publicationRevision.version")}</dt>
-                  <dd className="text-foreground">{data.revision_version}</dd>
-                </div>}
                 {data.published_revision_sha256 && <div>
                   <dt>{t("notes.publicationRevision.publishedDigest")}</dt>
                   <dd className="break-all font-mono text-foreground">{data.published_revision_sha256}</dd>
@@ -102,9 +99,32 @@ function PublicationRevisionDisclosure({ slug, boardId, noteId, ownerId }: {
   );
 }
 
+function PublicationPresence({ slug, boardId, noteId, ownerId }: {
+  slug: string; boardId: string; noteId: string; ownerId: string;
+}) {
+  const { t } = useTranslation();
+  const presence = useNotePublicationPresence(slug, boardId, noteId, ownerId);
+  if (presence.isError) return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <p role="status" className="text-muted-foreground">{t("notes.publicationRevision.loadError")}</p>
+      <Button variant="ghost" size="sm" disabled={presence.isFetching} onClick={() => void presence.refetch()}>
+        {t("notes.publicationRevision.retry")}
+      </Button>
+    </div>
+  );
+  if (presence.data && "status" in presence.data) return (
+    <p role="status" className="text-xs text-muted-foreground">{t("notes.publicationRevision.accessLost")}</p>
+  );
+  if (!presence.data?.has_record) return null;
+  return <PublicationRevisionDisclosure slug={slug} boardId={boardId} noteId={noteId} ownerId={ownerId} />;
+}
+
 export function NotePublicationRevision({ note, slug }: { note: Note; slug: string }) {
-  const { data: me } = useCurrentUser();
-  if (!note.board_id || !me || me.id !== note.created_by) return null;
-  return <PublicationRevisionDisclosure key={`${slug}/${note.board_id}/${note.id}/${me.id}`}
+  const { data: me, error } = useCurrentUser();
+  // React Query retains cached identity after a failed refresh. An explicit
+  // denial must unmount the private queries, aborting and discarding their proof.
+  const identityLost = isApiError(error) && [401, 403, 404].includes(error.status);
+  if (identityLost || !note.board_id || !me || me.id !== note.created_by) return null;
+  return <PublicationPresence key={`${slug}/${note.board_id}/${note.id}/${me.id}`}
     slug={slug} boardId={note.board_id} noteId={note.id} ownerId={me.id} />;
 }

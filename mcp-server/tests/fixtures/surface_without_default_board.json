@@ -5224,6 +5224,17 @@
           ],
           "description": "Card to link (on the note's board); omit to keep the link."
         },
+        "client_request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retry key (UUID): a resent identical edit replays instead of applying twice."
+        },
         "content": {
           "anyOf": [
             {
@@ -5239,6 +5250,28 @@
           "default": false,
           "description": "Clear the card link; wins over card_id.",
           "type": "boolean"
+        },
+        "expected_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reject unless the note still has this revision_digest."
+        },
+        "expected_revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reject unless the note is still at this history_revision."
         },
         "mode": {
           "default": "replace",

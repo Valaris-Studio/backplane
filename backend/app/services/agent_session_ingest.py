@@ -56,6 +56,7 @@ from app.services.session_events import (
     queue_after_commit,
     session_updated,
 )
+from app.services.session_search_index import SessionSearchIndexWriter
 from app.services.session_history_cutoff import (
     MAX_CLOCK_SKEW,
     deleted_history_of,
@@ -635,6 +636,11 @@ class AgentSessionIngestService:
                 }
             )
         new_ids = await self.sessions.insert_new_events(rows)
+        # Only rows this record stored, as stored: a replay never re-indexes
+        # an older row from its incoming copy.
+        await SessionSearchIndexWriter(self.db).index_new_events(
+            session, [row for row in rows if row["event_id"] in new_ids]
+        )
         new_events = [promoted_by_id[event_id] for event_id in new_ids]
         upgraded = await self.usage.upgrade(
             session,

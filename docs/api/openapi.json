@@ -5,6 +5,296 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/me/sessions": {
+      "get": {
+        "tags": [
+          "agent-sessions"
+        ],
+        "summary": "List Owner Sessions",
+        "description": "Your session metadata across current workspace memberships.\n\nFilters precede global keyset pagination. Continue with the same filters;\nthe cursor retains its capture-state evaluation time, while current access\nis checked again. This is a live list, not an immutable historical snapshot.",
+        "operationId": "list_owner_sessions_api_me_sessions_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "harness",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Harness"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "idle",
+                    "ended"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "active",
+                      "idle",
+                      "ended",
+                      "incomplete",
+                      "paused",
+                      "disconnected"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "linked_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Linked Only"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "root_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Root Only"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "recent",
+                "started"
+              ],
+              "type": "string",
+              "default": "recent",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 600
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 40,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerSessionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/me/sessions/overview": {
+      "get": {
+        "tags": [
+          "agent-sessions"
+        ],
+        "summary": "Owner Session Overview",
+        "description": "Active capture and other recent root sessions under one evaluation time.",
+        "operationId": "owner_session_overview_api_me_sessions_overview_get",
+        "parameters": [
+          {
+            "name": "active_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 6,
+              "minimum": 1,
+              "default": 6,
+              "title": "Active Limit"
+            }
+          },
+          {
+            "name": "recent_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 6,
+              "minimum": 1,
+              "default": 6,
+              "title": "Recent Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerSessionOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
     "/api/workspaces/{slug}/sessions": {
       "get": {
         "tags": [
@@ -1535,6 +1825,73 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "internal"
+      }
+    },
+    "/api/workspaces/{slug}/sessions/{session_id}/search": {
+      "post": {
+        "tags": [
+          "agent-sessions"
+        ],
+        "summary": "Search Session",
+        "description": "Find literal text anywhere in your session's retained content and\ncalls, including bodies beyond their previews and records captured before\nsearch existed, once indexed (`coverage` says what is). The query is sent\nin the body and never echoed. Never available to agent keys, the keys the\ncompanion hands its agents, or devices.",
+        "operationId": "search_session_api_workspaces__slug__sessions__session_id__search_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionSearchPage"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The cursor's search is stale"
           },
           "422": {
             "description": "Validation Error",
@@ -17458,6 +17815,68 @@
         "x-surface": "public"
       }
     },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/publication-revision/presence": {
+      "get": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "Get Board Note Publication Presence",
+        "operationId": "get_board_note_publication_presence_api_workspaces__slug__boards__board_id__notes__note_id__publication_revision_presence_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePublicationPresenceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
     "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/publication-revision": {
       "get": {
         "tags": [
@@ -17646,6 +18065,322 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoteRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/edit": {
+      "post": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "Edit Note",
+        "operationId": "edit_note_api_workspaces__slug__boards__board_id__notes__note_id__edit_post",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/revisions": {
+      "get": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "List Revisions",
+        "operationId": "list_revisions_api_workspaces__slug__boards__board_id__notes__note_id__revisions_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before_revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/revisions/compare": {
+      "get": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "Compare Revisions",
+        "operationId": "compare_revisions_api_workspaces__slug__boards__board_id__notes__note_id__revisions_compare_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "from_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "From Revision"
+            }
+          },
+          {
+            "name": "to_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "To Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/boards/{board_id}/notes/{note_id}/revisions/{revision}": {
+      "get": {
+        "tags": [
+          "board-notes"
+        ],
+        "summary": "Get Revision",
+        "operationId": "get_revision_api_workspaces__slug__boards__board_id__notes__note_id__revisions__revision__get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Board Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionDetail"
                 }
               }
             }
@@ -18322,6 +19057,286 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoteRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/notes/{note_id}/edit": {
+      "post": {
+        "tags": [
+          "workspace-notes"
+        ],
+        "summary": "Edit Note",
+        "operationId": "edit_note_api_workspaces__slug__notes__note_id__edit_post",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/notes/{note_id}/revisions": {
+      "get": {
+        "tags": [
+          "workspace-notes"
+        ],
+        "summary": "List Revisions",
+        "operationId": "list_revisions_api_workspaces__slug__notes__note_id__revisions_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before_revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/notes/{note_id}/revisions/compare": {
+      "get": {
+        "tags": [
+          "workspace-notes"
+        ],
+        "summary": "Compare Revisions",
+        "operationId": "compare_revisions_api_workspaces__slug__notes__note_id__revisions_compare_get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "from_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "From Revision"
+            }
+          },
+          {
+            "name": "to_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "To Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "public"
+      }
+    },
+    "/api/workspaces/{slug}/notes/{note_id}/revisions/{revision}": {
+      "get": {
+        "tags": [
+          "workspace-notes"
+        ],
+        "summary": "Get Revision",
+        "operationId": "get_revision_api_workspaces__slug__notes__note_id__revisions__revision__get",
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRevisionDetail"
                 }
               }
             }
@@ -30794,6 +31809,31 @@
         ],
         "title": "CostRead"
       },
+      "CoverageCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "bytes"
+        ],
+        "title": "CoverageCount"
+      },
       "CycleInfo": {
         "properties": {
           "card_ids": {
@@ -34918,6 +35958,25 @@
         ],
         "title": "InstallationRename"
       },
+      "LinkedChildMetadata": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "searchable": {
+            "type": "boolean",
+            "const": false,
+            "title": "Searchable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "LinkedChildMetadata"
+      },
       "LinkedSessionList": {
         "properties": {
           "items": {
@@ -38043,6 +39102,24 @@
         "title": "NoteAppend",
         "description": "Body for a surgical append: new blocks only, never the whole document.\n\nUnlike `NoteUpdate.content`, this field is required and must carry at least\none block. An append that normalizes to an empty doc means the caller lost\nits payload \u2014 surfacing that as 422 beats a silent no-op the operator would\nhave to notice by diffing the note."
       },
+      "NoteCaptureBoundary": {
+        "properties": {
+          "first_revision": {
+            "type": "integer",
+            "title": "First Revision"
+          },
+          "capture_kind": {
+            "type": "string",
+            "title": "Capture Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_revision",
+          "capture_kind"
+        ],
+        "title": "NoteCaptureBoundary"
+      },
       "NoteCreate": {
         "properties": {
           "title": {
@@ -38154,6 +39231,108 @@
         ],
         "title": "NoteCreate"
       },
+      "NoteEdit": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "title": "Content"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "append",
+              "section"
+            ],
+            "title": "Mode",
+            "default": "replace"
+          },
+          "anchor_heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Heading"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "expected_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Digest"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          }
+        },
+        "type": "object",
+        "title": "NoteEdit",
+        "description": "One atomic content operation and its optional metadata changes."
+      },
       "NoteFormat": {
         "type": "string",
         "enum": [
@@ -38162,6 +39341,31 @@
         ],
         "title": "NoteFormat",
         "description": "Wire format for a single note read. `prosemirror` (default) returns the\nstored canonical PM JSON; `markdown` serializes it back to CommonMark."
+      },
+      "NotePublicationPresenceRead": {
+        "properties": {
+          "has_record": {
+            "type": "boolean",
+            "title": "Has Record"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_record"
+        ],
+        "title": "NotePublicationPresenceRead"
       },
       "NotePublicationRevisionRead": {
         "properties": {
@@ -38359,6 +39563,55 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "history_revision": {
+            "type": "integer",
+            "title": "History Revision",
+            "default": 0
+          },
+          "revision_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Digest"
+          },
+          "applied_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied Revision"
+          },
+          "changed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed"
+          },
+          "replayed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replayed"
           }
         },
         "type": "object",
@@ -38376,6 +39629,507 @@
           "updated_at"
         ],
         "title": "NoteRead"
+      },
+      "NoteRevisionActor": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "user_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Name"
+          },
+          "authentication_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authentication Method"
+          },
+          "principal_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Principal Kind"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "api_key_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Id"
+          },
+          "api_key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Name"
+          },
+          "installation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Id"
+          }
+        },
+        "type": "object",
+        "title": "NoteRevisionActor"
+      },
+      "NoteRevisionComparison": {
+        "properties": {
+          "before": {
+            "$ref": "#/components/schemas/NoteRevisionDetail"
+          },
+          "after": {
+            "$ref": "#/components/schemas/NoteRevisionDetail"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after",
+          "changed_fields"
+        ],
+        "title": "NoteRevisionComparison"
+      },
+      "NoteRevisionDetail": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "capture_kind": {
+            "type": "string",
+            "enum": [
+              "creation",
+              "edit",
+              "baseline",
+              "gap_baseline"
+            ],
+            "title": "Capture Kind"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "content_bytes": {
+            "type": "integer",
+            "title": "Content Bytes"
+          },
+          "content_sha256": {
+            "type": "string",
+            "title": "Content Sha256"
+          },
+          "revision_digest": {
+            "type": "string",
+            "title": "Revision Digest"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoteRevisionActor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "unconfirmed",
+              "mcp_reported"
+            ],
+            "title": "Channel"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/NoteRevisionSnapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "recorded_at",
+          "capture_kind",
+          "operation",
+          "changed_fields",
+          "content_bytes",
+          "content_sha256",
+          "revision_digest",
+          "title",
+          "pinned",
+          "card_id",
+          "kind",
+          "source_execution_id",
+          "actor",
+          "channel",
+          "snapshot"
+        ],
+        "title": "NoteRevisionDetail"
+      },
+      "NoteRevisionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NoteRevisionSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Revision"
+          },
+          "latest_recorded_revision": {
+            "type": "integer",
+            "title": "Latest Recorded Revision"
+          },
+          "capture_boundary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoteCaptureBoundary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_revision",
+          "latest_recorded_revision",
+          "capture_boundary"
+        ],
+        "title": "NoteRevisionPage"
+      },
+      "NoteRevisionSnapshot": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "failure_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Class"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findings"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "title",
+          "pinned",
+          "card_id",
+          "kind",
+          "failure_class",
+          "findings",
+          "source_execution_id"
+        ],
+        "title": "NoteRevisionSnapshot"
+      },
+      "NoteRevisionSummary": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "capture_kind": {
+            "type": "string",
+            "enum": [
+              "creation",
+              "edit",
+              "baseline",
+              "gap_baseline"
+            ],
+            "title": "Capture Kind"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "content_bytes": {
+            "type": "integer",
+            "title": "Content Bytes"
+          },
+          "content_sha256": {
+            "type": "string",
+            "title": "Content Sha256"
+          },
+          "revision_digest": {
+            "type": "string",
+            "title": "Revision Digest"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoteRevisionActor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "unconfirmed",
+              "mcp_reported"
+            ],
+            "title": "Channel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "recorded_at",
+          "capture_kind",
+          "operation",
+          "changed_fields",
+          "content_bytes",
+          "content_sha256",
+          "revision_digest",
+          "title",
+          "pinned",
+          "card_id",
+          "kind",
+          "source_execution_id",
+          "actor",
+          "channel"
+        ],
+        "title": "NoteRevisionSummary"
       },
       "NoteSectionReplace": {
         "properties": {
@@ -38846,6 +40600,426 @@
           "buckets"
         ],
         "title": "OverviewRead"
+      },
+      "OwnerSessionLinkPreview": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "card",
+              "note"
+            ],
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "changed",
+              "consulted"
+            ],
+            "title": "Relation",
+            "description": "changed when the session changed it at least once."
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "correlated"
+            ],
+            "title": "Provenance"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "workspace_slug": {
+            "type": "string",
+            "title": "Workspace Slug"
+          },
+          "workspace_name": {
+            "type": "string",
+            "title": "Workspace Name"
+          },
+          "board_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "entity_id",
+          "board_id",
+          "title",
+          "relation",
+          "provenance",
+          "workspace_id",
+          "workspace_slug",
+          "workspace_name",
+          "board_name"
+        ],
+        "title": "OwnerSessionLinkPreview"
+      },
+      "OwnerSessionOverview": {
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerSessionRead"
+            },
+            "type": "array",
+            "title": "Active"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerSessionRead"
+            },
+            "type": "array",
+            "title": "Recent"
+          },
+          "active_more": {
+            "type": "boolean",
+            "title": "Active More"
+          },
+          "recent_more": {
+            "type": "boolean",
+            "title": "Recent More"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "recent",
+          "active_more",
+          "recent_more",
+          "generated_at"
+        ],
+        "title": "OwnerSessionOverview"
+      },
+      "OwnerSessionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerSessionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "OwnerSessionPage"
+      },
+      "OwnerSessionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "workspace_slug": {
+            "type": "string",
+            "title": "Workspace Slug"
+          },
+          "workspace_name": {
+            "type": "string",
+            "title": "Workspace Name"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          },
+          "board_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Name"
+          },
+          "parent_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Session Id"
+          },
+          "harness": {
+            "type": "string",
+            "title": "Harness"
+          },
+          "harness_display_name": {
+            "type": "string",
+            "title": "Harness Display Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "idle",
+              "ended"
+            ],
+            "title": "Status"
+          },
+          "display_state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "idle",
+              "ended",
+              "incomplete",
+              "paused",
+              "disconnected"
+            ],
+            "title": "Display State",
+            "description": "Capture state at the page's evaluation time; not runner execution."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "last_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Event At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "ended_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "session_end_event",
+                  "abandoned"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended Reason"
+          },
+          "idle_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Since"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "activity_event_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Event Count"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "activity",
+                  "usage_only",
+                  "empty"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage",
+            "description": "Null for older sessions without a stored activity count; discovery never reads their events."
+          },
+          "capture_gaps": {
+            "type": "integer",
+            "title": "Capture Gaps"
+          },
+          "capture_levels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "metadata",
+                "standard",
+                "full",
+                "rich"
+              ]
+            },
+            "type": "array",
+            "title": "Capture Levels"
+          },
+          "child_count": {
+            "type": "integer",
+            "title": "Child Count"
+          },
+          "link_count": {
+            "type": "integer",
+            "title": "Link Count"
+          },
+          "link_preview": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerSessionLinkPreview"
+            },
+            "type": "array",
+            "title": "Link Preview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "workspace_slug",
+          "workspace_name",
+          "board_id",
+          "board_name",
+          "parent_session_id",
+          "harness",
+          "harness_display_name",
+          "title",
+          "repository",
+          "branch",
+          "status",
+          "display_state",
+          "started_at",
+          "last_event_at",
+          "ended_at",
+          "ended_reason",
+          "idle_since",
+          "event_count",
+          "activity_event_count",
+          "coverage",
+          "capture_gaps",
+          "capture_levels",
+          "child_count",
+          "link_count",
+          "link_preview"
+        ],
+        "title": "OwnerSessionRead"
       },
       "PairingCodeRequest": {
         "properties": {
@@ -41483,6 +43657,346 @@
           "capture_gaps"
         ],
         "title": "SessionRhythm"
+      },
+      "SessionSearchCoverage": {
+        "properties": {
+          "indexed": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "pending_index": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "pending_upload": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "withheld": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "uncaptured": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "unavailable": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "nontext": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "available": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "eligible": {
+            "$ref": "#/components/schemas/CoverageCount"
+          },
+          "linked_child_metadata": {
+            "$ref": "#/components/schemas/LinkedChildMetadata"
+          },
+          "index_ready": {
+            "type": "boolean",
+            "title": "Index Ready"
+          },
+          "extractor_version": {
+            "type": "string",
+            "title": "Extractor Version"
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Verified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indexed",
+          "pending_index",
+          "pending_upload",
+          "withheld",
+          "uncaptured",
+          "unavailable",
+          "nontext",
+          "available",
+          "eligible",
+          "linked_child_metadata",
+          "index_ready",
+          "extractor_version",
+          "verified_at"
+        ],
+        "title": "SessionSearchCoverage",
+        "description": "What this session retains, by searchability, evaluated now. `indexed`\nis what a scan reads; `pending_index` is retained text not indexed yet\n(including anything written before search existed); `eligible` is both.\n`available` counts every body readable now, text or not. A scan that\ncompletes covers `indexed` only: `index_ready` says whether that is all\nof the retained text."
+      },
+      "SessionSearchHit": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "content",
+              "event"
+            ],
+            "title": "Source Kind"
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "content_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Id"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "call_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Key"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "prompt",
+                  "reply",
+                  "reasoning",
+                  "tool_input",
+                  "tool_output",
+                  "diff",
+                  "file_content",
+                  "command_output",
+                  "error",
+                  "summary",
+                  "instruction",
+                  "native_record",
+                  "attachment"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "byte_start": {
+            "type": "integer",
+            "title": "Byte Start"
+          },
+          "byte_end": {
+            "type": "integer",
+            "title": "Byte End"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "snippet_byte_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet Byte Start"
+          },
+          "source_state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Source State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_kind",
+          "source_id",
+          "content_id",
+          "event_id",
+          "call_key",
+          "channel",
+          "field",
+          "occurred_at",
+          "byte_start",
+          "byte_end",
+          "snippet",
+          "snippet_byte_start",
+          "source_state"
+        ],
+        "title": "SessionSearchHit",
+        "description": "One match, at its exact original UTF-8 bytes within `field`: a\ncontent body (`body`) or an event's string leaf: its root field (such as\n`prompt.text` or `tool.arguments`), then one `.`-separated segment per\nmember or array index, member names escaping `~` as `~0` and `.` as `~1`\n(through JSON text where a member holds some). `snippet` is at most 2 KiB\nof the current bytes around it, starting at `snippet_byte_start`; none\nwhen the source cannot be verified now (`source_state`)."
+      },
+      "SessionSearchPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionSearchHit"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "scanned_bytes": {
+            "type": "integer",
+            "title": "Scanned Bytes"
+          },
+          "eligible_bytes": {
+            "type": "integer",
+            "title": "Eligible Bytes"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SessionSearchCoverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "generation",
+          "scanned_bytes",
+          "eligible_bytes",
+          "next_cursor",
+          "complete",
+          "coverage"
+        ],
+        "title": "SessionSearchPage",
+        "description": "Hits in chronological order. A request scans at most 8 MiB of folded\ntext and returns at most `limit` hits; `complete` is true only when the\nscan reached the end. `generation` changes whenever the session's\nsearchable text changes, and a cursor from another generation (or whose\nfiltered calls changed) answers 409 `session_search_stale`: start again."
+      },
+      "SessionSearchRequest": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Q"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "prompt",
+                    "reply",
+                    "reasoning",
+                    "tool_input",
+                    "tool_output",
+                    "diff",
+                    "file_content",
+                    "command_output",
+                    "error",
+                    "summary",
+                    "instruction",
+                    "native_record",
+                    "attachment",
+                    "tool",
+                    "mcp",
+                    "subagent"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Types"
+          },
+          "failures_only": {
+            "type": "boolean",
+            "title": "Failures Only",
+            "default": false
+          },
+          "work_only": {
+            "type": "boolean",
+            "title": "Work Only",
+            "default": false
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "q"
+        ],
+        "title": "SessionSearchRequest",
+        "description": "A literal, case-insensitive substring (Unicode case folding, no\naccent or other normalization; `%`, `_` and `\\` are literal). Filters\nintersect; several `types` are alternatives. `tool` covers tool input and\noutput content and the fields of tool calls; `mcp` the content and fields\nof MCP calls; `subagent` matches nothing here, since a linked child\nsession is searched on its own. Failure and linked work are the calls'\ncurrent state. Pass `next_cursor` back, with the same query and filters,\nto continue a scan."
       },
       "SessionTurn": {
         "properties": {

@@ -97,7 +97,15 @@ async def test_paramless_workspace_list_shape_unchanged(
         "id", "workspace_id", "board_id", "card_id", "title", "content",
         "pinned", "kind", "failure_class", "findings", "source_execution_id",
         "created_by", "created_at", "updated_at",
+        "history_revision", "revision_digest", "applied_revision", "changed", "replayed",
     }
+    for note in body:
+        # Legacy rows have no recorded history; list reads do not hash their bodies.
+        assert note["history_revision"] == 0
+        assert note["revision_digest"] is None
+        assert note["applied_revision"] is None
+        assert note["changed"] is None
+        assert note["replayed"] is None
 
 
 async def test_paramless_board_list_shape_unchanged(

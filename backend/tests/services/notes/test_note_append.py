@@ -11,6 +11,7 @@ unchanged.
 """
 import json
 import uuid
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,8 @@ from app.exceptions import ForbiddenError, ResourceNotFoundError
 from app.models.kanban.board import Board
 from app.models.notes.note import Note
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
+from app.repositories.notes.note import NoteRepository
 from app.schemas.notes.note import NoteAppend, NoteCreate
 from app.services.notes.note import NoteService
 
@@ -137,10 +139,45 @@ async def test_append_foreign_workspace_note_raises_not_found(
     service = NoteService(db_session)
     note = await _seed(service, test_workspace, test_user, test_board, "Header.")
 
+    # Authorization must succeed before this fixture can exercise note scope.
+    other_workspace = Workspace(
+        name="Other workspace", slug="other-workspace", created_by=test_user.id
+    )
+    db_session.add(other_workspace)
+    await db_session.flush()
+    db_session.add(WorkspaceMember(
+        workspace_id=other_workspace.id, user_id=test_user.id, role=WorkspaceRole.member,
+    ))
+    await db_session.flush()
+
     with pytest.raises(ResourceNotFoundError):
         await service.append_note(
-            note.id, uuid.uuid4(), NoteAppend(content="x"), actor_id=test_user.id
+            note.id, other_workspace.id, NoteAppend(content="x"), actor_id=test_user.id
         )
+
+
+@pytest.mark.parametrize("existing_note", [True, False], ids=["existing-note", "unknown-note"])
+async def test_append_nonmember_is_denied_before_note_lookup(
+    existing_note: bool, db_session: AsyncSession, test_workspace: Workspace,
+    test_board: Board, test_user: User, second_user: User,
+):
+    service = NoteService(db_session)
+    note = await _seed(service, test_workspace, test_user, test_board, "Header.")
+    note_id = note.id if existing_note else uuid.uuid4()
+
+    # These spies preserve repository behavior if called; authorization is real.
+    with (
+        patch.object(NoteRepository, "get_scope", autospec=True,
+                     side_effect=NoteRepository.get_scope) as get_scope,
+        patch.object(NoteRepository, "get_current", autospec=True,
+                     side_effect=NoteRepository.get_current) as get_current,
+    ):
+        with pytest.raises(ForbiddenError):
+            await service.append_note(
+                note_id, test_workspace.id, NoteAppend(content="x"), actor_id=second_user.id
+            )
+        get_scope.assert_not_called()
+        get_current.assert_not_called()
 
 
 async def test_append_rejected_on_immutable_kind(

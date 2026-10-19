@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Row, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,6 +72,16 @@ class NoteSaveReceiptRepository:
                 note_id=note_id,
                 published_note_revision_sha256=published_note_revision_sha256,
                 published_note_revision_version=published_note_revision_version,
+            )
+        )
+
+    async def get_publication_recorded_at(
+        self, user_id: uuid.UUID, note_id: uuid.UUID
+    ) -> datetime | None:
+        return await self.db.scalar(
+            select(NoteSaveReceipt.created_at).where(
+                NoteSaveReceipt.user_id == user_id,
+                NoteSaveReceipt.note_id == note_id,
             )
         )
 

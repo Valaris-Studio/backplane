@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -22,9 +23,11 @@ from sqlalchemy import (
     select,
     text,
     true,
+    union_all,
     update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.agent_session import (
     AgentSession,
@@ -39,7 +42,8 @@ from app.models.companion import CompanionInstallation, CompanionProjectMapping
 from app.models.kanban.board import Board
 from app.models.kanban.card import Card
 from app.models.notes.note import Note
-from app.models.workspace import WorkspaceMember
+from app.models.workspace import Workspace, WorkspaceMember
+from app.core.harness import HARNESS_FAMILIES
 from app.repositories.dialect_insert import conflict_aware_insert
 from app.core.session_content_keys import session_prefix
 
@@ -73,6 +77,17 @@ class LinkPreviewRow:
     provenance: str
 
 
+@dataclass(frozen=True)
+class OwnerSessionMetadata:
+    session: AgentSession
+    sort_key: datetime
+    workspace_slug: str
+    workspace_name: str
+    current_board_id: uuid.UUID | None
+    board_name: str | None
+    display_state: str
+
+
 def epoch_seconds(dialect_name: str, column):
     if dialect_name == "postgresql":
         return extract("epoch", column)
@@ -100,6 +115,318 @@ SESSION_IDENTITY = (
 class AgentSessionRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _owner_display_state(
+        self,
+        idle_before: datetime,
+        abandoned_before: datetime,
+        heartbeat_before: datetime,
+    ):
+        """The same precedence as display_state, evaluated inside the global
+        query so a page never has to load or filter all of an owner's devices.
+        Unknown harnesses keep their own configured switch; known families share it.
+        """
+        family = case(
+            HARNESS_FAMILIES, value=AgentSession.harness, else_=AgentSession.harness
+        )
+        enabled = CompanionInstallation.enabled_agents
+        values = (
+            func.jsonb_array_elements_text(cast(enabled, JSONB))
+            if self._dialect() == "postgresql"
+            else func.json_each(enabled)
+        )
+        entries = values.table_valued("value").alias("enabled_harness")
+        harness_enabled = (
+            select(entries.c.value)
+            .where(entries.c.value == family)
+            .correlate(AgentSession, CompanionInstallation)
+            .exists()
+        )
+        really_ended = and_(
+            AgentSession.ended_at.is_not(None),
+            AgentSession.ended_at >= AgentSession.last_event_at,
+        )
+        device_present = CompanionInstallation.id.is_not(None)
+        paused = and_(
+            device_present,
+            or_(
+                CompanionInstallation.paused.is_(True),
+                CompanionProjectMapping.enabled.is_(False),
+                not_(harness_enabled),
+            ),
+        )
+        disconnected = and_(
+            device_present,
+            or_(
+                CompanionInstallation.revoked_at.is_not(None),
+                CompanionInstallation.last_seen_at.is_(None),
+                CompanionInstallation.last_seen_at < heartbeat_before,
+            ),
+        )
+        return case(
+            (
+                really_ended,
+                case((AgentSession.capture_gaps > 0, "incomplete"), else_="ended"),
+            ),
+            (paused, "paused"),
+            (AgentSession.last_event_at < abandoned_before, "incomplete"),
+            (disconnected, "disconnected"),
+            (AgentSession.last_event_at < idle_before, "idle"),
+            else_="active",
+        )
+
+    async def list_owner_metadata(
+        self,
+        owner_id: uuid.UUID,
+        *,
+        workspace_id,
+        board_id,
+        harness,
+        status,
+        states,
+        q,
+        linked_only,
+        since,
+        root_only,
+        sort,
+        idle_before,
+        abandoned_before,
+        heartbeat_before,
+        after,
+        limit,
+        excluded_session_ids: Collection[uuid.UUID] = (),
+    ) -> list[OwnerSessionMetadata]:
+        state = self._owner_display_state(
+            idle_before, abandoned_before, heartbeat_before
+        )
+        sort_key = self.list_sort_key(sort)
+        query = (
+            select(
+                AgentSession,
+                sort_key.label("sort_key"),
+                Workspace.slug.label("workspace_slug"),
+                Workspace.name.label("workspace_name"),
+                Board.id.label("current_board_id"),
+                Board.name.label("board_name"),
+                state.label("display_state"),
+            )
+            .join(Workspace, Workspace.id == AgentSession.workspace_id)
+            .outerjoin(
+                Board,
+                and_(
+                    Board.id == AgentSession.board_id,
+                    Board.workspace_id == AgentSession.workspace_id,
+                ),
+            )
+            .outerjoin(
+                CompanionInstallation,
+                CompanionInstallation.id == AgentSession.installation_id,
+            )
+            .outerjoin(
+                CompanionProjectMapping,
+                CompanionProjectMapping.id == AgentSession.mapping_id,
+            )
+            .where(
+                AgentSession.owner_id == owner_id,
+                self._in_member_workspace(owner_id),
+                self._status_clause(status, idle_before, abandoned_before),
+            )
+        )
+        if workspace_id is not None:
+            query = query.where(AgentSession.workspace_id == workspace_id)
+        if board_id is not None:
+            query = query.where(Board.id == board_id)
+        if harness is not None:
+            query = query.where(AgentSession.harness == harness)
+        if root_only:
+            query = query.where(AgentSession.parent_native_session_id.is_(None))
+        if since is not None:
+            query = query.where(AgentSession.last_event_at >= since)
+        if states:
+            query = query.where(state.in_(states))
+        if excluded_session_ids:
+            query = query.where(AgentSession.id.not_in(excluded_session_ids))
+        if q:
+            pattern = like_pattern(q)
+            query = query.where(
+                or_(
+                    *(
+                        column.ilike(pattern, escape="\\")
+                        for column in (
+                            AgentSession.title,
+                            AgentSession.repository,
+                            AgentSession.branch,
+                            Board.name,
+                        )
+                    )
+                )
+            )
+        if linked_only:
+            links = self._owner_destination_links(owner_id).subquery()
+            query = query.where(
+                select(links.c.session_id)
+                .where(links.c.session_id == AgentSession.id)
+                .exists()
+            )
+        if after is not None:
+            key, row_id = after
+            query = query.where(
+                or_(sort_key < key, and_(sort_key == key, AgentSession.id < row_id))
+            )
+        rows = await self.db.execute(
+            query.order_by(sort_key.desc(), AgentSession.id.desc()).limit(limit)
+        )
+        return [OwnerSessionMetadata(*row) for row in rows]
+
+    async def owner_child_counts(
+        self, owner_id: uuid.UUID, session_ids: set[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        if not session_ids:
+            return {}
+        rows = await self.db.execute(
+            select(AgentSession.parent_session_id, func.count())
+            .where(
+                AgentSession.owner_id == owner_id,
+                self._in_member_workspace(owner_id),
+                AgentSession.parent_session_id.in_(session_ids),
+            )
+            .group_by(AgentSession.parent_session_id)
+        )
+        return dict(rows.tuples().all())
+
+    @staticmethod
+    def _owner_destination_links(owner_id, session_ids=None):
+        """A link records past evidence; the current entity decides its destination
+        and visibility. Never authorize a moved note against the link's old workspace.
+        Select only label/location columns, not note or card bodies.
+        """
+        common = [
+            SessionWorkLink.id,
+            SessionWorkLink.session_id,
+            SessionWorkLink.entity_type,
+            SessionWorkLink.entity_id,
+            SessionWorkLink.relation,
+            SessionWorkLink.last_seen_at,
+            SessionWorkLink.invocation_count,
+            SessionWorkLink.correlated_count,
+        ]
+        destination = [
+            Workspace.id.label("workspace_id"),
+            Workspace.slug.label("workspace_slug"),
+            Workspace.name.label("workspace_name"),
+            Board.id.label("board_id"),
+            Board.name.label("board_name"),
+        ]
+        cards = (
+            select(*common, *destination, Card.title.label("title"))
+            .join(
+                Card,
+                and_(
+                    SessionWorkLink.entity_type == "card",
+                    Card.id == SessionWorkLink.entity_id,
+                ),
+            )
+            .join(Board, Board.id == Card.board_id)
+            .join(Workspace, Workspace.id == Board.workspace_id)
+        )
+        notes = (
+            select(*common, *destination, Note.title.label("title"))
+            .join(
+                Note,
+                and_(
+                    SessionWorkLink.entity_type == "note",
+                    Note.id == SessionWorkLink.entity_id,
+                ),
+            )
+            .join(Workspace, Workspace.id == Note.workspace_id)
+            .outerjoin(
+                Board,
+                and_(
+                    Board.id == Note.board_id, Board.workspace_id == Note.workspace_id
+                ),
+            )
+        )
+        queries = []
+        for query in (cards, notes):
+            query = query.join(
+                WorkspaceMember,
+                and_(
+                    WorkspaceMember.workspace_id == Workspace.id,
+                    WorkspaceMember.user_id == owner_id,
+                ),
+            )
+            if session_ids is not None:
+                query = query.where(SessionWorkLink.session_id.in_(session_ids))
+            queries.append(query)
+        return union_all(*queries)
+
+    async def owner_link_previews(self, owner_id, session_ids, per_session):
+        if not session_ids:
+            return {}
+        links = self._owner_destination_links(owner_id, session_ids).subquery()
+        per_entity = select(
+            links,
+            func.row_number()
+            .over(
+                partition_by=(
+                    links.c.session_id,
+                    links.c.entity_type,
+                    links.c.entity_id,
+                ),
+                order_by=(
+                    case((links.c.relation == "changed", 0), else_=1),
+                    links.c.last_seen_at.desc(),
+                    links.c.id,
+                ),
+            )
+            .label("entity_rank"),
+        ).subquery()
+        entities = select(per_entity).where(per_entity.c.entity_rank == 1).subquery()
+        ranked = select(
+            entities,
+            func.row_number()
+            .over(
+                partition_by=entities.c.session_id,
+                order_by=(
+                    case((entities.c.relation == "changed", 0), else_=1),
+                    entities.c.last_seen_at.desc(),
+                    entities.c.entity_type,
+                    entities.c.entity_id,
+                ),
+            )
+            .label("rank"),
+            func.count().over(partition_by=entities.c.session_id).label("total"),
+        ).subquery()
+        rows = await self.db.execute(
+            select(ranked)
+            .where(ranked.c.rank <= per_session)
+            .order_by(ranked.c.session_id, ranked.c.rank)
+        )
+        previews = {}
+        for row in rows.mappings():
+            _, items = previews.setdefault(row["session_id"], (row["total"], []))
+            items.append(
+                {
+                    **{
+                        name: row[name]
+                        for name in (
+                            "entity_type",
+                            "entity_id",
+                            "title",
+                            "relation",
+                            "workspace_id",
+                            "workspace_slug",
+                            "workspace_name",
+                            "board_id",
+                            "board_name",
+                        )
+                    },
+                    "provenance": "correlated"
+                    if row["correlated_count"] >= row["invocation_count"]
+                    else "exact",
+                }
+            )
+        return previews
 
     async def capture_receipt(
         self, installation_id: uuid.UUID, capture_id: str

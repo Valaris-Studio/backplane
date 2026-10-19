@@ -141,7 +141,7 @@
       "replacement": "update_note(mode='section')"
     }
   },
-  "listing_bytes": 96211,
+  "listing_bytes": 96698,
   "tool_count": 143,
   "tools": {
     "activate_catalog_skill": {
@@ -2423,14 +2423,17 @@
         "readOnlyHint": false
       },
       "category": "notes",
-      "description": "Update a note; only provided fields change. mode: \"replace\" (default), \"append\" (not idempotent) or \"section\" (rewrites the anchor_heading section; idempotent). See docs.",
+      "description": "Update a note atomically; only provided fields change. mode: \"replace\" (default), \"append\" (additive unless retried with the same client_request_id) or \"section\" (rewrites the anchor_heading section; idempotent). See docs.",
       "kind": "write",
       "params": {
         "anchor_heading": "mode=\"section\" only: heading text without # marks (trimmed, case-insensitive).",
         "board_id": "Board UUID if board-scoped.",
         "card_id": "Card to link (on the note's board); omit to keep the link.",
+        "client_request_id": "Retry key (UUID): a resent identical edit replays instead of applying twice.",
         "content": "Markdown (HTML, text or ProseMirror JSON accepted); required for mode=\"append\".",
         "detach_card": "Clear the card link; wins over card_id.",
+        "expected_digest": "Reject unless the note still has this revision_digest.",
+        "expected_revision": "Reject unless the note is still at this history_revision.",
         "mode": "\"replace\", \"append\" or \"section\".",
         "note_id": "Note UUID.",
         "pinned": "Pin state.",
