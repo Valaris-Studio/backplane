@@ -320,8 +320,8 @@ export function BoardView() {
   // would re-render every card on the board.
   const focusCardById = useCallback(
     (cardId: string) => {
-      setSelectedCardId(cardId);
-      setSheetOpen(true);
+      // The route guard must approve departure before the URL effect selects
+      // another card; changing local selection here discards the current draft.
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set(CARD_SEARCH_PARAM, cardId);
@@ -338,8 +338,9 @@ export function BoardView() {
 
   const handleSheetOpenChange = useCallback(
     (open: boolean) => {
-      setSheetOpen(open);
+      if (open) setSheetOpen(true);
       if (!open) {
+        // Keep the editor visible until its URL departure is approved.
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev);

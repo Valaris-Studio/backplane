@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ChevronRight, FilePen, Link2, RotateCw, SquareTerminal } from "lucide-react";
@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api-error";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import type { AgentSession, ContentChannel, SessionContent } from "@/types/agent-session";
 import { SessionReaderActive } from "../api/use-session-contents";
 import { useSessionWindow, type ContentWindowRequest } from "../api/use-session-window";
 import { transcriptEntries, type TranscriptEntry } from "../utils/contents";
-import type { ExcerptNoteDraft } from "../utils/excerpt-note";
+import { useHandoffDraft } from "../hooks/use-handoff-drafts";
 import { formatClock } from "../utils/format";
 import { KindIcon } from "./CallRow";
 import { ContentBody, CoverageBadge, CoverageNote } from "./ContentBody";
@@ -45,14 +46,32 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
   const { t } = useTranslation();
   const headingId = useId();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const routerNavigate = useNavigate();
   const anchor = location.hash.startsWith(ANCHOR_PREFIX) ? location.hash.slice(ANCHOR_PREFIX.length) : undefined;
-  const [view, setView] = useState<View>("conversation");
+  const returnNavigation = useReturnNavigation();
+  const viewKey = `session-reader-view:${slug}/${session.id}`;
+  const [view, setViewState] = useState<View>(() => returnNavigation?.readView<View>(viewKey) ?? "conversation");
+  const viewEntry = useRef(location.key);
+  useLayoutEffect(() => {
+    if (viewEntry.current === location.key) return;
+    viewEntry.current = location.key;
+    // Hash replacement keeps this reader mounted but creates a new history key.
+    // Carry its filter there; Back/Forward must read the destination's own value.
+    if (navigationType === "REPLACE") returnNavigation?.writeView(viewKey, view);
+    else setViewState(returnNavigation?.readView<View>(viewKey) ?? "conversation");
+  }, [location.key, navigationType, returnNavigation, viewKey, view]);
+  const setView = (next: View) => {
+    returnNavigation?.writeView(viewKey, next);
+    setViewState(next);
+  };
   const [actionsHeight, setActionsHeight] = useState(0);
-  const [snapshots, setSnapshots] = useState<ReadonlyMap<string, SessionContent>>(() => new Map());
+  const handoff = useHandoffDraft(slug, session.id);
+  const clearHandoff = handoff.clear;
+  const snapshots = handoff.state.selected;
   const selected = useMemo(() => new Set(snapshots.keys()), [snapshots]);
   const selectedItems = useMemo(() => [...snapshots.values()], [snapshots]);
-  const [draft, setDraft] = useState<ExcerptNoteDraft | null>(null);
+  const draft = handoff.state.draft;
   const contents = useSessionWindow(slug, session.id, active, anchor);
   const items = contents.data?.items ?? [];
   const entries = useMemo(() => transcriptEntries(items, { includeRaw: view === "everything" }), [items, view]);
@@ -82,9 +101,8 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
 
   useEffect(() => {
     if (!refused) return;
-    setSnapshots(new Map());
-    setDraft(null);
-  }, [refused]);
+    clearHandoff();
+  }, [refused, clearHandoff]);
 
   useEffect(() => {
     if (!active) return;
@@ -156,20 +174,18 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
 
   function navigate(request: ContentWindowRequest) {
     pageScroll.current = null;
-    if (location.hash) routerNavigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true, preventScrollReset: true });
+    if (location.hash) routerNavigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true, preventScrollReset: true, state: location.state });
     contents.navigate(request);
   }
 
   function onSelect(id: string, checked: boolean) {
-    setSnapshots((current) => {
-      const next = new Map(current);
-      if (!checked) next.delete(id);
-      else if (current.size < MAX_SELECTED_RECORDS) {
-        const item = items.find((candidate) => candidate.id === id);
-        if (item) next.set(id, { ...item, preview: null });
-      }
-      return next;
-    });
+    const next = new Map(snapshots);
+    if (!checked) next.delete(id);
+    else if (snapshots.size < MAX_SELECTED_RECORDS) {
+      const item = items.find((candidate) => candidate.id === id);
+      if (item) next.set(id, { ...item, preview: null });
+    }
+    if (!handoff.select(next)) toast.error(t("sessions.contents.excerpt.note.capacity"));
   }
 
   const pending = contents.isFetching && (contents.isPending || contents.isPlaceholderData);
@@ -206,7 +222,7 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
         {!refused ? <Button variant="outline" size="sm" onClick={() => void contents.refetch()}><RotateCw aria-hidden />{t("sessions.contents.retry")}</Button> : null}
       </div> : null}
       {unlocated ? <p role="status" className="px-[var(--card-padding)] py-3 text-sm">{t("sessions.contents.window.anchorUnlocated")}</p> : null}
-      <SessionExcerpt key="excerpt" slug={slug} session={session} items={selectedItems} selected={selected} hasMore={hasMore} loadedCount={items.length} revalidateSources active={active} draft={draft} onDraftChange={setDraft} onClear={() => setSnapshots(new Map())} onActionsHeightChange={setActionsHeight} />
+      <SessionExcerpt key="excerpt" slug={slug} session={session} items={selectedItems} selected={selected} hasMore={hasMore} loadedCount={items.length} revalidateSources active={active} draft={draft} onDraftChange={handoff.setDraft} handoff={handoff} onClear={() => handoff.select(new Map())} onActionsHeightChange={setActionsHeight} />
       {!refused && !unavailable ? <div aria-busy={pending}>
         {visibleItems.length ? <LoadedContentNavigation session={session} items={visibleItems} hasMore={hasMore} /> : null}
         {entries.length ? <ol aria-labelledby={headingId} className="flex flex-col">
@@ -233,7 +249,7 @@ function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSe
       className="h-10 w-full min-w-0 rounded-[var(--radius-cap)] border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:min-h-[44px] max-sm:min-w-[44px]"
       onChange={(event) => {
         if (!items.some((item) => item.id === event.target.value)) return;
-        navigate({ pathname: location.pathname, search: location.search, hash: `${ANCHOR_PREFIX}${event.target.value}` }, { replace: true, preventScrollReset: true });
+        navigate({ pathname: location.pathname, search: location.search, hash: `${ANCHOR_PREFIX}${event.target.value}` }, { replace: true, preventScrollReset: true, state: location.state });
       }}
     >
       <option value="" disabled>{t("sessions.contents.navigation.label")}</option>

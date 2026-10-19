@@ -10121,7 +10121,9 @@
           "resumeDraft": "Retomar rascunho da nota",
           "discard": "Descartar rascunho",
           "recheck": "Verificar novamente",
-          "sourceCheckFailed": "Não foi possível verificar as fontes selecionadas. Seu rascunho foi mantido. Verifique novamente antes de salvar."
+          "sourceCheckFailed": "Não foi possível verificar as fontes selecionadas. Seu rascunho foi mantido. Verifique novamente antes de salvar.",
+          "memoryOnly": "Este rascunho fica nesta aba enquanto você navega. Ele é perdido ao recarregar ou fechar a aba.",
+          "capacity": "Esta aba atingiu seu limite de rascunhos. Conclua ou descarte outro rascunho, limpe uma seleção que não usa ou reduza este rascunho."
         },
         "moreWindows": "A seleção é mantida ao passar de um intervalo para outro.",
         "validating": "Verificando as fontes selecionadas…",
@@ -10306,5 +10308,9 @@
       "loaded_many": "{{count}} chamadas correspondentes carregadas",
       "loaded_zero": "0 chamadas correspondentes carregadas"
     }
+  },
+  "navigation": {
+    "returnToPrevious": "Voltar à visualização anterior",
+    "previousViewUnavailable": "A visualização anterior não está mais disponível. Use a página superior para continuar."
   }
 }

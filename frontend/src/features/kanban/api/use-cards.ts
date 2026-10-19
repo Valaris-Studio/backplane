@@ -107,7 +107,16 @@ export function useUpdateCard(slug: string, boardId: string) {
     },
 
     onMutate: async ({ cardId, ...payload }) => {
-      await queryClient.cancelQueries({ queryKey });
+      const detailKey = cardKeys.detail(slug, boardId, cardId);
+      const detailState = queryClient.getQueryState(detailKey);
+      // A partial acknowledgement cannot supply untouched fields from a lost read.
+      const needsDetailRefresh = !!detailState &&
+        (detailState.fetchStatus !== "idle" || detailState.isInvalidated);
+      // A pre-save detail read must not replace the later mutation response.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: detailKey, exact: true }),
+      ]);
       const snapshot = queryClient.getQueryData<BoardDetail>(queryKey);
 
       queryClient.setQueryData<BoardDetail>(queryKey, (old) => {
@@ -123,7 +132,25 @@ export function useUpdateCard(slug: string, boardId: string) {
         return { ...old, columns };
       });
 
-      return { snapshot };
+      return { snapshot, needsDetailRefresh };
+    },
+
+    onSuccess: async (saved, { cardId, ...fields }, context) => {
+      const detailKey = cardKeys.detail(slug, boardId, cardId);
+      const detailState = queryClient.getQueryState(detailKey);
+      context.needsDetailRefresh ||= !!detailState &&
+        (detailState.fetchStatus !== "idle" || detailState.isInvalidated);
+      // A refresh started during the write can still contain pre-commit values.
+      await queryClient.cancelQueries({ queryKey: detailKey, exact: true });
+      // Field saves and moves commit independently. Acknowledge only these
+      // fields so a failed companion operation cannot replay this write.
+      const committed = Object.fromEntries(
+        Object.keys(fields).map((field) => [field, saved[field as keyof Card]]),
+      );
+      // A partial acknowledgement does not make untouched fields fresh.
+      queryClient.setQueryData<Card>(detailKey,
+        (current) => current ? { ...current, ...committed } : current,
+        { updatedAt: queryClient.getQueryState(detailKey)?.dataUpdatedAt });
     },
 
     onError: (_err, _vars, context) => {
@@ -132,8 +159,15 @@ export function useUpdateCard(slug: string, boardId: string) {
       }
     },
 
-    onSettled: () => {
+    onSettled: (_data, _error, { cardId }, context) => {
       queryClient.invalidateQueries({ queryKey });
+      if (context?.needsDetailRefresh) {
+        // Restore the obligation on failure too; reuse a companion's fresh read.
+        void queryClient.invalidateQueries(
+          { queryKey: cardKeys.detail(slug, boardId, cardId), exact: true },
+          { cancelRefetch: false },
+        );
+      }
     },
   });
 }

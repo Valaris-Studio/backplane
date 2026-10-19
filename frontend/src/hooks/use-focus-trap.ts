@@ -55,9 +55,11 @@ function focusableWithin(container: HTMLElement): HTMLElement[] {
 export function useFocusTrap(
   containerRef: React.RefObject<HTMLElement | null>,
   active: boolean,
-  { deferInitialFocus = false }: { deferInitialFocus?: boolean } = {},
+  { deferInitialFocus = false, onEscape }: { deferInitialFocus?: boolean; onEscape?: () => void } = {},
 ): () => void {
   const previouslyFocused = React.useRef<HTMLElement | null>(null);
+  const escapeHandler = React.useRef(onEscape);
+  escapeHandler.current = onEscape;
   // Deferred initial focus is a rendezvous between two independent effects: the
   // caller's animation effect (which arms) and the trap effect below (which
   // resolves the container, possibly a commit later). Either can win the race —
@@ -108,7 +110,16 @@ export function useFocusTrap(
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Tab" || activeTraps.at(-1) !== trapped) return;
+      if (activeTraps.at(-1) !== trapped) return;
+      // Portaled consent dialogs share the sheet's document. Only the active
+      // focus trap may dismiss, otherwise one Escape also closes its parent.
+      if (event.key === "Escape" && !event.defaultPrevented && escapeHandler.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        escapeHandler.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
 
       const focusable = focusableWithin(trapped);
       const first = focusable[0];

@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { RichTooltip } from "@/components/ui/rich-tooltip";
 import { UnsavedChangesPrompt } from "@/components/ui/unsaved-changes-prompt";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { useNavigationGuard } from "@/providers/NavigationGuardProvider";
 import {
   Select,
   SelectContent,
@@ -90,6 +91,22 @@ interface Props {
   isDetailLoaded?: boolean;
 }
 
+function descriptionsMatch(draft: string, saved: string): boolean {
+  if (draft === saved) return true;
+  try {
+    const draftDocument = JSON.parse(draft);
+    const savedDocument = JSON.parse(saved);
+    // The API serializes rich text with spaces and escaped Unicode, while
+    // TipTap emits compact JSON. Those byte changes are not another edit.
+    return draftDocument?.type === "doc" && savedDocument?.type === "doc" &&
+      JSON.stringify(draftDocument) === JSON.stringify(savedDocument);
+  } catch {
+    return false;
+  }
+}
+
+type DraftField = "title" | "description" | "card_type" | "priority" | "column_id" | "due_date" | "status" | "labels";
+
 export function CardDetailSheet({
   card,
   columns,
@@ -106,6 +123,15 @@ export function CardDetailSheet({
   const rootId = useId();
   const fieldId = (name: string) => `${rootId}-${name}`;
   const [title, setTitle] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const saveAttempt = useRef(0);
+  const draftEditVersion = useRef(0);
+  const fieldsEditedDuringSave = useRef(new Set<DraftField>());
+  const acknowledgedFields = useRef<Partial<Pick<Card, DraftField>>>({});
+  const sourceBeforeAcknowledgment = useRef<Card | null>(null);
+  const approvedClose = useRef(false);
+  const previousSource = useRef<{ card: Card | null; open: boolean; slug: string; boardId: string; isDetailLoaded: boolean; savingDraft: boolean } | null>(null);
   const [description, setDescription] = useState("");
   const [cardType, setCardType] = useState<CardType>("task");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -251,7 +277,19 @@ export function CardDetailSheet({
 
   const isDoneColumn = currentColumn?.column_type === "done";
 
+  useEffect(() => () => {
+    // A committed request still refreshes its own card, but its completion
+    // cannot close or report an error in a different editor lifetime.
+    saveAttempt.current += 1;
+  }, [card?.id, open, slug, boardId]);
+
   const resetDraft = useCallback(() => {
+    saveAttempt.current += 1;
+    fieldsEditedDuringSave.current.clear();
+    acknowledgedFields.current = {};
+    sourceBeforeAcknowledgment.current = null;
+    setSavingDraft(false);
+    setSaveError(null);
     if (!card) return;
     setTitle(card.title);
     setDescription(card.description);
@@ -263,17 +301,74 @@ export function CardDetailSheet({
     setLabelsText(card.labels?.join(", ") ?? "");
   }, [card]);
 
-  // Keyed on `open` as well as the card: BoardView mounts this sheet
-  // unconditionally and never clears selectedCardId, and useCardDetail hands
-  // back the same cached object on reopen, so a card-only key would never
-  // refire and the sheet would reopen on a stale draft. Deliberately one-way —
-  // resetting as `open` flips false would snap the still-visible sheet back to
-  // pre-save values during the exit tween (useUpdateCard's optimistic patch
-  // hits the board query, not cardKeys.detail).
+  const draftMatches = useCallback((saved: Card) => {
+    const normalizedLabels = labelsText.split(",").map((label) => label.trim()).filter(Boolean).join(", ");
+    return title.trim() === saved.title && descriptionsMatch(description, saved.description) &&
+      cardType === saved.card_type && priority === saved.priority && columnId === saved.column_id &&
+      dueDate === (saved.due_date ?? "") && status === (saved.status ?? "") &&
+      normalizedLabels === (saved.labels?.join(", ") ?? "");
+  }, [title, description, cardType, priority, columnId, dueDate, status, labelsText]);
+
+  function acknowledgmentPending(saved: Card): boolean {
+    // Observer notifications can coalesce: a newer remote snapshot may arrive
+    // instead of the exact response. Either completes delivery to this editor.
+    if (saved !== sourceBeforeAcknowledgment.current) return false;
+    return Object.entries(acknowledgedFields.current).some(([field, value]) => {
+      const current = saved[field as DraftField];
+      return field === "description"
+        ? !descriptionsMatch(current as string, value as string)
+        : JSON.stringify(current) !== JSON.stringify(value);
+    });
+  }
+
   useEffect(() => {
-    if (!open) return;
-    resetDraft();
-  }, [resetDraft, open]);
+    const previous = previousSource.current;
+    previousSource.current = { card, open, slug, boardId, isDetailLoaded, savingDraft };
+    if (!open || !card || (previous?.card === card && previous.open === open &&
+        previous.slug === slug && previous.boardId === boardId && previous.isDetailLoaded === isDetailLoaded &&
+        previous.savingDraft === savingDraft)) return;
+    // Reopening and initial detail hydration start from the saved card.
+    if (!previous?.open || !previous.card || previous.card.id !== card.id ||
+        previous.slug !== slug || previous.boardId !== boardId ||
+        (!previous.isDetailLoaded && isDetailLoaded)) {
+      resetDraft();
+      return;
+    }
+    // Keep each local edit, including a rejected move, while untouched fields
+    // adopt remote completion changes instead of writing stale values back.
+    const saved = previous.card;
+    const waitingForAcknowledgment = acknowledgmentPending(card);
+    // Observing the response completes delivery. Later remote edits must not
+    // reactivate an old acknowledgment as a new pending save.
+    if (!waitingForAcknowledgment) acknowledgedFields.current = {};
+    function reconcile<Value>(
+      field: DraftField, value: Value, before: Value, after: Value,
+      equals: (left: Value, right: Value) => boolean = (left, right) => left === right,
+    ): Value {
+      // A user can undo to the old saved value while a different value is
+      // committing. Equality with that old value does not make it untouched.
+      if (fieldsEditedDuringSave.current.has(field)) {
+        // Mutation completion can render before React Query delivers its saved
+        // card to the parent. The old prop cannot acknowledge a later edit.
+        if (savingDraft || waitingForAcknowledgment || !equals(value, after)) return value;
+        fieldsEditedDuringSave.current.delete(field);
+      }
+      // Canonical serialization is not user input. Keep equivalent raw draft
+      // bytes, including when one independently committed operation fails.
+      if (equals(value, after)) return value;
+      return equals(value, before) ? after : value;
+    }
+    setTitle(reconcile("title", title, saved.title, card.title, (left, right) => left.trim() === right));
+    setDescription(reconcile("description", description, saved.description, card.description, descriptionsMatch));
+    setCardType(reconcile("card_type", cardType, saved.card_type, card.card_type));
+    setPriority(reconcile("priority", priority, saved.priority, card.priority));
+    setColumnId(reconcile("column_id", columnId, saved.column_id, card.column_id));
+    setDueDate(reconcile("due_date", dueDate, saved.due_date ?? "", card.due_date ?? ""));
+    setStatus(reconcile("status", status, saved.status ?? "", card.status ?? ""));
+    setLabelsText(reconcile("labels", labelsText, saved.labels?.join(", ") ?? "", card.labels?.join(", ") ?? "",
+      (left, right) => left.split(",").map((label) => label.trim()).filter(Boolean).join(", ") === right));
+  }, [card, open, slug, boardId, isDetailLoaded, resetDraft, title, description,
+    cardType, priority, columnId, dueDate, status, labelsText, savingDraft]);
 
   function copyCardId() {
     if (!card) return;
@@ -319,12 +414,50 @@ export function CardDetailSheet({
     });
   }
 
-  function handleSave() {
-    if (!card || !title.trim()) return;
+  function closeApproved() {
+    // The modal already obtained Save/Discard consent. Its query update must
+    // not open a second prompt before React has committed the cleared draft.
+    approvedClose.current = true;
+    onOpenChange(false);
+    queueMicrotask(() => { approvedClose.current = false; });
+  }
+
+  function editDraft<Value>(field: DraftField, setValue: (value: Value) => void, value: Value) {
+    draftEditVersion.current += 1;
+    if (savingDraft || (card && acknowledgmentPending(card))) fieldsEditedDuringSave.current.add(field);
+    else fieldsEditedDuringSave.current.delete(field);
+    setValue(value);
+  }
+
+  async function saveDraft(closeAfterSave: boolean): Promise<boolean> {
+    if (!card || !title.trim() || savingDraft || acknowledgmentPending(card)) return false;
+    const currentAttempt = ++saveAttempt.current;
+    const submittedEditVersion = draftEditVersion.current;
+    fieldsEditedDuringSave.current.clear();
+    acknowledgedFields.current = {};
+    sourceBeforeAcknowledgment.current = null;
+    const reportError = (error: unknown) => {
+      if (saveAttempt.current === currentAttempt) setSaveError(error);
+    };
+    setSavingDraft(true);
+    setSaveError(null);
+    const writes: Promise<boolean>[] = [];
     const parsedLabels = labelsText
       .split(",")
       .map((l) => l.trim())
       .filter(Boolean);
+    // Omit untouched fields: another actor may have changed them since this
+    // card was observed, even when no refresh signal has reached this tab.
+    const changedFields: Partial<Pick<Card, "title" | "description" | "card_type" | "priority" | "due_date" | "status" | "labels">> = {};
+    if (title.trim() !== card.title) changedFields.title = title.trim();
+    if (!descriptionsMatch(description, card.description)) changedFields.description = description;
+    if (cardType !== card.card_type) changedFields.card_type = cardType;
+    if (priority !== card.priority) changedFields.priority = priority;
+    if (dueDate !== (card.due_date ?? "")) changedFields.due_date = dueDate || null;
+    if (status !== (card.status ?? "")) changedFields.status = status || null;
+    if (parsedLabels.join(", ") !== (card.labels?.join(", ") ?? "")) {
+      changedFields.labels = parsedLabels.length > 0 ? parsedLabels : null;
+    }
 
     // A column change is NOT a plain field PATCH — update_card has no
     // column_id field and now rejects it outright; only /move does. Moving
@@ -338,67 +471,93 @@ export function CardDetailSheet({
         (max, c) => (c.position > max ? c.position : max),
         0,
       ) ?? 0;
-      moveCard.mutate({
-        cardId: card.id,
-        column_id: columnId,
-        position: maxPosition + 1024,
-      });
+      writes.push(new Promise<boolean>((resolve) => {
+        moveCard.mutate({
+          cardId: card.id,
+          column_id: columnId,
+          position: maxPosition + 1024,
+        }, {
+          onSuccess: (saved) => {
+            if (saveAttempt.current === currentAttempt) {
+              sourceBeforeAcknowledgment.current = previousSource.current?.card ?? card;
+              acknowledgedFields.current.column_id = saved.column_id;
+            }
+            resolve(true);
+          },
+          onError: (error) => { reportError(error); resolve(false); },
+        });
+      }));
     }
 
-    updateCard.mutate(
-      {
-        cardId: card.id,
-        title: title.trim(),
-        description,
-        card_type: cardType,
-        priority,
-        due_date: dueDate || null,
-        status: status || null,
-        labels: parsedLabels.length > 0 ? parsedLabels : null,
-      },
-      { onSuccess: () => onOpenChange(false) },
-    );
+    if (Object.keys(changedFields).length > 0) {
+      writes.push(new Promise<boolean>((resolve) => updateCard.mutate(
+        { cardId: card.id, ...changedFields },
+        {
+          onSuccess: (saved) => {
+            if (saveAttempt.current === currentAttempt) {
+              // The response may include fields committed by a separate move;
+              // this request acknowledges only the fields it actually wrote.
+              sourceBeforeAcknowledgment.current = previousSource.current?.card ?? card;
+              Object.assign(acknowledgedFields.current, Object.fromEntries(
+                Object.keys(changedFields).map((field) => [field, saved[field as DraftField]]),
+              ));
+            }
+            resolve(true);
+          },
+          onError: (error) => { reportError(error); resolve(false); },
+        },
+      )));
+    }
+    // These endpoints commit independently. A successful field update cannot
+    // hide a failed move; keep the draft until both requested writes succeed.
+    const succeeded = (await Promise.all(writes)).every(Boolean);
+    if (saveAttempt.current !== currentAttempt) return false;
+    setSavingDraft(false);
+    // A successful request commits only the submitted draft. Later input must
+    // keep this editor (and any pending route departure) open for another save.
+    const draftCommitted = succeeded && draftEditVersion.current === submittedEditVersion;
+    if (draftCommitted && closeAfterSave) closeApproved();
+    return draftCommitted;
   }
+
+  function handleSave() { void saveDraft(true); }
 
   // Save only activates when an editable field actually diverges from the
   // card's persisted value. Participants/dependencies save through their own
   // immediate mutations, so they're intentionally excluded here. Normalize the
   // same way handleSave does (trim title, comma-split labels) so cosmetic
   // whitespace doesn't read as a change.
-  const isDirty = useMemo(() => {
-    if (!card) return false;
-    const normalizedLabels = labelsText
-      .split(",")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .join(", ");
-    const originalLabels = card.labels?.join(", ") ?? "";
-    return (
-      title.trim() !== card.title ||
-      description !== card.description ||
-      cardType !== card.card_type ||
-      priority !== card.priority ||
-      columnId !== card.column_id ||
-      dueDate !== (card.due_date ?? "") ||
-      status !== (card.status ?? "") ||
-      normalizedLabels !== originalLabels
-    );
-  }, [card, title, description, cardType, priority, columnId, dueDate, status, labelsText]);
+  const isDirty = card !== null && (!draftMatches(card) ||
+    (fieldsEditedDuringSave.current.size > 0 && (savingDraft || acknowledgmentPending(card))));
 
   const saveDisabled =
+    savingDraft ||
+    (card !== null && acknowledgmentPending(card)) ||
     updateCard.isPending ||
+    moveCard.isPending ||
     !title.trim() ||
     !isDirty ||
     isFrozen ||
     !isDetailLoaded;
-  const saveLabel = updateCard.isPending ? t("common.saving") : t("common.save");
+  const saveLabel = savingDraft || updateCard.isPending || moveCard.isPending ? t("common.saving") : t("common.save");
 
   const guard = useUnsavedChangesGuard({
     isDirty,
-    onClose: () => onOpenChange(false),
+    onClose: closeApproved,
     onSave: handleSave,
     canSave: !saveDisabled,
     onDiscard: resetDraft,
+  });
+
+  useNavigationGuard({
+    isDirty: open && isDirty,
+    canSave: !saveDisabled,
+    save: () => saveDraft(false),
+    discard: resetDraft,
+    leavesScope: (next, current) => !approvedClose.current && (
+      next.pathname !== current.pathname ||
+      new URLSearchParams(next.search).get("card") !== new URLSearchParams(current.search).get("card")
+    ),
   });
 
   // Capture-phase so card-reference anchors anywhere in the sheet body
@@ -523,14 +682,14 @@ export function CardDetailSheet({
             <Input
               id={fieldId("title")}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => editDraft("title", setTitle, e.target.value)}
               placeholder={t("cards.titleLabel")}
               aria-label={t("cards.titleLabel")}
             />
           </div>
           <RichTextEditor
             content={description}
-            onChange={setDescription}
+            onChange={(value) => editDraft("description", setDescription, value)}
             placeholder={t("cards.descriptionLabel")}
             workspaceSlug={slug}
           />
@@ -539,7 +698,7 @@ export function CardDetailSheet({
               <label htmlFor={fieldId("type")} className="text-sm font-medium">
                 {t("cards.typeLabel")}
               </label>
-              <Select value={cardType} onValueChange={(v) => setCardType(v as CardType)}>
+              <Select value={cardType} onValueChange={(v) => editDraft("card_type", setCardType, v as CardType)}>
                 <SelectTrigger id={fieldId("type")}>
                   <SelectValue>{t(`cards.types.${cardType}`)}</SelectValue>
                 </SelectTrigger>
@@ -555,7 +714,7 @@ export function CardDetailSheet({
               <label htmlFor={fieldId("priority")} className="text-sm font-medium">
                 {t("cards.priorityLabel")}
               </label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
+              <Select value={priority} onValueChange={(v) => editDraft("priority", setPriority, v as Priority)}>
                 <SelectTrigger id={fieldId("priority")}>
                   <SelectValue>{priorityLabel(t, priority)}</SelectValue>
                 </SelectTrigger>
@@ -579,7 +738,7 @@ export function CardDetailSheet({
                 id={fieldId("dueDate")}
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) => editDraft("due_date", setDueDate, e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -588,7 +747,7 @@ export function CardDetailSheet({
                   <span>{t("cards.statusLabel")}</span>
                 </RichTooltip>
               </label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(value) => editDraft("status", setStatus, value)}>
                 <SelectTrigger id={fieldId("status")}>
                   <SelectValue placeholder={t("common.none")}>
                     {statusLabel(t, status)}
@@ -612,7 +771,7 @@ export function CardDetailSheet({
               id={fieldId("labels")}
               placeholder={t("cards.labelsPlaceholder")}
               value={labelsText}
-              onChange={(e) => setLabelsText(e.target.value)}
+              onChange={(e) => editDraft("labels", setLabelsText, e.target.value)}
             />
           </div>
 
@@ -994,7 +1153,7 @@ export function CardDetailSheet({
             <label htmlFor={fieldId("column")} className="text-sm font-medium">
               {t("cards.columnLabel")}
             </label>
-            <Select value={columnId} onValueChange={setColumnId}>
+            <Select value={columnId} onValueChange={(value) => editDraft("column_id", setColumnId, value)}>
               <SelectTrigger id={fieldId("column")} disabled={isFrozen}>
                 <SelectValue>
                   {columns.find((c) => c.id === columnId)?.name}
@@ -1016,6 +1175,7 @@ export function CardDetailSheet({
           {card ? <CardSessionsSection slug={slug} boardId={boardId} cardId={card.id} /> : null}
         </div>
 
+        {saveError !== null ? <p role="alert" className="px-6 py-2 text-sm text-destructive">{resolveApiErrorMessage(saveError, t, i18n)}</p> : null}
         <SheetFooter className="shrink-0 border-t border-border/60 px-6 pb-6 pt-4">
           <FrozenActionTooltip frozen={isFrozen} className="mr-auto">
             <Button

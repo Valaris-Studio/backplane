@@ -65,9 +65,20 @@ export function MermaidCodeBlockView({ node, editor }: NodeViewProps) {
 
   useEffect(() => {
     if (!isEditing) return;
+    const editorRoot = editor.view.dom;
 
+    // Bound on the editor root, not `document`: it runs after ProseMirror's own
+    // root listener (so an Escape a nested owner such as the mention picker
+    // consumed arrives prevented) and before the host focus trap's `document`
+    // listener, which would otherwise close or guard the sheet on this Escape.
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") stopEditing();
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.isComposing || editor.view.composing) return;
+      // Typed into the editor text, not a control another node view owns.
+      if (event.target !== editorRoot || !editor.isEditable) return;
+      event.preventDefault();
+      event.stopPropagation();
+      stopEditing();
     }
     // Blur alone is unreliable inside ProseMirror (selection churn fires it);
     // an outside-pointer check is what actually distinguishes "left the node".
@@ -75,13 +86,13 @@ export function MermaidCodeBlockView({ node, editor }: NodeViewProps) {
       if (!wrapperRef.current?.contains(event.target as globalThis.Node)) stopEditing();
     }
 
-    document.addEventListener("keydown", onKeyDown);
+    editorRoot.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
+      editorRoot.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [isEditing, stopEditing]);
+  }, [editor, isEditing, stopEditing]);
 
   // Every non-mermaid language keeps the stock code-block rendering. The
   // <pre><code> shape is load-bearing: index.css styles `.tiptap-editor pre`

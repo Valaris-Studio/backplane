@@ -24,6 +24,9 @@ export type EntityType =
   | "agent"
   | "board"
   | "workspace"
+  | "session"
+  | "resource"
+  | "timeline"
   | "pr";
 
 export interface EntityRef {
@@ -35,6 +38,8 @@ export interface EntityRef {
   boardId?: string;
   /** For `pr` (and any future off-platform target): the raw external URL. */
   externalUrl?: string;
+  contentId?: string;
+  eventSequence?: string | number;
 }
 
 /**
@@ -49,6 +54,27 @@ export function buildEntityLink(
   ref: EntityRef,
 ): { href: string; external: boolean } | null {
   switch (ref.type) {
+    case "session":
+      if (!ref.id) return null;
+      return {
+        href: `/${encodeURIComponent(ref.slug)}/sessions/${encodeURIComponent(ref.id)}${ref.contentId ? `#content-${encodeURIComponent(ref.contentId)}` : ""}`,
+        external: false,
+      };
+    case "resource":
+      if (!ref.id) return null;
+      return {
+        href: `/${encodeURIComponent(ref.slug)}${ref.boardId ? `/boards/${encodeURIComponent(ref.boardId)}` : ""}/resources?resource=${encodeURIComponent(ref.id)}`,
+        external: false,
+      };
+    case "timeline": {
+      const sequence = String(ref.eventSequence ?? "");
+      if (!ref.boardId || !/^\d{1,19}$/.test(sequence) || BigInt(sequence) > 9223372036854775807n ||
+          (typeof ref.eventSequence === "number" && !Number.isSafeInteger(ref.eventSequence))) return null;
+      return {
+        href: `/${encodeURIComponent(ref.slug)}/boards/${encodeURIComponent(ref.boardId)}/timeline?at=${sequence}`,
+        external: false,
+      };
+    }
     case "card":
       if (!ref.boardId || !ref.id) return null;
       return {

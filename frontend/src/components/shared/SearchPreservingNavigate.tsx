@@ -10,6 +10,6 @@ import { Navigate, useLocation } from "react-router-dom";
  * tab keeping their params.
  */
 export function SearchPreservingNavigate({ to }: { to: string }) {
-  const { search } = useLocation();
-  return <Navigate to={{ pathname: to, search }} replace />;
+  const { search, state } = useLocation();
+  return <Navigate to={{ pathname: to, search }} state={state} replace />;
 }

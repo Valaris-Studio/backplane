@@ -3,7 +3,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { boardKeys } from "@/lib/query-keys";
+import { boardKeys, cardKeys } from "@/lib/query-keys";
 import type { BoardDetail, Card, CardMoveRequest } from "@/types/kanban";
 
 interface MoveCardParams extends CardMoveRequest {
@@ -24,7 +24,16 @@ export function useOptimisticCardMove(slug: string, boardId: string) {
     },
 
     onMutate: async ({ cardId, column_id, position }) => {
-      await queryClient.cancelQueries({ queryKey });
+      const detailKey = cardKeys.detail(slug, boardId, cardId);
+      const detailState = queryClient.getQueryState(detailKey);
+      // A partial acknowledgement cannot supply untouched fields from a lost read.
+      const needsDetailRefresh = !!detailState &&
+        (detailState.fetchStatus !== "idle" || detailState.isInvalidated);
+      // A pre-save detail read must not replace the later mutation response.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: detailKey, exact: true }),
+      ]);
       const snapshot = queryClient.getQueryData<BoardDetail>(queryKey);
 
       queryClient.setQueryData<BoardDetail>(queryKey, (old) => {
@@ -56,7 +65,22 @@ export function useOptimisticCardMove(slug: string, boardId: string) {
         return { ...old, columns };
       });
 
-      return { snapshot };
+      return { snapshot, needsDetailRefresh };
+    },
+
+    onSuccess: async (saved, { cardId }, context) => {
+      const detailKey = cardKeys.detail(slug, boardId, cardId);
+      const detailState = queryClient.getQueryState(detailKey);
+      context.needsDetailRefresh ||= !!detailState &&
+        (detailState.fetchStatus !== "idle" || detailState.isInvalidated);
+      // A refresh started during the write can still contain pre-commit values.
+      await queryClient.cancelQueries({ queryKey: detailKey, exact: true });
+      // Never replace the entire detail: a concurrent field save may have
+      // committed after the move response was produced.
+      // A partial acknowledgement does not make untouched fields fresh.
+      queryClient.setQueryData<Card>(detailKey,
+        (current) => current ? { ...current, column_id: saved.column_id, position: saved.position } : current,
+        { updatedAt: queryClient.getQueryState(detailKey)?.dataUpdatedAt });
     },
 
     onError: (_err, _vars, context) => {
@@ -65,8 +89,15 @@ export function useOptimisticCardMove(slug: string, boardId: string) {
       }
     },
 
-    onSettled: () => {
+    onSettled: (_data, _error, { cardId }, context) => {
       queryClient.invalidateQueries({ queryKey });
+      if (context?.needsDetailRefresh) {
+        // Restore the obligation on failure too; reuse a companion's fresh read.
+        void queryClient.invalidateQueries(
+          { queryKey: cardKeys.detail(slug, boardId, cardId), exact: true },
+          { cancelRefetch: false },
+        );
+      }
     },
   });
 }

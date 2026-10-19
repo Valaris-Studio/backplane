@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { ContextLink } from "./ContextLink";
 import { buildEntityLink, type EntityRef } from "@/lib/entity-link";
 
 /**
@@ -36,8 +36,8 @@ export function EntityLink({
     );
   }
   return (
-    <Link to={resolved.href} className={linkClass}>
+    <ContextLink to={resolved.href} className={linkClass}>
       {children}
-    </Link>
+    </ContextLink>
   );
 }

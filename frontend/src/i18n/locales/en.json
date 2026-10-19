@@ -10030,7 +10030,9 @@
           "resumeDraft": "Resume note draft",
           "discard": "Discard draft",
           "recheck": "Check again",
-          "sourceCheckFailed": "Couldn't check the selected sources. Your draft is kept. Check again before saving."
+          "sourceCheckFailed": "Couldn't check the selected sources. Your draft is kept. Check again before saving.",
+          "memoryOnly": "This draft stays in this tab while you navigate. Reloading or closing the tab loses it.",
+          "capacity": "This tab has reached its handoff limit. Finish or discard another handoff, clear an unused selection, or shorten this draft."
         },
         "moreWindows": "Selection stays with you as you move between windows.",
         "validating": "Checking selected sources…",
@@ -10208,5 +10210,9 @@
       "linksError": "Linked work could not be loaded.",
       "sessionTotals": "Session totals"
     }
+  },
+  "navigation": {
+    "returnToPrevious": "Return to previous view",
+    "previousViewUnavailable": "The previous view is no longer available. Use the parent page to continue."
   }
 }

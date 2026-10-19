@@ -6,6 +6,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { isInaccessible } from "@testing-library/react";
 import type { JsonBodyType } from "msw";
 import { Link, Route, Routes } from "react-router-dom";
+import { ContextLink } from "@/components/shared/ContextLink";
 import i18n from "@/i18n/config";
 import { api } from "@/lib/api";
 import { sessionKeys } from "@/lib/query-keys";
@@ -13,6 +14,7 @@ import type { WebSocketEvent } from "@/lib/websocket";
 import { WebSocketContext } from "@/providers/WebSocketProvider";
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { renderBrowserNavigationRouter } from "@/test/navigation-router";
 import type { SessionContent } from "@/types/agent-session";
 import { ME, SLUG, callPage, contentPage, makeCall, makeContent, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { SessionDetailPage } from "../SessionDetailPage";
@@ -80,7 +82,7 @@ function serveReader(initial: SessionContent[] = [record(1), record(2)]) {
     bodies: [] as string[],
     downloads: [] as string[],
     writes: [] as Record<string, unknown>[],
-    windowResponse: null as null | ((params: URLSearchParams) => Response | Promise<Response>),
+    windowResponse: null as null | ((params: URLSearchParams) => Response | undefined | Promise<Response | undefined>),
     metadataResponse: null as null | ((ids: string[]) => Response | Promise<Response>),
     saveResponse: (payload: Record<string, unknown>): Response => HttpResponse.json({
       id: "note-reader", workspace_id: "ws-1", board_id: BOARD, card_id: null,
@@ -134,7 +136,7 @@ function serveReader(initial: SessionContent[] = [record(1), record(2)]) {
       const params = new URL(request.url).searchParams;
       state.windows.push(params); state.reads.push("window");
       if (state.windowError) return responseError(state.windowError.status, state.windowError.code);
-      return state.windowResponse ? state.windowResponse(params) : windowPage(params);
+      return (await state.windowResponse?.(params)) ?? windowPage(params);
     }),
     http.get(CONTENTS, ({ request }) => {
       const params = new URL(request.url).searchParams;
@@ -295,6 +297,76 @@ beforeEach(async () => { listeners.clear(); await i18n.changeLanguage("en"); });
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("bounded session reader navigation", () => {
+  it("restores an earlier window, view and selection after canonical shared work and browser Back", async () => {
+    const rows = Array.from({ length: 301 }, (_, index) => record(index + 1));
+    rows[150] = record(151, { channel: "native_record" });
+    const state = serveReader(rows);
+    const origin = `/${SLUG}/sessions/${SESSION}`;
+    const sharedWork = `/${SLUG}/boards/${BOARD}/kanban?card=card-reader`;
+    const { router, client } = renderBrowserNavigationRouter([
+      { path: origin, element: <main>
+        <SessionTranscript slug={SLUG} session={session} />
+        <ContextLink id="reader-shared-work" to={sharedWork}>Open related card</ContextLink>
+      </main> },
+      { path: `/${SLUG}/boards/${BOARD}/kanban`, element: <main><h1>Related shared card</h1></main> },
+    ], origin);
+    clients.push(client);
+    const user = userEvent.setup();
+    await screen.findByText("Captured record 301");
+    await user.click(screen.getByRole("button", { name: "Earlier records" }));
+    await screen.findByText("Captured record 150");
+    await user.click(recordCheckbox(150));
+    await user.click(screen.getByRole("button", { name: "Everything" }));
+    await screen.findByText("Captured record 151");
+    await settled(client);
+    const originalWindow = visibleIds();
+    expect(originalWindow).toEqual(Array.from({ length: 100 }, (_, index) => `content-${contentId(index + 102)}`));
+    expect(recordCheckbox(150)).toBeChecked();
+
+    // jsdom has no layout. Supply the initiating control's offsets to exercise
+    // the provider's real anchor-offset/focus restoration after route unmount.
+    let returning = false;
+    const bounds = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.id !== "reader-shared-work") return bounds.call(this);
+      const top = returning ? 272 : 112;
+      return { x: 0, y: top, top, bottom: top + 44, left: 0, right: 200, width: 200, height: 44, toJSON: () => ({}) };
+    });
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    const originKey = router.state.location.key;
+    const link = screen.getByRole("link", { name: "Open related card" });
+    expect(link).toHaveAttribute("href", sharedWork);
+    await user.click(link);
+    await screen.findByRole("heading", { name: "Related shared card" });
+    expect(screen.queryByRole("heading", { name: "Transcript" })).not.toBeInTheDocument();
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(sharedWork);
+    expect(window.history.state.usr).toEqual({ bpReturn: { v: 1, originKey, originIdx: 0 } });
+
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => { release = resolve; });
+    state.windowResponse = async () => { await ready; return undefined; };
+    returning = true;
+    scrollBy.mockClear();
+    try {
+      await act(async () => { window.history.back(); });
+      await waitFor(() => expect(router.state.location.key).toBe(originKey));
+      await waitFor(() => expect(state.windows).toHaveLength(3));
+      expect(screen.queryByText("Captured record 150")).not.toBeInTheDocument();
+      await act(async () => { release(); });
+      await settled(client);
+      expect(visibleIds()).toEqual(originalWindow);
+      expect(screen.getByRole("button", { name: "Everything" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("Captured record 151")).toBeVisible();
+      expect(recordCheckbox(150)).toBeChecked();
+      expect(screen.getByRole("link", { name: "Open related card" })).toHaveFocus();
+      expect(scrollBy).toHaveBeenCalledWith({ top: 160, behavior: "instant" });
+      expect(screen.queryByText("Captured record 301")).not.toBeInTheDocument();
+      expect(state.bodies).toEqual([]);
+      expect(state.downloads).toEqual([]);
+      expect(state.legacy).toEqual([]);
+    } finally { release(); }
+  });
+
   it.each([375, 1024, 1440])("offers peer readers and roving keyboard tabs at %spx without hidden reader controls", async (width) => {
     responsiveViewport(width); serveReader(); renderReader();
     const user = userEvent.setup();

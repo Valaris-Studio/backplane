@@ -33,6 +33,11 @@ keeps its own detailed per-tool history in
 
 #### Added
 
+- Compare a published note with its original handoff when an authorized
+  publication record is available. Older records without saved text explain
+  that limitation instead of presenting an invented diff.
+- Query your session metadata across accessible workspaces through one
+  owner-scoped API, with global filtering and pagination.
 - Record committed note changes from the UI and MCP, with authorized revision
   and comparison APIs. Existing notes gain an honest baseline on their first
   edit; revisions remain available until the note is deleted.
@@ -53,6 +58,10 @@ keeps its own detailed per-tool history in
 
 #### Changed
 
+- Follow related work and return with filters, selection and useful reading
+  position preserved. Dirty cards and notes require an explicit save or
+  discard decision; pending handoff drafts remain available within the tab
+  until reload or access loss.
 - Selected evidence and note drafts survive transcript navigation. Fresh source
   checks protect preview and sharing; uncertain note saves retain the same
   retry identity.
