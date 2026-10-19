@@ -149,6 +149,21 @@ function action(container: HTMLElement, name: string) {
   return button;
 }
 
+function labeledControl(container: HTMLElement, name: string, role: "combobox" | "textbox") {
+  const label = within(container).getByText(name, { selector: "label" }) as HTMLLabelElement;
+  expect(isInaccessible(label)).toBe(false);
+  // Resolve the explicit association before checking its one accessible name:
+  // jsdom otherwise scans all retained row labels for every candidate control.
+  const control = label.control;
+  expect(control).not.toBeNull();
+  expect(control).toBeInstanceOf(role === "combobox" ? HTMLSelectElement : HTMLInputElement);
+  expect(container).toContainElement(control);
+  expect(within(label).getByRole(role)).toBe(control);
+  expect(control).toHaveAccessibleName(name);
+  expect(isInaccessible(control!)).toBe(false);
+  return control!;
+}
+
 function row(container: HTMLElement, order: number) {
   const element = container.querySelector<HTMLElement>(`[id="content-${contentId(order)}"]`);
   expect(element).not.toBeNull();
@@ -172,10 +187,10 @@ async function prepareDraft(container: HTMLElement, user: ReturnType<typeof user
   expect((within(preview).getByRole("textbox", { name: "Excerpt preview" }) as HTMLTextAreaElement).value).toContain(bodyText(order));
   await user.click(action(preview, "Share as note")); context.signal.throwIfAborted();
   const dialog = await screen.findByRole("dialog", { name: "Share as note" }); context.signal.throwIfAborted();
-  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Workspace" }), SLUG); context.signal.throwIfAborted();
+  await user.selectOptions(labeledControl(dialog, "Workspace", "combobox"), SLUG); context.signal.throwIfAborted();
   await within(dialog).findByRole("option", { name: "Reader review" }); context.signal.throwIfAborted();
-  await user.selectOptions(within(dialog).getByRole("combobox", { name: "Board" }), BOARD); context.signal.throwIfAborted();
-  await user.clear(within(dialog).getByRole("textbox", { name: "Note title" })); context.signal.throwIfAborted();
+  await user.selectOptions(labeledControl(dialog, "Board", "combobox"), BOARD); context.signal.throwIfAborted();
+  await user.clear(labeledControl(dialog, "Note title", "textbox")); context.signal.throwIfAborted();
   await user.paste(TITLE); context.signal.throwIfAborted();
   await waitFor(() => expect(within(dialog).getByText("Save note", { selector: "button" })).toBeEnabled(), { container: dialog });
   context.signal.throwIfAborted();
