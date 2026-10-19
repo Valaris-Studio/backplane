@@ -68,7 +68,7 @@ export function NoteEditor({
     slug: string;
     open: boolean;
     isBodyAuthoritative: boolean;
-  } | null>(null);
+  }>({ note: source, slug, open, isBodyAuthoritative });
   const updateNote = useUpdateNote(slug, boardId);
   const deleteNote = useDeleteNote(slug, boardId);
 
@@ -81,14 +81,13 @@ export function NoteEditor({
   useEffect(() => {
     const previous = previousSource.current;
     previousSource.current = { note: source, slug, open, isBodyAuthoritative };
-    if (!open || (previous?.note === source && previous.slug === slug &&
+    if (!open || (previous.note === source && previous.slug === slug &&
         previous.open === open && previous.isBodyAuthoritative === isBodyAuthoritative)) return;
 
     // A detail refetch can change pin metadata while this draft is unsaved.
     // Compare with the prior saved copy before deciding to adopt the new one.
-    const wasClean = previous !== null &&
-      title.trim() === previous.note.title && content === previous.note.content;
-    if (!previous || !previous.open || previous.note.id !== source.id ||
+    const wasClean = title.trim() === previous.note.title && content === previous.note.content;
+    if (!previous.open || previous.note.id !== source.id ||
         previous.slug !== slug || (!previous.isBodyAuthoritative && isBodyAuthoritative) || wasClean) {
       resetDraft();
     } else {
