@@ -36,6 +36,79 @@ const record = (order: number): SessionContent => makeContent({
 type Context = { signal: AbortSignal; onTestFinished: (cleanup: () => void) => void };
 type Publication = Record<string, unknown>;
 
+// BEGIN bounded reader lifecycle observation
+// Observe the original operations without changing waits, cancellation or cleanup.
+const diagnosticEventLimit = 300;
+type DiagnosticCase = { id: number; name: string; phase: string; startedAt: number; finished: boolean };
+const diagnosticCases = new Map<Context, DiagnosticCase>();
+const diagnosticMetrics = new Map<Context, () => Record<string, number>>();
+const diagnosticRemovers: (() => void)[] = [];
+const diagnostic = { nodeVersion: process.version, events: [] as Record<string, unknown>[], droppedEvents: 0 };
+function diagnosticMark(context: Context | undefined, phase: string, detail: Record<string, unknown> = {}) {
+  const owner = context ? diagnosticCases.get(context) : undefined;
+  if (owner) owner.phase = phase;
+  const at = performance.now();
+  if (diagnostic.events.length < diagnosticEventLimit) diagnostic.events.push({
+    at, phase, caseId: owner?.id, elapsedMs: owner ? at - owner.startedAt : undefined,
+    aborted: context?.signal.aborted, finished: owner?.finished,
+    language: i18n.language, documentLanguage: document.documentElement.lang,
+    metrics: context ? diagnosticMetrics.get(context)?.() : undefined, ...detail,
+  });
+  else diagnostic.droppedEvents += 1;
+}
+function diagnosticSummary(context: Context, reason: string, previousPhase?: string) {
+  const owner = diagnosticCases.get(context);
+  console.info("reader-lifecycle-summary", JSON.stringify({
+    reason, ...owner, previousPhase, elapsedMs: owner ? performance.now() - owner.startedAt : undefined,
+    aborted: context.signal.aborted, language: i18n.language, documentLanguage: document.documentElement.lang,
+    eventCount: diagnostic.events.length, droppedEvents: diagnostic.droppedEvents,
+    metrics: diagnosticMetrics.get(context)?.(),
+  }));
+}
+function diagnosticRead<T>(context: Context, phase: string, read: () => T): T {
+  diagnosticMark(context, `${phase}:begin`);
+  try { return read(); } finally { diagnosticMark(context, `${phase}:end`); }
+}
+function diagnosticLanguageChanged(language: string) {
+  // A locale completion has no request owner; keep all case states so an old
+  // continuation cannot be misattributed to the currently running test.
+  diagnosticMark(undefined, "languageChanged", { eventLanguage: language,
+    cases: [...diagnosticCases].map(([context, owner]) => ({
+      id: owner.id, phase: owner.phase, finished: owner.finished, aborted: context.signal.aborted,
+    })) });
+}
+function diagnosticBegin(context: Context, name: string) {
+  diagnosticCases.set(context, { id: diagnosticCases.size + 1, name, phase: "beforeEach:begin", startedAt: performance.now(), finished: false });
+  const onAbort = () => {
+    const previousPhase = diagnosticCases.get(context)?.phase;
+    diagnosticMark(context, "signal:abort", { previousPhase });
+    diagnosticSummary(context, "abort", previousPhase);
+  };
+  context.signal.addEventListener("abort", onAbort);
+  diagnosticRemovers.push(() => context.signal.removeEventListener("abort", onAbort));
+  context.onTestFinished(() => {
+    diagnosticCases.get(context)!.finished = true;
+    diagnosticMark(context, "onTestFinished"); diagnosticSummary(context, "finished");
+  });
+  diagnosticMark(context, "beforeEach:begin");
+}
+function diagnosticObserveState(context: Context, state: ReturnType<typeof serveReader>, calls?: { mock: { calls: unknown[] } }) {
+  diagnosticMetrics.set(context, () => ({ requests: state.requests.length, windows: state.windows.length,
+    metadata: state.metadata.length, bodies: state.bodies.length, writes: state.writes.length,
+    unexpected: state.unexpected.length, ...(calls ? { formattingCalls: calls.mock.calls.length } : {}) }));
+}
+beforeAll(() => {
+  i18n.on("languageChanged", diagnosticLanguageChanged);
+  diagnosticMark(undefined, "file:beforeAll");
+});
+afterAll(() => {
+  diagnosticMark(undefined, "file:afterAll");
+  console.info("reader-lifecycle-journal", JSON.stringify({ ...diagnostic, cases: [...diagnosticCases.values()] }));
+  i18n.off("languageChanged", diagnosticLanguageChanged);
+  for (const remove of diagnosticRemovers) remove();
+});
+// END bounded reader lifecycle observation
+
 function serveReader(total: number) {
   const items = Array.from({ length: total }, (_, index) => record(index + 1));
   const state = {
@@ -133,10 +206,12 @@ function RetentionProbe() {
 
 function mountReader(context: Context, fullPage = false) {
   // The existing router fixture supplies actual navigation, return and owner-scoped draft providers.
+  diagnosticMark(context, "mount:begin", { fullPage });
   const view = renderNavigationRouter([
     { path: "/:slug/sessions/:sessionId", element: <><RetentionProbe />{fullPage ? <SessionDetailPage /> : <SessionTranscript slug={SLUG} session={session} />}</> },
   ], { initialEntries: [fullPage ? `${ROUTE}#content-${contentId(2)}` : ROUTE] });
-  const dispose = () => { view.unmount(); view.router.dispose(); view.client.clear(); };
+  const dispose = () => { diagnosticMark(context, "dispose:begin"); view.unmount(); view.router.dispose(); view.client.clear(); diagnosticMark(context, "dispose:end"); };
+  diagnosticMark(context, "mount:end", { fullPage });
   context.onTestFinished(dispose);
   return { ...view, dispose };
 }
@@ -171,27 +246,45 @@ function row(container: HTMLElement, order: number) {
 }
 
 async function idle(client: QueryClient, context: Context) {
+  diagnosticMark(context, "query-idle:begin");
   await waitFor(() => expect(client.isFetching()).toBe(0));
+  diagnosticMark(context, "query-idle:end");
   context.signal.throwIfAborted();
 }
 
 async function prepareDraft(container: HTMLElement, user: ReturnType<typeof userEvent.setup>, order: number, context: Context) {
+  diagnosticMark(context, "prepare:row:begin");
   await within(container).findByText(`Captured record ${order}`); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:row:end");
+  diagnosticMark(context, "prepare:selection:begin");
   await user.click(within(row(container, order)).getByRole("checkbox")); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:selection:end");
   expect(within(row(container, order)).getByRole("checkbox")).toBeChecked();
   const actions = within(container).getByText(/^Selected: \d+ · /).parentElement!;
+  diagnosticMark(context, "prepare:preview-click:begin");
   await user.click(action(actions, "Preview excerpt")); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:preview-click:end");
+  diagnosticMark(context, "prepare:preview-ready:begin");
   const preview = await screen.findByRole("dialog", { name: "Selected excerpt" }); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:preview-ready:end");
   await waitFor(() => expect(within(preview).getByText("Share as note", { selector: "button" })).toBeEnabled(), { container: preview });
   context.signal.throwIfAborted();
   expect((within(preview).getByRole("textbox", { name: "Excerpt preview" }) as HTMLTextAreaElement).value).toContain(bodyText(order));
+  diagnosticMark(context, "prepare:share-click:begin");
   await user.click(action(preview, "Share as note")); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:share-click:end");
+  diagnosticMark(context, "prepare:share-ready:begin");
   const dialog = await screen.findByRole("dialog", { name: "Share as note" }); context.signal.throwIfAborted();
-  await user.selectOptions(labeledControl(dialog, "Workspace", "combobox"), SLUG); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:share-ready:end");
+  await user.selectOptions(diagnosticRead(context, "native-label:Workspace", () => labeledControl(dialog, "Workspace", "combobox")), SLUG); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:board-ready:begin");
   await within(dialog).findByRole("option", { name: "Reader review" }); context.signal.throwIfAborted();
-  await user.selectOptions(labeledControl(dialog, "Board", "combobox"), BOARD); context.signal.throwIfAborted();
-  await user.clear(labeledControl(dialog, "Note title", "textbox")); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:board-ready:end");
+  await user.selectOptions(diagnosticRead(context, "native-label:Board", () => labeledControl(dialog, "Board", "combobox")), BOARD); context.signal.throwIfAborted();
+  await user.clear(diagnosticRead(context, "native-label:Note title", () => labeledControl(dialog, "Note title", "textbox"))); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:title-paste:begin");
   await user.paste(TITLE); context.signal.throwIfAborted();
+  diagnosticMark(context, "prepare:title-paste:end");
   await waitFor(() => expect(within(dialog).getByText("Save note", { selector: "button" })).toBeEnabled(), { container: dialog });
   context.signal.throwIfAborted();
   const editor = await waitFor(() => {
@@ -200,10 +293,12 @@ async function prepareDraft(container: HTMLElement, user: ReturnType<typeof user
   }, { container: dialog });
   context.signal.throwIfAborted();
   expect(editor.textContent).toContain(bodyText(order));
+  diagnosticMark(context, "prepare:editor-ready");
   return { dialog, editor };
 }
 
 async function pasteBody(editor: HTMLElement, context: Context) {
+  diagnosticMark(context, "body-paste:begin");
   const paragraph = editor.querySelector("p")!;
   editor.focus();
   const range = document.createRange(); range.selectNodeContents(paragraph); range.collapse(false);
@@ -219,6 +314,7 @@ async function pasteBody(editor: HTMLElement, context: Context) {
   context.signal.throwIfAborted();
   expect(editor.querySelector("strong")?.textContent).toBe(EDIT);
   expect(editor).toHaveFocus();
+  diagnosticMark(context, "body-paste:end");
 }
 
 function unloadWarns() {
@@ -238,19 +334,22 @@ afterAll(() => {
     else Reflect.deleteProperty(Range.prototype, name);
   }
 });
-beforeEach(async () => { await i18n.changeLanguage("en"); stubReducedMotion(true); });
-afterEach(async () => { vi.restoreAllMocks(); stubReducedMotion(false); await i18n.changeLanguage("en"); });
+beforeEach(async (context) => { diagnosticBegin(context, context.task.name); diagnosticMark(context, "beforeEach:english:begin"); await i18n.changeLanguage("en"); diagnosticMark(context, "beforeEach:english:end"); stubReducedMotion(true); diagnosticMark(context, "beforeEach:end"); });
+afterEach(async (context) => { diagnosticMark(context, "afterEach:begin"); vi.restoreAllMocks(); stubReducedMotion(false); diagnosticMark(context, "afterEach:english:begin"); await i18n.changeLanguage("en"); diagnosticMark(context, "afterEach:english:end"); diagnosticSummary(context, "afterEach"); });
 
 describe("retained transcript work while editing a handoff", () => {
   it("keeps a real body edit bounded independently of 4 versus 100 loaded rows, preserving output and selection", async (context) => {
     const calls = vi.spyOn(Date.prototype, "toLocaleTimeString"); // Call through: timestamps stay real.
     const measured: { rows: number; calls: number }[] = [];
     for (const total of [4, 201]) {
+      diagnosticMark(context, `corpus:${total}:start`);
       const state = serveReader(total);
+      diagnosticObserveState(context, state, calls);
       const view = mountReader(context);
       const user = userEvent.setup();
       try {
         await within(view.container).findByText(`Captured record ${total}`); context.signal.throwIfAborted();
+        diagnosticMark(context, `corpus:${total}:loaded`);
         const list = within(view.container).getByRole("list", { name: "Transcript" });
         const { dialog, editor } = await prepareDraft(view.container, user, total, context);
         await idle(view.client, context);
@@ -266,35 +365,51 @@ describe("retained transcript work while editing a handoff", () => {
         await pasteBody(editor, context);
         const formattingCalls = calls.mock.calls.length - before;
         measured.push({ rows: expectedIds.length, calls: formattingCalls });
+        diagnosticMark(context, `corpus:${total}:measured`, { rows: expectedIds.length, formattingCalls });
         expect(state.requests).toEqual(readsBefore);
         expect([...list.children].map((element) => element.id)).toEqual(ids);
         expect([...list.querySelectorAll("time")].map((element) => [element.dateTime, element.textContent])).toEqual(times);
         expect([...view.container.querySelectorAll('select option[value^="93333333-"]')].map((option) => option.textContent)).toEqual(labels);
         expect(row(view.container, total).querySelector('input[type="checkbox"]')).toBeChecked();
         expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", contentId(total));
+        diagnosticMark(context, "save-click:begin");
         await user.click(action(dialog, "Save note")); context.signal.throwIfAborted();
+        diagnosticMark(context, "save-click:end");
+        diagnosticMark(context, "save-response:begin");
         await within(dialog).findByRole("link", { name: "Open note" }); context.signal.throwIfAborted();
+        diagnosticMark(context, "save-response:end");
         expect(state.writes).toHaveLength(1);
         expect(state.writes[0]).toMatchObject({ title: TITLE, excerpt_source: { session_id: SESSION, items: [{ content_id: contentId(total), sha256: "a".repeat(64) }] } });
         expect(String(state.writes[0]!.content)).toContain(EDIT);
         expect(String(state.writes[0]!.content)).toContain(bodyText(total));
         expect(String(state.writes[0]!.content)).toContain('"type":"bold"');
         expect(state.bodies).toEqual([contentId(total)]);
+        diagnosticMark(context, "hide-click:begin");
         await user.click(action(dialog, "Hide for now")); context.signal.throwIfAborted();
+        diagnosticMark(context, "hide-click:end");
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "Share as note" })).not.toBeInTheDocument()); context.signal.throwIfAborted();
         if (total === 201) {
+          diagnosticMark(context, "beginning-click:begin");
           await user.click(action(within(view.container).getByRole("navigation", { name: "Captured records" }), "Beginning")); context.signal.throwIfAborted();
+          diagnosticMark(context, "beginning-click:end");
+          diagnosticMark(context, "beginning-ready:begin");
           await within(view.container).findByText("Captured record 1"); context.signal.throwIfAborted();
+          diagnosticMark(context, "beginning-ready:end");
           expect(view.container.querySelector(`[id="content-${contentId(201)}"]`)).toBeNull();
+          diagnosticMark(context, "beginning-selection:begin");
           await user.click(within(row(view.container, 1)).getByRole("checkbox")); context.signal.throwIfAborted();
+          diagnosticMark(context, "beginning-selection:end");
           expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
           expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", `${contentId(201)},${contentId(1)}`);
           for (const language of ["es", "pt-BR", "en"]) {
-            await act(async () => { await i18n.changeLanguage(language); }); context.signal.throwIfAborted();
+            diagnosticMark(context, `locale:${language}:act:begin`, { catalogAlreadyLoaded: i18n.hasResourceBundle(language, "translation") });
+            await act(async () => { diagnosticMark(context, `locale:${language}:request`); await i18n.changeLanguage(language); diagnosticMark(context, `locale:${language}:resolved`); });
+            diagnosticMark(context, `locale:${language}:act:end`); context.signal.throwIfAborted();
             const expected = new Intl.DateTimeFormat(language, { hour: "2-digit", minute: "2-digit" }).format(new Date(record(1).occurred_at));
             expect(row(view.container, 1).querySelector("time")?.textContent).toBe(expected);
             expect(view.container.querySelector(`option[value="${contentId(1)}"]`)?.textContent).toContain(expected);
             expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
+            diagnosticMark(context, `locale:${language}:assertions-complete`);
           }
           expect(state.windows).toEqual(["latest", "beginning"]);
         }
@@ -305,10 +420,12 @@ describe("retained transcript work while editing a handoff", () => {
     // Fixed range/header bookkeeping is allowed; an additional 96 unchanged
     // rows must not add per-row formatting work to an unrelated editor paste.
     expect(measured[1]!.calls, JSON.stringify(measured)).toBeLessThanOrEqual(measured[0]!.calls + 4);
+    diagnosticMark(context, "comparison:all-assertions-complete", { measured });
   });
 
   it("replays an authorized unknown outcome with the same request and no source/body revalidation", async (context) => {
     const state = serveReader(2); state.saveStatus = "unknown";
+    diagnosticObserveState(context, state);
     const view = mountReader(context, true); const user = userEvent.setup();
     const { dialog, editor } = await prepareDraft(view.container, user, 2, context);
     await pasteBody(editor, context);
@@ -339,6 +456,7 @@ describe("retained transcript work while editing a handoff", () => {
 
   it.for([403, 404])("purges an unknown outcome's retained source, document and retry on actual selected-metadata %i", async (status, context) => {
     const state = serveReader(2); state.saveStatus = "unknown";
+    diagnosticObserveState(context, state);
     const view = mountReader(context, true); const user = userEvent.setup();
     const { dialog, editor } = await prepareDraft(view.container, user, 2, context);
     await pasteBody(editor, context);
