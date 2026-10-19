@@ -204,15 +204,47 @@ function RetentionProbe() {
     data-pending={state.form?.pending ? "yes" : "no"} />;
 }
 
+// Each case owns the views it mounts and the locale/act work it starts, so its
+// teardown can settle both before English is restored for the next case.
+type CaseOwnership = { views: (() => void)[]; work: Promise<unknown>[]; failures: unknown[]; finished: boolean };
+const ownerships = new Map<Context, CaseOwnership>();
+function ownCase(context: Context) {
+  const owned: CaseOwnership = { views: [], work: [], failures: [], finished: false };
+  ownerships.set(context, owned);
+  context.onTestFinished(() => {
+    owned.finished = true;
+    if (owned.failures.length) throw new AggregateError(owned.failures, "Locale or act work owned by this case rejected");
+  });
+}
+function ownership(context: Context) {
+  const owned = ownerships.get(context);
+  if (!owned) throw new Error("Reader case has no lifecycle ownership");
+  return owned;
+}
+function startOwned<T>(context: Context, start: () => PromiseLike<T>) {
+  const owned = ownership(context);
+  context.signal.throwIfAborted();
+  // Subscribe exactly once: every then() on an act thenable pops React's act scope.
+  const work = Promise.resolve(start());
+  owned.work.push(work);
+  return work;
+}
+
 function mountReader(context: Context, fullPage = false) {
+  const owned = ownership(context);
   // The existing router fixture supplies actual navigation, return and owner-scoped draft providers.
   diagnosticMark(context, "mount:begin", { fullPage });
   const view = renderNavigationRouter([
     { path: "/:slug/sessions/:sessionId", element: <><RetentionProbe />{fullPage ? <SessionDetailPage /> : <SessionTranscript slug={SLUG} session={session} />}</> },
   ], { initialEntries: [fullPage ? `${ROUTE}#content-${contentId(2)}` : ROUTE] });
-  const dispose = () => { diagnosticMark(context, "dispose:begin"); view.unmount(); view.router.dispose(); view.client.clear(); diagnosticMark(context, "dispose:end"); };
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    diagnosticMark(context, "dispose:begin"); view.unmount(); view.router.dispose(); view.client.clear(); diagnosticMark(context, "dispose:end");
+  };
   diagnosticMark(context, "mount:end", { fullPage });
-  context.onTestFinished(dispose);
+  owned.views.push(dispose);
   return { ...view, dispose };
 }
 
@@ -308,13 +340,67 @@ async function pasteBody(editor: HTMLElement, context: Context) {
     types: ["text/html", "text/plain"], items: [], files: [],
     getData: (type: string) => type === "text/html" ? `<strong>${EDIT}</strong>` : type === "text/plain" ? EDIT : "",
   } });
-  await act(async () => { context.signal.throwIfAborted(); editor.dispatchEvent(event); });
+  await startOwned(context, () => act(async () => { context.signal.throwIfAborted(); editor.dispatchEvent(event); }));
   context.signal.throwIfAborted();
   await waitFor(() => expect(editor.textContent).toContain(EDIT), { container: editor });
   context.signal.throwIfAborted();
   expect(editor.querySelector("strong")?.textContent).toBe(EDIT);
   expect(editor).toHaveFocus();
   diagnosticMark(context, "body-paste:end");
+}
+
+function openLatestWindow(context: Context, total: number, calls: { mock: { calls: unknown[] } }) {
+  context.signal.throwIfAborted();
+  diagnosticMark(context, `corpus:${total}:start`);
+  const state = serveReader(total);
+  diagnosticObserveState(context, state, calls);
+  return { state, view: mountReader(context), user: userEvent.setup(), calls };
+}
+
+// Select the newest record, prepare its note, make one real bold Unicode body edit,
+// publish it and dismiss the saved dialog. Returns the paste's formatting work.
+async function publishLatestEdit(context: Context, { state, view, user, calls }: ReturnType<typeof openLatestWindow>) {
+  const total = state.items.length;
+  await within(view.container).findByText(`Captured record ${total}`); context.signal.throwIfAborted();
+  diagnosticMark(context, `corpus:${total}:loaded`);
+  const list = within(view.container).getByRole("list", { name: "Transcript" });
+  const { dialog, editor } = await prepareDraft(view.container, user, total, context);
+  await idle(view.client, context);
+  const ids = [...list.children].map((element) => element.id);
+  const expectedIds = state.items.slice(-100).map((item) => `content-${item.id}`);
+  expect(ids).toEqual(expectedIds);
+  const labels = [...view.container.querySelectorAll('select option[value^="93333333-"]')].map((option) => option.textContent);
+  const times = [...list.querySelectorAll("time")].map((element) => [element.dateTime, element.textContent]);
+  expect(labels).toHaveLength(Math.min(total, 100));
+  expect(times).toHaveLength(Math.min(total, 100));
+  const readsBefore = [...state.requests];
+  const before = calls.mock.calls.length;
+  await pasteBody(editor, context);
+  const formattingCalls = calls.mock.calls.length - before;
+  diagnosticMark(context, `corpus:${total}:measured`, { rows: expectedIds.length, formattingCalls });
+  expect(state.requests).toEqual(readsBefore);
+  expect([...list.children].map((element) => element.id)).toEqual(ids);
+  expect([...list.querySelectorAll("time")].map((element) => [element.dateTime, element.textContent])).toEqual(times);
+  expect([...view.container.querySelectorAll('select option[value^="93333333-"]')].map((option) => option.textContent)).toEqual(labels);
+  expect(row(view.container, total).querySelector('input[type="checkbox"]')).toBeChecked();
+  expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", contentId(total));
+  diagnosticMark(context, "save-click:begin");
+  await user.click(action(dialog, "Save note")); context.signal.throwIfAborted();
+  diagnosticMark(context, "save-click:end");
+  diagnosticMark(context, "save-response:begin");
+  await within(dialog).findByRole("link", { name: "Open note" }); context.signal.throwIfAborted();
+  diagnosticMark(context, "save-response:end");
+  expect(state.writes).toHaveLength(1);
+  expect(state.writes[0]).toMatchObject({ title: TITLE, excerpt_source: { session_id: SESSION, items: [{ content_id: contentId(total), sha256: "a".repeat(64) }] } });
+  expect(String(state.writes[0]!.content)).toContain(EDIT);
+  expect(String(state.writes[0]!.content)).toContain(bodyText(total));
+  expect(String(state.writes[0]!.content)).toContain('"type":"bold"');
+  expect(state.bodies).toEqual([contentId(total)]);
+  diagnosticMark(context, "hide-click:begin");
+  await user.click(action(dialog, "Hide for now")); context.signal.throwIfAborted();
+  diagnosticMark(context, "hide-click:end");
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Share as note" })).not.toBeInTheDocument()); context.signal.throwIfAborted();
+  return { rows: expectedIds.length, calls: formattingCalls };
 }
 
 function unloadWarns() {
@@ -334,93 +420,73 @@ afterAll(() => {
     else Reflect.deleteProperty(Range.prototype, name);
   }
 });
-beforeEach(async (context) => { diagnosticBegin(context, context.task.name); diagnosticMark(context, "beforeEach:english:begin"); await i18n.changeLanguage("en"); diagnosticMark(context, "beforeEach:english:end"); stubReducedMotion(true); diagnosticMark(context, "beforeEach:end"); });
-afterEach(async (context) => { diagnosticMark(context, "afterEach:begin"); vi.restoreAllMocks(); stubReducedMotion(false); diagnosticMark(context, "afterEach:english:begin"); await i18n.changeLanguage("en"); diagnosticMark(context, "afterEach:english:end"); diagnosticSummary(context, "afterEach"); });
+beforeEach(async (context) => { diagnosticBegin(context, context.task.name); ownCase(context); diagnosticMark(context, "beforeEach:english:begin"); await i18n.changeLanguage("en"); diagnosticMark(context, "beforeEach:english:end"); stubReducedMotion(true); diagnosticMark(context, "beforeEach:end"); });
+afterEach(async (context) => {
+  const owned = ownership(context);
+  diagnosticMark(context, "afterEach:begin", { startedWork: owned.work.length }); vi.restoreAllMocks(); stubReducedMotion(false);
+  // Dispose, join, then reset: a catalog import that outlived its case switches
+  // the i18n singleton before this reset instead of inside the next case.
+  for (const dispose of owned.views) dispose();
+  const settled = await Promise.allSettled(owned.work);
+  owned.failures.push(...settled.flatMap((result) => result.status === "rejected" ? [result.reason] : []));
+  if (owned.finished) {
+    // Vitest already failed this hook at its deadline; a reset now would land in a later case.
+    diagnosticMark(context, "afterEach:english:refused", { rejectedWork: owned.failures.length, reasons: owned.failures.map(String) });
+    throw new AggregateError(owned.failures, "Reader teardown outlived its hook deadline; English was not reset by a detached hook");
+  }
+  diagnosticMark(context, "afterEach:english:begin", { rejectedWork: owned.failures.length }); await i18n.changeLanguage("en"); diagnosticMark(context, "afterEach:english:end");
+  diagnosticSummary(context, "afterEach");
+});
 
 describe("retained transcript work while editing a handoff", () => {
   it("keeps a real body edit bounded independently of 4 versus 100 loaded rows, preserving output and selection", async (context) => {
     const calls = vi.spyOn(Date.prototype, "toLocaleTimeString"); // Call through: timestamps stay real.
     const measured: { rows: number; calls: number }[] = [];
     for (const total of [4, 201]) {
-      diagnosticMark(context, `corpus:${total}:start`);
-      const state = serveReader(total);
-      diagnosticObserveState(context, state, calls);
-      const view = mountReader(context);
-      const user = userEvent.setup();
+      const corpus = openLatestWindow(context, total, calls);
       try {
-        await within(view.container).findByText(`Captured record ${total}`); context.signal.throwIfAborted();
-        diagnosticMark(context, `corpus:${total}:loaded`);
-        const list = within(view.container).getByRole("list", { name: "Transcript" });
-        const { dialog, editor } = await prepareDraft(view.container, user, total, context);
-        await idle(view.client, context);
-        const ids = [...list.children].map((element) => element.id);
-        const expectedIds = state.items.slice(-100).map((item) => `content-${item.id}`);
-        expect(ids).toEqual(expectedIds);
-        const labels = [...view.container.querySelectorAll('select option[value^="93333333-"]')].map((option) => option.textContent);
-        const times = [...list.querySelectorAll("time")].map((element) => [element.dateTime, element.textContent]);
-        expect(labels).toHaveLength(Math.min(total, 100));
-        expect(times).toHaveLength(Math.min(total, 100));
-        const readsBefore = [...state.requests];
-        const before = calls.mock.calls.length;
-        await pasteBody(editor, context);
-        const formattingCalls = calls.mock.calls.length - before;
-        measured.push({ rows: expectedIds.length, calls: formattingCalls });
-        diagnosticMark(context, `corpus:${total}:measured`, { rows: expectedIds.length, formattingCalls });
-        expect(state.requests).toEqual(readsBefore);
-        expect([...list.children].map((element) => element.id)).toEqual(ids);
-        expect([...list.querySelectorAll("time")].map((element) => [element.dateTime, element.textContent])).toEqual(times);
-        expect([...view.container.querySelectorAll('select option[value^="93333333-"]')].map((option) => option.textContent)).toEqual(labels);
-        expect(row(view.container, total).querySelector('input[type="checkbox"]')).toBeChecked();
-        expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", contentId(total));
-        diagnosticMark(context, "save-click:begin");
-        await user.click(action(dialog, "Save note")); context.signal.throwIfAborted();
-        diagnosticMark(context, "save-click:end");
-        diagnosticMark(context, "save-response:begin");
-        await within(dialog).findByRole("link", { name: "Open note" }); context.signal.throwIfAborted();
-        diagnosticMark(context, "save-response:end");
-        expect(state.writes).toHaveLength(1);
-        expect(state.writes[0]).toMatchObject({ title: TITLE, excerpt_source: { session_id: SESSION, items: [{ content_id: contentId(total), sha256: "a".repeat(64) }] } });
-        expect(String(state.writes[0]!.content)).toContain(EDIT);
-        expect(String(state.writes[0]!.content)).toContain(bodyText(total));
-        expect(String(state.writes[0]!.content)).toContain('"type":"bold"');
-        expect(state.bodies).toEqual([contentId(total)]);
-        diagnosticMark(context, "hide-click:begin");
-        await user.click(action(dialog, "Hide for now")); context.signal.throwIfAborted();
-        diagnosticMark(context, "hide-click:end");
-        await waitFor(() => expect(screen.queryByRole("dialog", { name: "Share as note" })).not.toBeInTheDocument()); context.signal.throwIfAborted();
-        if (total === 201) {
-          diagnosticMark(context, "beginning-click:begin");
-          await user.click(action(within(view.container).getByRole("navigation", { name: "Captured records" }), "Beginning")); context.signal.throwIfAborted();
-          diagnosticMark(context, "beginning-click:end");
-          diagnosticMark(context, "beginning-ready:begin");
-          await within(view.container).findByText("Captured record 1"); context.signal.throwIfAborted();
-          diagnosticMark(context, "beginning-ready:end");
-          expect(view.container.querySelector(`[id="content-${contentId(201)}"]`)).toBeNull();
-          diagnosticMark(context, "beginning-selection:begin");
-          await user.click(within(row(view.container, 1)).getByRole("checkbox")); context.signal.throwIfAborted();
-          diagnosticMark(context, "beginning-selection:end");
-          expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
-          expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", `${contentId(201)},${contentId(1)}`);
-          for (const language of ["es", "pt-BR", "en"]) {
-            diagnosticMark(context, `locale:${language}:act:begin`, { catalogAlreadyLoaded: i18n.hasResourceBundle(language, "translation") });
-            await act(async () => { diagnosticMark(context, `locale:${language}:request`); await i18n.changeLanguage(language); diagnosticMark(context, `locale:${language}:resolved`); });
-            diagnosticMark(context, `locale:${language}:act:end`); context.signal.throwIfAborted();
-            const expected = new Intl.DateTimeFormat(language, { hour: "2-digit", minute: "2-digit" }).format(new Date(record(1).occurred_at));
-            expect(row(view.container, 1).querySelector("time")?.textContent).toBe(expected);
-            expect(view.container.querySelector(`option[value="${contentId(1)}"]`)?.textContent).toContain(expected);
-            expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
-            diagnosticMark(context, `locale:${language}:assertions-complete`);
-          }
-          expect(state.windows).toEqual(["latest", "beginning"]);
-        }
-        expect(state.unexpected).toEqual([]);
-      } finally { view.dispose(); }
+        measured.push(await publishLatestEdit(context, corpus)); context.signal.throwIfAborted();
+        expect(corpus.state.unexpected).toEqual([]);
+      } finally { corpus.view.dispose(); }
     }
     console.info("A01 handoff body-edit formatting", JSON.stringify(measured));
     // Fixed range/header bookkeeping is allowed; an additional 96 unchanged
     // rows must not add per-row formatting work to an unrelated editor paste.
     expect(measured[1]!.calls, JSON.stringify(measured)).toBeLessThanOrEqual(measured[0]!.calls + 4);
     diagnosticMark(context, "comparison:all-assertions-complete", { measured });
+  });
+
+  it("navigates to Beginning, keeps off-window selection and updates every locale after a published 100-row body edit", async (context) => {
+    const calls = vi.spyOn(Date.prototype, "toLocaleTimeString"); // Call through: timestamps stay real.
+    // The full edit and publication precede navigation: a pristine or seeded
+    // reader would not challenge stale callbacks or memoized rows after an edit.
+    const corpus = openLatestWindow(context, 201, calls);
+    const { state, view, user } = corpus;
+    await publishLatestEdit(context, corpus); context.signal.throwIfAborted();
+    diagnosticMark(context, "beginning-click:begin");
+    await user.click(action(within(view.container).getByRole("navigation", { name: "Captured records" }), "Beginning")); context.signal.throwIfAborted();
+    diagnosticMark(context, "beginning-click:end");
+    diagnosticMark(context, "beginning-ready:begin");
+    await within(view.container).findByText("Captured record 1"); context.signal.throwIfAborted();
+    diagnosticMark(context, "beginning-ready:end");
+    expect(view.container.querySelector(`[id="content-${contentId(201)}"]`)).toBeNull();
+    diagnosticMark(context, "beginning-selection:begin");
+    await user.click(within(row(view.container, 1)).getByRole("checkbox")); context.signal.throwIfAborted();
+    diagnosticMark(context, "beginning-selection:end");
+    expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
+    expect(within(view.container).getByTestId("retention")).toHaveAttribute("data-selected", `${contentId(201)},${contentId(1)}`);
+    for (const language of ["es", "pt-BR", "en"]) {
+      diagnosticMark(context, `locale:${language}:act:begin`, { catalogAlreadyLoaded: i18n.hasResourceBundle(language, "translation") });
+      await startOwned(context, () => act(async () => { diagnosticMark(context, `locale:${language}:request`); await startOwned(context, () => i18n.changeLanguage(language)); diagnosticMark(context, `locale:${language}:resolved`); }));
+      diagnosticMark(context, `locale:${language}:act:end`); context.signal.throwIfAborted();
+      const expected = new Intl.DateTimeFormat(language, { hour: "2-digit", minute: "2-digit" }).format(new Date(record(1).occurred_at));
+      expect(row(view.container, 1).querySelector("time")?.textContent).toBe(expected);
+      expect(view.container.querySelector(`option[value="${contentId(1)}"]`)?.textContent).toContain(expected);
+      expect(within(row(view.container, 1)).getByRole("checkbox")).toBeChecked();
+      diagnosticMark(context, `locale:${language}:assertions-complete`);
+    }
+    expect(state.windows).toEqual(["latest", "beginning"]);
+    expect(state.unexpected).toEqual([]);
   });
 
   it("replays an authorized unknown outcome with the same request and no source/body revalidation", async (context) => {
