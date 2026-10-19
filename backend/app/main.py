@@ -271,19 +271,27 @@ def create_app() -> FastAPI:
     from app.routers import workspace_config as workspace_config_router
     from app.routers import config as config_router
 
-    from app.routers import agent_session, companion, mcp_invocation, session_content
+    from app.routers import (
+        agent_session,
+        companion,
+        mcp_invocation,
+        session_content,
+        session_search,
+    )
 
     # Unmounted, not just refused: a mounted route answers a wrong method with
     # 405 (and is listed in /api/openapi.json) before any dependency runs, which
     # confirms the feature exists. COMPANION_ENABLED is deploy-time env, read
     # once here; require_companion_enabled still guards a runtime flip.
     if settings.COMPANION_ENABLED:
-        from app.routers import companion_pairing
+        from app.routers import companion_pairing, owner_session
 
+        application.include_router(owner_session.router)
         application.include_router(agent_session.router)
         application.include_router(agent_session.card_router)
         application.include_router(agent_session.note_router)
         application.include_router(session_content.router)
+        application.include_router(session_search.router)
         application.include_router(companion.router)
         application.include_router(companion.device_router)
         application.include_router(companion_pairing.router)

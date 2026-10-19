@@ -41,32 +41,33 @@ def test_update_note_schema_carries_mode_and_anchor_heading():
 # ---------- replace (default) ----------
 
 
-async def test_update_note_default_mode_puts_only_provided_fields(mock_client, ctx):
+async def test_update_note_default_mode_posts_only_provided_fields(mock_client, ctx):
     from valaris_mcp.tools.notes import update_note
 
-    mock_client.put.return_value = {"id": "n1"}
+    mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", title="T", content="C", ctx=ctx)
-    mock_client.put.assert_called_once_with("/workspaces/test/notes/n1", {"title": "T", "content": "C"})
-    mock_client.post.assert_not_called()
+    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/edit", {"mode": "replace", "title": "T", "content": "C"})
+    mock_client.put.assert_not_called()
 
 
 async def test_update_note_explicit_replace_mode_is_the_default_path(mock_client, ctx):
     from valaris_mcp.tools.notes import update_note
 
-    mock_client.put.return_value = {"id": "n1"}
+    mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", content="C", mode="replace", board_id="b1", ctx=ctx)
-    mock_client.put.assert_called_once_with("/workspaces/test/boards/b1/notes/n1", {"content": "C"})
+    mock_client.post.assert_called_once_with("/workspaces/test/boards/b1/notes/n1/edit", {"mode": "replace", "content": "C"})
+    mock_client.put.assert_not_called()
 
 
 # ---------- append ----------
 
 
-async def test_update_note_append_mode_posts_content_to_append(mock_client, ctx):
+async def test_update_note_append_mode_posts_atomic_edit(mock_client, ctx):
     from valaris_mcp.tools.notes import update_note
 
     mock_client.post.return_value = {"id": "n1"}
     out = json.loads(await update_note("test", "n1", content="## Session 5", mode="append", ctx=ctx))
-    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/append", {"content": "## Session 5"})
+    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/edit", {"mode": "append", "content": "## Session 5"})
     mock_client.put.assert_not_called()
     assert out["id"] == "n1"
 
@@ -76,7 +77,7 @@ async def test_update_note_append_mode_board_scoped_path(mock_client, ctx):
 
     mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", content="entry", mode="append", board_id="b1", ctx=ctx)
-    assert mock_client.post.call_args[0][0] == "/workspaces/test/boards/b1/notes/n1/append"
+    assert mock_client.post.call_args[0][0] == "/workspaces/test/boards/b1/notes/n1/edit"
 
 
 async def test_update_note_append_mode_requires_content(mock_client, ctx):
@@ -88,19 +89,16 @@ async def test_update_note_append_mode_requires_content(mock_client, ctx):
     mock_client.post.assert_not_called()
 
 
-async def test_update_note_append_mode_applies_metadata_first_then_appends(mock_client, ctx):
-    """title/pinned/card_id still mean what they mean in every mode: they go
-    through the PUT before the body operation, so one call can retitle a log
-    and add today's entry."""
+async def test_update_note_append_mode_commits_metadata_and_content_together(mock_client, ctx):
+    """A failed body operation must not leave separately committed metadata."""
     from valaris_mcp.tools.notes import update_note
 
-    mock_client.put.return_value = {"id": "n1"}
     mock_client.post.return_value = {"id": "n1", "title": "Log"}
     out = json.loads(
         await update_note("test", "n1", title="Log", pinned=True, content="entry", mode="append", ctx=ctx)
     )
-    mock_client.put.assert_called_once_with("/workspaces/test/notes/n1", {"title": "Log", "pinned": True})
-    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/append", {"content": "entry"})
+    mock_client.put.assert_not_called()
+    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/edit", {"mode": "append", "title": "Log", "pinned": True, "content": "entry"})
     assert out["title"] == "Log"
 
 
@@ -113,8 +111,8 @@ async def test_update_note_section_mode_posts_anchor_and_content(mock_client, ct
     mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", content="Done.", mode="section", anchor_heading="Cluster I", ctx=ctx)
     mock_client.post.assert_called_once_with(
-        "/workspaces/test/notes/n1/replace-section",
-        {"anchor_heading": "Cluster I", "content": "Done."},
+        "/workspaces/test/notes/n1/edit",
+        {"mode": "section", "anchor_heading": "Cluster I", "content": "Done."},
     )
     mock_client.put.assert_not_called()
 
@@ -124,8 +122,8 @@ async def test_update_note_section_mode_omitted_content_clears_the_section(mock_
 
     mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", mode="section", anchor_heading="Cluster I", board_id="b1", ctx=ctx)
-    assert mock_client.post.call_args[0][0] == "/workspaces/test/boards/b1/notes/n1/replace-section"
-    assert mock_client.post.call_args[0][1] == {"anchor_heading": "Cluster I", "content": ""}
+    assert mock_client.post.call_args[0][0] == "/workspaces/test/boards/b1/notes/n1/edit"
+    assert mock_client.post.call_args[0][1] == {"mode": "section", "anchor_heading": "Cluster I", "content": ""}
 
 
 async def test_update_note_section_mode_requires_anchor_heading(mock_client, ctx):

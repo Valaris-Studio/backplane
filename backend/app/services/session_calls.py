@@ -366,6 +366,11 @@ class SessionCallService(AgentSessionService):
             if total.turn_index in on_page
         ]
 
+    async def work_call_ids(self, session: AgentSession) -> set[str]:
+        """Native ids of the calls whose linked work the owner can see now."""
+        refs_by_call = await self._work_refs(session)
+        return {call_id for call_id, refs in refs_by_call.items() if refs}
+
     async def _work_refs(self, session: AgentSession) -> dict[str, list[CallWorkRef]]:
         """Per native call id, the cards and notes it touched that still exist
         in a workspace the owner belongs to (the rule of `_visible_links`)."""

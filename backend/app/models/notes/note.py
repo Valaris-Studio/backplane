@@ -3,7 +3,7 @@
 
 import uuid
 
-from sqlalchemy import JSON, Boolean, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,7 @@ class Note(Base, UUIDMixin, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(500))
     content: Mapped[str] = mapped_column(Text, default="")
+    history_revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Plain-text projection of `content`, maintained by NoteService on every
     # write. Search ILIKEs this instead of `content` — the raw column is
     # ProseMirror JSON, so a LIKE over it matches node names ("paragraph",

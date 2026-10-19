@@ -28,6 +28,12 @@ def stored_bytes(dialect_name: str, column):
 class NoteRepository(BaseRepository[Note]):
     model = Note
 
+    async def get_current(self, note_id: uuid.UUID, *, lock: bool = False) -> Note | None:
+        query = select(Note).where(Note.id == note_id).execution_options(populate_existing=True)
+        if lock:
+            query = query.with_for_update()
+        return (await self.db.execute(query)).scalar_one_or_none()
+
     async def find_by_id_prefix(
         self,
         workspace_id: uuid.UUID,

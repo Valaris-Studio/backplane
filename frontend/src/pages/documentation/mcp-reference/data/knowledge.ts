@@ -240,7 +240,7 @@ export const KNOWLEDGE_TOOL_DOCS: ToolDoc[] = [
     category: "notes",
     kind: "write",
     description:
-      "Edit a note's title, pinned flag, card link, or body. mode picks how content lands: replace the whole body, append at the end, or rewrite one section.",
+      "Edit a note's title, pinned flag, card link and body in one atomic request. mode replaces the body, appends at the end or rewrites one section.",
     params: [
       {
         name: "workspace_slug",
@@ -303,16 +303,34 @@ export const KNOWLEDGE_TOOL_DOCS: ToolDoc[] = [
         description:
           "Pass true to get the stored body (ProseMirror JSON) back in the receipt. Default false: the receipt carries content_chars instead.",
       },
+      {
+        name: "expected_revision",
+        required: false,
+        description:
+          "Apply only if history_revision still matches this integer, including 0 for an unrecorded note.",
+      },
+      {
+        name: "expected_digest",
+        required: false,
+        description:
+          "Apply only if revision_digest still matches the note state you read; this also detects changes from older writers.",
+      },
+      {
+        name: "client_request_id",
+        required: false,
+        description:
+          "Your UUID for this edit. Reuse it only for an identical retry; omission does not deduplicate an append.",
+      },
     ],
     gotchas: [
       "The receipt omits the note body by default and reports its stored size as content_chars, so a long note never floods the reply. Read the body with get_note(format=\"markdown\"), or pass return_content=true.",
       "Mutation receipts can contain raw ProseMirror JSON, identified by _content_format or _description_format and _hint. Do not reuse a receipt as editable markdown: read get_note(format=\"markdown\") or get_card, or preserve your original markdown before editing.",
       'mode="replace" (the default) swaps the whole body, not a merge. For logs and journals use mode="append", which adds blocks after the existing body and leaves the rest untouched.',
-      'mode="append" is additive, not idempotent — calling it twice appends twice, and empty content is rejected. If a call\'s result was lost, read the note back before retrying.',
+      "Without client_request_id, each append adds content again. To retry safely, reuse your UUID with exactly the same edit and preconditions; a new intentional edit needs a new UUID. Empty append content is rejected.",
       'mode="section" is the idempotent way to edit a status inside a long tracker: only the body under anchor_heading changes, the heading itself stays, and empty or omitted content clears the section. Replaying the same call converges.',
       "A section runs to the next heading of the same or higher level, so rewriting a ## section also rewrites the ### subsections nested under it.",
       'In mode="section" a heading that does not exist is a not-found error, not an insert (use mode="append" to add a new section), and a heading that appears more than once is a conflict — disambiguate the headings in the note first.',
-      "title, pinned, card_id and detach_card apply in every mode and are saved before the body operation, so a rejected append or section edit can still have changed the metadata.",
+      "Metadata and body commit together in every mode. A failed append or section edit leaves both unchanged. Older backends without the atomic edit endpoint return an error without applying a partial edit.",
       'Notes with kind="review_verdict" are append-only audit records — updates are rejected with a permission error.',
     ],
     examplePrompt:

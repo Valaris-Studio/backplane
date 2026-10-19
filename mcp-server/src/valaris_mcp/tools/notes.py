@@ -204,22 +204,36 @@ def _note_error(message: str) -> str:
     return json.dumps({"error": True, "message": message}, indent=2)
 
 
-async def _put_note_fields(client, workspace_slug, board_id, note_id, title, pinned, card_id, detach_card, content):
-    body: dict = {}
+def _note_metadata(title, pinned, card_id, detach_card) -> dict:
+    metadata: dict = {}
     if title is not None:
-        body["title"] = title
-    if content is not None:
-        body["content"] = content
+        metadata["title"] = title
     if pinned is not None:
-        body["pinned"] = pinned
+        metadata["pinned"] = pinned
+    # An explicit null detaches the card; an omitted card_id keeps the link.
     if detach_card:
-        body["card_id"] = None
+        metadata["card_id"] = None
     elif card_id is not None:
-        body["card_id"] = card_id
-    if not body:
-        return None
-    path = f"{_notes_path(client, workspace_slug, board_id)}/{note_id}"
-    return await client.put(path, body)
+        metadata["card_id"] = card_id
+    return metadata
+
+
+def _note_body(mode, content, anchor_heading) -> dict:
+    if mode == "section":
+        # An omitted section body clears that section, never the whole note.
+        return {"anchor_heading": anchor_heading, "content": content or ""}
+    return {} if content is None else {"content": content}
+
+
+def _edit_guards(expected_revision, expected_digest, client_request_id) -> dict:
+    # Only the caller's own client_request_id deduplicates a retry. The
+    # invocation header already correlates the call and is never promoted to one.
+    guards = {
+        "expected_revision": expected_revision,
+        "expected_digest": expected_digest,
+        "client_request_id": client_request_id,
+    }
+    return {name: value for name, value in guards.items() if value is not None}
 
 
 async def _append_note_blocks(client, workspace_slug, board_id, note_id, content):
@@ -246,9 +260,12 @@ async def update_note(
     card_id: str | None = None,
     detach_card: bool = False,
     return_content: bool = False,
+    expected_revision: int | None = None,
+    expected_digest: str | None = None,
+    client_request_id: str | None = None,
     ctx: Context = None,
 ) -> str:
-    """Update a note; only provided fields change. mode: "replace" (default), "append" (not idempotent) or "section" (rewrites the anchor_heading section; idempotent). See docs.
+    """Update a note atomically; only provided fields change. mode: "replace" (default), "append" (additive unless retried with the same client_request_id) or "section" (rewrites the anchor_heading section; idempotent). See docs.
 
     Args:
         note_id: Note UUID.
@@ -260,6 +277,9 @@ async def update_note(
         card_id: Card to link (on the note's board); omit to keep the link.
         detach_card: Clear the card link; wins over card_id.
         return_content: Echo the stored body in the receipt.
+        expected_revision: Reject unless the note is still at this history_revision.
+        expected_digest: Reject unless the note still has this revision_digest.
+        client_request_id: Retry key (UUID): a resent identical edit replays instead of applying twice.
     """
     if mode not in NOTE_WRITE_MODES:
         return _note_error(f"mode must be one of {', '.join(NOTE_WRITE_MODES)}; got {mode!r}")
@@ -269,19 +289,22 @@ async def update_note(
         return _note_error('mode="section" needs anchor_heading')
     if mode != "section" and anchor_heading is not None:
         return _note_error('anchor_heading only applies to mode="section"')
+    # An edit with no fields still goes to the server: it owns authorization,
+    # preconditions, replay and the no-op receipt.
+    edit = {
+        "mode": mode,
+        **_note_metadata(title, pinned, card_id, detach_card),
+        **_note_body(mode, content, anchor_heading),
+        **_edit_guards(expected_revision, expected_digest, client_request_id),
+    }
 
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
-    body_content = content if mode == "replace" else None
-    result = await _put_note_fields(
-        client, workspace_slug, board_id, note_id, title, pinned, card_id, detach_card, body_content
-    )
-    if mode == "append":
-        result = await _append_note_blocks(client, workspace_slug, board_id, note_id, content)
-    elif mode == "section":
-        result = await _replace_note_section(
-            client, workspace_slug, board_id, note_id, anchor_heading, content or ""
-        )
+    # Metadata and body travel in one request so they commit together. A
+    # backend without /edit answers 404 having written nothing; falling back to
+    # the split PUT + append/section routes would reintroduce partial commits.
+    path = f"{_notes_path(client, workspace_slug, board_id)}/{note_id}/edit"
+    result = await client.post(path, edit)
     return _note_receipt(result, return_content)
 
 

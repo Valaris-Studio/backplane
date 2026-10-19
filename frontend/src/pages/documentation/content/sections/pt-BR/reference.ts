@@ -750,8 +750,8 @@ const PT_BR_MCP_TOOL_CATALOG = {
     "kind NÃO é validado: qualquer string é armazenada literalmente (para permitir extensão pelo operador), portanto um erro de digitação cria silenciosamente uma nota inerte. Somente tipos conhecidos (plan, rework_brief, review_verdict, system) afetam o pipeline.",
   "A note created with kind=\"review_verdict\" is permanently immutable — update_note and delete_note are rejected on it.":
     "Uma nota criada com kind=\"review_verdict\" é permanentemente imutável; update_note e delete_note são rejeitados.",
-  "Edit a note's title, pinned flag, card link, or body. mode picks how content lands: replace the whole body, append at the end, or rewrite one section.":
-    "Edite o título, o indicador pinned, o vínculo com o cartão ou o corpo de uma nota. mode decide o que content faz: substituir o corpo inteiro, acrescentar ao final ou reescrever uma seção.",
+  "Edit a note's title, pinned flag, card link and body in one atomic request. mode replaces the body, appends at the end or rewrites one section.":
+    "Edite o título, o estado pinned, o vínculo com o cartão e o corpo de uma nota em uma única operação atômica. mode substitui o corpo, acrescenta ao final ou reescreve uma seção.",
   "Body blocks — markdown recommended, normalized like create_note. mode decides where they land: the whole body (mode=\"replace\"), after the existing body (mode=\"append\", where content is required), or under one heading (mode=\"section\").":
     "Blocos do corpo; markdown é recomendado e normalizado como em create_note. mode decide onde eles entram: o corpo inteiro (mode=\"replace\"), depois do corpo existente (mode=\"append\", em que content é obrigatório) ou abaixo de um título (mode=\"section\").",
   "\"replace\" (default) rewrites the whole body with content; \"append\" adds content blocks at the end; \"section\" rewrites only the body under anchor_heading.":
@@ -760,16 +760,22 @@ const PT_BR_MCP_TOOL_CATALOG = {
     "Somente com mode=\"section\": texto do título cuja seção será reescrita, sem os sinais # iniciais: \"Cluster I\", não \"## Cluster I\". A comparação ignora espaços nas extremidades e diferenças entre maiúsculas e minúsculas.",
   "mode=\"replace\" (the default) swaps the whole body, not a merge. For logs and journals use mode=\"append\", which adds blocks after the existing body and leaves the rest untouched.":
     "mode=\"replace\" (o padrão) troca o corpo inteiro, não faz merge. Para logs e diários use mode=\"append\", que acrescenta blocos depois do corpo existente e deixa o restante intacto.",
-  "mode=\"append\" is additive, not idempotent — calling it twice appends twice, and empty content is rejected. If a call's result was lost, read the note back before retrying.":
-    "mode=\"append\" é aditivo, não idempotente: chamar duas vezes acrescenta o conteúdo duas vezes, e content vazio é rejeitado. Se o resultado de uma chamada foi perdido, leia a nota novamente antes de repetir.",
+  "Without client_request_id, each append adds content again. To retry safely, reuse your UUID with exactly the same edit and preconditions; a new intentional edit needs a new UUID. Empty append content is rejected.":
+    "Sem client_request_id, cada append acrescenta o conteúdo novamente. Para repetir com segurança, reutilize seu UUID com a mesma edição e as mesmas pré-condições; uma nova edição precisa de outro UUID. Conteúdo vazio em append é rejeitado.",
   "mode=\"section\" is the idempotent way to edit a status inside a long tracker: only the body under anchor_heading changes, the heading itself stays, and empty or omitted content clears the section. Replaying the same call converges.":
     "mode=\"section\" é a forma idempotente de editar um status em um tracker extenso: somente o corpo abaixo de anchor_heading muda, o título é preservado e content vazio ou omitido limpa a seção. Repetir a mesma chamada converge.",
   "A section runs to the next heading of the same or higher level, so rewriting a ## section also rewrites the ### subsections nested under it.":
     "Uma seção vai até o próximo título do mesmo nível ou de nível superior. Portanto, reescrever uma seção ## também reescreve as subseções ### contidas nela.",
   "In mode=\"section\" a heading that does not exist is a not-found error, not an insert (use mode=\"append\" to add a new section), and a heading that appears more than once is a conflict — disambiguate the headings in the note first.":
     "Com mode=\"section\", um título inexistente gera um erro not-found, não uma inserção (use mode=\"append\" para adicionar uma nova seção), e um título repetido gera conflito. Primeiro diferencie os títulos da nota.",
-  "title, pinned, card_id and detach_card apply in every mode and are saved before the body operation, so a rejected append or section edit can still have changed the metadata.":
-    "title, pinned, card_id e detach_card valem em todos os modos e são salvos antes da operação no corpo, portanto um append ou uma edição de seção rejeitados ainda podem ter alterado os metadados.",
+  "Metadata and body commit together in every mode. A failed append or section edit leaves both unchanged. Older backends without the atomic edit endpoint return an error without applying a partial edit.":
+    "Os metadados e o corpo são salvos juntos em todos os modos. Se append ou uma edição de seção falhar, ambos permanecem intactos. Backends antigos sem a operação de edição atômica retornam um erro sem aplicar alterações parciais.",
+  "Apply only if history_revision still matches this integer, including 0 for an unrecorded note.":
+    "Aplique a alteração somente se history_revision corresponder a este inteiro, incluindo 0 para uma nota sem revisões registradas.",
+  "Apply only if revision_digest still matches the note state you read; this also detects changes from older writers.":
+    "Aplique a alteração somente se revision_digest corresponder ao estado da nota que você leu; isso também detecta alterações de clientes antigos.",
+  "Your UUID for this edit. Reuse it only for an identical retry; omission does not deduplicate an append.":
+    "Seu UUID para esta edição. Reutilize-o somente para uma repetição idêntica; sem ele, um append pode ser aplicado novamente.",
   "UUID of the note to update.": "UUID da nota que será atualizada.",
   "New title for the note.": "Novo título da nota.",
   "Whether the note should be pinned.": "Se a nota deve ficar fixada.",

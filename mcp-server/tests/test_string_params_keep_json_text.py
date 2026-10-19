@@ -85,13 +85,13 @@ def test_list_and_dict_params_still_accept_json_text():
 @pytest.mark.anyio
 async def test_update_note_accepts_prosemirror_json_string_through_the_tool(mock_client, ctx):
     prosemirror = json.dumps({"type": "doc", "content": [{"type": "paragraph"}]})
-    mock_client.put.return_value = {"id": "n1"}
+    mock_client.post.return_value = {"id": "n1"}
 
     await mcp._tool_manager._tools["update_note"].run(
         {"workspace_slug": "ws", "note_id": "n1", "content": prosemirror}, context=ctx
     )
 
-    mock_client.put.assert_called_once_with("/workspaces/ws/notes/n1", {"content": prosemirror})
+    mock_client.post.assert_called_once_with("/workspaces/ws/notes/n1/edit", {"mode": "replace", "content": prosemirror})
 
 
 @pytest.mark.anyio

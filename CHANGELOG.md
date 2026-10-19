@@ -33,6 +33,12 @@ keeps its own detailed per-tool history in
 
 #### Added
 
+- Record committed note changes from the UI and MCP, with authorized revision
+  and comparison APIs. Existing notes gain an honest baseline on their first
+  edit; revisions remain available until the note is deleted.
+- Search retained session text through an owner-only API, with exact result
+  anchors, bounded continuation and explicit indexing and availability coverage.
+  Historical indexing is tracked separately from a completed search scan.
 - Read captured sessions in peer Timeline and Transcript views. Jump to recent,
   beginning, earlier or later evidence, or open a linked record directly in a
   bounded window.

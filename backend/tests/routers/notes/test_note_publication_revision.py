@@ -43,6 +43,14 @@ def publication_revision_path(workspace, board, note_id):
     return f"{board_notes(workspace, board)}/{note_id}/publication-revision"
 
 
+def publication_presence_path(workspace, board, note_id):
+    return f"{publication_revision_path(workspace, board, note_id)}/presence"
+
+
+def workspace_notes(workspace):
+    return f"/api/workspaces/{workspace.slug}/notes"
+
+
 @pytest.fixture
 async def publication(owner, test_workspace, test_board, source):
     payload = excerpt_save(test_workspace, source["session_id"], source["items"])
@@ -57,6 +65,13 @@ async def inspect_revision(owner, workspace, board, note_id):
     response = await owner.get(publication_revision_path(workspace, board, note_id))
     assert response.status_code == 200, response.text
     assert set(response.json()) == REVISION_FIELDS
+    return response.json()
+
+
+async def inspect_presence(owner, workspace, board, note_id):
+    response = await owner.get(publication_presence_path(workspace, board, note_id))
+    assert response.status_code == 200, response.text
+    assert set(response.json()) == {"has_record", "recorded_at"}
     return response.json()
 
 
@@ -408,7 +423,15 @@ async def test_inspection_preserves_shared_note_export_context_selection_and_lin
         "id", "workspace_id", "board_id", "card_id", "title", "content", "pinned",
         "kind", "failure_class", "findings", "source_execution_id", "created_by",
         "created_at", "updated_at",
+        "history_revision", "revision_digest", "applied_revision", "changed", "replayed",
     }
+    assert saved["history_revision"] == 1
+    assert isinstance(saved["revision_digest"], str)
+    assert len(saved["revision_digest"]) == 64
+    assert set(saved["revision_digest"]) <= set("0123456789abcdef")
+    assert saved["applied_revision"] is None
+    assert saved["changed"] is None
+    assert saved["replayed"] is None
     before_export = await owner.get(f"{url}/export")
     assert before_export.status_code == 200, before_export.text
     before_markdown = await owner.get(f"{url}/{saved['id']}?format=markdown")
@@ -498,3 +521,226 @@ async def test_publication_revision_validation_error_is_private_and_redacted(
     assert invalid_id not in response.text
     assert response.json()["detail"] == "Invalid request"
     assert response.json()["error_code"] == "validation_error"
+
+
+async def test_publication_presence_distinguishes_recorded_and_ordinary_notes_without_reading_or_hashing_body(
+    owner, db_session, test_workspace, test_board, publication, monkeypatch
+):
+    _, saved = publication
+    ordinary = await owner.post(board_notes(test_workspace, test_board), json={
+        "title": "Ordinary note", "content": "Saved normally without handoff",
+    })
+    assert ordinary.status_code == 201, ordinary.text
+    ordinary_id = ordinary.json()["id"]
+    receipt = await receipt_for(db_session, saved["id"])
+
+    def fail_on_note_revision(*args, **kwargs):
+        pytest.fail("Publication presence must not compute or hash note revisions")
+
+    async def fail_on_revision_fields(*args, **kwargs):
+        pytest.fail("Publication presence must not read note body or revision fields")
+
+    monkeypatch.setattr("app.services.notes.note.note_revision", fail_on_note_revision)
+    monkeypatch.setattr(NoteRepository, "get_revision_fields", fail_on_revision_fields)
+
+    selected_statements = []
+
+    def observe(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selected_statements.append(statement.lower())
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", observe)
+    try:
+        present = await inspect_presence(owner, test_workspace, test_board, saved["id"])
+        absent = await inspect_presence(owner, test_workspace, test_board, ordinary_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", observe)
+
+    assert present["has_record"] is True
+    assert datetime.fromisoformat(present["recorded_at"]).replace(
+        tzinfo=None
+    ) == receipt.created_at.replace(tzinfo=None)
+    assert absent == {"has_record": False, "recorded_at": None}
+    assert not any("notes.content" in sql or "octet_length" in sql for sql in selected_statements)
+
+
+@pytest.mark.parametrize("version,digest", [
+    (None, None),
+    (1, None),
+    (99, "a" * 64),
+])
+async def test_publication_presence_reports_legacy_or_unsupported_receipt_record_without_inventing_diff(
+    version, digest, owner, db_session, test_workspace, test_board, publication
+):
+    _, saved = publication
+    receipt = await receipt_for(db_session, saved["id"])
+    receipt.published_note_revision_sha256 = digest
+    receipt.published_note_revision_version = version
+    await db_session.flush()
+
+    presence = await inspect_presence(owner, test_workspace, test_board, saved["id"])
+    assert presence["has_record"] is True
+    assert presence["recorded_at"] is not None
+
+    inspected = await inspect_revision(owner, test_workspace, test_board, saved["id"])
+    assert inspected["comparison"] is None
+    assert inspected["current_revision_sha256"] is None
+
+
+async def test_publication_presence_enforces_author_only_credential_scope_and_private_no_store_boundaries(
+    owner,
+    agent_client,
+    installation_key_client,
+    plain_key_client,
+    db_session,
+    test_user,
+    second_user,
+    test_workspace,
+    test_board,
+    publication,
+):
+    _, saved = publication
+    ordinary = await owner.post(board_notes(test_workspace, test_board), json={
+        "title": "Shared ordinary", "content": "Shared content",
+    })
+    assert ordinary.status_code == 201, ordinary.text
+    ordinary_id = ordinary.json()["id"]
+
+    owner_response = await owner.get(publication_presence_path(test_workspace, test_board, saved["id"]))
+    assert owner_response.status_code == 200, owner_response.text
+    assert owner_response.json()["has_record"] is True
+    assert_no_http_storage(owner_response)
+
+    key_presence = await inspect_presence(plain_key_client, test_workspace, test_board, saved["id"])
+    assert key_presence["has_record"] is True
+
+    for client in (agent_client, installation_key_client):
+        denied_key = await client.get(publication_presence_path(test_workspace, test_board, saved["id"]))
+        assert denied_key.status_code == 403, denied_key.text
+        assert saved["id"] not in denied_key.text
+        assert_no_http_storage(denied_key)
+
+    await add_member(db_session, test_workspace, second_user)
+    async with as_principal(db_session, second_user) as reader:
+        other_responses = []
+        for note_id in (saved["id"], ordinary_id, str(uuid.uuid4())):
+            res = await reader.get(publication_presence_path(test_workspace, test_board, note_id))
+            assert res.status_code == 404, res.text
+            assert_no_http_storage(res)
+            other_responses.append(res.json())
+        assert other_responses[0] == other_responses[1] == other_responses[2]
+
+    invalid_id = "synthetic-private-presence-reference"
+    invalid_res = await owner.get(publication_presence_path(test_workspace, test_board, invalid_id))
+    assert invalid_res.status_code == 422, invalid_res.text
+    assert_no_http_storage(invalid_res)
+    assert invalid_id not in invalid_res.text
+
+    other_board = Board(
+        workspace_id=test_workspace.id, name="Wrong board", slug="wrong-board", created_by=test_user.id,
+    )
+    db_session.add(other_board)
+    await db_session.flush()
+    wrong_board = await owner.get(publication_presence_path(test_workspace, other_board, saved["id"]))
+    assert wrong_board.status_code == 404, wrong_board.text
+    assert_no_http_storage(wrong_board)
+
+    await db_session.execute(delete(WorkspaceMember).where(
+        WorkspaceMember.workspace_id == test_workspace.id,
+        WorkspaceMember.user_id == test_user.id,
+    ))
+    revoked = await owner.get(publication_presence_path(test_workspace, test_board, saved["id"]))
+    assert revoked.status_code == 403, revoked.text
+    assert_no_http_storage(revoked)
+
+
+async def test_ordinary_ui_and_mcp_note_mutations_do_not_create_publication_receipts(
+    owner, db_session, test_workspace, test_board
+):
+    base = board_notes(test_workspace, test_board)
+    created = await owner.post(base, json={
+        "title": "Routine note", "content": "## Status\n\nInitial body",
+    })
+    assert created.status_code == 201, created.text
+    note_id = created.json()["id"]
+
+    updated = await owner.put(f"{base}/{note_id}", json={
+        "title": "Routine note edited", "pinned": True,
+    })
+    assert updated.status_code == 200, updated.text
+
+    appended = await owner.post(f"{base}/{note_id}/append", json={
+        "content": "Appended paragraph",
+    })
+    assert appended.status_code == 200, appended.text
+
+    replaced = await owner.post(f"{base}/{note_id}/replace-section", json={
+        "anchor_heading": "Status", "content": "Updated status section",
+    })
+    assert replaced.status_code == 200, replaced.text
+
+    receipt_count = await db_session.scalar(
+        select(func.count()).select_from(NoteSaveReceipt).where(
+            NoteSaveReceipt.note_id == uuid.UUID(note_id)
+        )
+    )
+    assert receipt_count == 0
+    presence = await inspect_presence(owner, test_workspace, test_board, note_id)
+    assert presence == {"has_record": False, "recorded_at": None}
+
+
+async def test_workspace_route_mutations_on_board_note_record_actual_note_board_id_in_activity(
+    owner, db_session, test_workspace, test_board, monkeypatch
+):
+    from app.models.activity import Activity, ActivityEntityType
+    from app.services import activity as activity_service_module
+
+    published_events = []
+    original_queue = activity_service_module.queue_until_commit
+
+    def spy_queue(db, event_type, payload, workspace_id):
+        published_events.append((event_type, payload, workspace_id))
+        return original_queue(db, event_type, payload, workspace_id)
+
+    monkeypatch.setattr(activity_service_module, "queue_until_commit", spy_queue)
+
+    created = await owner.post(board_notes(test_workspace, test_board), json={
+        "title": "Board note edited via workspace route",
+        "content": "## Progress\n\nInitial progress",
+    })
+    assert created.status_code == 201, created.text
+    note_id = created.json()["id"]
+    ws_url = f"{workspace_notes(test_workspace)}/{note_id}"
+
+    assert (await owner.put(ws_url, json={"pinned": True})).status_code == 200
+    assert (await owner.post(f"{ws_url}/append", json={"content": "More details"})).status_code == 200
+    assert (await owner.post(f"{ws_url}/replace-section", json={
+        "anchor_heading": "Progress", "content": "Replaced progress",
+    })).status_code == 200
+    assert (await owner.delete(ws_url)).status_code == 204
+
+    rows = (
+        await db_session.execute(
+            select(Activity.message_key, Activity.board_id)
+            .where(
+                Activity.entity_type == ActivityEntityType.note,
+                Activity.entity_id == uuid.UUID(note_id),
+            )
+            .order_by(Activity.created_at)
+        )
+    ).all()
+    by_key = {message_key: board_id for message_key, board_id in rows}
+    for key in (
+        "activity.note.updated",
+        "activity.note.appended",
+        "activity.note.section_replaced",
+        "activity.note.deleted",
+    ):
+        assert by_key.get(key) == test_board.id, f"{key} omitted or misattributed the note's board_id"
+
+    note_events = [event for event in published_events if event[1].get("entity_id") == note_id]
+    assert len(note_events) == 5
+    for event_type, payload, workspace_id in note_events:
+        assert workspace_id == test_workspace.id
+        assert payload["board_id"] == str(test_board.id), f"{event_type} omitted the note's board_id"

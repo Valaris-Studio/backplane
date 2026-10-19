@@ -1070,19 +1070,19 @@ async def test_create_note_board_scoped(mock_client, ctx):
 async def test_update_note_filters_none(mock_client, ctx):
     from valaris_mcp.tools.notes import update_note
 
-    mock_client.put.return_value = {"id": "n1", "title": "Updated"}
+    mock_client.post.return_value = {"id": "n1", "title": "Updated"}
     await update_note("test", "n1", title="Updated", ctx=ctx)
-    mock_client.put.assert_called_once_with("/workspaces/test/notes/n1", {"title": "Updated"})
+    mock_client.post.assert_called_once_with("/workspaces/test/notes/n1/edit", {"mode": "replace", "title": "Updated"})
 
 
 @pytest.mark.anyio
 async def test_update_note_multiple_fields(mock_client, ctx):
     from valaris_mcp.tools.notes import update_note
 
-    mock_client.put.return_value = {"id": "n1"}
+    mock_client.post.return_value = {"id": "n1"}
     await update_note("test", "n1", title="T", content="C", pinned=True, ctx=ctx)
-    body = mock_client.put.call_args[0][1]
-    assert body == {"title": "T", "content": "C", "pinned": True}
+    body = mock_client.post.call_args[0][1]
+    assert body == {"mode": "replace", "title": "T", "content": "C", "pinned": True}
 
 
 @pytest.mark.anyio

@@ -237,6 +237,29 @@ class NoteFormat(str, Enum):
     markdown = "markdown"
 
 
+class NoteEdit(NoteUpdate):
+    """One atomic content operation and its optional metadata changes."""
+
+    mode: Literal["replace", "append", "section"] = "replace"
+    anchor_heading: str | None = None
+    expected_revision: int | None = Field(default=None, ge=0)
+    expected_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    client_request_id: uuid.UUID | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _operation_content(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        value = dict(value)
+        if value.get("mode") == "append":
+            value["content"] = NoteAppend.model_validate(value).content
+        elif value.get("mode") == "section":
+            parsed = NoteSectionReplace.model_validate(value)
+            value.update(content=parsed.content, anchor_heading=parsed.anchor_heading)
+        return value
+
+
 class NoteRead(UTCModel):
     id: uuid.UUID
     workspace_id: uuid.UUID
@@ -253,6 +276,11 @@ class NoteRead(UTCModel):
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    history_revision: int = 0
+    revision_digest: str | None = None
+    applied_revision: int | None = None
+    changed: bool | None = None
+    replayed: bool | None = None
 
     model_config = {"from_attributes": True}
 
@@ -320,6 +348,11 @@ PublicationRevisionStatus = Literal[
 ]
 PublicationRevisionComparison = Literal["matches", "differs", "unavailable"]
 PublicationRevisionComparisonReason = Literal["current_note_too_large"]
+
+
+class NotePublicationPresenceRead(UTCModel):
+    has_record: bool
+    recorded_at: datetime | None = None
 
 
 class NotePublicationRevisionRead(UTCModel):

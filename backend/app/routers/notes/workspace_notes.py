@@ -19,6 +19,7 @@ from app.schemas.notes.note import (
     NoteUpdate,
 )
 from app.routers.notes.list_options import build_list_options
+from app.routers.notes.history import router as history_router
 from app.services.notes.note import NoteService
 
 router = APIRouter(
@@ -185,3 +186,6 @@ async def delete_workspace_note(
 ):
     service = NoteService(db)
     await service.delete_note(note_id, ctx.workspace.id, actor_id=ctx.user.id)
+
+
+router.include_router(history_router)

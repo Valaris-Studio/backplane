@@ -13,6 +13,7 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app import database
 from app.core.auth import current_agent_id, get_current_user
 from app.database import get_db
 from app.main import create_app
@@ -99,7 +100,7 @@ def anyio_backend():
 
 
 @pytest_asyncio.fixture
-async def db_engine():
+async def db_engine(monkeypatch):
     # One PRIVATE engine (= one private :memory: DB) per test, disposed at
     # teardown. The previous design shared a single module-level StaticPool
     # engine across every test in the worker process: the lone aiosqlite
@@ -133,6 +134,14 @@ async def db_engine():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Work that opens its own sessions after a response (the post-commit
+    # search indexer) must reach this database too, never the process
+    # default. monkeypatch restores the original, after any test's own patch.
+    monkeypatch.setattr(
+        database,
+        "async_session",
+        async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False),
+    )
     yield engine
     await engine.dispose()
 

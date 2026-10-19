@@ -37,8 +37,14 @@ from app.models.git import GitConnection, GitProvider, GitRepo
 from app.models.kanban import BoardLoopTransition, Board, Card, CardParticipant, CardType, Column, ParticipantRole, Priority
 from app.models.kanban.completion import CompletionCandidate, CompletionAttempt
 from app.models.notes import Note, NoteSaveReceipt
+from app.models.notes.history import NoteRevision, NoteRevisionChunk, NoteRevisionManifest, NoteMutationReceipt
 from app.models.notifications import Notification, NotificationPreference
 from app.models.resources import Resource, ResourceType
+from app.models.session_search import (
+    SessionSearchChunk,
+    SessionSearchSource,
+    SessionSearchState,
+)
 from app.models.skills.skill import BoardSkill, Skill, SkillAuditEvent, SkillVersion, SkillVersionStatus
 from app.models.user import User
 from app.models.webhooks.webhook import Webhook, WebhookEvent
@@ -46,6 +52,7 @@ from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.models.workspace_config import WorkspaceConfig
 
 __all__ = [
+    "NoteRevision", "NoteRevisionChunk", "NoteRevisionManifest", "NoteMutationReceipt",
     "TimelineGeneration", "TimelineCheckpoint", "TimelinePreparation",
     "AgentSession",
     "AgentSessionCapture",
@@ -57,6 +64,9 @@ __all__ = [
     "AgentSessionTombstone",
     "AgentSessionUsage",
     "SessionWorkLink",
+    "SessionSearchChunk",
+    "SessionSearchSource",
+    "SessionSearchState",
     "CompanionInstallation",
     "CompanionPairing",
     "CompanionPairingLookupFailure",
