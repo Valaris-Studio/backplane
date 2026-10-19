@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefCallback } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -178,15 +178,20 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
     contents.navigate(request);
   }
 
-  function onSelect(id: string, checked: boolean) {
-    const next = new Map(snapshots);
+  // One identity for every retained row, acting on the committed window and selection.
+  const committedSelection = useRef({ snapshots, items });
+  useLayoutEffect(() => { committedSelection.current = { snapshots, items }; });
+  const selectHandoff = handoff.select;
+  const onSelect = useCallback((id: string, checked: boolean) => {
+    const current = committedSelection.current;
+    const next = new Map(current.snapshots);
     if (!checked) next.delete(id);
-    else if (snapshots.size < MAX_SELECTED_RECORDS) {
-      const item = items.find((candidate) => candidate.id === id);
+    else if (current.snapshots.size < MAX_SELECTED_RECORDS) {
+      const item = current.items.find((candidate) => candidate.id === id);
       if (item) next.set(id, { ...item, preview: null });
     }
-    if (!handoff.select(next)) toast.error(t("sessions.contents.excerpt.note.capacity"));
-  }
+    if (!selectHandoff(next)) toast.error(t("sessions.contents.excerpt.note.capacity"));
+  }, [selectHandoff, t]);
 
   const pending = contents.isFetching && (contents.isPending || contents.isPlaceholderData);
   return (
@@ -235,7 +240,11 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
   );
 }
 
-function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSession; items: SessionContent[]; hasMore: boolean }) {
+// Draft, fetch-state and tab updates re-render the reader. Retained rows and
+// their navigation options skip those renders (and their timestamp formatting)
+// only while every prop keeps its identity: data from the window query, the
+// memoized selection set and the stable onSelect.
+const LoadedContentNavigation = memo(function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSession; items: SessionContent[]; hasMore: boolean }) {
   const { t } = useTranslation();
   const id = useId();
   const location = useLocation();
@@ -262,7 +271,7 @@ function LoadedContentNavigation({ session, items, hasMore }: { session: AgentSe
     </select>
     <p id={`${id}-scope`} className="text-xs text-muted-foreground">{t(hasMore ? "sessions.contents.navigation.incomplete" : "sessions.contents.navigation.loaded")}</p>
   </div>;
-}
+});
 
 function TranscriptFrame({ headingId, headingRef, actionsHeight, controls, children }: { headingId: string; headingRef?: RefCallback<HTMLHeadingElement>; actionsHeight: number; controls?: ReactNode; children: ReactNode }) {
   const { t } = useTranslation();
@@ -367,7 +376,7 @@ interface ExcerptSelection {
   onSelect: (id: string, checked: boolean) => void;
 }
 
-function TranscriptMessage({ slug, session, item, selected, onSelect }: { slug: string; session: AgentSession; item: SessionContent } & ExcerptSelection) {
+const TranscriptMessage = memo(function TranscriptMessage({ slug, session, item, selected, onSelect }: { slug: string; session: AgentSession; item: SessionContent } & ExcerptSelection) {
   const { t } = useTranslation();
   const labelId = useId();
   const copy = useCopyItemLink(slug, session.id);
@@ -385,7 +394,7 @@ function TranscriptMessage({ slug, session, item, selected, onSelect }: { slug: 
       <ContentBody slug={slug} sessionId={session.id} content={item} prose={PROSE.has(item.channel)} emphasis={item.channel === "prompt"} />
     </li>
   );
-}
+});
 
 function partLabel(item: SessionContent, t: (key: string, values?: Record<string, string>) => string): string {
   const part = t(`sessions.contents.parts.${item.channel}`);
@@ -400,7 +409,7 @@ interface TranscriptCallProps extends ExcerptSelection {
   active: boolean;
 }
 
-function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, active }: TranscriptCallProps) {
+const TranscriptCall = memo(function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, active }: TranscriptCallProps) {
   const { t } = useTranslation();
   const { hash, key } = useLocation();
   const linkedId = parts.find((part) => hash === `#${itemAnchor(part)}`)?.id;
@@ -465,4 +474,4 @@ function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, ac
       ) : null}
     </li>
   );
-}
+});
