@@ -206,32 +206,46 @@ function actionButton(container: HTMLElement, name: string) {
   return button;
 }
 
-async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2) {
+async function prepareNote(user: ReturnType<typeof userEvent.setup>, order = 2, signal?: AbortSignal) {
   await screen.findByText(`Captured record ${order}`);
+  signal?.throwIfAborted();
   await user.click(recordCheckbox(order));
+  signal?.throwIfAborted();
   const excerptActions = screen.getByText(/^Selected: \d+ · /).parentElement!;
   await user.click(actionButton(excerptActions, "Preview excerpt"));
+  signal?.throwIfAborted();
   const preview = await screen.findByRole("dialog", { name: "Selected excerpt" });
+  signal?.throwIfAborted();
   await waitFor(() => expect(actionButton(preview, "Share as note")).toBeEnabled(), { container: preview });
+  signal?.throwIfAborted();
   await user.click(actionButton(preview, "Share as note"));
+  signal?.throwIfAborted();
   const dialog = await screen.findByRole("dialog", { name: "Share as note" });
+  signal?.throwIfAborted();
   const workspaceField = within(dialog).getByText("Workspace", { selector: "label" });
   await user.selectOptions(within(workspaceField).getByRole("combobox", { name: "Workspace" }), SLUG);
+  signal?.throwIfAborted();
   const boardField = within(dialog).getByText("Board", { selector: "label" });
   await within(boardField).findByRole("option", { name: "Reader review" });
+  signal?.throwIfAborted();
   await user.selectOptions(within(boardField).getByRole("combobox", { name: "Board" }), BOARD);
+  signal?.throwIfAborted();
   await user.clear(within(dialog).getByRole("textbox", { name: "Note title" }));
+  signal?.throwIfAborted();
   await user.paste("Owner reviewed handoff");
+  signal?.throwIfAborted();
   await waitFor(() => expect(actionButton(dialog, "Save note")).toBeEnabled(), { container: dialog });
+  signal?.throwIfAborted();
   return dialog;
 }
 
-async function editDraftBody(dialog: HTMLElement) {
+async function editDraftBody(dialog: HTMLElement, signal?: AbortSignal) {
   const editor = await waitFor(() => {
     const current = within(dialog).getByRole("region", { name: "Note content" }).querySelector<HTMLElement>('[contenteditable="true"]');
     expect(current).not.toBeNull();
     return current!;
   });
+  signal?.throwIfAborted();
   const paragraph = editor.querySelector("p")!;
   editor.focus();
   const range = document.createRange(); range.selectNodeContents(paragraph); range.collapse(false);
@@ -241,8 +255,10 @@ async function editDraftBody(dialog: HTMLElement) {
     types: ["text/html", "text/plain"], items: [], files: [],
     getData: (type: string) => type === "text/html" ? "<strong>OWNER REVIEWED CONTEXT</strong>" : type === "text/plain" ? "OWNER REVIEWED CONTEXT" : "",
   } });
-  await act(async () => { editor.dispatchEvent(paste); });
+  await act(async () => { signal?.throwIfAborted(); editor.dispatchEvent(paste); });
+  signal?.throwIfAborted();
   await waitFor(() => expect(editor.textContent).toContain("OWNER REVIEWED CONTEXT"));
+  signal?.throwIfAborted();
 }
 
 function responsiveViewport(initial: number) {
@@ -266,10 +282,14 @@ function responsiveViewport(initial: number) {
   };
 }
 
-async function openTranscript(user: ReturnType<typeof userEvent.setup>) {
+async function openTranscript(user: ReturnType<typeof userEvent.setup>, signal?: AbortSignal) {
   await screen.findByRole("heading", { name: session.title! });
+  signal?.throwIfAborted();
   await user.click(screen.getByRole("tab", { name: "Transcript" }));
-  return screen.findByRole("region", { name: "Transcript" });
+  signal?.throwIfAborted();
+  const frame = await screen.findByRole("region", { name: "Transcript" });
+  signal?.throwIfAborted();
+  return frame;
 }
 
 async function settled(client: QueryClient) { await waitFor(() => expect(client.isFetching()).toBe(0)); }
@@ -671,43 +691,66 @@ describe("selected evidence is independent from the current window", () => {
     } finally { release(responseError(404, "content_not_found")); }
   });
 
-  it("replays an unknown save exactly after disjoint navigation, tab changes and metadata failure", async () => {
+  it("replays an unknown save exactly after disjoint navigation, tab changes and metadata failure", async (context) => {
     const resize = responsiveViewport(1440);
     const state = serveReader(Array.from({ length: 201 }, (_, index) => record(index + 1)));
     const saved = state.saveResponse;
     state.saveResponse = () => HttpResponse.error();
-    const { client } = renderReader(); const user = userEvent.setup();
+    const { client, container, unmount } = renderReader(); const user = userEvent.setup();
+    // Do not let an expired unknown-save journey resume into the next fixture.
+    context.onTestFinished(() => { unmount(); client.clear(); });
+    const view = within(container);
     await screen.findByRole("heading", { name: session.title! });
-    const refreshEvidence = screen.getByRole("button", { name: "Refresh evidence" });
-    const frame = await openTranscript(user);
-    const tabs = within(screen.getByRole("tablist", { name: "Session sections" }));
+    context.signal.throwIfAborted();
+    const refreshEvidence = actionButton(container, "Refresh evidence");
+    const frame = await openTranscript(user, context.signal);
+    context.signal.throwIfAborted();
+    const tabs = within(view.getByRole("tablist", { name: "Session sections" }));
     const windowNavigation = within(frame).getByRole("navigation", { name: "Captured records" });
     const excerptActions = within(frame).getByText(/^Selected: \d+ · /).parentElement!;
-    const dialog = await prepareNote(user, 201); await editDraftBody(dialog);
+    const dialog = await prepareNote(user, 201, context.signal);
+    context.signal.throwIfAborted();
+    await editDraftBody(dialog, context.signal);
+    context.signal.throwIfAborted();
     await user.click(actionButton(dialog, "Save note"));
+    context.signal.throwIfAborted();
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/may have been saved/i);
+    context.signal.throwIfAborted();
     expect(state.writes).toHaveLength(1);
     const frozen = structuredClone(state.writes[0]!);
     expect(frozen.title).toBe("Owner reviewed handoff"); expect(String(frozen.content)).toContain("OWNER REVIEWED CONTEXT");
     await user.click(actionButton(dialog, "Hide for now"));
+    context.signal.throwIfAborted();
     await user.click(actionButton(windowNavigation, "Beginning"));
-    await screen.findByText("Captured record 1");
+    context.signal.throwIfAborted();
+    await view.findByText("Captured record 1");
+    context.signal.throwIfAborted();
     expect(screen.queryByText("Captured record 201")).not.toBeInTheDocument();
     await user.click(tabs.getByRole("tab", { name: "Timeline" }));
+    context.signal.throwIfAborted();
     act(() => resize(375));
     await user.click(tabs.getByRole("tab", { name: "Session details" }));
+    context.signal.throwIfAborted();
     await user.click(tabs.getByRole("tab", { name: "Transcript" }));
+    context.signal.throwIfAborted();
     await settled(client);
+    context.signal.throwIfAborted();
     state.metadataStatus = 404;
-    await user.click(refreshEvidence); await settled(client);
+    await user.click(refreshEvidence);
+    context.signal.throwIfAborted();
+    await settled(client);
+    context.signal.throwIfAborted();
     await user.click(actionButton(excerptActions, "Resume note save"));
+    context.signal.throwIfAborted();
     const resumed = screen.getByRole("dialog", { name: "Share as note" });
     expect(within(resumed).getByRole("textbox", { name: "Note title" })).toHaveValue("Owner reviewed handoff");
     expect(within(resumed).getByRole("region", { name: "Note content" })).toHaveTextContent("OWNER REVIEWED CONTEXT");
     const validations = state.metadata.length;
     state.saveResponse = saved;
     await user.click(actionButton(resumed, "Retry save"));
+    context.signal.throwIfAborted();
     await within(resumed).findByRole("link", { name: "Open note" });
+    context.signal.throwIfAborted();
     expect(state.writes).toEqual([frozen, frozen]);
     expect(state.metadata).toHaveLength(validations);
     expect(state.bodies).toEqual([contentId(201)]);

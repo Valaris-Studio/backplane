@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
+import { isInaccessible } from "@testing-library/react";
 import { ContextLink } from "@/components/shared/ContextLink";
 import { act, userEvent, waitFor, within } from "@/test/test-utils";
 import { renderBrowserNavigationRouter } from "@/test/navigation-router";
@@ -46,6 +47,16 @@ function serveWindows() {
   return { windows, bodies, middleCursor };
 }
 
+// Each button's accessible name can traverse the full jsdom label tree.
+// Narrow by text before checking the same role, name and accessibility.
+function actionButton(scope: ReturnType<typeof within>, name: string) {
+  const button = scope.getByText(name, { selector: "button" });
+  expect(button.getAttribute("role")?.split(" ")[0] ?? "button").toBe("button");
+  expect(button).toHaveAccessibleName(name);
+  expect(isInaccessible(button)).toBe(false);
+  return button;
+}
+
 describe("reader filter retention through local URL replacement and route unmount", () => {
   it.for(["jump to loaded record", "clear linked record", "no local URL replacement"] as const)(
     "retains Everything, the bounded window and selection after %s then shared work and Back",
@@ -70,18 +81,20 @@ describe("reader filter retention through local URL replacement and route unmoun
         let filters = within(reader.getByRole("group", { name: "Records" }));
         const navigation = within(reader.getByRole("navigation", { name: "Captured records" }));
         const filterEntryKey = router.state.location.key;
-        await user.click(filters.getByRole("button", { name: "Everything" }));
+        await user.click(actionButton(filters, "Everything"));
         context.signal.throwIfAborted();
-        await user.click(navigation.getByRole("button", { name: "Beginning" }));
+        await user.click(actionButton(navigation, "Beginning"));
         context.signal.throwIfAborted();
         await reader.findByText("Retained evidence 1");
         context.signal.throwIfAborted();
-        await user.click(navigation.getByRole("button", { name: "Later records" }));
+        await user.click(actionButton(navigation, "Later records"));
         context.signal.throwIfAborted();
         await reader.findByText("Retained evidence 152");
         context.signal.throwIfAborted();
         if (action === "jump to loaded record") {
-          await user.selectOptions(reader.getByRole("combobox", { name: "Jump to loaded content" }), "record-152");
+          const jumpLabel = reader.getByText("Jump to loaded content", { selector: "label" });
+          const jumpField = within(jumpLabel.parentElement!);
+          await user.selectOptions(jumpField.getByRole("combobox", { name: "Jump to loaded content" }), "record-152");
           context.signal.throwIfAborted();
           await waitFor(() => expect(router.state.location.hash).toBe("#content-record-152"));
           context.signal.throwIfAborted();
@@ -93,7 +106,7 @@ describe("reader filter retention through local URL replacement and route unmoun
         await user.click(selected());
         context.signal.throwIfAborted();
         expect(selected()).toBeChecked();
-        expect(filters.getByRole("button", { name: "Everything" })).toHaveAttribute("aria-pressed", "true");
+        expect(actionButton(filters, "Everything")).toHaveAttribute("aria-pressed", "true");
         expect(reader.getByText("Retained evidence 151")).toBeVisible();
         await waitFor(() => expect(client.isFetching()).toBe(0));
         context.signal.throwIfAborted();
@@ -126,7 +139,7 @@ describe("reader filter retention through local URL replacement and route unmoun
         expect(selected()).toBeChecked();
         expect(state.windows.slice(beforeReturn).some((params) => params.get("mode") === "refresh" && params.get("cursor") === state.middleCursor)).toBe(true);
         expect(state.bodies).toEqual([]);
-        expect(filters.getByRole("button", { name: "Everything" })).toHaveAttribute("aria-pressed", "true");
+        expect(actionButton(filters, "Everything")).toHaveAttribute("aria-pressed", "true");
         expect(reader.getByText("Retained evidence 151")).toBeVisible();
       } finally { client.clear(); }
     },
@@ -150,7 +163,7 @@ describe("reader filter retention through local URL replacement and route unmoun
       const filters = within(reader.getByRole("group", { name: "Records" }));
       const readerHeading = view.getByRole("heading", { name: "Transcript" });
       const firstKey = router.state.location.key;
-      await user.click(filters.getByRole("button", { name: "Everything" }));
+      await user.click(actionButton(filters, "Everything"));
       context.signal.throwIfAborted();
       expect(reader.getByText("Retained evidence 151")).toBeVisible();
       await user.click(view.getByRole("link", { name: "Open another view of this session" }));
@@ -159,12 +172,12 @@ describe("reader filter retention through local URL replacement and route unmoun
       const secondKey = router.state.location.key;
       expect(secondKey).not.toBe(firstKey);
       expect(view.getByRole("heading", { name: "Transcript" })).toBe(readerHeading);
-      expect(filters.getByRole("button", { name: "Conversation" })).toHaveAttribute("aria-pressed", "true");
+      expect(actionButton(filters, "Conversation")).toHaveAttribute("aria-pressed", "true");
       // Commit a distinct choice in the second entry, rather than relying only
       // on its default, then prove neither POP overwrites the other entry.
-      await user.click(filters.getByRole("button", { name: "Everything" }));
+      await user.click(actionButton(filters, "Everything"));
       context.signal.throwIfAborted();
-      await user.click(filters.getByRole("button", { name: "Conversation" }));
+      await user.click(actionButton(filters, "Conversation"));
       context.signal.throwIfAborted();
 
       await act(async () => { context.signal.throwIfAborted(); await router.navigate(-1); });
@@ -173,7 +186,7 @@ describe("reader filter retention through local URL replacement and route unmoun
       context.signal.throwIfAborted();
       expect(router.state.historyAction).toBe("POP");
       expect(view.getByRole("heading", { name: "Transcript" })).toBe(readerHeading);
-      expect(filters.getByRole("button", { name: "Everything" })).toHaveAttribute("aria-pressed", "true");
+      expect(actionButton(filters, "Everything")).toHaveAttribute("aria-pressed", "true");
       expect(reader.getByText("Retained evidence 151")).toBeVisible();
 
       await act(async () => { context.signal.throwIfAborted(); await router.navigate(1); });
@@ -182,7 +195,7 @@ describe("reader filter retention through local URL replacement and route unmoun
       context.signal.throwIfAborted();
       expect(router.state.historyAction).toBe("POP");
       expect(view.getByRole("heading", { name: "Transcript" })).toBe(readerHeading);
-      expect(filters.getByRole("button", { name: "Conversation" })).toHaveAttribute("aria-pressed", "true");
+      expect(actionButton(filters, "Conversation")).toHaveAttribute("aria-pressed", "true");
       expect(reader.queryByText("Retained evidence 151")).not.toBeInTheDocument();
       expect(state.bodies).toEqual([]);
     } finally { client.clear(); }
