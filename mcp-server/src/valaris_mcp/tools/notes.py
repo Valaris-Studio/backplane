@@ -169,7 +169,7 @@ async def create_note(
     Args:
         title: Note title.
         content: Markdown (HTML, plain text or ProseMirror JSON accepted).
-        pinned: Pin the note to the top.
+        pinned: Pin the note to the top. Agent keys are refused; pinning is a human act.
         board_id: Board UUID if board-scoped.
         card_id: Card to link; needs board_id and a card on this board.
         kind: user_note or a structural kind (plan, review_verdict, ...).
@@ -272,7 +272,7 @@ async def update_note(
         content: Markdown (HTML, text or ProseMirror JSON accepted); required for mode="append".
         mode: "replace", "append" or "section".
         anchor_heading: mode="section" only: heading text without # marks (trimmed, case-insensitive).
-        pinned: Pin state.
+        pinned: Pin state. Agent keys cannot pin, unpin or edit a pinned note.
         board_id: Board UUID if board-scoped.
         card_id: Card to link (on the note's board); omit to keep the link.
         detach_card: Clear the card link; wins over card_id.

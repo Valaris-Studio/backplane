@@ -180,7 +180,9 @@ ROLES & WORKFLOWS:
     a selection filter. Apply the prompt's scope to every candidate read.
     Pickup (Interactive agents/humans): claiming = move_card into the
     column resolved by column_type (never by column NAME) +
-    add_card_participant (see the pickup prompt). Never call
+    add_card_participant (see the pickup prompt). At claim time, call
+    get_card(include_context=True) for the labelled bootstrap snapshot and
+    declared omissions. This is interactive context, not pipeline delivery. Never call
     `next_assignment` interactively.
 
 GETTING STARTED:

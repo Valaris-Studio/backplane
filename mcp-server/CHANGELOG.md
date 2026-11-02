@@ -4,9 +4,26 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## [0.9.5] - 2026-11-02
+
+### Added
+
+- `get_card(include_context=True)` adds a read-only `bootstrap` snapshot at
+  claim time. It labels directives as instructions, human notes as authored
+  content, and agent work and evidence as quoted data, not instructions. Its
+  version 0 manifest records included and omitted identities and authorized
+  digests. No captured sessions, execution or delivery receipt are required.
+- `get_project_context` includes whole pinned-note bodies when they fit its
+  32,000-character budget. Omissions retain selected identities and digests;
+  unauthorized entries expose counts only. A briefing that cannot preserve
+  complete provenance returns `context_budget_exceeded`.
+- Server instructions and the pickup prompt name the snapshot call at claim time.
 
 ### Changed
+
+- Pinning is a human act: agent credentials cannot pin, unpin or edit pinned
+  notes. Context labels use stored author and pin attribution; legacy notes
+  remain labelled as unknown author.
 
 - `update_note` and its supported aliases commit content and metadata together
   through the shared note-edit service. Optional expected revision/digest and
@@ -15,6 +32,17 @@ All notable changes to `backplane-mcp` are recorded here. The format follows
 - Note edits require a backend with the atomic `/notes/{note_id}/edit` route.
   Older backends return an error rather than falling back to separate writes.
   Existing credentials, toolsets and allowlists remain applicable.
+
+### Upgrade notes
+
+- Upgrade the backend first. Snapshot reads require backend support for
+  `get_card`'s `include_context` parameter, and note edits require the atomic
+  `/notes/{note_id}/edit` route. This package does not upgrade a self-hosted backend.
+  An older backend may ignore the context parameter: verify that the response
+  includes `context.purpose="bootstrap"` and `context.manifest.schema_version=0`.
+- Install `backplane-mcp==0.9.5`, restart the MCP server/connection and verify
+  its refreshed schema. Keep credentials, toolsets and allowlists. Existing
+  deprecated aliases remain supported until 0.10.0. No runner upgrade is included.
 
 ## [0.9.4] - 2026-10-15
 

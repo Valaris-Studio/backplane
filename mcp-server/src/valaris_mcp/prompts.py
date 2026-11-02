@@ -112,6 +112,8 @@ Execute these tool calls in order:
 
 5. create_note(workspace_slug="{workspace_slug}", title="Decision Log",
      content="Project decision log initialized.", board_id=<board_id>, pinned=True)
+   If the server refuses the pin (agent keys cannot pin), create the note unpinned
+   and ask a person to pin it.
 
 6. If a git repo is mentioned:
    create_git_repo(workspace_slug="{workspace_slug}", board_id=<board_id>,
@@ -677,6 +679,8 @@ PHASE 4 — DOCUMENT
   create_note(workspace_slug="{workspace_slug}", title="Sprint Plan — <date range>",
     board_id="{board_id}", pinned=True,
     content=<sprint_plan_html>)
+  If the server refuses the pin (agent keys cannot pin), create the note unpinned
+  and ask a person to pin it.
 
 Sprint plan content:
   - Sprint goal (1 sentence)
@@ -733,8 +737,10 @@ rather than guessing by column name.'''}
 PHASE 2 — CONTEXTUALIZE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Gather context for the selected card:
-  1. get_card(workspace_slug="{workspace_slug}", board_id="{board_id}", card_id=<selected_card_id>)
-     — Full card details.
+  1. get_card(workspace_slug="{workspace_slug}", board_id="{board_id}",
+       card_id=<selected_card_id>, include_context=True)
+     — At claim time, read the labelled bootstrap snapshot and its omissions.
+       This interactive snapshot is not a pipeline delivery receipt.
   2. get_definition(workspace_slug="{workspace_slug}", board_id="{board_id}")
      — Project objectives and tech stack.
   3. list_notes(workspace_slug="{workspace_slug}", board_id="{board_id}", summary_only=True)

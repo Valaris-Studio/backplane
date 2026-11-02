@@ -213,6 +213,26 @@ intersection; `enabled_tools` is the hand after it.
 
 ## Upgrading
 
+### Upgrading from 0.9.4
+
+0.9.5 adds labelled context without requiring captured sessions. At claim time,
+call `get_card(include_context=True)` for the `bootstrap` snapshot and its
+version 0 inclusion/omission manifest. Board briefings also include pinned-note
+bodies when they fit the existing 32,000-character budget. Agent credentials
+cannot pin, unpin or edit pinned notes.
+
+Upgrade the backend first: it must support card snapshots through
+`include_context` and atomic note edits through `/notes/{note_id}/edit`.
+Installing this package does not update a self-hosted backend. An older backend
+may ignore the context parameter, so confirm the returned card contains
+`context.purpose="bootstrap"` and `context.manifest.schema_version=0` before
+relying on the snapshot. Unsupported note edits fail without split-write fallback.
+
+Install `backplane-mcp==0.9.5`, then restart the MCP server/connection so the
+client reloads its tool schema and instructions. Preserve credentials, toolsets
+and allowlists. Existing deprecated aliases remain available until 0.10.0.
+This release does not change the runner's generated MCP version pin.
+
 ### Upgrading from 0.9.3
 
 0.9.4 requires MCP SDK `>=1.30.0,<2`, fixing unbounded stateful Streamable HTTP

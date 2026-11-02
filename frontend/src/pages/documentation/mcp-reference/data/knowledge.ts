@@ -25,6 +25,7 @@ export const KNOWLEDGE_TOOL_DOCS: ToolDoc[] = [
       },
     ],
     gotchas: [
+      "Pinned-note bodies are included whole when they fit. omissions preserves selected identities and digests; unauthorized entries contain counts only. If complete provenance cannot fit the 32000-character limit, the briefing returns context_budget_exceeded.",
       "Heavy sections are capped (25 notes, 20 activity rows, definition ~8KB) and the whole briefing has a ~32KB budget. Trimmed responses carry `_..._truncated` or `_size_capped` markers and an `_hint` naming the tool that returns the full data.",
       "The board section is always a compact per-column summary — never full cards. Per-column status counts keep the 8 most common statuses (keys clipped to 60 characters) and fold the rest into `_other`. Use list_cards or search_cards for card detail.",
     ],
@@ -185,7 +186,7 @@ export const KNOWLEDGE_TOOL_DOCS: ToolDoc[] = [
       {
         name: "pinned",
         required: false,
-        description: "Pin the note to the top of the list.",
+        description: "Pin the note to the top of the list. Agent keys are refused; pinning is a human act.",
       },
       {
         name: "board_id",
