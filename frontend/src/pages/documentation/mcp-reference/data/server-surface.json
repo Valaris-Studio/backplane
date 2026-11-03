@@ -141,7 +141,7 @@
       "replacement": "update_note(mode='section')"
     }
   },
-  "listing_bytes": 96698,
+  "listing_bytes": 96912,
   "tool_count": 143,
   "tools": {
     "activate_catalog_skill": {
@@ -495,7 +495,7 @@
         "content": "Markdown (HTML, plain text or ProseMirror JSON accepted).",
         "excerpt_source": "Your session's {workspace_id, session_id, items:[{content_id, sha256}]}.",
         "kind": "user_note or a structural kind (plan, review_verdict, ...).",
-        "pinned": "Pin the note to the top.",
+        "pinned": "Pin the note to the top. Agent keys are refused; pinning is a human act.",
         "return_content": "Echo the stored body in the receipt.",
         "title": "Note title.",
         "workspace_slug": null
@@ -997,11 +997,12 @@
         "readOnlyHint": true
       },
       "category": "cards",
-      "description": "Get one card with full details (participants, markdown description).",
+      "description": "Get one card; include_context adds a labelled bootstrap snapshot at claim time.",
       "kind": "read",
       "params": {
         "board_id": "Board UUID.",
         "card_id": "Card UUID or id prefix.",
+        "include_context": "Include bootstrap context and omissions.",
         "workspace_slug": null
       },
       "title": "Get card"
@@ -1176,7 +1177,7 @@
         "readOnlyHint": true
       },
       "category": "context",
-      "description": "Full board briefing in one call (counts, definition, notes, repos, activity); the recommended first call. See docs.",
+      "description": "Board briefing with pinned bodies and omissions; use get_card(include_context=True) at claim time. See docs.",
       "kind": "composite",
       "params": {
         "board_id": "Board UUID.",
@@ -2436,7 +2437,7 @@
         "expected_revision": "Reject unless the note is still at this history_revision.",
         "mode": "\"replace\", \"append\" or \"section\".",
         "note_id": "Note UUID.",
-        "pinned": "Pin state.",
+        "pinned": "Pin state. Agent keys cannot pin, unpin or edit a pinned note.",
         "return_content": "Echo the stored body in the receipt.",
         "title": null,
         "workspace_slug": null

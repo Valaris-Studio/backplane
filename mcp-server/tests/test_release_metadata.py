@@ -44,9 +44,9 @@ INVOCATION_RECORDING_RELEASE_DATE = "2026-10-04"
 WP1_RELEASE = "0.9.1"
 # Wire-budget headroom: usage guidance moved off tools/list into the docs.
 WIRE_GUIDANCE_RELEASE = "0.9.2"
-# Stateful HTTP session retention is bounded by the fixed SDK dependency floor.
-CURRENT_RELEASE = "0.9.4"
-CURRENT_RELEASE_DATE = "2026-10-15"
+# Interactive context snapshots and human-controlled note promotion.
+CURRENT_RELEASE = "0.9.5"
+CURRENT_RELEASE_DATE = "2026-11-03"
 # One line that restores the pre-0.6.0 full surface for an unchanged config.
 FULL_SURFACE_ONE_LINER = '"VALARIS_MCP_TOOLSETS": "all"'
 

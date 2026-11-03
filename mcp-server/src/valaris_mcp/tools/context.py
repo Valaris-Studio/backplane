@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 from mcp.server.fastmcp import Context
@@ -92,9 +93,35 @@ def _collapse_status_counts(result: dict) -> str:
     return "per-column status counts collapsed — use list_cards/search_cards for card statuses."
 
 
+def _omit_note_body(result: dict, note: dict, reason: str) -> None:
+    omission = {"entity_type": "note", "entity_id": note["id"], "reason": reason}
+    digest = note.get("sha256")
+    body = note.get("content")
+    if digest is None and isinstance(body, str):
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    if digest is not None:
+        omission["sha256"] = digest
+    result.setdefault("omissions", []).append(omission)
+    note.pop("content", None)
+
+
+def _drop_pinned_bodies(result: dict) -> str:
+    notes = [note for note in result.get("notes") or [] if note.get("pinned") and isinstance(note.get("content"), str)]
+    # Preserve as many complete bodies as fit; never slice their markdown.
+    for note in reversed(notes):
+        if len(_render(result)) + _BACKSTOP_MARKER_RESERVE_CHARS <= MAX_PROJECT_CONTEXT_CHARS:
+            break
+        _omit_note_body(result, note, "over_budget")
+    return "pinned bodies omitted whole — use get_note for the full body."
+
+
 def _shrink_list(result: dict, key: str, marker: str, keep: int) -> None:
     items = result.get(key) or []
     if len(items) > keep:
+        if key == "notes":
+            for note in items[keep:]:
+                if note.get("pinned") and isinstance(note.get("content"), str):
+                    _omit_note_body(result, note, "over_budget")
         result[marker] = result.get(marker, 0) + len(items) - keep
         result[key] = items[:keep]
 
@@ -159,13 +186,14 @@ def _clip_leaf(value):
 
 def _clip_leaves(result: dict) -> str:
     for key in list(result):
-        if not key.startswith("_"):
+        if not key.startswith("_") and key not in {"notes", "omissions"}:
             result[key] = _clip_leaf(result[key])
     return "long text and lists clipped — fetch the section's own tool for full values."
 
 
 _BACKSTOP_STEPS = (
     ("status_counts", _collapse_status_counts),
+    ("pinned_bodies", _drop_pinned_bodies),
     ("notes", _shrink_notes),
     ("activity", _shrink_activity),
     ("definition", _omit_definition_content),
@@ -190,7 +218,7 @@ def _enforce_total_budget(result: dict, hints: list[str]) -> None:
 @mcp.tool()
 @handle_api_errors
 async def get_project_context(workspace_slug: str, board_id: str, ctx: Context = None) -> str:
-    """Full board briefing in one call (counts, definition, notes, repos, activity); the recommended first call. See docs.
+    """Board briefing with pinned bodies and omissions; use get_card(include_context=True) at claim time. See docs.
 
     Args:
         board_id: Board UUID.
@@ -200,11 +228,16 @@ async def get_project_context(workspace_slug: str, board_id: str, ctx: Context =
     result = await client.get(f"{client.board(workspace_slug, board_id)}/context")
 
     hints: list[str] = []
+    result.setdefault("omissions", [])
+    for note in result.get("notes") or []:
+        if note.get("pinned") and "content" not in note and not any(
+            omission.get("entity_id") == note["id"] for omission in result["omissions"]
+        ):
+            _omit_note_body(result, note, "unsupported")
 
-    notes, notes_dropped = _cap_list(result.get("notes") or [], MAX_NOTES)
+    _, notes_dropped = _cap_list(result.get("notes") or [], MAX_NOTES)
     if notes_dropped:
-        result["notes"] = notes
-        result["_notes_truncated"] = notes_dropped
+        _shrink_list(result, "notes", "_notes_truncated", MAX_NOTES)
         hints.append(f"{notes_dropped} more note(s) omitted — use list_notes for the full list.")
 
     activity, activity_dropped = _cap_list(result.get("recent_activity") or [], MAX_ACTIVITY)
@@ -224,4 +257,12 @@ async def get_project_context(workspace_slug: str, board_id: str, ctx: Context =
     if hints:
         result["_hint"] = " ".join(hints)
 
-    return _render(result)
+    rendered = _render(result)
+    if len(rendered) > MAX_PROJECT_CONTEXT_CHARS:
+        return _render({
+            "error": True,
+            "error_code": "context_budget_exceeded",
+            "message": "The briefing cannot fit while preserving all selected omission identities and digests.",
+            "_hint": "Use scoped get_card(include_context=True) or get_note reads.",
+        })
+    return rendered

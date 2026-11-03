@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 const ES_MCP_TOOL_CATALOG = {
+  "Include the bootstrap context snapshot (default: false).": "Incluye la instantánea de contexto bootstrap (default: false).",
+  "At claim time, use get_card(include_context=True) for labelled context, authorized record digests and declared omissions. The response names bootstrap and is not a delivery receipt.": "Al tomar una tarjeta, usa get_card(include_context=True) para obtener contexto etiquetado, digests de registros autorizados y omisiones declaradas. La respuesta indica bootstrap y no es un comprobante de entrega.",
+  "Pinned-note bodies are included whole when they fit. omissions preserves selected identities and digests; unauthorized entries contain counts only. If complete provenance cannot fit the 32000-character limit, the briefing returns context_budget_exceeded.": "Los cuerpos de las notas fijadas se incluyen completos cuando caben. omissions conserva las identidades y los digests seleccionados; las entradas unauthorized solo contienen conteos. Si la procedencia completa no cabe en el límite de 32000 caracteres, el resumen devuelve context_budget_exceeded.",
   "Full UUID of the card.": "UUID completo de la tarjeta.",
   "Read the effective completion policy, inheritance, capabilities and incompatibilities.": "Lee la política efectiva de finalización, su herencia, capacidades e incompatibilidades.",
   "Read the current candidate, exact source and merge revisions, and public completion history.": "Lee el candidato actual, las revisiones exactas de origen y fusión y el historial público de finalización.",
@@ -719,7 +722,7 @@ const ES_MCP_TOOL_CATALOG = {
   "The note title.": "Título de la nota.",
   "Note body — send markdown (recommended); HTML, plain text, or ProseMirror JSON are also accepted and normalized.":
     "Contenido; se recomienda markdown. También acepta HTML, texto o ProseMirror.",
-  "Pin the note to the top of the list.": "Fijar la nota arriba.",
+  "Pin the note to the top of the list. Agent keys are refused; pinning is a human act.": "Fijar la nota arriba. Las claves de agente son rechazadas; fijar una nota es un acto humano.",
   "Board UUID to scope the note to a board instead of the workspace.":
     "UUID del tablero para ese alcance.",
   "Card UUID to link the note to; the card must belong to the note's board (pass board_id alongside it — a workspace-level create with card_id is rejected).":

@@ -48,10 +48,16 @@ export const CARDS_WORK_TOOL_DOCS: ToolDoc[] = [
         required: true,
         description: "The card's full UUID, or a unique short id prefix (at least 4 characters).",
       },
+      {
+        name: "include_context",
+        required: false,
+        description: "Include the bootstrap context snapshot (default: false).",
+      },
     ],
     gotchas: [
       "Anything shorter than a full 36-char UUID is treated as a prefix and resolved against this board only.",
       "An ambiguous prefix returns an error listing the candidate cards — retry with more characters.",
+      "At claim time, use get_card(include_context=True) for labelled context, authorized record digests and declared omissions. The response names bootstrap and is not a delivery receipt.",
     ],
     examplePrompt:
       "Using the Backplane MCP, look up card <short-id> on the <board> board in <workspace> with get_card and summarize its status, participants, and description.",

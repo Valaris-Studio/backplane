@@ -85,12 +85,16 @@ async def _resolve_card_id(client, slug: str, board_id: str, card_id: str) -> st
 
 @mcp.tool()
 @handle_api_errors
-async def get_card(workspace_slug: str, board_id: str, card_id: str, ctx: Context) -> str:
-    """Get one card with full details (participants, markdown description).
+async def get_card(
+    workspace_slug: str, board_id: str, card_id: str,
+    include_context: bool = False, ctx: Context = None,
+) -> str:
+    """Get one card; include_context adds a labelled bootstrap snapshot at claim time.
 
     Args:
         board_id: Board UUID.
         card_id: Card UUID or id prefix.
+        include_context: Include bootstrap context and omissions.
     """
     app: AppContext = ctx.request_context.lifespan_context
     client = app.client
@@ -101,6 +105,8 @@ async def get_card(workspace_slug: str, board_id: str, card_id: str, ctx: Contex
         # format=markdown: descriptions are stored as canonical PM JSON
         # (editor P0-3); LLM callers read faithful markdown, not the JSON ballast.
         path = f"{_cards_path(workspace_slug, board_id)}/{card_id}?format=markdown"
+    if include_context:
+        path += "&include_context=true"
     result = await client.get(path)
     return json.dumps(result, indent=2, default=str)
 

@@ -7,7 +7,7 @@ version lines:
 | --- | --- | --- | --- |
 | **Platform** | The web app, API and database you self-host | [0.1.4-preview.3](#platform-v0.1.4-preview.3) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.3) |
 | **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
-| **MCP server** | Connects any MCP client to your boards | [0.9.4](#mcp-server-v0.9.4) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
+| **MCP server** | Connects any MCP client to your boards | [0.9.5](#mcp-server-v0.9.5) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 | **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.2](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg) |
 
 A platform release never republishes the runner or MCP server; each entry
@@ -94,6 +94,39 @@ keeps its own detailed per-tool history in
   and removes cached evidence.
 
 ---
+
+<a id="mcp-server-v0.9.5"></a>
+
+## MCP server 0.9.5 — 2026-11-03
+
+`mcp` · [Package](https://pypi.org/project/backplane-mcp/0.9.5/)
+
+#### Added
+
+- Read labelled bootstrap context at claim time with
+  `get_card(include_context=True)`. The snapshot names its purpose and includes
+  a version 0 manifest of included and omitted records with authorized digests.
+  It works without captured sessions and creates no execution or delivery receipt.
+- Board briefings include pinned-note bodies within the existing 32,000-character
+  budget and explain omitted content. Directives, human notes and quoted agent
+  work remain distinct; legacy notes retain unknown-author labels.
+
+#### Changed
+
+- Note edits commit content and metadata atomically, with optional revision,
+  digest and retry guards. Agent credentials cannot pin, unpin or edit pinned notes.
+
+#### Upgrade notes
+
+- Deploy a matching backend before using the context snapshot and atomic note
+  editing. The backend must support card reads with `include_context` and
+  `/notes/{note_id}/edit`; this package does not update a self-hosted backend.
+  Older backends may ignore the context parameter, so verify that the returned
+  card contains `context.purpose="bootstrap"` and `context.manifest.schema_version=0`.
+  Note editing fails without its endpoint instead of falling back to split writes.
+- Install `backplane-mcp==0.9.5` and restart the MCP server/connection to refresh
+  its schema. Preserve credentials, toolsets and allowlists. Existing deprecated
+  aliases remain available until 0.10.0; no runner upgrade is included.
 
 <a id="platform-v0.1.4-preview.3"></a>
 
