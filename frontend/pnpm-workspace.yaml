@@ -19,12 +19,18 @@ allowBuilds:
 # pnpm-workspace.yaml overrides; keep the two in sync
 # (backend/tests/test_pnpm_config_drift.py pins them equal).
 overrides:
+  # Patch sanitization and redirect handling within the parents' supported ranges.
+  "mermaid>dompurify": 3.4.17
+  "axios>follow-redirects": 1.16.2
   # Keep Mammoth's v1 CLI API while removing the unpatched sprintf-js dependency.
   "mammoth>argparse": 2.0.1
   # Reject inherited trust settings in diagram math (GHSA-238p-pmpm-9mq7).
   "mermaid>katex": 0.18.2
   # Bound indexed source-map section offsets (GHSA-68fv-2mgg-jv7q).
   source-map-js: 1.2.2
+  # Bound globstar part amplification (GHSA-g3hv-75wg-m249). Patched only in 11.x; eslint 9 still
+  # declares ^3 but only uses the Minimatch class, which 11 keeps (lint verified identical).
+  minimatch: 11.0.3
   # Mammoth parses uploaded DOCX XML; older releases have CPU/memory DoS issues.
   "@xmldom/xmldom": 0.8.15
   "@tiptap/core": 3.30.5

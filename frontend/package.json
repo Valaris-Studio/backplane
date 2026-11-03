@@ -40,13 +40,13 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
-    "dompurify": "3.4.16",
+    "dompurify": "3.4.17",
     "gsap": "^3.14.2",
     "highlight.js": "^11.11.1",
     "i18next": "^25.8.17",
     "lucide-react": "^0.468.0",
     "mammoth": "^1.12.1",
-    "markdown-it": "^14.1.2",
+    "markdown-it": "^14.3.3",
     "mermaid": "11.16.1",
     "motion": "^12.23.30",
     "react": "^19.0.0",
@@ -81,7 +81,7 @@
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.0",
     "typescript-eslint": "^8.18.0",
-    "vite": "^6.4.2",
-    "vitest": "^4.1.11"
+    "vite": "^6.4.4",
+    "vitest": "^4.1.12"
   }
 }

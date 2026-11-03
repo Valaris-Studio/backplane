@@ -97,7 +97,7 @@ keeps its own detailed per-tool history in
 
 <a id="mcp-server-v0.9.5"></a>
 
-## MCP server 0.9.5 — 2026-11-02
+## MCP server 0.9.5 — 2026-11-03
 
 `mcp` · [Package](https://pypi.org/project/backplane-mcp/0.9.5/)
 

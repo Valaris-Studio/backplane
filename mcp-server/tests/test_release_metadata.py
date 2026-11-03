@@ -46,7 +46,7 @@ WP1_RELEASE = "0.9.1"
 WIRE_GUIDANCE_RELEASE = "0.9.2"
 # Interactive context snapshots and human-controlled note promotion.
 CURRENT_RELEASE = "0.9.5"
-CURRENT_RELEASE_DATE = "2026-11-02"
+CURRENT_RELEASE_DATE = "2026-11-03"
 # One line that restores the pre-0.6.0 full surface for an unchanged config.
 FULL_SURFACE_ONE_LINER = '"VALARIS_MCP_TOOLSETS": "all"'
 
