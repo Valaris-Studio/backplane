@@ -8,6 +8,7 @@ import { utils, write } from "xlsx";
 import { act, screen, stubReducedMotion, waitFor } from "@/test/test-utils";
 import { renderNavigationRouter } from "@/test/navigation-router";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { findLiteralText } from "@/test/literal-text-queries";
 import { WebSocketProvider } from "@/providers/WebSocketProvider";
 import { resourceKeys } from "@/lib/query-keys";
 import { ResourceList } from "@/features/resources/components/ResourceList";
@@ -156,7 +157,7 @@ function mount(context: TestContext, family: Family, holdPrivateBody = false) {
 type Fixture = ReturnType<typeof mount>;
 
 async function openPrivate(fixture: Fixture) {
-  expect(await screen.findByText(SIBLING_TEXT)).toBeVisible();
+  expect(await findLiteralText(SIBLING_TEXT)).toBeVisible();
   await waitFor(() => expect(fixture.client.isFetching()).toBe(0));
   const siblingBytes = fixture.client.getQueryData(fixture.siblingKey);
   expect(siblingBytes).toBeDefined();
@@ -189,13 +190,13 @@ it.for<{ family: Family; signal: Signal }>([
 ])("erases fetched $family preview bytes on $signal while preserving the sibling workspace", async ({ family, signal }, context) => {
   const fixture = mount(context, family);
   const { socket, siblingBytes } = await openPrivate(fixture);
-  expect(await screen.findByText(PRIVATE_TEXT)).toBeVisible();
+  expect(await findLiteralText(PRIVATE_TEXT)).toBeVisible();
   await settled(fixture);
   expect(fixture.client.getQueryData(fixture.privateKey)).toBeDefined();
   expect(fixture.state.bodyRequests).toEqual([fixture.siblingResource.id, fixture.privateResource.id]);
   fixture.state.authorized = false;
   act(() => signal === "authority close" ? socket.close(4002) : socket.removeViewer());
-  expect(await screen.findByText("Workspace not found")).toBeVisible();
+  expect(await findLiteralText("Workspace not found")).toBeVisible();
   await settled(fixture);
   expect(screen.queryByText(PRIVATE_TEXT)).not.toBeInTheDocument();
   expect(fixture.client.getQueryData(resourceKeys.detail(PRIVATE_SLUG, undefined, fixture.privateResource.id))).toBeUndefined();
@@ -211,7 +212,7 @@ it.for<Family>(["text", "binary"])("does not restore %s preview bytes from a res
   expect(fixture.client.getQueryState(fixture.privateKey)?.fetchStatus).toBe("fetching");
   fixture.state.authorized = false;
   act(() => socket.close(4002));
-  expect(await screen.findByText("Workspace not found")).toBeVisible();
+  expect(await findLiteralText("Workspace not found")).toBeVisible();
   await act(async () => fixture.release());
   await waitFor(() => expect(fixture.state.deliveredBodies).toContain(`/workspace-resource-body/${fixture.privateResource.id}`));
   await settled(fixture);

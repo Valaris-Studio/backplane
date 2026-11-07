@@ -12,21 +12,12 @@ import { ownerSessionKeys } from "@/lib/query-keys";
 import { renderBrowserNavigationRouter } from "@/test/navigation-router";
 import { act, screen, stubReducedMotion, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { findLiteralTextLink as findLink } from "@/test/literal-text-queries";
 import type { OwnerSession } from "@/types/owner-session";
 import { ownerSessionListScope } from "../../api/use-owner-sessions";
 import { useOwnerSessionFilters } from "../../hooks/use-owner-session-filters";
 import type { OwnerSessionReadingOrder } from "../../hooks/use-owner-session-snapshot";
 import { GlobalSessionsPage } from "../GlobalSessionsPage";
-
-// Expected absent rows should not format the whole page on each polling tick.
-// Keep the same global accessible-name/uniqueness query and default wait budget.
-function findLink(name: string) {
-  return waitFor(() => {
-    const link = screen.queryByRole("link", { name });
-    if (!link) throw new Error(`Waiting for link: ${name}`);
-    return link;
-  });
-}
 
 // Observation only: no extra waits, DOM queries, React updates or timer changes.
 // Abort and teardown flush the bounded journal even when the case never resolves.

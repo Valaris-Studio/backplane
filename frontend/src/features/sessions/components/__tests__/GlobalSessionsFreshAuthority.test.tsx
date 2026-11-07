@@ -8,6 +8,7 @@ import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, type TestContext } from "vitest";
 import { act, stubReducedMotion, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
+import { findLiteralTextLink } from "@/test/literal-text-queries";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { NavigationGuardProvider } from "@/providers/NavigationGuardProvider";
 import { ReturnNavigationProvider } from "@/providers/ReturnNavigationProvider";
@@ -229,10 +230,10 @@ afterEach(() => { window.localStorage.clear(); stubReducedMotion(false); });
 
 it.for(["ReturnLink", "browser POP"] as const)("restores two pages with fresh keyset cursors after GC through %s", async (returnKind, context) => {
   const fixture = mount(context, "keyset");
-  await fixture.ui.findByRole("link", { name: "Retained authority session 39" });
+  await findLiteralTextLink("Retained authority session 39", fixture.ui);
   context.signal.throwIfAborted();
   await userEvent.click(fixture.ui.getByRole("button", { name: /load more/i }));
-  const selected = await fixture.ui.findByRole("link", { name: "Retained authority session 79" });
+  const selected = await findLiteralTextLink("Retained authority session 79", fixture.ui);
   await settled(fixture);
   context.signal.throwIfAborted();
   const originalOrder = sessionLinks(fixture).map((link) => link.getAttribute("href"));
@@ -255,7 +256,7 @@ it.for(["ReturnLink", "browser POP"] as const)("restores two pages with fresh ke
   await waitFor(() => expect(fixture.router.state.location.pathname + fixture.router.state.location.search).toBe(fixture.origin));
   context.signal.throwIfAborted();
   expect(window.history.state.idx).toBe(0);
-  const restored = await fixture.ui.findByRole("link", { name: "Retained authority session 79" });
+  const restored = await findLiteralTextLink("Retained authority session 79", fixture.ui);
   await waitFor(() => expect(restored).toHaveFocus());
   await settled(fixture);
   context.signal.throwIfAborted();
@@ -280,7 +281,7 @@ it.for(["Home", "Global"] as const)("%s trusts newer global discovery, then hono
   await waitFor(() => expect(Date.now()).toBeGreaterThan(inventoryTime));
   context.signal.throwIfAborted();
   fixture.releaseDiscovery();
-  await fixture.ui.findByRole("link", { name: knownWorkspaceSession.title! });
+  await findLiteralTextLink(knownWorkspaceSession.title!, fixture.ui);
   await settled(fixture);
   context.signal.throwIfAborted();
   const discoveryTime = discoveryUpdatedAt(fixture);
