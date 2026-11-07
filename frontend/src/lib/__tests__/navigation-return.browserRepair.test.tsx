@@ -43,7 +43,7 @@ describe("return after actual route remount", () => {
     returning = true;
     scrollBy.mockClear();
     await act(async () => { await router.navigate(-1); });
-    const link = screen.getByRole("link", { name: "Follow related note" });
+    const link = await screen.findByRole("link", { name: "Follow related note" });
     expect(screen.getByTestId("origin-panel").id).not.toBe(initialPanel);
     await waitFor(() => expect(link).toHaveFocus());
     expect(scrollBy).toHaveBeenCalledWith({ top: 310, behavior: "instant" });
@@ -54,7 +54,7 @@ describe("return after actual route remount", () => {
     const { router } = mount();
     await userEvent.click(screen.getByRole("link", { name: "Follow related note" }));
     await act(async () => { await router.navigate(-1); });
-    const link = screen.getByRole("link", { name: "Follow related note" });
+    const link = await screen.findByRole("link", { name: "Follow related note" });
     const other = screen.getByRole("button", { name: "Another control" });
     await waitFor(() => expect(link).toHaveFocus());
     act(() => { other.focus(); });
