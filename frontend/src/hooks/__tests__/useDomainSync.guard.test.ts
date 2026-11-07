@@ -37,6 +37,7 @@ const PAYLOAD_READING_ALLOWLIST = new Set([
   "features/notifications/api/use-notifications.ts",
   "features/observer/hooks/useObserverEvents.ts",
   "features/workspaces/components/CostAlertBanner.tsx",
+  "pages/WorkspaceLayout.tsx",
 ]);
 
 const ALLOWED = new Set([

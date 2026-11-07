@@ -6,8 +6,8 @@ counter arithmetic, cascades and constraints that SQLite cannot show.
 
 SESSION_CAPTURE_TEST_DATABASE_URL names a database on a disposable server.
 The tests create synthetic users/workspaces and delete only those; the
-migration test creates its own uniquely named database on that server, which
-goes with the server. Run this file serially (no -n): the purge it drives
+migration test creates and removes its own receipted scratch database.
+Run this file serially (no -n): the purge it drives
 processes every pending deletion in the database."""
 
 import asyncio
@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -649,134 +650,213 @@ async def _insert_previous_release_rows(connection, owner, workspace, installati
     )
 
 
-async def _scratch_database() -> str:
-    """A fresh database on the same disposable server; it goes with it."""
-    server = make_url(database_url())
-    name = "rc02_migration_" + uuid.uuid4().hex[:12]
-    admin = create_async_engine(server, isolation_level="AUTOCOMMIT")
-    async with admin.connect() as connection:
-        await connection.execute(text(f'CREATE DATABASE "{name}"'))
-    await admin.dispose()
-    return server.set(database=name).render_as_string(hide_password=False)
+def _record_scratch(path, value):
+    with path.open("x") as receipt:
+        json.dump(value, receipt, indent=2)
+        receipt.write("\n")
+        receipt.flush()
+        os.fsync(receipt.fileno())
+    descriptor = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
-async def test_migration_119_round_trips_on_postgresql():
+async def _scratch_server_identity(connection):
+    result = await connection.execute(text(
+        "SELECT current_user AS role, current_database() AS database, "
+        "d.oid::bigint AS database_oid, inet_server_addr()::text AS address, "
+        "inet_server_port() AS port, current_setting('server_version_num') AS version_num "
+        "FROM pg_database d WHERE d.datname=current_database()"
+    ))
+    return dict(result.mappings().one())
+
+
+async def _scratch_identity(connection, name):
+    result = await connection.execute(text(
+        "SELECT oid::bigint AS oid, pg_get_userbyid(datdba) AS owner "
+        "FROM pg_database WHERE datname=:name"
+    ), {"name": name})
+    row = result.mappings().one_or_none()
+    return None if row is None else dict(row)
+
+
+# Each receipted scratch-database owner has its own prefix, so reconciliation can
+# attribute a retained database to the test module that created it.
+SCRATCH_PREFIXES = {"rc02_migration_", "ctx_receipts_migration_", "uxc_ssi_", "uxc_cb_"}
+
+
+@asynccontextmanager
+async def _scratch_database(server_url, evidence_directory, *, prefix="rc02_migration_"):
+    """Create once; retain uncertain ownership instead of adopting or forcing cleanup."""
+    if prefix not in SCRATCH_PREFIXES:
+        raise ValueError("Unknown migration fixture prefix")
+    server = make_url(server_url)
+    name = prefix + uuid.uuid4().hex[:12]
+    receipts = evidence_directory / name
+    receipts.mkdir(mode=0o700)
+    admin = create_async_engine(server, isolation_level="AUTOCOMMIT", hide_parameters=True)
+    try:
+        async with admin.connect() as connection:
+            identity = await _scratch_server_identity(connection)
+            if await _scratch_identity(connection, name) is not None:
+                raise RuntimeError("Scratch database already exists; never adopt")
+            _record_scratch(receipts / "create-intent.json", {
+                "server": identity, "name": name, "prior_absent": True,
+            })
+            await connection.execute(text(f'CREATE DATABASE "{name}"'))
+            owned = await _scratch_identity(connection, name)
+            if owned is None or owned["owner"] != identity["role"]:
+                raise RuntimeError("Scratch database identity could not be recorded")
+            _record_scratch(receipts / "owner.json", {
+                "server": identity, "name": name, **owned,
+            })
+        # Cleanup begins only after durable ownership. A failed CREATE/receipt
+        # leaves evidence for reconciliation without guessing which DB we own.
+        try:
+            yield server.set(database=name).render_as_string(hide_password=False)
+        finally:
+            async with admin.connect() as connection:
+                if (await _scratch_server_identity(connection) != identity
+                        or await _scratch_identity(connection, name) != owned):
+                    raise RuntimeError("Scratch database identity changed; retained")
+                clients = await connection.execute(text(
+                    "SELECT count(*) AS clients FROM pg_stat_activity "
+                    "WHERE datname=:name AND backend_type='client backend'"
+                ), {"name": name})
+                if clients.scalar_one():
+                    raise RuntimeError("Scratch database has active clients; retained")
+                _record_scratch(receipts / "drop-intent.json", {
+                    "server": identity, "name": name, **owned, "no_clients": True,
+                })
+                await connection.execute(text(f'DROP DATABASE "{name}"'))
+                if await _scratch_identity(connection, name) is not None:
+                    raise RuntimeError("Scratch database still exists after DROP")
+                _record_scratch(receipts / "drop-result.json", {
+                    "name": name, "oid": owned["oid"], "dropped": True, "force": False,
+                })
+    finally:
+        await admin.dispose()
+
+
+async def test_migration_119_round_trips_on_postgresql(tmp_path):
     """Upgrade over the previous release's rows, downgrade (rich falls back to
     full everywhere the previous release reads it), upgrade again."""
-    scratch = await _scratch_database()
-    engine = create_async_engine(scratch)
-    owner, workspace, installation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    sessions = [uuid.uuid4() for _ in CAPTURE_LEVELS_ROLLBACK]
-    try:
-        _alembic(scratch, "upgrade", "118")
-        async with engine.begin() as connection:
-            await _insert_previous_release_rows(
-                connection, owner, workspace, installation
-            )
-        _alembic(scratch, "upgrade", "119")
-        async with engine.begin() as connection:
-            row = (
-                await connection.execute(
-                    text(
-                        "SELECT content_level, rich_since FROM companion_project_mappings"
-                    )
+    async with _scratch_database(database_url(), tmp_path) as scratch:
+        engine = create_async_engine(scratch)
+        owner, workspace, installation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        sessions = [uuid.uuid4() for _ in CAPTURE_LEVELS_ROLLBACK]
+        try:
+            _alembic(scratch, "upgrade", "118")
+            async with engine.begin() as connection:
+                await _insert_previous_release_rows(
+                    connection, owner, workspace, installation
                 )
-            ).one()
-            assert tuple(row) == ("full", None)
-            assert (
-                await connection.scalar(
-                    text("SELECT content_bytes FROM companion_installations")
-                )
-                == 0
-            )
-            types = dict(
-                (
+            _alembic(scratch, "upgrade", "119")
+            async with engine.begin() as connection:
+                row = (
                     await connection.execute(
                         text(
-                            "SELECT column_name, data_type FROM "
-                            "information_schema.columns "
-                            "WHERE table_name = 'agent_session_contents'"
+                            "SELECT content_level, rich_since FROM companion_project_mappings"
                         )
                     )
-                ).all()
-            )
-            assert types["content_key"] == "character"
-            assert types["source_order"] == "bigint"
-            await _seed_rich(connection, owner, workspace, installation, sessions)
-        _alembic(scratch, "downgrade", "118")
-        async with engine.begin() as connection:
-            await _assert_previous_release_reads_it(connection, sessions)
-        _alembic(scratch, "upgrade", "head")
-    finally:
-        await engine.dispose()
+                ).one()
+                assert tuple(row) == ("full", None)
+                assert (
+                    await connection.scalar(
+                        text("SELECT content_bytes FROM companion_installations")
+                    )
+                    == 0
+                )
+                types = dict(
+                    (
+                        await connection.execute(
+                            text(
+                                "SELECT column_name, data_type FROM "
+                                "information_schema.columns "
+                                "WHERE table_name = 'agent_session_contents'"
+                            )
+                        )
+                    ).all()
+                )
+                assert types["content_key"] == "character"
+                assert types["source_order"] == "bigint"
+                await _seed_rich(connection, owner, workspace, installation, sessions)
+            _alembic(scratch, "downgrade", "118")
+            async with engine.begin() as connection:
+                await _assert_previous_release_reads_it(connection, sessions)
+            _alembic(scratch, "upgrade", "head")
+        finally:
+            await engine.dispose()
 
 
-async def test_forget_rich_readies_the_database_for_the_previous_release():
+async def test_forget_rich_readies_the_database_for_the_previous_release(tmp_path):
     """The rollback of code alone (schema stays at 119): the entrypoint
     rewrites what the previous release cannot read, keeping every table."""
-    scratch = await _scratch_database()
-    engine = create_async_engine(scratch)
-    owner, workspace, installation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    sessions = [uuid.uuid4() for _ in CAPTURE_LEVELS_ROLLBACK]
-    try:
-        _alembic(scratch, "upgrade", "119")
-        async with engine.begin() as connection:
-            await _insert_previous_release_rows(
-                connection, owner, workspace, installation
-            )
-            await _seed_rich(connection, owner, workspace, installation, sessions)
-            await connection.execute(
-                text(
-                    "INSERT INTO agent_session_content_deletions (id, "
-                    "storage_backend, storage_prefix, requested_at, next_attempt_at) "
-                    "VALUES (:id, 'local', 'session-content/v1/kept/', now(), now())"
-                ),
-                {"id": uuid.uuid4()},
-            )
-        backend = Path(__file__).resolve().parents[1]
-        result = subprocess.run(
-            [sys.executable, "-m", "scripts.forget_rich", "--apply"],
-            cwd=backend,
-            env={**os.environ, "DATABASE_URL": scratch},
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        assert result.returncode == 0, result.stderr[-4000:]
-        async with engine.begin() as connection:
-            await _assert_previous_release_reads_it(connection, sessions)
-            # The previous image's `alembic upgrade head` must find a head it knows.
-            assert (
-                await connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "118"
-            )
-            assert (
-                await connection.scalar(
-                    text("SELECT to_regclass('agent_session_contents')::text")
+    async with _scratch_database(database_url(), tmp_path) as scratch:
+        engine = create_async_engine(scratch)
+        owner, workspace, installation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        sessions = [uuid.uuid4() for _ in CAPTURE_LEVELS_ROLLBACK]
+        try:
+            _alembic(scratch, "upgrade", "119")
+            async with engine.begin() as connection:
+                await _insert_previous_release_rows(
+                    connection, owner, workspace, installation
                 )
-                == "agent_session_contents"
-            )
-        # Rolling forward runs 119 again over the objects it kept.
-        _alembic(scratch, "upgrade", "119")
-        async with engine.begin() as connection:
-            assert (
-                await connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "119"
-            )
-            assert (
-                await connection.scalar(
-                    text("SELECT content_level FROM agent_session_captures")
+                await _seed_rich(connection, owner, workspace, installation, sessions)
+                await connection.execute(
+                    text(
+                        "INSERT INTO agent_session_content_deletions (id, "
+                        "storage_backend, storage_prefix, requested_at, next_attempt_at) "
+                        "VALUES (:id, 'local', 'session-content/v1/kept/', now(), now())"
+                    ),
+                    {"id": uuid.uuid4()},
                 )
-                == "full"
+            backend = Path(__file__).resolve().parents[1]
+            result = subprocess.run(
+                [sys.executable, "-m", "scripts.forget_rich", "--apply"],
+                cwd=backend,
+                env={**os.environ, "DATABASE_URL": scratch},
+                capture_output=True,
+                text=True,
+                timeout=300,
             )
-            assert await connection.scalar(
-                text("SELECT count(*) FROM agent_sessions")
-            ) == len(sessions)
-            assert (
-                await connection.scalar(
-                    text("SELECT storage_prefix FROM agent_session_content_deletions")
+            assert result.returncode == 0, result.stderr[-4000:]
+            async with engine.begin() as connection:
+                await _assert_previous_release_reads_it(connection, sessions)
+                # The previous image's `alembic upgrade head` must find a head it knows.
+                assert (
+                    await connection.scalar(text("SELECT version_num FROM alembic_version"))
+                    == "118"
                 )
-                == "session-content/v1/kept/"
-            )
-    finally:
-        await engine.dispose()
+                assert (
+                    await connection.scalar(
+                        text("SELECT to_regclass('agent_session_contents')::text")
+                    )
+                    == "agent_session_contents"
+                )
+            # Rolling forward runs 119 again over the objects it kept.
+            _alembic(scratch, "upgrade", "119")
+            async with engine.begin() as connection:
+                assert (
+                    await connection.scalar(text("SELECT version_num FROM alembic_version"))
+                    == "119"
+                )
+                assert (
+                    await connection.scalar(
+                        text("SELECT content_level FROM agent_session_captures")
+                    )
+                    == "full"
+                )
+                assert await connection.scalar(
+                    text("SELECT count(*) FROM agent_sessions")
+                ) == len(sessions)
+                assert (
+                    await connection.scalar(
+                        text("SELECT storage_prefix FROM agent_session_content_deletions")
+                    )
+                    == "session-content/v1/kept/"
+                )
+        finally:
+            await engine.dispose()

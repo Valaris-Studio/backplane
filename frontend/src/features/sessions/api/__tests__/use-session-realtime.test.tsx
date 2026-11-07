@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { ReactNode } from "react";
-import { QueryClient, onlineManager } from "@tanstack/react-query";
+import { QueryClient, QueryObserver, onlineManager } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
 import { act, renderWithProviders, screen, waitFor } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
@@ -399,5 +399,36 @@ describe("Session evidence before cold-start identity resolves", () => {
     expect(target.client.getQueryState(sessionKeys.onCard(TARGET_SLUG, BOARD_ID, CARD_ID))?.isInvalidated).toBe(false);
     expect(target.client.getQueryState(sessionKeys.onNote(TARGET_SLUG, NOTE_ID))?.isInvalidated).toBe(false);
     expectImmutableEvidenceUnchanged(target.client);
+  });
+});
+
+
+describe("Retained session searches", () => {
+  it("keeps an observed search stable across live invalidation and reconnect while refreshing ordinary evidence", async () => {
+    const state = serveEvidence();
+    const view = renderEvidence(SLUG);
+    await waitFor(() => expect(screen.getByLabelText("Source relationships")).toHaveTextContent("1"));
+    let scans = 0;
+    const search = new QueryObserver(view.client, {
+      queryKey: [...sessionKeys.detail(SLUG, SESSION_ID), "search", { q: "private retained query" }],
+      queryFn: async () => { scans += 1; return { items: [], complete: true }; },
+      staleTime: Infinity,
+    });
+    const unsubscribe = search.subscribe(() => {});
+    try {
+      await waitFor(() => expect(scans).toBe(1));
+      state.linked = false;
+      await emitBurst(view.connection, { owner_id: ME, session_id: SESSION_ID });
+      await waitFor(() => expect(screen.getByLabelText("Source relationships")).toHaveTextContent("0"));
+      expect(scans).toBe(1);
+
+      state.linked = true;
+      view.status("reconnecting");
+      view.status("connected");
+      await waitFor(() => expect(screen.getByLabelText("Source relationships")).toHaveTextContent("1"));
+      expect(scans).toBe(1);
+    } finally {
+      unsubscribe();
+    }
   });
 });

@@ -2048,6 +2048,7 @@ const ES_ENVIRONMENT_VARIABLES = {
   "Default": "Predeterminado",
   "Purpose": "Propósito",
     "Optional literal password override for DATABASE_URL. Encoding is automatic. Production Compose supplies it from POSTGRES_PASSWORD.": "Contraseña literal opcional que reemplaza la de DATABASE_URL. La codificación es automática. Compose de producción la toma de POSTGRES_PASSWORD.",
+  "Optional positive integer in MB for PostgreSQL work_mem per sort or hash operation. Unset preserves the server default. Applies to application and Alembic connections.": "Entero positivo opcional en MB para work_mem de PostgreSQL por operación de ordenación o hash. Si no se define, se conserva el valor predeterminado del servidor. Se aplica a las conexiones de la aplicación y de Alembic.",
   "Async SQLAlchemy DSN. Deployed environments point it at their Postgres instance. Must use the asyncpg driver.": "DSN asíncrono de SQLAlchemy. En entornos desplegados debe apuntar a la instancia de Postgres y usar el driver asyncpg.",
   "Gates dev-mode behaviors (swagger exposure, dev-mode auth fallback). Set to ": "Controla Swagger y auth de dev; define ",
   " in deployed environments.": " en entornos desplegados.",

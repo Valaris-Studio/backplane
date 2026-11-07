@@ -79,7 +79,7 @@ describe("My sessions — loading, empty and error scaffolding", () => {
     await waitFor(() => expect(attempts).toBeGreaterThanOrEqual(2));
   });
 
-  it("tells an agent key it cannot read captured sessions", async () => {
+  it("explains denied access without assuming the credential type and offers a deliberate retry", async () => {
     stubAuthModes(true);
     server.use(
       http.get(`/api/workspaces/${SLUG}/sessions`, () =>
@@ -87,6 +87,8 @@ describe("My sessions — loading, empty and error scaffolding", () => {
       ),
     );
     renderAt(`/${SLUG}/sessions`);
-    expect(await screen.findByText("Agent keys can't read captured sessions.")).toBeInTheDocument();
+    expect(await screen.findByText("You don't have access to this session information right now.")).toBeInTheDocument();
+    expect(screen.queryByText("Agent keys can't read captured sessions.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
   });
 });

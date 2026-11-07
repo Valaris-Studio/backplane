@@ -3,10 +3,11 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderWithProviders, screen, userEvent, within } from "@/test/test-utils";
+import { http, HttpResponse, server } from "@/test/msw-server";
 import type { RhythmBucket, SessionRhythm } from "@/types/agent-session";
 import { SLUG, makeSession } from "../../__tests__/fixtures";
 import { setPromptsHidden } from "../../hooks/use-hide-prompts";
-import { RhythmView } from "../RhythmStrip";
+import { RhythmStrip, RhythmView } from "../RhythmStrip";
 
 const START = Date.parse("2026-10-05T14:00:00Z");
 const MINUTE = 60_000;
@@ -52,9 +53,41 @@ function renderStrip(data: SessionRhythm = rhythm(), onJump = vi.fn()) {
 
 afterEach(() => {
   act(() => setPromptsHidden(false));
+  vi.restoreAllMocks();
 });
 
 describe("Session rhythm", () => {
+  it.each([
+    { reducedMotion: true, behavior: "instant" },
+    { reducedMotion: false, behavior: "smooth" },
+  ] as const)("jumps to the active turn with $behavior scrolling and no implicit focus scroll", async ({ reducedMotion, behavior }) => {
+    const matchMedia = window.matchMedia;
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      ...matchMedia(query), matches: query === "(prefers-reduced-motion: reduce)" && reducedMotion,
+    }));
+    server.use(http.get(`/api/workspaces/${SLUG}/sessions/${SESSION.id}/rhythm`, () => HttpResponse.json(rhythm())));
+    renderWithProviders(
+      <>
+        <RhythmStrip slug={SLUG} session={SESSION} />
+        <div data-turn data-started={new Date(START).toISOString()} tabIndex={-1}>Earlier turn</div>
+        <div data-turn data-started={new Date(START + 2 * MINUTE).toISOString()} tabIndex={-1}>Active turn</div>
+        <div data-turn data-started={new Date(START + 5 * MINUTE).toISOString()} tabIndex={-1}>Later turn</div>
+      </>,
+    );
+    const turn = screen.getByText("Active turn");
+    const focus = vi.spyOn(turn, "focus");
+    const scrollIntoView = vi.fn();
+    turn.scrollIntoView = scrollIntoView;
+    const strip = await screen.findByRole("group", { name: /Activity over time/ });
+    act(() => within(strip).getAllByRole("button")[0]!.focus());
+
+    await userEvent.keyboard("{Enter}");
+
+    expect(turn).toHaveFocus();
+    expect.soft(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: "start", behavior });
+    expect.soft(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
+
   it("states wall time once, and that subagent time overlaps", () => {
     renderStrip();
     const region = screen.getByRole("region", { name: "Session rhythm" });

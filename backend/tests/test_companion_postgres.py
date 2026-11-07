@@ -668,6 +668,46 @@ async def test_concurrent_agent_key_rotations_leave_one_live_key(pg):
     assert len(live) == 1
 
 
+async def test_mints_racing_a_capture_only_restriction_leave_no_key(pg):
+    """Whichever order the row locks grant, a restricted installation ends
+    with no agent key: an earlier mint's key is deleted by the restriction, a
+    later mint re-reads the scope under the lock and is refused."""
+    async with pg["factory"].begin() as db:
+        installation_id = await db.scalar(
+            select(CompanionInstallation.id).where(
+                CompanionInstallation.owner_id == pg["owner_id"]
+            )
+        )
+
+    async def mint():
+        return await pg["client"].post("/api/companion/agent-key", headers=pg["headers"])
+
+    async def restrict():
+        async with pg["factory"].begin() as db:
+            await CompanionService(db).restrict_to_capture(
+                pg["owner_id"], installation_id
+            )
+
+    results = await asyncio.wait_for(
+        asyncio.gather(mint(), mint(), restrict(), mint(), mint()), 30
+    )
+    for response in [result for result in results if result is not None]:
+        assert response.status_code in {201, 403, 409}, response.text
+        if response.status_code == 403:
+            assert response.json()["error_code"] == "capture_only_token"
+    async with pg["factory"].begin() as db:
+        scope = await db.scalar(
+            select(CompanionInstallation.token_scope).where(
+                CompanionInstallation.id == installation_id
+            )
+        )
+        keys = (
+            await db.execute(select(ApiKey.id).where(ApiKey.installation_id == installation_id))
+        ).scalars().all()
+    assert scope == "capture_only"
+    assert keys == []
+
+
 async def test_calls_page_groups_on_postgresql(pg):
     """The calls query groups on a computed anchor; PostgreSQL rejects a GROUP
     BY whose expression carries bind parameters that differ from the SELECT's."""

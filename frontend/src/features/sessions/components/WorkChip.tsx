@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, Pencil } from "lucide-react";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { cn } from "@/lib/utils";
 import type { LinkProvenance, LinkRelation } from "@/types/agent-session";
 import { useWorkTarget, type WorkEntityRef } from "../api/use-work-title";
@@ -66,7 +66,7 @@ export function WorkChip({ work, className }: WorkChipProps) {
   }
 
   return (
-    <Link
+    <ContextLink
       to={href}
       aria-label={accessibleName}
       title={correlated ? t("sessions.work.correlatedHint") : title}
@@ -75,6 +75,6 @@ export function WorkChip({ work, className }: WorkChipProps) {
       onClick={(event) => event.stopPropagation()}
     >
       {chip}
-    </Link>
+    </ContextLink>
   );
 }

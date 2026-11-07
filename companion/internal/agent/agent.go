@@ -197,6 +197,17 @@ type Agent interface {
 	ToolOutput(event string) []string
 }
 
+// CaptureKeySource names an inbox item by what it observed, so a re-delivered
+// observation keeps its capture id. Without it the inbox file name is the key.
+type CaptureKeySource interface {
+	CaptureKey(Observation, map[string]any) (string, bool)
+}
+
+// EventProjector keeps only an agent's allowlisted members of its normalized events.
+type EventProjector interface {
+	ProjectEvents(Observation, map[string]any, []json.RawMessage) ([]json.RawMessage, error)
+}
+
 // UsageRead asks for the token usage an agent's local transcript recorded
 // since the previous read, after the hook event Event.
 type UsageRead struct {

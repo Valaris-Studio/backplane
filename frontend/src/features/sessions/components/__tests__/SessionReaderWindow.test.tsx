@@ -360,7 +360,7 @@ describe("bounded session reader navigation", () => {
     await screen.findByRole("heading", { name: "Related shared card" });
     expect(screen.queryByRole("heading", { name: "Transcript" })).not.toBeInTheDocument();
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(sharedWork);
-    expect(window.history.state.usr).toEqual({ bpReturn: { v: 1, originKey, originIdx: 0 } });
+    expect(window.history.state.usr).toEqual({ bpReturn: { v: 1, originKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i), originIdx: 0 } });
 
     let release!: () => void;
     const ready = new Promise<void>((resolve) => { release = resolve; });
@@ -684,7 +684,13 @@ describe("selected evidence is independent from the current window", () => {
     try {
       await user.dblClick(save);
       await waitFor(() => expect(state.metadata.length).toBe(before + 1));
-      expect(state.writes).toEqual([]); expect(save).toBeDisabled();
+      expect(state.writes).toEqual([]);
+      expect(save).toHaveAttribute("aria-disabled", "true");
+      expect(save).not.toBeDisabled();
+      expect(save).toHaveFocus();
+      await user.keyboard("{Enter} ");
+      expect(state.metadata).toHaveLength(before + 1);
+      expect(state.writes).toEqual([]);
       release(HttpResponse.json({ items: [{ ...state.items[1], preview: null }], unavailable_ids: [] }));
       await screen.findByRole("link", { name: "Open note" });
       expect(state.writes).toHaveLength(1);

@@ -177,6 +177,33 @@ list_executions(workspace_slug="your-workspace", limit=1)`}
       </ul>
       <p><a href="../documentation/mcp-toolsets#discovery">Catalog recovery and remote operator setup</a></p>
 
+      <h2 id="pickup">Pick up an existing card</h2>
+      <p>
+        Project context works without captured sessions. Companion is optional.
+        After choosing an existing card, read the board briefing and then
+        request its card snapshot with include_context=True.
+      </p>
+      <CodeExample language="python" title="Read the selected card's context">
+        {`get_project_context(workspace_slug="your-workspace", board_id="existing-returned-board-id")
+get_card(workspace_slug="your-workspace", board_id="existing-returned-board-id", card_id="selected-card-id", include_context=True)`}
+      </CodeExample>
+      <p>
+        Use MCP 0.9.5 with a backend that supports interactive snapshots. The
+        card response names bootstrap as its purpose and includes manifest
+        schema version 0. Upgrade the backend first if that context is unavailable.
+      </p>
+      <p>
+        Read the declared omissions and truncation hints. Fetch the governing
+        notes or definitions needed for this task with get_note or get_definition
+        before relying on the snapshot; do not infer omitted content.
+      </p>
+      <p>
+        Blocks label directives as instruction, human notes as content with
+        their author, and agent working notes and evidence as quoted data, not
+        instruction. Unknown authors remain unknown, including on legacy pinned
+        notes; pinning alone does not verify authorship.
+      </p>
+
       <h2 id="prompts">Use the exact prompt identifiers</h2>
       <p>
         The MCP server currently registers ten prompts:

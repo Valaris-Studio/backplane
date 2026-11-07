@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { onlineManager } from "@tanstack/react-query";
+import { useState } from "react";
 import { act, createTestQueryClient, renderWithProviders, screen, userEvent, waitFor, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import type { AgentSession, LinkedSessionList } from "@/types/agent-session";
@@ -105,6 +107,14 @@ function renderCard() {
   const queryClient = createTestQueryClient();
   renderWithProviders(<CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />, { queryClient });
   return queryClient;
+}
+
+function RequestedCard() {
+  const [request, setRequest] = useState(0);
+  return <>
+    <button onClick={() => setRequest((value) => value + 1)}>Show related sessions</button>
+    <CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} jumpRequest={request} />
+  </>;
 }
 
 const THREE = listOf([
@@ -216,6 +226,163 @@ describe("Your sessions on this card", () => {
     expect(within(section).getByText("Couldn't load your sessions here.")).toBeInTheDocument();
     await userEvent.click(within(section).getByRole("button", { name: "Try again" }));
     expect(await within(section).findByTestId("linked-sessions-summary")).toHaveTextContent("3 sessions");
+  });
+
+  it("keeps an offline retry focused until the same request settles after reconnect", async () => {
+    serve({ list: THREE });
+    let attempts = 0;
+    server.use(http.get(CARD_SESSIONS, () => {
+      attempts += 1;
+      return HttpResponse.json({ detail: "Unavailable" }, { status: 503 });
+    }));
+    const queryClient = renderCard();
+    try {
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      act(() => onlineManager.setOnline(false));
+      retry.focus();
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(queryClient.getQueryCache().getAll()
+        .some((query) => query.state.fetchStatus === "paused")).toBe(true));
+      expect(retry).toHaveFocus();
+      expect(retry).toHaveAttribute("aria-busy", "true");
+      expect(retry).toHaveAttribute("aria-disabled", "true");
+      expect(retry).not.toBeDisabled();
+      await userEvent.keyboard("{Enter} ");
+      expect(attempts).toBe(1);
+      act(() => onlineManager.setOnline(true));
+      await waitFor(() => expect(attempts).toBe(2));
+      await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+      expect(await screen.findByRole("button", { name: "Try again" })).toBe(retry);
+      expect(retry).toHaveFocus();
+      expect(retry).not.toHaveAttribute("aria-busy", "true");
+    } finally {
+      act(() => onlineManager.setOnline(true));
+      await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+      queryClient.clear();
+    }
+  });
+
+  it.each([false, true])("preserves a focused first-load error through background refetch (requested=%s)", async (requested) => {
+    serve({ list: THREE });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let attempts = 0;
+    server.use(http.get(CARD_SESSIONS, async () => {
+      if (++attempts > 1) await pending;
+      return HttpResponse.json({ detail: "Unavailable" }, { status: 503 });
+    }));
+    const client = createTestQueryClient();
+    renderWithProviders(requested ? <RequestedCard /> : <CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />, { queryClient: client });
+    try {
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      if (requested) await userEvent.click(screen.getByRole("button", { name: "Show related sessions" }));
+      retry.focus();
+      act(() => { void client.invalidateQueries(); });
+      await waitFor(() => expect(attempts).toBe(2));
+      expect(screen.getByRole("button", { name: "Try again" })).toBe(retry);
+      expect(retry).toHaveFocus();
+      await userEvent.keyboard("{Enter} ");
+      expect(attempts).toBe(2);
+      release();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      expect(retry).toHaveFocus();
+    } finally {
+      release();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      client.clear();
+    }
+  });
+
+  it.each([false, true])("keeps a neutral retry focused after access is denied (requested=%s)", async (requested) => {
+    serve({ list: THREE });
+    let attempts = 0;
+    server.use(http.get(CARD_SESSIONS, () => HttpResponse.json(
+      { detail: "Unavailable" }, { status: ++attempts === 1 ? 503 : 403 },
+    )));
+    const client = createTestQueryClient();
+    renderWithProviders(requested ? <RequestedCard /> : <CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />, { queryClient: client });
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    if (requested) await userEvent.click(screen.getByRole("button", { name: "Show related sessions" }));
+    await userEvent.click(retry);
+    await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.getByRole("button", { name: "Try again" })).toBe(retry);
+    expect(retry).toHaveFocus();
+    expect(screen.queryByTestId("linked-sessions-summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your sessions here.")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("preserves denial while a refetch is held (requested=%s)", async (requested) => {
+    serve({});
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let attempts = 0;
+    server.use(http.get(CARD_SESSIONS, async () => {
+      if (++attempts > 1) await pending;
+      return HttpResponse.json({ detail: "Denied" }, { status: 403 });
+    }));
+    const client = createTestQueryClient();
+    renderWithProviders(requested ? <RequestedCard /> : <CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />, { queryClient: client });
+    try {
+      await waitFor(() => expect(attempts).toBe(1));
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      expect(screen.queryByRole("region")).not.toBeInTheDocument();
+      let retry: HTMLElement | undefined;
+      if (requested) {
+        await userEvent.click(screen.getByRole("button", { name: "Show related sessions" }));
+        retry = screen.getByRole("button", { name: "Try again" });
+        await userEvent.click(retry);
+      } else {
+        act(() => { void client.invalidateQueries(); });
+      }
+      await waitFor(() => expect(attempts).toBe(2));
+      if (requested) {
+        await waitFor(() => expect(retry).toHaveAttribute("aria-busy", "true"));
+        expect(retry).toHaveFocus();
+        expect(screen.getByText("Your sessions are unavailable")).toBeInTheDocument();
+        expect(screen.queryByText("Couldn't load your sessions here.")).not.toBeInTheDocument();
+        expect(screen.queryByText(/Only your own sessions are listed/)).not.toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("region")).not.toBeInTheDocument();
+      }
+    } finally {
+      release();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      client.clear();
+    }
+  });
+
+  it("moves focus to the section heading when a focused retry recovers", async () => {
+    serve({ list: THREE });
+    let attempts = 0;
+    server.use(http.get(CARD_SESSIONS, () => ++attempts === 1
+      ? HttpResponse.json({ detail: "Unavailable" }, { status: 503 })
+      : HttpResponse.json(THREE)));
+    renderCard();
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await screen.findByTestId("linked-sessions-summary");
+    expect(screen.getByRole("heading", { name: "Your sessions on this card" })).toHaveFocus();
+  });
+
+  it("does not carry a focused denied section into a different card", async () => {
+    serve({ list: THREE });
+    let attempts = 0;
+    server.use(
+      http.get(CARD_SESSIONS, () => HttpResponse.json({ detail: "Unavailable" }, { status: ++attempts === 1 ? 503 : 403 })),
+      http.get(`/api/workspaces/${SLUG}/boards/${BOARD}/cards/other-card/sessions`, () => HttpResponse.json({ detail: "Denied" }, { status: 403 })),
+    );
+    const client = createTestQueryClient();
+    const view = renderWithProviders(<CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />, { queryClient: client });
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus();
+    view.rerender(<CardSessionsSection slug={SLUG} boardId={BOARD} cardId="other-card" />);
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.queryByRole("region", { name: "Your sessions on this card" })).not.toBeInTheDocument();
+    view.rerender(<CardSessionsSection slug={SLUG} boardId={BOARD} cardId={CARD} />);
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.queryByRole("region", { name: "Your sessions on this card" })).not.toBeInTheDocument();
   });
 
   it("blurs session titles in presenter mode", async () => {

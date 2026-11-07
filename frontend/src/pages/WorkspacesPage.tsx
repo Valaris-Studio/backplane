@@ -32,11 +32,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fadeInUp, scaleIn, staggerChildren } from "@/lib/animations";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { OwnerSessionOverview } from "@/features/sessions/components/OwnerSessionOverview";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 
 export function WorkspacesPage() {
   const { data: workspaces, isLoading } = useWorkspaces();
   const [createOpen, setCreateOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const returnNavigation = useReturnNavigation();
+  const [query, setQuery] = useState(() => returnNavigation?.readView<string>("home-workspace-query") ?? "");
+  useEffect(() => { returnNavigation?.writeView("home-workspace-query", query); }, [returnNavigation, query]);
   const [sortMode, setSortMode, sortDirection, toggleSortDirection] =
     useWorkspaceSort();
   const navigate = useNavigate();
@@ -145,6 +149,8 @@ export function WorkspacesPage() {
                 {t("workspaces.newWorkspace")}
               </Button>
             </div>
+
+            <OwnerSessionOverview />
 
             {hasWorkspaces && (
               <div className="flex w-full items-center gap-2">

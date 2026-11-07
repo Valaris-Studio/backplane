@@ -30,6 +30,9 @@ func (a *app) mcp(ctx context.Context, args []string) error {
 		return err
 	}
 	layout := store.Layout{Root: root}
+	if a.operatorManaged(layout) {
+		return errHeadlessOperatorManaged
+	}
 	installation, _ := state.Load[state.Installation](layout.Installation())
 	admission, _ := state.Load[state.Admission](layout.Admission())
 	access, accessErr := agentaccess.Load(layout)

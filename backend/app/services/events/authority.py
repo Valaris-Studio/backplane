@@ -211,7 +211,7 @@ async def current_delivery_authority(
         key = await keys.get_by_id(principal.api_key_id)
         if key is None or key.user_id != principal.user_id:
             return _CREDENTIAL_REVOKED
-        if key.installation_id is not None and await keys.installation_revoked(
+        if key.installation_id is not None and await keys.installation_refuses_keys(
             key.installation_id
         ):
             return _CREDENTIAL_REVOKED

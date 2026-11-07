@@ -9,10 +9,10 @@ import { sessionKeys } from "@/lib/query-keys";
 import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 
 // Keep the owner check as defense in depth and coalesce capture bursts.
-const SESSION_EVENT_DEBOUNCE_MS = 2000;
+export const SESSION_EVENT_DEBOUNCE_MS = 2000;
 
 // Body pages and files are keyed by their digest, so no event changes them.
-const IMMUTABLE_CONTENT = new Set(["content-body", "content-file"]);
+const IMMUTABLE_CONTENT = new Set(["content-body", "content-file", "search"]);
 
 // Where a detail query names its part: sessionKeys.detail(slug, id) is the prefix.
 const DETAIL_PART_INDEX = sessionKeys.detail("", "").length;
@@ -27,6 +27,13 @@ export function useSessionRealtime(slug: string) {
   const queryClient = useQueryClient();
   const { status } = useWebSocket();
   const pendingOwnerIdsRef = useRef(new Set<string>());
+  const markSearchesStale = useCallback((sessionId?: unknown) => {
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: sessionKeys.all(slug) })) {
+      if (typeof sessionId === "string" && query.queryKey[DETAIL_PART_INDEX - 1] !== sessionId) continue;
+      const mark = query.meta?.markSessionSearchStale;
+      if (typeof mark === "function") mark();
+    }
+  }, [queryClient, slug]);
   useDomainSync("agent_session", sessionKeys.all(slug), {
     debounceMs: SESSION_EVENT_DEBOUNCE_MS,
     filter: (event) => {
@@ -39,6 +46,7 @@ export function useSessionRealtime(slug: string) {
       }
       return ownerId === me.id;
     },
+    patch: (event) => { markSearchesStale(event.payload.session_id); },
     predicate: changeable,
   });
 
@@ -60,12 +68,13 @@ export function useSessionRealtime(slug: string) {
     pendingOwnerIdsRef.current.clear();
     if (pendingRecoveryRef.current || ownsPendingEvent) {
       pendingRecoveryRef.current = false;
+      markSearchesStale();
       void queryClient.invalidateQueries({
         queryKey: sessionKeys.all(slug),
         predicate: changeable,
       });
     }
-  }, [status, me, queryClient, slug]);
+  }, [status, me, queryClient, slug, markSearchesStale]);
 }
 
 // Session detail descendants include private call previews as well as bodies.

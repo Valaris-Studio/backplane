@@ -17,8 +17,8 @@ func TestMCPLaunchShapes(t *testing.T) {
 	if uvx.Command != "uvx" {
 		t.Fatalf("MCPLaunchUvx().Command = %q, want %q", uvx.Command, "uvx")
 	}
-	if len(uvx.Args) != 1 || uvx.Args[0] != "backplane-mcp==0.9.3" {
-		t.Fatalf("MCPLaunchUvx().Args = %v, want [backplane-mcp==0.9.3]", uvx.Args)
+	if len(uvx.Args) != 1 || uvx.Args[0] != "backplane-mcp==0.9.5" {
+		t.Fatalf("MCPLaunchUvx().Args = %v, want [backplane-mcp==0.9.5]", uvx.Args)
 	}
 
 	checkout := MCPLaunchCheckout("/src/backplane/mcp-server")
@@ -72,7 +72,7 @@ func TestMarshalMCPConfigLaunchShapes(t *testing.T) {
 				AgentEmail: "runner@valaris.dev",
 			},
 			wantCommand: "uvx",
-			wantArgs:    []string{"backplane-mcp==0.9.3"},
+			wantArgs:    []string{"backplane-mcp==0.9.5"},
 		},
 		{
 			name: "source checkout launch",

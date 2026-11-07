@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { SearchX } from "lucide-react";
@@ -12,9 +13,11 @@ import { buttonVariants } from "@/components/ui/button";
 // let anyone confirm a private workspace's existence by typing its slug.
 export function WorkspaceNotFoundPage() {
   const { t } = useTranslation();
+  const unavailableRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { unavailableRef.current?.focus(); }, []);
 
   return (
-    <div data-testid="workspace-not-found">
+    <div ref={unavailableRef} tabIndex={-1} role="region" aria-label={t("workspace.notFound.title")} data-testid="workspace-not-found">
       <EmptyState
         icon={SearchX}
         title={t("workspace.notFound.title")}

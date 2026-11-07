@@ -41,6 +41,9 @@ func (a *app) uninstall(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if a.operatorManaged(store.Layout{Root: root}) {
+		return errHeadlessOperatorManaged
+	}
 	if err := a.refuseUnsafeDataRoot(root); err != nil {
 		return err
 	}

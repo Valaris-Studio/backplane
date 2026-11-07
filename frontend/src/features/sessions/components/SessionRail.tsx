@@ -5,6 +5,7 @@ import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Coins, Cpu, Eye, GitFork, Info, Link2, Lock, Pencil, SlidersHorizontal } from "lucide-react";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useBoards } from "@/features/kanban/api/use-boards";
@@ -188,7 +189,7 @@ export function LinkedWorkPanel({ slug, session, onInspect }: { slug: string; se
       ) : (
         <ul className="grid gap-2.5">
           {items.map((link) => (
-            <LinkedWorkRow key={`${link.workspace_id}-${link.entity_type}-${link.entity_id}-${link.relation}`} link={link} onInspect={onInspect} />
+            <LinkedWorkRow key={`${link.workspace_id}-${link.entity_type}-${link.entity_id}-${link.relation}`} sessionId={session.id} link={link} onInspect={onInspect} />
           ))}
         </ul>
       )}
@@ -196,7 +197,7 @@ export function LinkedWorkPanel({ slug, session, onInspect }: { slug: string; se
   );
 }
 
-function LinkedWorkRow({ link, onInspect }: { link: SessionWorkLink; onInspect?: (identity: SessionWorkIdentity) => void }) {
+function LinkedWorkRow({ sessionId, link, onInspect }: { sessionId: string; link: SessionWorkLink; onInspect?: (identity: SessionWorkIdentity) => void }) {
   const { t } = useTranslation();
   const target = useWorkTarget(link);
   const boards = useBoards(target.status === "available" ? target.slug : "", { enabled: target.status === "available" && link.entity_type === "card" });
@@ -212,12 +213,13 @@ function LinkedWorkRow({ link, onInspect }: { link: SessionWorkLink; onInspect?:
     <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 text-[0.88rem]">
       <Icon aria-hidden className={cn("mt-0.5 size-4", link.relation === "changed" ? "text-primary" : "text-muted-foreground")} />
       {target.status === "available" ? (
-        <Link
+        <ContextLink
+          id={`linked-work-${sessionId}-${link.workspace_id}-${link.entity_type}-${link.entity_id}-${link.relation}`}
           to={target.href}
           className="min-w-0 break-words rounded-[var(--radius-cap)] font-semibold text-[color:color-mix(in_oklab,var(--color-primary)_70%,var(--color-foreground))] underline-offset-[0.18em] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {target.title}
-        </Link>
+        </ContextLink>
       ) : (
         <p role={target.status === "loading" ? "status" : undefined} className="text-sm text-muted-foreground">
           {t(target.status === "loading" ? "sessions.work.loadingTitle" : target.status === "error" ? "sessions.work.loadError" : "sessions.work.unavailable")}

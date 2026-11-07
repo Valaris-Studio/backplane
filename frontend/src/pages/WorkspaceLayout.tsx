@@ -1,13 +1,17 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { RouteFallback } from "@/components/layout/RouteFallback";
 import { useCompanionEnabled } from "@/features/sessions/api/use-sessions";
 import { SessionRealtimeOwner } from "@/features/sessions/components/SessionRealtimeOwner";
-import { useWorkspace } from "@/features/workspaces/api/use-workspace";
+import { revokeWorkspaceAccess, useWorkspace } from "@/features/workspaces/api/use-workspace";
 import { WorkspaceResolvedProvider } from "@/features/workspaces/hooks/use-workspace-resolved";
+import { useWebSocket, useWebSocketEvent } from "@/hooks/use-websocket";
+import { meKeys, workspaceKeys } from "@/lib/query-keys";
 import { WorkspaceNotFoundPage } from "./WorkspaceNotFoundPage";
 
 // Gates every /:slug/* route on the workspace actually resolving. Without it a
@@ -27,14 +31,34 @@ export function WorkspaceLayout() {
   const { slug } = useParams<{ slug: string }>();
   const { data, isError } = useWorkspace(slug);
   const companionEnabled = useCompanionEnabled() === true;
+  const client = useQueryClient();
+  const { status, onAccessRevoked } = useWebSocket();
+  const previousStatus = useRef(status);
+  const revoke = useCallback(() => {
+    if (slug) revokeWorkspaceAccess(client, slug);
+  }, [client, slug]);
+  useEffect(() => onAccessRevoked?.(revoke), [onAccessRevoked, revoke]);
+  useWebSocketEvent("activity.member.*", (event) => {
+    const viewer = client.getQueryData<{ id: string }>(meKeys.me());
+    const changes = event.payload.changes as Record<string, unknown> | undefined;
+    if (viewer && (event.payload.entity_id === viewer.id || changes?.affected_user_id === viewer.id)
+      && /removed|deleted|revoked/.test(event.event)) revoke();
+  });
+  useEffect(() => {
+    if (slug && status === "connected" && previousStatus.current !== "connected" && data === null) {
+      void client.invalidateQueries({ queryKey: workspaceKeys.bySlug(slug), exact: true });
+    }
+    previousStatus.current = status;
+  }, [client, data, slug, status]);
+  const unavailable = isError || data === null;
 
   return (
-    <WorkspaceResolvedProvider resolved={Boolean(data)}>
+    <WorkspaceResolvedProvider resolved={Boolean(data) && !unavailable}>
       {slug && data && !isError && companionEnabled ? (
         <SessionRealtimeOwner key={slug} slug={slug} />
       ) : null}
       <AppShell>
-        {isError ? (
+        {unavailable ? (
           <WorkspaceNotFoundPage />
         ) : data ? (
           <Outlet />

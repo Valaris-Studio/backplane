@@ -138,6 +138,8 @@ change is needed — `ContextSources` is a raw `map[string]string`.
 | `produces_note` | LLM emitted research / analysis findings. Engine plumbs them through `CreateReviewNote`. No git push. | researcher, analyst |
 | `mutates_backlog` | LLM already wrote side-effects via MCP tools (`create_card`, `update_card`). Engine records the summary only — no git, no note. | planner |
 
+A stage that writes notes through MCP under an agent key cannot pin them: `create_note` with `pinned: true` is refused with 403 `pin_requires_human` (pinning is a human act). Create the note unpinned and let a person pin it.
+
 ## SensorDef
 
 Computational quality gates that run between LLM and post-action. A sensor failure can either use the legacy aggregated failure path (creates a review note + records failure) or route via `ActionDef.Branches[decision]` when `on_pass`/`on_fail` are set.

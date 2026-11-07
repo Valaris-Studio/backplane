@@ -26,6 +26,12 @@ from app.models.kanban.board import Board
 from app.models.kanban.card import Card
 from app.models.notes.kinds import REVIEW_VERDICT
 from app.repositories.definitions.definition import DefinitionRepository
+from app.repositories.agents.execution import ExecutionRepository
+from app.services.kanban.dependencies import DependencyService
+from app.services.notes.content_serializer import prosemirror_to_markdown
+from app.services.agents.context_snapshot import (
+    SnapshotSelection, note_class, quote_data, snapshot_note, snapshot_record,
+)
 from app.repositories.kanban.card import CardRepository
 from app.repositories.notes.context_note import (
     ContextNoteBody,
@@ -192,6 +198,7 @@ class _GuardedAssembly:
         board: Board,
         stage: dict | None,
         pipeline_stages: list[dict] | None,
+        snapshot: SnapshotSelection | None = None,
     ):
         self.db = db
         self.policy = policy
@@ -201,6 +208,7 @@ class _GuardedAssembly:
         self.board = board
         self.stage = stage
         self.pipeline_stages = pipeline_stages
+        self.snapshot = snapshot
         self.notes = ContextNoteRepository(db)
         self.fetched_bytes = 0
         self.managed_bytes = 0
@@ -230,12 +238,16 @@ class _GuardedAssembly:
             await self._admit_notes(plan, outcome, scope, render=pinned_note_block)
         elif plan.kind == "board_definition":
             definition = await DefinitionRepository(self.db).get_by_board(self.board.id)
-            self._admit_block(
-                plan,
-                outcome,
-                render_board_definition(definition, []),
-                candidate_index=None,
-            )
+            if self.snapshot is not None:
+                if definition is not None:
+                    text = "instruction; board definition\n\n" + render_board_definition(definition, [])
+                    self._admit_snapshot_record(plan, outcome, snapshot_record(
+                        plan.kind, "definition", definition.id, "directive", "instruction", text,
+                    ))
+            else:
+                self._admit_block(
+                    plan, outcome, render_board_definition(definition, []), candidate_index=None,
+                )
             scope = ContextNoteScope(
                 self.workspace_id,
                 board_id=self.board.id,
@@ -248,6 +260,8 @@ class _GuardedAssembly:
                 self.workspace_id, card_id=self.card.id, kind=REVIEW_VERDICT
             )
             await self._admit_notes(plan, outcome, scope, render=review_note_block)
+        elif self.snapshot is not None and plan.kind in {"linked_cards", "execution_history"}:
+            await self._admit_snapshot_history(plan, outcome)
         else:
             text = await _FETCHERS[plan.kind](
                 db=self.db,
@@ -263,6 +277,78 @@ class _GuardedAssembly:
             )
             self._admit_block(plan, outcome, text, candidate_index=0)
         return outcome
+
+    def _admit_snapshot_record(self, plan, outcome, record, *, optional_note=False):
+        self.snapshot.observed_sources.add(plan.kind)
+        outcome.candidate_count += 1
+        reason = self._admit_if_fits(
+            plan, outcome, record["text"], optional_record_cap=optional_note,
+        )
+        if reason is None:
+            outcome.admitted_count += 1
+            self.snapshot.blocks.append(record)
+        else:
+            self.snapshot.omit(plan.kind, "over_budget", record=record, detail=reason)
+        return reason
+
+    def admit_snapshot_card(self):
+        plan = _SourcePlan(-1, "card", "card", {}, False, None, None)
+        text = (
+            f"instruction; card\n\n{self.card.title}\n\n"
+            f"{prosemirror_to_markdown(self.card.description)}\n\n"
+            f"Labels: {canonical_json(self.card.labels or [])}"
+        )
+        self._admit_snapshot_record(plan, _SourceOutcome(), snapshot_record(
+            "card", "card", self.card.id, "directive", "instruction", text,
+        ))
+
+    async def _admit_snapshot_history(self, plan, outcome):
+        limit = _clamp_limit(plan.filter, 20)
+        if plan.kind == "linked_cards":
+            view, unauthorized_count, has_more = await DependencyService(self.db).list_for_context(
+                workspace_id=self.workspace_id, card_id=self.card.id, limit=limit,
+            )
+            if unauthorized_count:
+                self.snapshot.observed_sources.add(plan.kind)
+                self.snapshot.omit(plan.kind, "unauthorized", count=unauthorized_count)
+            candidates = []
+            for direction, edges in (("depends_on", view.depends_on), ("blocks", view.blocks)):
+                for edge in edges:
+                    entity_id = edge.depends_on_card_id if direction == "depends_on" else edge.card_id
+                    text = (f"{direction}: {edge.depends_on_title or 'untitled'} "
+                            f"({edge.depends_on_status or 'no status'}, {edge.depends_on_column_type or 'untyped'})")
+                    candidates.append(snapshot_record(
+                        plan.kind, "card", entity_id, "shared_record", "content; linked card", text,
+                    ))
+            seen = set()
+            records = []
+            for record in candidates:
+                if record["entity_id"] not in seen:
+                    seen.add(record["entity_id"])
+                    records.append(record)
+            if has_more or len(records) > limit:
+                self.snapshot.omit(plan.kind, "over_budget", detail="selection_window", count_at_least=1)
+            records = records[:limit]
+        else:
+            rows = await ExecutionRepository(self.db).list_by_card(
+                self.workspace_id, self.card.id, limit=limit + 1,
+            )
+            if len(rows) > limit:
+                self.snapshot.omit(plan.kind, "over_budget", detail="selection_window", count_at_least=1)
+            records = []
+            for row in rows[:limit]:
+                state = row.status.value if hasattr(row.status, "value") else row.status
+                text = quote_data(
+                    f"{row.action} [{row.role or 'unspecified role'}] — {state}\n"
+                    f"{row.error_message or row.output_summary or ''}"
+                )
+                records.append(snapshot_record(
+                    plan.kind, "execution", row.id, "evidence", "evidence, not instruction",
+                    f"evidence, not instruction\n\n{text}",
+                    agent_id=str(row.agent_id) if row.agent_id else None,
+                ))
+        for record in records:
+            self._admit_snapshot_record(plan, outcome, record)
 
     def _admit_block(
         self,
@@ -310,10 +396,24 @@ class _GuardedAssembly:
         assert plan.window is not None, "note sources always plan a window"
         headers, has_more = await self.notes.list_headers(scope, limit=plan.window)
         outcome.candidate_count += len(headers)
+        if self.snapshot is not None and headers:
+            self.snapshot.observed_sources.add(plan.kind)
         outcome.has_more_candidates = has_more
         for candidate_index, header in enumerate(headers):
+            if self.snapshot is not None:
+                if header.id in self.snapshot.seen_notes:
+                    outcome.candidate_count -= 1
+                    continue
+                self.snapshot.seen_notes.add(header.id)
+                material_class, _ = note_class(header)
+                if material_class == "agent_working_note" and header.card_id != self.card.id:
+                    self.snapshot.omit(plan.kind, "unauthorized", count=1)
+                    outcome.candidate_count -= 1
+                    continue
             body, skipped = await self._body(header, scope)
             if skipped is not None:
+                if self.snapshot is not None:
+                    self.snapshot.omit(plan.kind, "over_budget", entity_type="note", entity_id=header.id, detail=skipped, digest_available=False)
                 outcome.exclusions.append(
                     _exclusion(plan, candidate_index, header, skipped)
                 )
@@ -326,15 +426,28 @@ class _GuardedAssembly:
                 max_nodes=self.ceilings.max_json_nodes,
             )
             if excess is not None:
+                if self.snapshot is not None:
+                    self.snapshot.omit(plan.kind, "unsupported", entity_type="note", entity_id=header.id, detail=excess, digest_available=False)
                 outcome.exclusions.append(
                     _exclusion(plan, candidate_index, header, excess)
                 )
                 continue
             block = render(body)
+            record = None
+            if self.snapshot is not None:
+                material_class, _ = note_class(body)
+                if material_class == "agent_working_note" and body.card_id != self.card.id:
+                    self.snapshot.omit(plan.kind, "unauthorized", count=1)
+                    outcome.candidate_count -= 1
+                    continue
+                record = snapshot_note(plan.kind, body, block)
+                block = record["text"]
             reason = self._admit_if_fits(
                 plan, outcome, block, optional_record_cap=not plan.required
             )
             if reason is not None:
+                if self.snapshot is not None:
+                    self.snapshot.omit(plan.kind, "over_budget", record=record, detail=reason)
                 outcome.exclusions.append(
                     _exclusion(
                         plan, candidate_index, header, reason, body=body, block=block
@@ -342,6 +455,8 @@ class _GuardedAssembly:
                 )
                 continue
             outcome.admitted_count += 1
+            if self.snapshot is not None:
+                self.snapshot.blocks.append(record)
             admitted = AdmittedNote(
                 source_index=plan.source_index,
                 candidate_index=candidate_index,
@@ -395,6 +510,12 @@ class _GuardedAssembly:
             header.kind,
             header.pinned,
             header.created_at,
+        ):
+            raise _selection_changed()
+        if self.snapshot is not None and (
+            body.created_by, body.author_principal_kind, body.author_agent_id, body.pinned_by, body.card_id,
+        ) != (
+            header.created_by, header.author_principal_kind, header.author_agent_id, header.pinned_by, header.card_id,
         ):
             raise _selection_changed()
         return body, None
@@ -556,6 +677,7 @@ async def assemble_guarded_context(
     sources: list[dict],
     stage: dict | None = None,
     pipeline_stages: list[dict] | None = None,
+    snapshot: SnapshotSelection | None = None,
 ) -> AssembledContext:
     sources = sources or []
     if len(sources) > ceilings.max_sources:
@@ -578,7 +700,10 @@ async def assemble_guarded_context(
         board=board,
         stage=stage,
         pipeline_stages=pipeline_stages,
+        snapshot=snapshot,
     )
+    if snapshot is not None:
+        assembly.admit_snapshot_card()
     outcomes: dict[int, _SourceOutcome] = {}
     for plan in (p for p in plans if p.required):
         outcomes[plan.source_index] = await assembly.admit(plan)
@@ -619,6 +744,13 @@ async def assemble_guarded_context(
     for plan in (p for p in plans if not p.required):
         outcomes[plan.source_index] = await assembly.admit(plan)
 
+    if snapshot is not None:
+        for plan in plans:
+            outcome = outcomes[plan.source_index]
+            if plan.kind not in snapshot.observed_sources:
+                snapshot.omit(plan.kind, "missing", count=0)
+            if outcome.has_more_candidates:
+                snapshot.omit(plan.kind, "over_budget", detail="selection_window", count_at_least=1)
     rendered: dict[str, str] = {}
     manifest_sources: list[ContextSource] = []
     admissions = {
@@ -682,6 +814,7 @@ async def assemble_guarded_context(
         # other in `context`, never here.
         blocks=tuple(outcomes[plan.source_index].text for plan in plans),
         selection=selection,
+        snapshot=snapshot,
     )
 
 
@@ -696,6 +829,7 @@ async def assemble_for_invocation(
     card: Card,
     board: Board,
     stage: dict | None = None,
+    snapshot: SnapshotSelection | None = None,
 ) -> AssembledContext:
     """Every reader of an invocation's context (refresh, assignment,
     dispatch) resolves its budget through this one path."""
@@ -726,6 +860,7 @@ async def assemble_for_invocation(
         sources=sources,
         stage=stage,
         pipeline_stages=stages,
+        snapshot=snapshot,
     )
 
 
@@ -739,6 +874,7 @@ async def assemble_stage_context(
     board: Board,
     sources: list[dict],
     stage: dict,
+    snapshot: SnapshotSelection | None = None,
 ) -> AssembledContext:
     """A role's flat-stage call (assignment bundle, A1 refresh/prepare),
     through the same budget resolution as named-step dispatch."""
@@ -771,4 +907,5 @@ async def assemble_stage_context(
         card=card,
         board=board,
         stage=stage,
+        snapshot=snapshot,
     )

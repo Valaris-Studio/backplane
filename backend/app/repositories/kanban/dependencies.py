@@ -13,9 +13,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.kanban.board import Board
 from app.models.kanban.card import Card, CardDependency
 from app.models.kanban.column import Column
 
@@ -89,9 +90,12 @@ class DependencyRepository:
         )
         await self.db.flush()
 
-    async def list_depends_on(self, card_id: uuid.UUID) -> list[DependencyEdge]:
+    async def list_depends_on(
+        self, card_id: uuid.UUID, *, workspace_id: uuid.UUID | None = None,
+        limit: int | None = None,
+    ) -> list[DependencyEdge]:
         # Forward edges: project the prerequisite (`depends_on_card_id`).
-        result = await self.db.execute(
+        query = (
             select(
                 CardDependency.card_id,
                 CardDependency.depends_on_card_id,
@@ -103,14 +107,22 @@ class DependencyRepository:
             )
             .join(Card, Card.id == CardDependency.depends_on_card_id)
             .join(Column, Column.id == Card.column_id)
+            .join(Board, Board.id == Card.board_id)
             .where(CardDependency.card_id == card_id)
+            .where(Board.workspace_id == workspace_id if workspace_id is not None else True)
         )
+        if limit is not None:
+            query = query.order_by(Card.id).limit(limit)
+        result = await self.db.execute(query)
         return [self._to_edge(row) for row in result.all()]
 
-    async def list_blocks(self, card_id: uuid.UUID) -> list[DependencyEdge]:
+    async def list_blocks(
+        self, card_id: uuid.UUID, *, workspace_id: uuid.UUID | None = None,
+        limit: int | None = None,
+    ) -> list[DependencyEdge]:
         # Reverse edges: the detail view renders the dependent (`card_id`),
         # so project that card rather than the prerequisite.
-        result = await self.db.execute(
+        query = (
             select(
                 CardDependency.card_id,
                 CardDependency.depends_on_card_id,
@@ -122,9 +134,26 @@ class DependencyRepository:
             )
             .join(Card, Card.id == CardDependency.card_id)
             .join(Column, Column.id == Card.column_id)
+            .join(Board, Board.id == Card.board_id)
             .where(CardDependency.depends_on_card_id == card_id)
+            .where(Board.workspace_id == workspace_id if workspace_id is not None else True)
         )
+        if limit is not None:
+            query = query.order_by(Card.id).limit(limit)
+        result = await self.db.execute(query)
         return [self._to_edge(row) for row in result.all()]
+
+    async def count_unauthorized_context_links(self, card_id: uuid.UUID, workspace_id: uuid.UUID) -> int:
+        target_is_linked = or_(
+            and_(CardDependency.card_id == card_id, Card.id == CardDependency.depends_on_card_id),
+            and_(CardDependency.depends_on_card_id == card_id, Card.id == CardDependency.card_id),
+        )
+        return await self.db.scalar(
+            select(func.count()).select_from(CardDependency)
+            .join(Card, target_is_linked)
+            .join(Board, Board.id == Card.board_id)
+            .where(Board.workspace_id != workspace_id)
+        ) or 0
 
     async def list_for_board(
         self, board_id: uuid.UUID

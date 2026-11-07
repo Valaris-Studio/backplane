@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Link, useLocation, useNavigate, type LinkProps } from "react-router-dom";
+import { Link, useLocation, useNavigate, useResolvedPath, type LinkProps } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
@@ -10,13 +10,16 @@ function plainClick(event: React.MouseEvent<HTMLAnchorElement>) {
   return !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.currentTarget.target !== "_blank";
 }
 
-export function ContextLink({ onClick, id, state, ...props }: LinkProps) {
+// `handoff` is private context for this tab's destination only. It stays in the
+// owner's return registry: never in the href, history state or a copied link.
+export function ContextLink({ onClick, id, state, handoff, ...props }: LinkProps & { handoff?: unknown }) {
   const navigation = useReturnNavigation();
   const navigate = useNavigate();
+  const destination = useResolvedPath(props.to, { relative: props.relative });
   return <Link {...props} id={id} state={state} onClick={(event) => {
     onClick?.(event);
     if (!plainClick(event) || !navigation) return;
-    const reference = navigation.capture(event.currentTarget);
+    const reference = navigation.capture(event.currentTarget, handoff === undefined ? undefined : { pathname: destination.pathname, value: handoff });
     if (!reference) return;
     event.preventDefault();
     void navigate(props.to, { replace: props.replace, state: { ...state, bpReturn: reference }, preventScrollReset: props.preventScrollReset, relative: props.relative });

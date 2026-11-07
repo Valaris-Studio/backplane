@@ -1,0 +1,1 @@
+{"hook_event_name": "on_session_start", "session_id": "local-fc454eeec2bf5a3235124d6337e8e9051f5d9f23734fd8ab9c21b046a8d7a748", "cwd": "/workspace/repo", "tool_name": null, "tool_input": null, "extra": {"model": "fake-model", "platform": "cli", "observed_at": "2026-10-24T04:34:55.448514Z", "plugin_schema": "backplane.hermes.v1"}}

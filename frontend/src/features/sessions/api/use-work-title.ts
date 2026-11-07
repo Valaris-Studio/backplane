@@ -41,7 +41,7 @@ export function useWorkTarget(ref: WorkEntityRef): TargetState<{ slug: string; t
   const workspace = useWorkspaceTarget(ref.workspace_id);
   const slug = workspace.status === "available" ? workspace.slug : "";
   const isCard = ref.entity_type === "card";
-  const card = useQuery({
+  const card = useQuery<Card | null>({
     queryKey: cardKeys.detail(slug, ref.board_id ?? "", ref.entity_id),
     queryFn: async ({ signal }) => {
       const { data } = await api.get<Card>(`/workspaces/${slug}/boards/${ref.board_id}/cards/${ref.entity_id}`, { signal });
@@ -72,5 +72,8 @@ export function useWorkTarget(ref: WorkEntityRef): TargetState<{ slug: string; t
     return { status: denied ? "unavailable" : "error", refetch };
   }
   if (target.isPending) return { status: "loading", refetch };
+  // The card editor retains a null tombstone after denial, including when a
+  // pending retry is cancelled by navigation. It is never an authorized title.
+  if (target.data === null) return { status: "unavailable", refetch };
   return { status: "available", title: target.data.title, href, slug, refetch };
 }

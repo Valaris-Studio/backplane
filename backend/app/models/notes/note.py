@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +35,14 @@ class Note(Base, UUIDMixin, TimestampMixin):
     # extracting from `content` (see services.notes.content_text.build_preview).
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The human promotion act: pinning is refused to Agent principals, so these
+    # two record who pinned and when. Cleared on unpin; NULL on pre-131 rows.
+    pinned_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    pinned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # See app.models.notes.kinds — kept as a free String (not Enum) so the set
     # of kinds is operator-extensible without a schema change.
     kind: Mapped[str] = mapped_column(
@@ -66,4 +75,14 @@ class Note(Base, UUIDMixin, TimestampMixin):
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    # Trust is the server-stamped request principal ("user", "installation"
+    # or "agent"), never the caller's claim. NULL means a pre-131 row or an
+    # internal writer with no request actor.
+    author_principal_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    author_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )

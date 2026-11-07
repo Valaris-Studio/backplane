@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { fireEvent, within } from "@testing-library/react";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import type {
   AgentSession,
@@ -13,6 +14,14 @@ import type {
 
 export const SLUG = "acme";
 export const ME = "user-me";
+
+// Home keeps each row's linked items behind a disclosure. Open them all so a
+// suite asserts the authorized targets a reader could actually reveal.
+export function openHomeLinkedItems(container: HTMLElement = document.body) {
+  for (const toggle of within(container).queryAllByRole("button", { name: /linked items?$/, expanded: false })) {
+    fireEvent.click(toggle);
+  }
+}
 
 export function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();

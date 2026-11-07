@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "2026-09-24T11:59:54.345678Z",
+  "event": {"id": "__EVENT_ID__", "action": "approval.denied", "category": "approval", "kind": "agent_runtime", "fidelity": "observed"},
+  "harness": {"name": "hermes", "collection_method": "plugin"},
+  "session": {"id": "20260924_115958_a1b2c3", "working_directory": "__CWD__"},
+  "approval": {"decision": "deny"}
+}

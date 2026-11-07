@@ -15,7 +15,10 @@ def _literal_assignment(path: Path, name: str):
     for node in tree.body:
         if not isinstance(node, ast.Assign):
             continue
-        if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+        if any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
             return ast.literal_eval(node.value)
     raise AssertionError(f"{path.name} does not assign {name}")
 
@@ -44,4 +47,4 @@ def test_alembic_revision_ids_are_unique_and_have_one_head():
     assert not missing, f"missing Alembic parent revisions: {sorted(missing)}"
 
     heads = set(revisions) - referenced_parents
-    assert heads == {"125"}, f"expected Alembic head 125, got {sorted(heads)}"
+    assert heads == {"131"}, f"expected Alembic head 131, got {sorted(heads)}"

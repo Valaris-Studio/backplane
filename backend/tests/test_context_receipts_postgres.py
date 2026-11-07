@@ -21,7 +21,6 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select, text, update
-from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.database import get_db
@@ -41,6 +40,7 @@ from app.models.workspace_config import WorkspaceConfig
 from app.schemas.agents.execution import ExecutionCreate
 from app.services.agents.execution import ExecutionService
 from tests.conftest import _raw_api_key
+from tests.test_session_content_postgres import _scratch_database
 from tests.routers.agents.test_assignments import (
     _add_team_role,
     _make_card,
@@ -414,28 +414,24 @@ def _alembic(database: str, *args: str) -> None:
     assert result.returncode == 0, result.stderr[-4000:]
 
 
-async def test_migration_121_round_trips_on_postgresql():
-    server = make_url(database_url())
-    name = "ctx_receipts_migration_" + uuid.uuid4().hex[:12]
-    admin = create_async_engine(server, isolation_level="AUTOCOMMIT")
-    async with admin.connect() as connection:
-        await connection.execute(text(f'CREATE DATABASE "{name}"'))
-    await admin.dispose()
-    scratch = server.set(database=name).render_as_string(hide_password=False)
-    tables = text("SELECT count(*) FROM information_schema.tables WHERE table_name IN "
-                  "('execution_context_bindings', 'execution_context_receipts')")
-    engine = create_async_engine(scratch)
-    try:
-        _alembic(scratch, "upgrade", "121")
-        async with engine.connect() as connection:
-            assert await connection.scalar(tables) == 2
-        _alembic(scratch, "downgrade", "120")
-        async with engine.connect() as connection:
-            assert await connection.scalar(tables) == 0
-            assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "120"
-        _alembic(scratch, "upgrade", "121")
-        async with engine.connect() as connection:
-            assert await connection.scalar(tables) == 2
-            assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "121"
-    finally:
-        await engine.dispose()
+async def test_migration_121_round_trips_on_postgresql(tmp_path):
+    async with _scratch_database(
+        database_url(), tmp_path, prefix="ctx_receipts_migration_"
+    ) as scratch:
+        tables = text("SELECT count(*) FROM information_schema.tables WHERE table_name IN "
+                      "('execution_context_bindings', 'execution_context_receipts')")
+        engine = create_async_engine(scratch)
+        try:
+            _alembic(scratch, "upgrade", "121")
+            async with engine.connect() as connection:
+                assert await connection.scalar(tables) == 2
+            _alembic(scratch, "downgrade", "120")
+            async with engine.connect() as connection:
+                assert await connection.scalar(tables) == 0
+                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "120"
+            _alembic(scratch, "upgrade", "121")
+            async with engine.connect() as connection:
+                assert await connection.scalar(tables) == 2
+                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "121"
+        finally:
+            await engine.dispose()

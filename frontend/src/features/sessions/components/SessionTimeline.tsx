@@ -19,6 +19,7 @@ import { PromptText } from "./PromptText";
 import { SubagentRow } from "./SubagentRow";
 import { WithheldChip } from "./WithheldChip";
 import { formatBytes } from "../utils/format";
+import { useReaderValue } from "../hooks/use-find-navigation";
 
 // Screen readers hear new calls in batches, never more than once per window.
 const ANNOUNCE_WINDOW_MS = 10_000;
@@ -37,7 +38,7 @@ interface SessionTimelineProps {
 export function SessionTimeline({ slug, session, headingHidden = false, selectedWork, headingRef, onReturn, onReadContent }: SessionTimelineProps) {
   const { t } = useTranslation();
   const headingId = useId();
-  const [filter, setFilter] = useState<CallFilter>("all");
+  const [filter, setFilter] = useReaderValue<CallFilter>("timeline-filter", "all");
   const active = useSessionReaderActive();
   const callFilter = selectedWork ? "work" : filter;
   const calls = useSessionCalls(slug, session.id, callFilter, active);
@@ -303,6 +304,8 @@ function TurnView({ slug, sessionId, turn }: TurnViewProps) {
     <article
       aria-labelledby={`${timeId} ${promptId}`}
       tabIndex={-1}
+      id={`session-turn-${turn.prompt?.key ?? turn.turnIndex}`}
+      data-return-anchor=""
       data-turn=""
       data-started={startedAt}
       className="scroll-mt-[calc(var(--topbar-height)+1rem)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring grid grid-cols-[4.6rem_minmax(0,1fr)] border-t border-border/60 pb-1.5 pr-[var(--card-padding)] pt-3.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)] max-sm:pl-[calc(var(--card-padding)+0.25rem)] [content-visibility:auto] [contain-intrinsic-size:auto_12rem]"
@@ -408,7 +411,7 @@ function EntryView({ slug, sessionId, entry }: { slug: string; sessionId: string
 
 function CollapsedRun({ slug, sessionId, items }: { slug: string; sessionId: string; items: SessionCallItem[] }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useReaderValue<boolean>(`run:${items[0]?.key}`, false);
   if (open) {
     return (
       <>

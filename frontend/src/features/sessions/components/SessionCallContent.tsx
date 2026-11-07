@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import type { SessionContent } from "@/types/agent-session";
 import { useSessionContents } from "../api/use-session-contents";
 import { formatClock } from "../utils/format";
 import { ContentBody, CoverageNote } from "./ContentBody";
+import { useReaderValue } from "../hooks/use-find-navigation";
 
 interface SessionCallContentProps {
   slug: string;
@@ -20,7 +21,7 @@ interface SessionCallContentProps {
 
 export function SessionCallContent({ slug, sessionId, callId }: SessionCallContentProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useReaderValue<boolean>(`call-content:${callId}`, false);
   const panelId = useId();
   return <div className="min-w-0 border-t border-border pt-2">
     <Button
@@ -40,7 +41,7 @@ export function SessionCallContent({ slug, sessionId, callId }: SessionCallConte
 
 function CapturedCallRecords({ id, slug, sessionId, callId }: SessionCallContentProps & { id: string }) {
   const { t } = useTranslation();
-  const [showNative, setShowNative] = useState(false);
+  const [showNative, setShowNative] = useReaderValue<boolean>(`call-native:${callId}`, false);
   const contents = useSessionContents(slug, sessionId, callId);
   const headingId = `${id}-heading`;
   const items = contents.data?.pages.flatMap((page) => page.items) ?? [];

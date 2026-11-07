@@ -43,6 +43,12 @@ class GenerationExpired(ValarisError):
     detail = "This history view has expired. Open a new generation."
 
 
+class TimelineEventNotFound(ValarisError):
+    status_code = 404
+    error_code = "timeline_event_not_found"
+    detail = "History event not found in this generation."
+
+
 def now():
     return datetime.now(timezone.utc)
 
@@ -402,10 +408,20 @@ class TimelineService:
         return None, work
 
     async def window(
-        self, generation, user_id, *, limit=200, at_seq=None, at_time=None, cursor=None
+        self,
+        generation,
+        user_id,
+        *,
+        limit=200,
+        at_seq=None,
+        exact=False,
+        at_time=None,
+        cursor=None,
     ):
         if sum(value is not None for value in (at_seq, at_time, cursor)) > 1:
             raise ValidationError("Choose one history selector")
+        if exact and (at_seq is None or at_time is not None or cursor is not None):
+            raise ValidationError("Exact history lookup requires only at_seq")
         if cursor is not None:
             boundary, direction = self.parse_cursor(generation, cursor, "window")
             rows = await self.repo.page(
@@ -415,6 +431,13 @@ class TimelineService:
                 after=boundary if direction == "next" else None,
                 descending=direction == "previous",
             )
+        elif exact:
+            target = await self.repo.seek(
+                generation, seq=sequence(at_seq), exact=True
+            )
+            if target is None:
+                raise TimelineEventNotFound()
+            rows = await self.repo.page(generation, limit=limit, start=target)
         elif at_seq is not None or at_time is not None:
             target = await self.repo.seek(
                 generation,

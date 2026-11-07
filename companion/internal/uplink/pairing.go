@@ -149,6 +149,9 @@ func VerificationPageAllowed(raw string, allowLoopbackHTTP bool) bool {
 // doAnonymous is `do` for the pairing endpoints, which take no Authorization
 // header and answer 400 with an RFC 8628 error code.
 func (c *Client) doAnonymous(ctx context.Context, path string, body any) ([]byte, error) {
+	if err := c.refuseOutsideCapture(http.MethodPost, path); err != nil {
+		return nil, err
+	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return nil, err

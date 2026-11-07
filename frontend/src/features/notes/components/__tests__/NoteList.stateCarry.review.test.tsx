@@ -59,7 +59,7 @@ describe("NoteList same-page replacement preserves an opaque return reference", 
     await userEvent.click(screen.getByRole("link", { name: "Open shared note" }));
     await screen.findByDisplayValue(note.title);
     const state = router.state.location.state;
-    expect(state).toEqual({ bpReturn: { v: 1, originKey, originIdx: 0 } });
+    expect(state).toEqual({ bpReturn: { v: 1, originKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i), originIdx: 0 } });
     expect(JSON.stringify(state)).not.toMatch(/private-session|private-investigation|content-private/);
     expect(router.state.location.pathname + router.state.location.search).toBe(destination);
 

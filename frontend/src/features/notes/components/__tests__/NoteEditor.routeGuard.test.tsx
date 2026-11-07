@@ -15,7 +15,10 @@ vi.mock("../../api/use-notes", () => ({
 }));
 vi.mock("../NoteEditorMeta", () => ({ NoteEditorMeta: () => null }));
 vi.mock("@/features/kanban/components/CompletionContextWarning", () => ({ CompletionContextWarning: () => null }));
-vi.mock("@/features/sessions/components/LinkedSessionsSection", () => ({ NoteSessionsSection: () => null }));
+vi.mock("@/features/sessions/components/LinkedSessionsSection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/features/sessions/components/LinkedSessionsSection")>(),
+  NoteSessionsSection: () => null,
+}));
 vi.mock("@/components/shared/RichTextEditor", () => ({
   RichTextEditor: ({ content, onChange }: { content: string; onChange: (value: string) => void }) => (
     <textarea aria-label="Note body" value={content} onChange={(event) => onChange(event.target.value)} />

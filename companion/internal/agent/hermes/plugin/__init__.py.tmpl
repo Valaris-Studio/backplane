@@ -1,0 +1,246 @@
+"""Backplane Companion observer for Hermes Agent.
+
+Forwards the metadata of four lifecycle hooks to the Backplane Companion: over the hook socket
+named by BACKPLANE_COMPANION_HOOK_SOCKET when the Companion runs as another user, else by running
+`backplane-companion hook hermes`. Tool arguments and results, messages and approval commands never
+leave this process. Every callback returns None and never blocks, retries or raises into Hermes.
+"""
+
+import collections
+import functools
+import json
+import os
+import queue
+import re
+import socket
+import subprocess
+import threading
+from datetime import datetime, timezone
+
+try:
+    import pwd
+except ImportError:  # absent on Windows
+    pwd = None
+
+# None in the socket-only rendering baked into a worker image, which spawns nothing.
+COMPANION_ARGV = __COMPANION_ARGV__
+HOOK_SOCKET_ENV = "BACKPLANE_COMPANION_HOOK_SOCKET"
+# The socket frame: the agent line, then the same JSON the subprocess route writes to stdin.
+HOOK_SOCKET_AGENT_LINE = b"hermes\n"
+HOOK_SOCKET_CONSUMED = b"{}"
+PLUGIN_SCHEMA = "backplane.hermes.v1"
+LOCAL_SURFACES = ("cli", "tui", "desktop", "acp")
+TOOL_STATUSES = ("ok", "error", "blocked", "cancelled")
+DENYING_CHOICES = ("deny", "smart_deny", "timeout")
+# Hermes' own end-reason vocabulary (gateway/session_controls.py _END_REASON): cli_close,
+# new_session, session_boundary, ... A lifecycle token Hermes names, never text a person typed.
+END_REASON = re.compile(r"[a-z][a-z_]{0,31}")
+QUEUE_CAPACITY = 1024
+SESSIONS_REMEMBERED = 1024
+COMPANION_TIMEOUT_SECONDS = 10
+FORWARDER_NAME = "backplane-companion-forwarder"
+# Every load of this module in the process (a reload, or the plugin managers of multiplexed
+# profiles) shares one forwarder and its session memory, so the lock that guards both lives on
+# a module they all share; dict.setdefault is atomic, so concurrent first loads agree on one.
+PROCESS_LOCK = vars(threading).setdefault("_backplane_companion_forwarder_lock", threading.Lock())
+
+# Kept in memory only: nothing here may write to Hermes' output or logs.
+counters = {"dropped_queue_full": 0, "callback_failures": 0, "companion_failures": 0}
+
+
+def _text(value):
+    return value if isinstance(value, str) and value else None
+
+
+def _one_of(value, allowed):
+    return value if isinstance(value, str) and value in allowed else None
+
+
+def _duration_ms(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _session_start(kwargs):
+    return {}, {"model": _text(kwargs.get("model"))}
+
+
+def _post_tool_call(kwargs):
+    top = {"tool_name": _text(kwargs.get("tool_name")), "tool_call_id": _text(kwargs.get("tool_call_id"))}
+    extra = {
+        "turn_id": _text(kwargs.get("turn_id")),
+        "status": _one_of(kwargs.get("status"), TOOL_STATUSES),
+        "duration_ms": _duration_ms(kwargs.get("duration_ms")),
+    }
+    return top, extra
+
+
+def _post_approval_response(kwargs):
+    # Only denials are observed: Beacon would report the other choices as allowed.
+    if _one_of(kwargs.get("choice"), DENYING_CHOICES) is None:
+        return None
+    return {"tool_call_id": _text(kwargs.get("tool_call_id"))}, {"turn_id": _text(kwargs.get("turn_id")), "choice": "deny"}
+
+
+def _session_finalize(kwargs):
+    reason = kwargs.get("reason")
+    return {}, {"reason": reason if isinstance(reason, str) and END_REASON.fullmatch(reason) else None}
+
+
+# Observer hooks only. pre_tool_call, pre_llm_call, pre_verify and transform_* can block or
+# rewrite what Hermes does; on_session_end fires after every turn and does not end a session.
+OBSERVERS = {
+    "on_session_start": _session_start,
+    "post_tool_call": _post_tool_call,
+    "post_approval_response": _post_approval_response,
+    "on_session_finalize": _session_finalize,
+}
+
+
+def _projection(hook_name, session_id, cwd, surface, members):
+    top, extra = members
+    # Hermes' shell-hook envelope, which Beacon parses: tool members are null off tool calls,
+    # and tool_input never carries the arguments.
+    payload = {"hook_event_name": hook_name, "session_id": session_id, "cwd": cwd, "tool_name": None, "tool_input": None}
+    payload.update((name, value) for name, value in top.items() if value is not None)
+    extra.update(
+        platform=surface,
+        observed_at=datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+        plugin_schema=PLUGIN_SCHEMA,
+    )
+    payload["extra"] = {name: value for name, value in extra.items() if value is not None}
+    return payload
+
+
+def _remember(sessions_seen, session_id, seen):
+    sessions_seen[session_id] = seen
+    sessions_seen.move_to_end(session_id)
+    while len(sessions_seen) > SESSIONS_REMEMBERED:
+        sessions_seen.popitem(last=False)
+
+
+def _observer(ctx, forwarder, hook_name, members_of):
+    def observe(**kwargs):
+        try:
+            session_id = _text(kwargs.get("session_id"))
+            if session_id is None:
+                return None
+            # session_surface() and session_cwd() read the calling hook's context. The gateway
+            # fires on_session_finalize after the last viewer detaches with no session bound
+            # (gateway/run_shutdown_session_end.py), where session_cwd() may be the profile's
+            # terminal directory: only a local surface binds the context, and with no surface
+            # at all the surface and cwd the session last showed bound stand in. A session never
+            # seen bound, and any messaging surface, is dropped.
+            surface = ctx.session_surface()
+            if surface in LOCAL_SURFACES:
+                seen = (surface, ctx.session_cwd())
+                with PROCESS_LOCK:
+                    _remember(forwarder.sessions_seen, session_id, seen)
+            elif surface == "":
+                with PROCESS_LOCK:
+                    seen = forwarder.sessions_seen.get(session_id)
+            else:
+                seen = None
+            members = members_of(kwargs)
+            if seen is None or members is None:
+                return None
+            surface, cwd = seen
+            payload = _projection(hook_name, session_id, cwd, surface, members)
+            forwarder.pending.put_nowait(functools.partial(_forward, json.dumps(payload).encode("utf-8")))
+        except queue.Full:
+            counters["dropped_queue_full"] += 1
+        except Exception:
+            counters["callback_failures"] += 1
+        return None
+
+    return observe
+
+
+def _companion_env():
+    # Hermes' environment carries provider credentials, and in profile mode HOME is the
+    # profile's; the companion needs only PATH and the user's real home.
+    env = {
+        "PATH": os.environ.get("PATH") or os.defpath,
+        "HOME": os.environ.get("HERMES_REAL_HOME") or _account_home(),
+    }
+    companion_home = os.environ.get("BACKPLANE_COMPANION_HOME")
+    if companion_home:
+        env["BACKPLANE_COMPANION_HOME"] = companion_home
+    return env
+
+
+def _account_home():
+    if pwd is None:
+        return os.path.expanduser("~")
+    return pwd.getpwuid(os.getuid()).pw_dir
+
+
+def _hook_socket_path():
+    # Read once per load, from the gateway's own environment: only an absolute path selects the route.
+    path = os.environ.get(HOOK_SOCKET_ENV)
+    return path if path and os.path.isabs(path) else None
+
+
+HOOK_SOCKET = _hook_socket_path()
+
+
+def _forward(stdin):
+    # At most once: an observation the companion missed, refused or timed out on is lost.
+    try:
+        if HOOK_SOCKET is not None:
+            _forward_over_socket(stdin)
+        else:
+            subprocess.run(COMPANION_ARGV, input=stdin, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env=_companion_env(), timeout=COMPANION_TIMEOUT_SECONDS, check=False)
+    except Exception:
+        counters["companion_failures"] += 1
+
+
+def _forward_over_socket(stdin):
+    # One record per connection: the frame, a half-close, then the companion's "{}" once it consumed
+    # the record. A closed connection without it means the record was refused.
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(COMPANION_TIMEOUT_SECONDS)
+        connection.connect(HOOK_SOCKET)
+        connection.sendall(HOOK_SOCKET_AGENT_LINE + stdin)
+        connection.shutdown(socket.SHUT_WR)
+        reply = b""
+        while len(reply) < 16:
+            chunk = connection.recv(16)
+            if not chunk:
+                break
+            reply += chunk
+    if reply.strip() != HOOK_SOCKET_CONSUMED:
+        counters["companion_failures"] += 1
+
+
+def _run_each(pending):
+    # Each job is a _forward of the module that queued it, so a reloaded plugin's companion
+    # path applies on a worker an earlier load started.
+    while True:
+        pending.get()()
+
+
+def _process_forwarder():
+    # Hermes re-runs this module on a plugin reload; the worker outlives it, so a reload adopts
+    # the running one, with its queue and the sessions it has seen, instead of starting another.
+    with PROCESS_LOCK:
+        for thread in threading.enumerate():
+            if thread.name == FORWARDER_NAME and hasattr(thread, "pending"):
+                return thread
+        pending = queue.Queue(maxsize=QUEUE_CAPACITY)
+        # One FIFO worker keeps each session's events in order and off Hermes' threads; a daemon
+        # thread never holds Hermes open at exit.
+        forwarder = threading.Thread(target=_run_each, args=(pending,), name=FORWARDER_NAME, daemon=True)
+        forwarder.pending = pending
+        forwarder.sessions_seen = collections.OrderedDict()
+        forwarder.start()
+        return forwarder
+
+
+def register(ctx):
+    # The socket-only rendering observes nothing unless the gateway names a socket.
+    if COMPANION_ARGV is None and HOOK_SOCKET is None:
+        return
+    forwarder = _process_forwarder()
+    for hook_name, members_of in OBSERVERS.items():
+        ctx.register_hook(hook_name, _observer(ctx, forwarder, hook_name, members_of))

@@ -157,6 +157,61 @@ async def test_get_board_context_nonexistent_board(
     assert response.status_code == 404
 
 
+async def test_get_board_context_pinned_bodies_include_server_attribution_and_class(
+    client, test_workspace, test_board, test_user, db_session,
+):
+    import hashlib
+
+    pinned = Note(
+        workspace_id=test_workspace.id, board_id=test_board.id,
+        title="Human directive", content="Complete pinned policy é🧭",
+        pinned=True, pinned_by=test_user.id, created_by=test_user.id,
+        author_principal_kind="user",
+    )
+    ordinary = Note(
+        workspace_id=test_workspace.id, board_id=test_board.id,
+        title="Ordinary summary", content="ORDINARY_BODY_NOT_IN_BRIEFING",
+        pinned=False, created_by=test_user.id, author_principal_kind="user",
+    )
+    db_session.add_all([pinned, ordinary])
+    await db_session.flush()
+
+    response = await client.get(_context_url(test_board.id))
+    assert response.status_code == 200
+    payload = response.json()
+    directive, = [note for note in payload["notes"] if note["id"] == str(pinned.id)]
+    assert directive.get("content") == pinned.content
+    assert directive["class"] == "directive"
+    assert "instruction" in directive["label"].lower()
+    assert directive["created_by"] == str(test_user.id)
+    assert directive["author_principal_kind"] == "user"
+    assert directive["pinned_by"] == str(test_user.id)
+    assert directive["sha256"] == hashlib.sha256(pinned.content.encode()).hexdigest()
+    assert ordinary.content not in response.text
+    assert isinstance(payload["omissions"], list)
+
+
+async def test_get_board_context_legacy_pin_keeps_body_and_labels_unknown_author(
+    client, test_workspace, test_board, test_user, db_session,
+):
+    legacy = Note(
+        workspace_id=test_workspace.id, board_id=test_board.id,
+        title="Legacy directive", content="Historical policy text", pinned=True,
+        created_by=test_user.id,
+    )
+    db_session.add(legacy)
+    await db_session.flush()
+
+    response = await client.get(_context_url(test_board.id))
+    assert response.status_code == 200
+    note, = response.json()["notes"]
+    assert note.get("content") == legacy.content
+    assert note["class"] == "directive"
+    assert "unknown author" in note["label"].lower()
+    assert note["author_principal_kind"] is None
+    assert note["pinned_by"] is None
+
+
 async def _seed_prose_statuses(
     db_session: AsyncSession,
     board: Board,
@@ -360,3 +415,108 @@ def test_status_distribution_counts_empty_and_missing_status_as_null():
         NO_STATUS_KEY: 2,
         "done": 1,
     }
+
+
+async def test_board_briefing_omits_whole_unpromoted_agent_records_before_exposure(
+    client, db_session, test_workspace, test_board, test_user, test_agent,
+):
+    import json
+    from app.models.agents.agent import Agent, AgentType
+
+    promoted_agent = Agent(name="Human-promoted author", agent_type=AgentType.coding, created_by_id=test_user.id)
+    db_session.add(promoted_agent)
+    await db_session.flush()
+    withheld = [
+        Note(
+            workspace_id=test_workspace.id, board_id=test_board.id,
+            title=f"WITHHELD_AGENT_TITLE_{pinned}", content=f"WITHHELD_AGENT_BODY_{pinned}",
+            pinned=pinned, author_principal_kind="agent", author_agent_id=test_agent.id,
+            created_by=test_user.id,
+        )
+        for pinned in (True, False)
+    ]
+    promoted = Note(
+        workspace_id=test_workspace.id, board_id=test_board.id, title="Human promotion",
+        content="Human promoted this complete note", pinned=True, pinned_by=test_user.id,
+        author_principal_kind="agent", author_agent_id=promoted_agent.id, created_by=test_user.id,
+    )
+    legacy = Note(
+        workspace_id=test_workspace.id, board_id=test_board.id, title="Legacy remains",
+        content="Legacy pinned body", pinned=True, created_by=test_user.id,
+    )
+    db_session.add_all([*withheld, promoted, legacy])
+    await db_session.flush()
+    response = await client.get(_context_url(test_board.id))
+    assert response.status_code == 200
+    payload = response.json()
+    serialized = json.dumps(payload)
+    for note in withheld:
+        assert str(note.id) not in serialized
+        assert note.title not in serialized
+        assert note.content not in serialized
+    assert str(test_agent.id) not in serialized
+    retained = {note["id"]: note for note in payload["notes"]}
+    assert set(retained) == {str(promoted.id), str(legacy.id)}
+    assert retained[str(promoted.id)]["content"] == promoted.content
+    assert retained[str(legacy.id)]["content"] == legacy.content
+    unauthorized = [entry for entry in payload["omissions"] if entry["reason"] == "unauthorized"]
+    assert sum(entry["count"] for entry in unauthorized) == 2
+    assert all(not {"entity_id", "title", "sha256", "digest", "agent_id", "author_agent_id"} & entry.keys() for entry in unauthorized)
+
+
+async def test_board_briefing_selects_authorized_notes_before_finite_sql_window(
+    client, db_session, db_engine, test_workspace, test_board, test_user, test_agent,
+):
+    from datetime import datetime, timedelta
+    from sqlalchemy import event
+
+    origin = datetime(2026, 11, 1, 12)
+    authorized = [
+        Note(
+            workspace_id=test_workspace.id, board_id=test_board.id,
+            title=f"BRIEF_AUTHORIZED_{index:02d}", content=f"Human note {index}",
+            author_principal_kind="user", created_by=test_user.id,
+            created_at=origin + timedelta(seconds=index),
+        )
+        for index in range(27)
+    ]
+    withheld = [
+        Note(
+            workspace_id=test_workspace.id, board_id=test_board.id,
+            title=f"BRIEF_WITHHELD_{index:02d}", content=f"Agent note {index}",
+            author_principal_kind="agent", author_agent_id=test_agent.id, created_by=test_user.id,
+            created_at=origin + timedelta(days=1, seconds=index),
+        )
+        for index in range(30)
+    ]
+    db_session.add_all([*authorized, *withheld])
+    await db_session.flush()
+    transferred = []
+
+    def observe_notes(connection, cursor, statement, parameters, context, executemany):
+        matching = [
+            row for row in getattr(cursor, "_rows", ())
+            if any(isinstance(value, str) and value.startswith(("BRIEF_AUTHORIZED_", "BRIEF_WITHHELD_")) for value in row)
+        ]
+        if matching:
+            transferred.append((statement.lower(), matching))
+
+    event.listen(db_engine.sync_engine, "after_cursor_execute", observe_notes)
+    try:
+        response = await client.get(_context_url(test_board.id))
+    finally:
+        event.remove(db_engine.sync_engine, "after_cursor_execute", observe_notes)
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["notes"]) == 25
+    assert all(note["title"].startswith("BRIEF_AUTHORIZED_") for note in payload["notes"])
+    assert transferred and sum(len(rows) for _, rows in transferred) <= 26
+    assert all("limit" in sql and "order by" in sql for sql, _ in transferred)
+    assert all(
+        not any(isinstance(value, str) and value.startswith("BRIEF_WITHHELD_") for value in row)
+        for _, rows in transferred for row in rows
+    ), "Agent metadata must be filtered in SQL before the authorized window"
+    unauthorized = [entry for entry in payload["omissions"] if entry["reason"] == "unauthorized"]
+    assert sum(entry["count"] for entry in unauthorized) == 30
+    windows = [entry for entry in payload["omissions"] if entry["reason"] == "over_budget" and entry.get("detail") == "selection_window"]
+    assert windows and any(entry.get("count_at_least", 0) >= 1 or entry.get("has_more") is True for entry in windows)

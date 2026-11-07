@@ -34,6 +34,7 @@ from app.repositories.notes.note import NoteRepository
 from app.schemas.agents.context import ContextManifest, ContextRecord, ContextSource
 from app.schemas.definitions.definition import DefinitionContent
 from app.services.agents.context_selection import GuardedSelection
+from app.services.agents.context_snapshot import SnapshotSelection
 from app.services.agents.context_manifest import (
     MANIFEST_SCHEMA_VERSION,
     RENDERER_VERSION,
@@ -70,6 +71,7 @@ class AssembledContext:
     blocks: tuple[str, ...] = ()
     # Budgeted assemblies only: the exact selection, for in-process reuse.
     selection: GuardedSelection | None = None
+    snapshot: SnapshotSelection | None = None
 
 
 @dataclass(frozen=True)

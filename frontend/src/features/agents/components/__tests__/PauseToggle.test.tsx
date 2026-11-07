@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  createTestQueryClient,
   renderWithProviders,
   screen,
   waitFor,
@@ -31,6 +32,15 @@ function agentResponse(isPaused: boolean) {
   };
 }
 
+async function expectMutationSettled(client: ReturnType<typeof createTestQueryClient>) {
+  // Handler entry is earlier than Axios/Query completion. Keep the test's
+  // jsdom environment alive until the request it started has settled.
+  await waitFor(() => {
+    expect(client.getMutationCache().getAll().map((mutation) => mutation.state.status)).toEqual(["success"]);
+    expect(client.isMutating()).toBe(0);
+  });
+}
+
 describe("PauseToggle", () => {
   it("renders_pause_label_when_runner_is_active", () => {
     renderWithProviders(
@@ -47,6 +57,7 @@ describe("PauseToggle", () => {
   });
 
   it("clicking_pause_calls_pause_endpoint", async () => {
+    const client = createTestQueryClient();
     let pauseCalled = false;
     server.use(
       http.post(`/api/agents/${AGENT_ID}/pause`, () => {
@@ -57,6 +68,7 @@ describe("PauseToggle", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <PauseToggle slug={SLUG} agentId={AGENT_ID} isPaused={false} />,
+      { queryClient: client },
     );
 
     await user.click(screen.getByRole("button", { name: /pause/i }));
@@ -64,9 +76,11 @@ describe("PauseToggle", () => {
     await waitFor(() => {
       expect(pauseCalled).toBe(true);
     });
+    await expectMutationSettled(client);
   });
 
   it("clicking_resume_calls_resume_endpoint", async () => {
+    const client = createTestQueryClient();
     let resumeCalled = false;
     server.use(
       http.post(`/api/agents/${AGENT_ID}/resume`, () => {
@@ -77,6 +91,7 @@ describe("PauseToggle", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <PauseToggle slug={SLUG} agentId={AGENT_ID} isPaused={true} />,
+      { queryClient: client },
     );
 
     await user.click(screen.getByRole("button", { name: /resume/i }));
@@ -84,27 +99,37 @@ describe("PauseToggle", () => {
     await waitFor(() => {
       expect(resumeCalled).toBe(true);
     });
+    await expectMutationSettled(client);
   });
 
   it("button_is_disabled_while_mutation_is_pending", async () => {
+    const client = createTestQueryClient();
+    let releaseResponse!: () => void;
+    const responseGate = new Promise<void>((resolve) => { releaseResponse = resolve; });
     server.use(
       http.post(`/api/agents/${AGENT_ID}/pause`, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await responseGate;
         return HttpResponse.json(agentResponse(true));
       }),
     );
     const user = userEvent.setup();
     renderWithProviders(
       <PauseToggle slug={SLUG} agentId={AGENT_ID} isPaused={false} />,
+      { queryClient: client },
     );
 
     const button = screen.getByRole("button", { name: /pause/i });
-    await user.click(button);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /pausing/i }),
-      ).toBeDisabled();
-    });
+    try {
+      await user.click(button);
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /pausing/i }),
+        ).toBeDisabled();
+      });
+    } finally {
+      releaseResponse();
+      await expectMutationSettled(client);
+    }
+    await waitFor(() => expect(screen.getByRole("button", { name: /pause/i })).toBeEnabled());
   });
 });

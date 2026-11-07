@@ -24,6 +24,15 @@ export interface Resource {
   updated_at: string;
 }
 
+export type ResourceAncestor = Pick<Resource, "id" | "name" | "resource_type" | "workspace_id" | "board_id">;
+
+/** Exact-target metadata: ancestors run root→parent and stop at the first
+ *  node the server could not authorize as a folder of the same scope. */
+export interface ResourceDetail extends Resource {
+  ancestors: ResourceAncestor[];
+  ancestors_complete: boolean;
+}
+
 export interface ResourceCreate {
   name: string;
   resource_type: ResourceType;

@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import delete, or_, select, update
 
 from app.models.api_key import ApiKey
-from app.models.companion import CompanionInstallation
+from app.models.companion import TOKEN_SCOPE_FULL, CompanionInstallation
 from app.repositories.base import BaseRepository
 
 
@@ -48,13 +48,20 @@ class ApiKeyRepository(BaseRepository[ApiKey]):
         )
         return result.scalar_one_or_none()
 
-    async def installation_revoked(self, installation_id: uuid.UUID) -> bool:
-        revoked_at = await self.db.scalar(
-            select(CompanionInstallation.revoked_at).where(
-                CompanionInstallation.id == installation_id
+    async def installation_refuses_keys(self, installation_id: uuid.UUID) -> bool:
+        """True when the installation is revoked or not full (capture-only):
+        its agent key then authenticates nowhere."""
+        found = (
+            await self.db.execute(
+                select(
+                    CompanionInstallation.revoked_at, CompanionInstallation.token_scope
+                ).where(CompanionInstallation.id == installation_id)
             )
-        )
-        return revoked_at is not None
+        ).one_or_none()
+        if found is None:
+            return False
+        revoked_at, token_scope = found
+        return revoked_at is not None or token_scope != TOKEN_SCOPE_FULL
 
     async def lock_installation(self, installation_id: uuid.UUID) -> None:
         """Serialize rotations of one installation's key (a no-op on SQLite)."""

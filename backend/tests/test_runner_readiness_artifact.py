@@ -9,6 +9,7 @@ model service, background worker or persistent operator configuration is used.
 
 import asyncio
 from contextlib import contextmanager
+from copy import deepcopy
 import hashlib
 import gzip
 import json
@@ -36,6 +37,7 @@ from app.main import create_app
 from app.models.agents.execution import AgentExecution
 from app.models.base import Base
 from app.models.kanban.completion import CompletionAttempt, CompletionCandidate
+from app.models.workspace_config import WorkspaceConfig
 from app.schemas.kanban.loop import LOOP_CONFIG_DEFAULTS
 from tests.test_agent_workspace_scope import _make_agent_with_key
 from tests.test_completion_readiness import (
@@ -326,6 +328,21 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
         selected_policy.update(
             source_review="none", review_role=None, evidence_only={"enabled": False}
         )
+    if scenario == "failed-review-rework":
+        config = await f.db.scalar(
+            select(WorkspaceConfig).where(
+                WorkspaceConfig.workspace_id == f.board.workspace_id
+            )
+        )
+        pipeline = deepcopy(config.pipeline_config)
+        review_stage = next(
+            stage
+            for stage in pipeline["stages"]
+            if stage["role"] == selected_policy["review_role"]
+        )
+        review_stage["context_sources"] = [{"kind": "card_notes"}]
+        config.pipeline_config = pipeline
+        await f.db.flush()
     updated = await client.put(f"{f.url}/policy", json={"policy": selected_policy})
     assert updated.status_code == 200, updated.text
     if scenario == "recovery":
@@ -511,11 +528,12 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                     {
                         "title": "Corrected verification evidence",
                         "content": corrected_evidence,
-                        "pinned": True,
+                        "pinned": False,
                         "card_id": str(f.card.id),
                     }
                 )
                 + ")\n"
+                + "assert note['pinned'] is False and note['author_principal_kind']=='agent'\n"
                 + f"retry=request({f'{api_url}{f.url}/cards/{f.card.id}/retry'!r}, {{}})\n"
                 + "assert retry['candidate']['status']=='awaiting_review'\n"
                 + "marker.write_text(json.dumps({'argv':sys.argv[1:],'note_id':note['id']}))\n"
@@ -588,7 +606,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             }
             # Populate one isolated resolver cache with both versions. The
             # generated recipe must still launch the qualified pin, not 0.7.3.
-            for mcp_version in ("0.7.3", "0.9.3"):
+            for mcp_version in ("0.7.3", "0.9.5"):
                 warm = await asyncio.create_subprocess_exec(
                     uvx,
                     "--from",
@@ -742,7 +760,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                         generated.append(server_config)
             assert generated, "first-use wizard did not generate a uvx config"
             assert all(
-                "backplane-mcp==0.9.3" in item.get("args", []) for item in generated
+                "backplane-mcp==0.9.5" in item.get("args", []) for item in generated
             )
             assert {auth for _, auth in forge_http.requests} == {
                 f"Bearer {WORKSPACE_TOKEN}"
@@ -800,7 +818,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
             # The terminal report wraps long absolute paths. The exact saved path
             # is asserted above; a successful probe plus the untouched conflicting
             # config marker proves this invocation used that explicit selection.
-            assert "0.9.3" in doctor_output
+            assert "0.9.5" in doctor_output
             assert not wrong_marker.exists()
             selected_mcp.unlink()
             missing_code, missing_output = await saved_profile_doctor()
@@ -819,7 +837,7 @@ async def test_built_runner_real_api_readiness_and_preserved_completion(
                         "result": "passed",
                         "artifact_sha256": digest,
                         "source_sha": sha,
-                        "published_mcp": "0.9.3",
+                        "published_mcp": "0.9.5",
                         "model_service_calls": 0,
                     }
                 ),

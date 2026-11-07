@@ -2469,6 +2469,7 @@ export const PT_BR_REFERENCE = {
     Default: "Padrão",
     Purpose: "Finalidade",
     "Optional literal password override for DATABASE_URL. Encoding is automatic. Production Compose supplies it from POSTGRES_PASSWORD.": "Senha literal opcional que substitui a de DATABASE_URL. A codificação é automática. O Compose de produção a obtém de POSTGRES_PASSWORD.",
+    "Optional positive integer in MB for PostgreSQL work_mem per sort or hash operation. Unset preserves the server default. Applies to application and Alembic connections.": "Inteiro positivo opcional em MB para work_mem do PostgreSQL por operação de ordenação ou hash. Quando não definido, preserva o padrão do servidor. Aplica-se às conexões da aplicação e do Alembic.",
     "Async SQLAlchemy DSN. Deployed environments point it at their Postgres instance. Must use the asyncpg driver.":
       "DSN assíncrono do SQLAlchemy. Em ambientes implantados, deve apontar para a instância do Postgres e usar o driver asyncpg.",
     "Gates dev-mode behaviors (swagger exposure, dev-mode auth fallback). Set to ":

@@ -36,7 +36,9 @@ def build_engine(url: str) -> AsyncEngine:
             pool_timeout=30,
             pool_pre_ping=True,
         )
-    return create_async_engine(url, **kwargs)
+    return create_async_engine(
+        url, connect_args=settings.database_connect_args(url), **kwargs
+    )
 
 
 engine = build_engine(settings.DATABASE_URL)

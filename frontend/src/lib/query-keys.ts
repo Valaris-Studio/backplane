@@ -52,6 +52,19 @@ export const noteKeys = {
     ["note-publication-revision", slug, boardId, noteId, ...(ownerId ? [ownerId] : []), "presence"] as const,
 };
 
+export const noteHistoryKeys = {
+  root: (slug: string, boardId: string | null, noteId: string, viewerId: string) =>
+    ["note-history", viewerId, slug, boardId ? "board" : "workspace", boardId ?? slug, noteId] as const,
+  list: (slug: string, boardId: string | null, noteId: string, viewerId: string) =>
+    [...noteHistoryKeys.root(slug, boardId, noteId, viewerId), "list"] as const,
+  current: (slug: string, boardId: string | null, noteId: string, viewerId: string) =>
+    [...noteHistoryKeys.root(slug, boardId, noteId, viewerId), "current"] as const,
+  revision: (slug: string, boardId: string | null, noteId: string, viewerId: string, revision: number) =>
+    [...noteHistoryKeys.root(slug, boardId, noteId, viewerId), "revision", revision] as const,
+  compare: (slug: string, boardId: string | null, noteId: string, viewerId: string, fromRevision: number, toRevision: number) =>
+    [...noteHistoryKeys.root(slug, boardId, noteId, viewerId), "compare", fromRevision, toRevision] as const,
+};
+
 export const activityKeys = {
   byBoard: (slug: string, boardId: string, filters?: object) =>
     ["activity", slug, boardId, filters ?? {}] as const,
@@ -66,6 +79,8 @@ export const timelineKeys = {
 };
 
 export const resourceKeys = {
+  detail: (slug: string, boardId: string | undefined, resourceId: string) =>
+    ["resources", slug, ...(boardId ? [boardId] : []), "detail", resourceId] as const,
   downloadUrl: (slug: string, boardId: string | undefined, resourceId: string) =>
     ["resource-download-url", slug, boardId ?? "workspace", resourceId] as const,
   previewText: (resourceId: string, url: string) => ["file-preview", resourceId, url] as const,
@@ -359,12 +374,21 @@ export const meKeys = {
   me: () => ["me"] as const,
 };
 
+export const ownerSessionKeys = {
+  all: ["owner-sessions"] as const,
+  overview: () => ["owner-sessions", "overview"] as const,
+  list: (params: object) => ["owner-sessions", "list", params] as const,
+  reading: (viewKey: string, scope: string, ownerId: string) => ["owner-sessions", "reading", viewKey, scope, ownerId] as const,
+};
+
 // `all(slug)` is the invalidation root: an owner's session event refreshes
 // every list variant and the open detail at once.
 export const sessionKeys = {
   all: (slug: string) => ["sessions", slug] as const,
   list: (slug: string, filters: object) => ["sessions", slug, "list", filters] as const,
   detail: (slug: string, id: string) => ["sessions", slug, "detail", id] as const,
+  searchRoot: (slug: string, id: string) => ["sessions", slug, "detail", id, "search"] as const,
+  search: (slug: string, id: string, run: number) => ["sessions", slug, "detail", id, "search", run] as const,
   calls: (slug: string, id: string, filter: string) => ["sessions", slug, "detail", id, "calls", filter] as const,
   call: (slug: string, id: string, key: string) => ["sessions", slug, "detail", id, "call", key] as const,
   usage: (slug: string, id: string) => ["sessions", slug, "detail", id, "usage"] as const,

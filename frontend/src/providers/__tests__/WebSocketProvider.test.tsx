@@ -85,7 +85,7 @@ describe("WebSocketProvider", () => {
     expect(result.current!.status).toBe("disconnected");
   });
 
-  it.each(["/setup", "/login", "/documentation", "/documentation/core-concepts"])(
+  it.each(["/setup", "/login", "/documentation", "/documentation/core-concepts", "/-/sessions", "/-/sessions?workspace_id=workspace-a"])(
     "opens no workspace socket on non-workspace route %s",
     (path) => {
       // These top-level segments are app routes, not workspace slugs. On a

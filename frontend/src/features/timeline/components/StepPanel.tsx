@@ -23,7 +23,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { buildEntityLink } from "@/lib/entity-link";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { resolveActivityMessage } from "@/features/activity/utils/resolve-activity-message";
@@ -101,6 +103,10 @@ interface Props {
   // caller that forgets the prop can never animate for reduced-motion users.
   reducedMotion?: boolean;
   onInspect?: () => void;
+  detailsOpen?: boolean;
+  onDetailsOpenChange?: (open: boolean) => void;
+  slug?: string;
+  onOpenCurrent?: () => void;
 }
 
 export function StepPanel({
@@ -113,13 +119,24 @@ export function StepPanel({
   prevEventAt,
   reducedMotion: reducedMotionOverride,
   onInspect,
+  detailsOpen: controlledDetailsOpen,
+  onDetailsOpenChange,
+  slug,
+  onOpenCurrent,
 }: Props) {
   const { t } = useTranslation();
   const detailsId = useId();
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [localDetailsOpen, setLocalDetailsOpen] = useState(false);
+  const detailsOpen = controlledDetailsOpen ?? localDetailsOpen;
   const systemReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionOverride ?? systemReducedMotion;
   const Icon = ICONS[descriptor.iconName] ?? Activity;
+  const currentEntityType = event.entity_type === "card" || event.entity_type === "note" || event.entity_type === "resource"
+    ? event.entity_type
+    : null;
+  const currentDestination = slug && currentEntityType && event.action !== "deleted"
+    ? buildEntityLink({ type: currentEntityType, id: event.entity_id, slug, boardId: event.board_id ?? undefined })
+    : null;
 
   // The kind always resolves to a known i18n key; the humanized raw action is a
   // safety-net defaultValue for an unknown card action surfaced as card-update.
@@ -286,7 +303,8 @@ export function StepPanel({
           aria-controls={detailsId}
           onClick={() => {
             if (!detailsOpen) onInspect?.();
-            setDetailsOpen(!detailsOpen);
+            if (onDetailsOpenChange) onDetailsOpenChange(!detailsOpen);
+            else setLocalDetailsOpen(!detailsOpen);
           }}
           className="absolute right-2 bottom-1 flex h-5 items-center gap-1 rounded px-1.5 text-[0.7rem] font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -304,6 +322,20 @@ export function StepPanel({
             <time dateTime={event.created_at}>{timestamp}</time>
             {stepRole ? <span>{t("timeline.step.role")}: <span className="text-foreground">{stepRole.role}</span></span> : null}
           </div>
+          {currentDestination ? (
+            <div className="flex flex-wrap items-center">
+              <ContextLink
+                id={`timeline-event-current-${event.id}`}
+                to={currentDestination.href}
+                onClick={(click) => {
+                  if (!click.defaultPrevented && click.button === 0 && !click.metaKey && !click.ctrlKey && !click.altKey && !click.shiftKey && click.currentTarget.target !== "_blank") onOpenCurrent?.();
+                }}
+                className="inline-flex min-h-11 items-center rounded px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {t(`timeline.current.${currentEntityType}`)}
+              </ContextLink>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>

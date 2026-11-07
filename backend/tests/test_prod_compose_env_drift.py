@@ -154,10 +154,10 @@ def test_active_env_example_keys_are_forwarded():
 
 
 # Settings whose compose default cannot be written as `${VAR:-default}` (a JSON
-# object's `}` would end the interpolation) and for which an empty string is
-# deliberately invalid. A YAML null mapping (`KEY:`) forwards the variable only
+# object's `}` ends interpolation, and an optional integer has no string default)
+# and for which an empty string is deliberately invalid. A null mapping (`KEY:`) forwards the variable only
 # when the operator sets it, so unset keeps the Settings default.
-NULL_PASSTHROUGHS = {"CONTEXT_BUDGET_CEILINGS"}
+NULL_PASSTHROUGHS = {"CONTEXT_BUDGET_CEILINGS", "DATABASE_WORK_MEM_MB"}
 
 
 def test_null_passthroughs_are_exactly_the_declared_settings():
@@ -190,3 +190,20 @@ def test_null_passthrough_explicit_empty_still_fails_startup(monkeypatch):
 def test_null_passthrough_forwards_exact_object_and_partial_values(monkeypatch):
     assert _settings_from(monkeypatch, "{}").CONTEXT_BUDGET_CEILINGS.max_sources == 32
     assert _settings_from(monkeypatch, '{"max_sources":16}').CONTEXT_BUDGET_CEILINGS.max_sources == 16
+
+
+@pytest.mark.parametrize("forwarded", [None, "64"])
+def test_work_memory_passthrough_preserves_unset_or_configured_value(monkeypatch, forwarded):
+    assert _backend_environment()["DATABASE_WORK_MEM_MB"] is None
+    monkeypatch.delenv("DATABASE_WORK_MEM_MB", raising=False)
+    if forwarded is not None:
+        monkeypatch.setenv("DATABASE_WORK_MEM_MB", forwarded)
+    expected = None if forwarded is None else 64
+    assert Settings(_env_file=None).DATABASE_WORK_MEM_MB == expected
+
+
+def test_work_memory_passthrough_rejects_explicit_empty_value(monkeypatch):
+    assert _backend_environment()["DATABASE_WORK_MEM_MB"] is None
+    monkeypatch.setenv("DATABASE_WORK_MEM_MB", "")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

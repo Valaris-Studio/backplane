@@ -28,11 +28,11 @@ export function GettingStartedCapturingSessionsWithCompanion() {
       <p>
         The packaged desktop app is available for macOS 13 or later, as one
         universal build for Apple silicon and Intel, Developer ID signed and
-        notarized. The current preview is 0.1.1-preview.2. Download it from
+        notarized. The current preview is 0.1.1-preview.3. Download it from
         the My sessions page, or directly:
       </p>
       <CodeExample language="text" title="macOS download">
-        {`https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg`}
+        {`https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/Backplane-Companion-0.1.1-preview.3-universal.dmg`}
       </CodeExample>
       <p>
         Open the DMG, move Backplane Companion into Applications, then open it.

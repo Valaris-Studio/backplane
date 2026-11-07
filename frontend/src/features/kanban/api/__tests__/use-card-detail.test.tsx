@@ -55,6 +55,7 @@ describe("useCardDetail", () => {
     );
     expect(apiGet).toHaveBeenCalledWith(
       `/workspaces/${SLUG}/boards/${BOARD_ID}/cards/${CARD_ID}`,
+      { signal: expect.any(AbortSignal) },
     );
   });
 

@@ -1,0 +1,29 @@
+{
+  "hook_event_name": "post_tool_call",
+  "session_id": "20260924_115958_a1b2c3",
+  "cwd": "__CWD__",
+  "tool_name": "mcp__backplane__get_card",
+  "tool_input": null,
+  "tool_call_id": "toolu_01AbCdEf",
+  "profile": "HERMES_SENTINEL_PROFILE",
+  "args": {"card_id": "HERMES_SENTINEL_ARGS", "api_key": "__API_KEY__"},
+  "result": "HERMES_SENTINEL_RESULT",
+  "error_message": "HERMES_SENTINEL_ERROR",
+  "middleware_trace": [{"step": "HERMES_SENTINEL_TRACE"}],
+  "task_id": "HERMES_SENTINEL_TASK",
+  "token": "__API_KEY__",
+  "extra": {
+    "turn_id": "20260924_115958_a1b2c3:6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b:8a1b2c3d",
+    "status": "ok",
+    "duration_ms": 42,
+    "platform": "cli",
+    "observed_at": "2026-09-24T11:59:52.234567Z",
+    "plugin_schema": "backplane.hermes.v1",
+    "api_request_id": "HERMES_SENTINEL_API_REQUEST",
+    "error_type": "HERMES_SENTINEL_ERROR_TYPE",
+    "model": "anthropic/claude-sonnet-4.5",
+    "telemetry_schema_version": "hermes.observer.v1",
+    "authorization": "Bearer __API_KEY__",
+    "headers": {"x-api-key": "__API_KEY__", "note": "HERMES_SENTINEL_NESTED"}
+  }
+}

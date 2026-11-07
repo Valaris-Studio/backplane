@@ -534,6 +534,7 @@ class AgentSessionContent(Base, UUIDMixin):
     __tablename__ = "agent_session_contents"
     __table_args__ = (
         UniqueConstraint("session_id", "content_key", name="uq_agent_session_content"),
+        Index("uq_agent_session_contents_id_session", "id", "session_id", unique=True),
         Index(
             "ix_agent_session_contents_timeline",
             "session_id",
@@ -555,6 +556,23 @@ class AgentSessionContent(Base, UUIDMixin):
             sqlite_where=text("state = 'pending'"),
         ),
         Index("ix_agent_session_contents_receipt", "installation_id", "capture_id"),
+        Index(
+            "ix_agent_session_contents_search_metadata",
+            "session_id",
+            "id",
+            "sha256",
+            postgresql_include=[
+                "state",
+                "coverage",
+                "media_type",
+                "byte_count",
+                "original_byte_count",
+                "channel",
+            ],
+        ).ddl_if(dialect="postgresql"),
+        Index("ix_agent_session_contents_search_session", "session_id", "id").ddl_if(
+            dialect="postgresql"
+        ),
         CheckConstraint(
             "state IN ('pending', 'available', 'recorded')",
             name="ck_agent_session_content_state",

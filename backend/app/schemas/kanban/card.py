@@ -6,10 +6,11 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_serializer
 from app.core.json_response import UTCModel
 
 from app.schemas.completion import CompletionMode
+from app.schemas.kanban.card_context import ContextSnapshotRead
 from app.models.kanban.card import CardType, ParticipantRole, Priority
 from app.models.kanban.column import ColumnType
 from app.services.notes.content_normalizer import (
@@ -160,6 +161,15 @@ class CardClaimRequest(UTCModel):
 
 
 class CardRead(UTCModel):
+    context: ContextSnapshotRead | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_context(self, handler):
+        result = handler(self)
+        if self.context is None:
+            result.pop("context", None)
+        return result
+
     id: uuid.UUID
     column_id: uuid.UUID
     # Derived column labels so a card payload is self-describing: a caller can

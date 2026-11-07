@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RichTextEditor } from "@/components/shared/RichTextEditor";
@@ -17,6 +17,7 @@ import { useCurrentUser } from "@/features/notifications/api/use-current-user";
 import { buildCardLink } from "@/features/kanban/utils/card-link";
 import { buildNoteLink } from "@/features/notes/utils/note-link";
 import { ApiError, isApiError } from "@/lib/api-error";
+import { randomUUID } from "@/lib/random-uuid";
 import { useSaveExcerptNote } from "../api/use-save-excerpt-note";
 import type { HandoffDraftController, HandoffForm } from "../hooks/use-handoff-drafts";
 import { compactNoteDocument, EXCERPT_NOTE_MAX_BYTES, EXCERPT_NOTE_MAX_ITEMS, type ExcerptNoteDraft } from "../utils/excerpt-note";
@@ -49,7 +50,16 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
   const [capacityReached, setCapacityReached] = useState(false);
   const dispatching = useRef(false);
   const mounted = useRef(true);
-  const [validating, setValidating] = useState(false);
+  const [sourceCheck, setSourceCheck] = useState<"save" | "recheck" | null>(null);
+  const validating = sourceCheck !== null;
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const dismissRef = useRef<HTMLButtonElement>(null);
+  const recheckRef = useCallback((button: HTMLButtonElement | null) => {
+    if (!button) return;
+    return () => {
+      if (button === document.activeElement) dismissRef.current?.focus();
+    };
+  }, []);
   const save = useSaveExcerptNote();
   const workspaces = useWorkspaces();
   const boards = useBoards(slug, { enabled: !!slug });
@@ -104,6 +114,11 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
     && ["member", "admin", "owner"].includes(role ?? "");
   const canRevise = form.error !== null && !form.hadUnknownOutcome
     && form.error.status >= 400 && form.error.status < 500;
+  const saveUnavailable = !canSave || validating || form.pending;
+  // A natively disabled button hands browser focus to <body>, outside the modal.
+  // Save's own source check or request keeps it focusable and aria-disabled, even
+  // when a live refresh makes its sources stale mid-check; a Recheck does not.
+  const actionBusy = form.pending || sourceCheck === "save";
   const formIdentity = JSON.stringify([slug, boardId, cardId, title, content, draft.fingerprint, stale, canSave]);
   const currentForm = useRef(formIdentity);
   currentForm.current = formIdentity;
@@ -148,12 +163,15 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
       if (!canSave || compact === null || !workspace || !destination) return false;
       dispatching.current = true;
       if (beforeFirstSave) {
-        setValidating(true);
+        setSourceCheck("save");
         let valid = false;
         try { valid = await beforeFirstSave(); } catch { /* A failed check never freezes a request. */ }
         if (!mounted.current || !handoff.isCurrent(draft)) return false;
-        setValidating(false);
+        setSourceCheck(null);
         if (!valid || currentForm.current !== formIdentity) {
+          // The refused action becomes natively disabled at the next commit.
+          // Move focus first, and only off the action itself, never a prompt.
+          if (actionRef.current && actionRef.current === document.activeElement) dismissRef.current?.focus();
           dispatching.current = false;
           return false;
         }
@@ -168,7 +186,7 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
         slug, boardId,
         payload: {
           title, content: compact, card_id: cardId || null, pinned: false,
-          client_request_id: crypto.randomUUID(),
+          client_request_id: randomUUID(),
           excerpt_source: {
             workspace_id: draft.session.workspace_id, session_id: draft.session.id,
             items: draft.bodies.map(({ item }) => ({ content_id: item.id, sha256: item.sha256! })),
@@ -231,10 +249,10 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
   async function recheckSources() {
     if (!onRecheckSources || dispatching.current) return;
     dispatching.current = true;
-    setValidating(true);
+    setSourceCheck("recheck");
     try { await onRecheckSources(); } finally {
       dispatching.current = false;
-      if (mounted.current) setValidating(false);
+      if (mounted.current) setSourceCheck(null);
     }
   }
 
@@ -299,13 +317,16 @@ export function ExcerptNoteDialog({ draft, stale, onDiscard, beforeFirstSave, so
             {cardLink ? <Link className="text-primary underline underline-offset-4 max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:min-w-[44px]" to={cardLink}>{label("openCard")}</Link> : null}
           </div> : null}
           <DialogFooter className="max-sm:[&>button]:min-h-[44px] max-sm:[&>button]:min-w-[44px]">
-            <Button variant="ghost" onClick={dismiss}>{frozen || stale || sourceCheckFailed ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
-            {!frozen && (stale || sourceCheckFailed) ? <>
+            <Button ref={dismissRef} variant="ghost" onClick={dismiss}>{frozen || stale || sourceCheckFailed ? label("hide") : t("sessions.contents.excerpt.cancel")}</Button>
+            {!frozen && (stale || sourceCheckFailed || sourceCheck === "recheck") ? <>
               <Button variant="ghost" disabled={validating} onClick={onDiscard}>{label("discard")}</Button>
-              {onRecheckSources ? <Button variant="outline" disabled={validating} onClick={() => void recheckSources()}>{label("recheck")}</Button> : null}
+              {onRecheckSources ? <Button ref={recheckRef} variant="outline" className="aria-disabled:opacity-45"
+                aria-disabled={validating || undefined} aria-busy={sourceCheck === "recheck" || undefined}
+                disabled={validating && sourceCheck !== "recheck"} onClick={() => void recheckSources()}>{label("recheck")}</Button> : null}
             </> : null}
             {canRevise ? <Button variant="outline" onClick={revise}>{label("revise")}</Button> : null}
-            {form.error ? <Button onClick={() => void dispatch()} disabled={validating || form.pending}>{label("retry")}</Button> : !saved ? <Button onClick={() => void dispatch()} disabled={!canSave || validating || form.pending}>{label("save")}</Button> : null}
+            {form.error ? <Button ref={actionRef} onClick={() => void dispatch()} disabled={validating || form.pending}>{label("retry")}</Button> : !saved ? <Button ref={actionRef} className="aria-disabled:opacity-45" aria-disabled={actionBusy || undefined}
+              onClick={() => { if (!saveUnavailable) void dispatch(); }} disabled={saveUnavailable && !actionBusy}>{label("save")}</Button> : null}
           </DialogFooter>
         </div>
       </DialogContent>

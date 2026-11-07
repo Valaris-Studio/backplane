@@ -8,9 +8,11 @@ import { useBoard } from "@/features/kanban/api/use-boards";
 import { useMembers } from "@/features/members/api/use-members";
 import { formatAbsolute, formatRelativeShort } from "@/lib/date-format";
 import { isApiError } from "@/lib/api-error";
+import { LinkedSessionsJump } from "@/features/sessions/components/LinkedSessionsSection";
 import type { Note, NoteFinding } from "@/types/note";
 import { NoteCardLinkControl } from "./NoteCardLinkControl";
 import { NoteKindBadge } from "./NoteKindBadge";
+import { NoteHistory } from "./NoteHistory";
 import { NotePublicationRevision } from "./NotePublicationRevision";
 
 const FINDING_SEVERITY_VARIANT: Record<
@@ -25,6 +27,8 @@ const FINDING_SEVERITY_VARIANT: Record<
 interface NoteEditorMetaProps {
   note: Note;
   slug: string;
+  // Present where the editor also renders the note's Your sessions section.
+  onJumpToSessions?: () => void;
 }
 
 /**
@@ -33,7 +37,7 @@ interface NoteEditorMetaProps {
  * when — plus a reviewer verdict's structured findings, which are stored on
  * the note but were previously invisible in the UI.
  */
-export function NoteEditorMeta({ note, slug }: NoteEditorMetaProps) {
+export function NoteEditorMeta({ note, slug, onJumpToSessions }: NoteEditorMetaProps) {
   const { t } = useTranslation();
   const { data: members, error: membersError } = useMembers(slug);
   const destinationAccessLost = isApiError(membersError) && [401, 403, 404].includes(membersError.status);
@@ -82,8 +86,10 @@ export function NoteEditorMeta({ note, slug }: NoteEditorMetaProps) {
         <span title={formatAbsolute(note.updated_at)}>
           {t("collection.updatedAt", { value: formatRelativeShort(note.updated_at) })}
         </span>
+        {onJumpToSessions ? <LinkedSessionsJump kind="note" onJump={onJumpToSessions} /> : null}
       </div>
 
+      <NoteHistory note={note} slug={slug} />
       {!destinationAccessLost && <NotePublicationRevision note={note} slug={slug} />}
 
       {note.findings?.length ? (

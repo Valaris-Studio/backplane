@@ -9,6 +9,7 @@ import { sessionKeys } from "@/lib/query-keys";
 import { shouldRetry } from "@/lib/should-retry";
 import { useAuthModes } from "@/features/auth/api/use-auth-modes";
 import { useForgetSessionContent } from "./use-session-realtime";
+import { usePrivateContentRead } from "./use-private-session-read";
 import type {
   AgentSession,
   AgentSessionList,
@@ -169,15 +170,16 @@ export function useSessionCalls(slug: string, sessionId: string, filter: CallFil
 }
 
 export function useSessionCall(slug: string, sessionId: string, callKey: string, enabled: boolean) {
+  const read = usePrivateContentRead(slug, sessionId);
   return useQuery({
     queryKey: sessionKeys.call(slug, sessionId, callKey),
-    queryFn: async ({ signal }) => {
+    queryFn: ({ signal }) => read(signal, async () => {
       const { data } = await api.get<SessionCallDetail>(
         `/workspaces/${slug}/sessions/${sessionId}/calls/${encodeURIComponent(callKey)}`,
         { signal },
       );
       return data;
-    },
+    }),
     enabled,
     retry: retryServerErrors,
     staleTime: 60_000,

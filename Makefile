@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: dev dev-backend dev-frontend dev-runner migrate migrate-create test test-fast test-all lint rebuild deploy deploy-backend deploy-frontend mcp-install mcp-dev mcp-lint mcp-test deploy-verify runner-setup runner-build runner-test runner-discover smoke smoke-fast quickstart-gate doctor test-e2e
+.PHONY: dev dev-backend dev-frontend dev-runner migrate migrate-create test test-fast test-all lint rebuild deploy deploy-backend deploy-frontend mcp-install mcp-dev mcp-lint mcp-test hermes-worker-test deploy-verify runner-setup runner-build runner-test runner-discover smoke smoke-fast quickstart-gate doctor test-e2e
 .PHONY: runner-release
 
 # Start everything (add --profile runner to include the agent)
@@ -122,6 +122,11 @@ mcp-lint:
 
 mcp-test:
 	cd mcp-server && uv run --extra dev pytest tests/ -v
+
+# No bytecode or pytest cache: residue under the package makes its own
+# clean-source check refuse the next build.
+hermes-worker-test:
+	cd integrations/hermes-worker && PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest==9.1.1 python -m pytest -q -p no:cacheprovider tests
 
 # Runner
 runner-setup:

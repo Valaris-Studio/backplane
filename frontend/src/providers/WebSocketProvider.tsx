@@ -51,7 +51,7 @@ export const WebSocketContext = createContext<WebSocketContextValue | null>(null
 // Top-level app routes that shadow the /:slug workspace pattern (App.tsx).
 // Without this, a fresh instance sitting on /setup opened a socket to
 // /ws/workspaces/setup/events and greeted every self-hoster with 403 log noise.
-const NON_WORKSPACE_ROUTES = new Set(["login", "setup", "documentation"]);
+const NON_WORKSPACE_ROUTES = new Set(["login", "setup", "documentation", "-"]);
 
 function extractWorkspaceSlug(pathname: string): string | null {
   const parts = pathname.split("/").filter(Boolean);

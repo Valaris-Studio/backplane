@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useTranslation } from "react-i18next";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { buildEntityLink } from "@/lib/entity-link";
 import { DwellBars } from "./DwellBars";
 import { HoldersList } from "./HoldersList";
 import { humanizeCardType, humanizePriority, humanizeRole, initials } from "../utils/humanize";
@@ -17,6 +19,9 @@ interface Props {
   analytics: CardAnalytics | null;
   columnNames: Record<string, string>;
   analyticsScope?: string;
+  slug?: string;
+  boardId?: string;
+  onOpenCurrent?: () => void;
 }
 
 // Read-only card detail. Deliberately NOT CardDetailSheet (which pulls in 6+
@@ -29,6 +34,9 @@ export function TimelineCardDetail({
   analytics,
   columnNames,
   analyticsScope,
+  slug,
+  boardId,
+  onOpenCurrent,
 }: Props) {
   const { t } = useTranslation();
   if (!card) return null;
@@ -36,6 +44,9 @@ export function TimelineCardDetail({
   const participants = card.participants ?? [];
   const labels = card.labels ?? [];
   const currentColumn = card.column_id ? columnNames[card.column_id] : undefined;
+  const currentDestination = slug && boardId
+    ? buildEntityLink({ type: "card", id: card.id, slug, boardId })
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -63,6 +74,20 @@ export function TimelineCardDetail({
             <p className="text-xs text-muted-foreground">
               {t("timeline.detail.currentColumn", { column: currentColumn })}
             </p>
+          ) : null}
+          {currentDestination ? (
+            <div className="flex flex-wrap items-center">
+              <ContextLink
+                id={`timeline-card-current-${card.id}`}
+                to={currentDestination.href}
+                onClick={(click) => {
+                  if (!click.defaultPrevented && click.button === 0 && !click.metaKey && !click.ctrlKey && !click.altKey && !click.shiftKey && click.currentTarget.target !== "_blank") onOpenCurrent?.();
+                }}
+                className="inline-flex min-h-11 items-center rounded px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {t("timeline.current.card")}
+              </ContextLink>
+            </div>
           ) : null}
         </SheetHeader>
 

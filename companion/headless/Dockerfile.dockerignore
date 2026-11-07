@@ -1,0 +1,20 @@
+# Copyright (c) 2026 Valaris Studio
+# SPDX-License-Identifier: MIT
+
+# Applies to `docker build -f headless/Dockerfile` with companion/ as the
+# context (a .dockerignore here would not: Docker reads the one named after
+# the Dockerfile, or the context root's). Only what the build reads; never
+# desktop/, dist/, .env or local state.
+*
+!go.mod
+!go.sum
+!LICENSE
+!beacon-source.json
+!cmd
+!internal
+!scripts/build_beacon.py
+!scripts/bundle.py
+!scripts/licenses.py
+!scripts/licensecheck
+**/*_test.go
+**/testdata

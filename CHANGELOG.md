@@ -5,10 +5,10 @@ version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
-| **Platform** | The web app, API and database you self-host | [0.1.4-preview.3](#platform-v0.1.4-preview.3) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.3) |
-| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.8](#v0.8.8) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8) · `ghcr.io/valaris-studio/backplane-runner:0.8.8` |
+| **Platform** | The web app, API and database you self-host | [0.1.4-preview.4](#platform-v0.1.4-preview.4) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4) |
+| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.9](#v0.8.9) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9) · `ghcr.io/valaris-studio/backplane-runner:0.8.9` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.5](#mcp-server-v0.9.5) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
-| **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.2](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg) |
+| **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.3](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/Backplane-Companion-0.1.1-preview.3-universal.dmg) |
 
 A platform release never republishes the runner or MCP server; each entry
 says which versions it was qualified with. Upgrade the platform before the
@@ -31,8 +31,68 @@ keeps its own detailed per-tool history in
 
 ## Unreleased
 
+---
+
+<a id="v0.8.9"></a>
+
+## Runner 0.8.9 — 2026-11-06
+
+`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9)
+
+#### Changed
+
+- Newly generated MCP configurations use `backplane-mcp==0.9.5`, including
+  interactive bootstrap context and atomic note updates. Existing custom
+  configurations, toolsets and allowlists remain unchanged.
+
+#### Upgrade notes
+
+- Pair with platform 0.1.4-preview.4. Upgrade the backend first and deliberately
+  update older generated MCP package arguments. Keep required-context policies
+  and budgets inactive until every participating and rollback runtime supports
+  them; installing a runner does not enable a policy.
+
+---
+
+<a id="platform-v0.1.4-preview.4"></a>
+
+## Platform 0.1.4-preview.4 — 2026-11-06
+
+`platform` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4)
+
+#### Upgrade notes
+
+- Use runner 0.8.9, MCP 0.9.5 and Companion desktop beta 0.1.1-preview.3.
+  Upgrade the backend before clients. Companion remains optional and capture
+  remains disabled by default; the desktop release retains its existing updater
+  key and beta channel.
+- Interactive board and card context works without captured sessions. Read the
+  declared omissions and fetch relevant governing notes or definitions before
+  acting. Legacy notes with unknown authorship remain labelled as unknown.
+
+#### Known limitations
+
+- Context snapshots are bounded; they do not contain the full project history
+  or establish that an agent followed up on omissions. Historical session
+  indexing and coverage remain separate from the interactive snapshot.
+- Runners remain experimental. Keep required-context policies and budgets in
+  legacy mode until the participating fleet and rollback runtime are compatible.
+
 #### Added
 
+- Read labelled interactive card context with a named bootstrap purpose and a
+  version 0 manifest of inclusions and omissions. Board briefings include
+  pinned-note bodies within their size budget. No captured session is required.
+- Find your active and recent captured sessions on Home, with global filters
+  and pagination in a dedicated list across accessible workspaces. Capture
+  state remains distinct from runner execution.
+- Open resources by exact identity, including items outside the current
+  folder or filters, and return with folder and filter context preserved.
+- Share an exact board timeline moment, open its current card, note or
+  resource, and return to the same unexpired replay. Missing or expired
+  moments and unavailable current targets are explicit.
+- Backfill older retained session text with a bounded, resumable command
+  and coverage reports that distinguish indexed, pending and unavailable data.
 - Compare a published note with its original handoff when an authorized
   publication record is available. Older records without saved text explain
   that limitation instead of presenting an invented diff.
@@ -78,6 +138,9 @@ keeps its own detailed per-tool history in
 
 #### Fixed
 
+- Session finalization safely handles NUL characters in text previews.
+- PostgreSQL session coverage aggregation avoids repeated content lookups while
+  preserving the existing query behavior for SERIALIZABLE transactions.
 - Session updates refresh each workspace once, including while its sidebar is
   collapsed, so one event burst no longer starts competing requests for
   loaded evidence.

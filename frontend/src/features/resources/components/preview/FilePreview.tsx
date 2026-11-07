@@ -51,6 +51,7 @@ export function FilePreview({ resource, downloadUrl, onRefreshUrl }: FilePreview
 
   const { data: textContent, isLoading, isError: textError, isFetching: fetchingText, refetch: retryText } = useQuery({
     queryKey: resourceKeys.previewText(resource.id, downloadUrl),
+    meta: { workspaceId: resource.workspace_id },
     queryFn: async () => {
       const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error("Preview request failed");
@@ -63,6 +64,7 @@ export function FilePreview({ resource, downloadUrl, onRefreshUrl }: FilePreview
 
   const { data: binaryContent, isLoading: isLoadingBinary, isError: binaryError, isFetching: fetchingBinary, refetch: retryBinary } = useQuery({
     queryKey: resourceKeys.previewBinary(resource.id, downloadUrl),
+    meta: { workspaceId: resource.workspace_id },
     queryFn: async () => {
       const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error("Preview request failed");

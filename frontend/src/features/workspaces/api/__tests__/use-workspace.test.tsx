@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useWorkspace } from "../use-workspace";
+import { revokeWorkspaceAccess, useWorkspace } from "../use-workspace";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api-error";
 import { shouldRetry } from "@/lib/should-retry";
@@ -45,5 +45,27 @@ describe("useWorkspace", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(get).toHaveBeenCalledTimes(1);
     expect(get).toHaveBeenCalledWith("/workspaces/ghost");
+  });
+});
+
+
+describe("workspace revocation query scope", () => {
+  it.each([
+    ["modes", ["auth", "modes"]],
+    ["reading", ["owner-sessions", "reading", "view", "all", "viewer"]],
+    ["installations", ["companion", "installations"]],
+    ["config-status", ["integrations", "config-status"]],
+    ["lifecycle-kinds", ["config", "lifecycle-kinds"]],
+    ["resource-id", ["file-preview", "resource-id", "signed-url"]],
+    ["agent-id", ["agents", "agent-id"]],
+    ["agent-id", ["agents", "agent-id", "budget-status"]],
+  ] as const)("preserves non-workspace cache whose identifier matches slug %s", (slug, unrelatedKey) => {
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+    client.setQueryData(unrelatedKey, { retained: true });
+    client.setQueryData(["notes", slug], { private: true });
+    revokeWorkspaceAccess(client, slug);
+    expect(client.getQueryData(unrelatedKey)).toEqual({ retained: true });
+    expect(client.getQueryData(["notes", slug])).toBeUndefined();
+    client.clear();
   });
 });

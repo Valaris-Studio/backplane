@@ -96,15 +96,27 @@ device_router = APIRouter(
 )
 
 
-async def get_device_installation(
+async def get_capture_installation(
     request: Request, db: AsyncSession = Depends(get_db, scope="function")
 ) -> CompanionInstallation:
-    """Device-token auth. `bpc_` tokens are accepted here and nowhere else."""
+    """Device-token auth for the headless uplink only (`/me`, `/policy`,
+    `/status`, `/ingest`, `/contents/*`): any token scope. `bpc_` tokens are
+    accepted on device routes and nowhere else."""
     installation = await CompanionService(db).authenticate_device(
         request.headers.get("Authorization", "")
     )
-    # Lets the rate limiter keep this token's device budget (core/rate_limit.py).
+    # Lets the rate limiter keep this token's device budget (core/rate_limit.py),
+    # even when get_device_installation then refuses its scope.
     request.state.device_verified = True
+    return installation
+
+
+async def get_device_installation(
+    installation: CompanionInstallation = Depends(get_capture_installation),
+) -> CompanionInstallation:
+    """Every other device route: a capture-only token is refused. The default,
+    so a new device route stays closed to it unless it is added to the uplink."""
+    CompanionService.require_full_token(installation)
     return installation
 
 
@@ -172,6 +184,24 @@ async def rotate_device_token(
 ):
     """Mint a new device token; the previous one stops working immediately."""
     return await CompanionService(db).rotate_token(user.id, installation_id)
+
+
+@router.post("/{installation_id}/capture-only", response_model=InstallationRead)
+async def restrict_to_capture(
+    installation_id: uuid.UUID,
+    background: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Limit the device's token to capture, permanently: it keeps working on
+    `/me`, `/policy`, `/status`, `/ingest` and content uploads only, and its
+    agent key is deleted. For full authority again, enroll a new installation.
+    Repeating it returns 200; 409 for a revoked device."""
+    result, invalidations = await CompanionService(db).restrict_to_capture(
+        user.id, installation_id
+    )
+    background.add_task(publish_invalidations, invalidations)
+    return result
 
 
 @router.delete("/{installation_id}", response_model=InstallationRead)
@@ -280,7 +310,7 @@ async def delete_mapping(
 @device_router.get("/policy", response_model=DevicePolicy)
 async def device_policy(
     capabilities: str | None = Header(None, alias=CAPABILITIES_HEADER, max_length=512),
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Capture policy, this installation's mappings, and the repositories bound
@@ -348,7 +378,7 @@ async def rename_own_installation(
 async def report_status(
     data: DeviceStatusReport,
     background: BackgroundTasks,
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Heartbeat. Marks the device seen and stores its report at most once a
@@ -397,7 +427,7 @@ async def create_device_mapping(
 
 @device_router.get("/me", response_model=DeviceIdentity)
 async def device_identity(
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Who this device captures for, and which installation it is."""
@@ -530,7 +560,7 @@ async def _bounded_body(request: Request) -> bytes:
 async def ingest(
     request: Request,
     background: BackgroundTasks,
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Store capture records. Each record is acknowledged or rejected on its
@@ -602,7 +632,7 @@ async def put_content_chunk(
     index: int,
     request: Request,
     chunk_sha256: str = Header(alias=CHUNK_DIGEST_HEADER, pattern=r"^[0-9a-f]{64}$"),
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Upload one chunk of a body the ingest answered `upload_required`. The
@@ -628,7 +658,7 @@ async def finalize_content(
     content_id: uuid.UUID,
     data: FinalizeRequest,
     background: BackgroundTasks,
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Compose the chunks and publish the body once it matches its
@@ -654,7 +684,7 @@ async def finalize_content(
 @device_router.get("/contents/{content_id}", response_model=ContentUploadState)
 async def get_content_upload(
     content_id: uuid.UUID,
-    installation: CompanionInstallation = Depends(get_device_installation),
+    installation: CompanionInstallation = Depends(get_capture_installation),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Where an upload stands, to resume it."""
