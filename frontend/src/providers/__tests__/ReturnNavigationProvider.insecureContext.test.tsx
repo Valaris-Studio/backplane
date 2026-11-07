@@ -131,7 +131,7 @@ it("captures opaque private returns without randomUUID and still expires evicted
   expect(fixture.ui.getByRole("link", { name: "Return to private origin" })).toHaveAttribute("href", origin);
   await user.click(fixture.ui.getByRole("link", { name: "Return to private origin" }));
   await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash).toBe(origin));
-  expect(fixture.ui.getByRole("link", { name: "Open shared destination" })).toHaveFocus();
+  expect(await fixture.ui.findByRole("link", { name: "Open shared destination" })).toHaveFocus();
   await user.click(fixture.ui.getByRole("link", { name: "Open shared destination" }));
   for (let step = 1; step <= 21; step += 1) {
     await user.click(fixture.ui.getByRole("link", { name: "Visit another actual entry" }));
