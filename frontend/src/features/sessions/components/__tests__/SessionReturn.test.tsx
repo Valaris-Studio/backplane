@@ -34,7 +34,7 @@ describe("SessionDetailPage return through the real router", () => {
     await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(origin));
     expect(router.state.location.key).toBe(originKey);
     expect(router.state.historyAction).toBe("POP");
-    const source = screen.getByRole("link", { name: "Read selected note evidence" });
+    const source = await screen.findByRole("link", { name: "Read selected note evidence" });
     expect(source).toBeVisible();
     expect(source).toHaveFocus();
     await act(async () => { await router.navigate(1); });
