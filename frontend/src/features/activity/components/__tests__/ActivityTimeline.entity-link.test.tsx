@@ -82,7 +82,7 @@ beforeEach(async () => {
 });
 
 describe("ActivityTimeline — entity linking", () => {
-  it("links a card-entity row to the card deep-link using entity_title as the label", () => {
+  it("links a card-entity row to its exact destination using the authorized summary as the label", () => {
     activitiesRef.current = [
       makeActivity({
         id: "a-card",
@@ -95,16 +95,16 @@ describe("ActivityTimeline — entity linking", () => {
     ];
     renderTimeline();
 
-    const link = screen.getByRole("link", { name: "Ship the login flow" });
+    const link = screen.getByRole("link", { name: "changed the priority" });
     expect(link).toHaveAttribute(
       "href",
       "/acme/boards/board-7/kanban?card=card-42",
     );
-    // The descriptive prose stays alongside the linked title chip.
+    // The authorized message itself is the link; no duplicate title chip is needed.
     expect(screen.getByText(/changed the priority/)).toBeInTheDocument();
   });
 
-  it("links a note-entity row to the board notes page using entity_title", () => {
+  it("links a note-entity row to its exact destination using the authorized summary", () => {
     activitiesRef.current = [
       makeActivity({
         id: "a-note",
@@ -117,7 +117,7 @@ describe("ActivityTimeline — entity linking", () => {
     ];
     renderTimeline();
 
-    const link = screen.getByRole("link", { name: "Release checklist" });
+    const link = screen.getByRole("link", { name: "edited the note" });
     // ?note=<id> is the notes page's deep-link contract (NoteList opens the
     // editor on arrival) — the link targets the note, not just the list.
     expect(link).toHaveAttribute("href", "/acme/boards/board-7/notes?note=note-9");
@@ -140,7 +140,7 @@ describe("ActivityTimeline — entity linking", () => {
     expect(screen.getByText(/renamed the workspace/)).toBeInTheDocument();
   });
 
-  it("renders a card row without entity_title as plain summary (no chip, no link)", () => {
+  it("links a card row by exact identity even without entity_title", () => {
     activitiesRef.current = [
       makeActivity({
         id: "a-card-untitled",
@@ -153,7 +153,9 @@ describe("ActivityTimeline — entity linking", () => {
     ];
     renderTimeline();
 
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "moved the card" })).toHaveAttribute(
+      "href", "/acme/boards/board-7/kanban?card=card-99",
+    );
     expect(screen.getByText(/moved the card/)).toBeInTheDocument();
   });
 

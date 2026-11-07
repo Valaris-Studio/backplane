@@ -4,6 +4,8 @@
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.engine import RowMapping
+from sqlalchemy.orm import aliased
 
 from app.models.resources.resource import Resource, ResourceType
 from app.repositories.base import BaseRepository
@@ -29,12 +31,41 @@ class ResourceRepository(BaseRepository[Resource]):
         return list(result.scalars().all())
 
     async def list_by_parent(self, parent_id: uuid.UUID) -> list[Resource]:
+        parent = aliased(Resource)
         result = await self.db.execute(
             select(Resource)
-            .where(Resource.parent_id == parent_id)
+            .join(parent, Resource.parent_id == parent.id)
+            .where(
+                parent.id == parent_id,
+                Resource.workspace_id == parent.workspace_id,
+                Resource.board_id.is_not_distinct_from(parent.board_id),
+            )
             .order_by(Resource.resource_type.desc(), Resource.name.asc())
         )
         return list(result.scalars().all())
+
+    async def get_folder_location(
+        self,
+        resource_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID | None,
+    ) -> RowMapping | None:
+        result = await self.db.execute(
+            select(
+                Resource.id,
+                Resource.name,
+                Resource.resource_type,
+                Resource.workspace_id,
+                Resource.board_id,
+                Resource.parent_id,
+            ).where(
+                Resource.id == resource_id,
+                Resource.workspace_id == workspace_id,
+                Resource.board_id == board_id,
+                Resource.resource_type == ResourceType.folder,
+            )
+        )
+        return result.mappings().one_or_none()
 
     async def list_root_by_workspace(self, workspace_id: uuid.UUID) -> list[Resource]:
         result = await self.db.execute(

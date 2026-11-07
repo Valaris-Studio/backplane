@@ -273,6 +273,11 @@ class NoteRead(UTCModel):
     failure_class: str | None = None
     findings: list[Finding] | None = None
     source_execution_id: uuid.UUID | None = None
+    # Server-stamped attribution: who wrote the note, who pinned it and when.
+    author_principal_kind: Literal["user", "installation", "agent"] | None = None
+    author_agent_id: uuid.UUID | None = None
+    pinned_by: uuid.UUID | None = None
+    pinned_at: datetime | None = None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -308,6 +313,11 @@ class NoteSummary(UTCModel):
     kind: str
     failure_class: str | None = None
     source_execution_id: uuid.UUID | None = None
+    # Server-stamped attribution: who wrote the note, who pinned it and when.
+    author_principal_kind: Literal["user", "installation", "agent"] | None = None
+    author_agent_id: uuid.UUID | None = None
+    pinned_by: uuid.UUID | None = None
+    pinned_at: datetime | None = None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime

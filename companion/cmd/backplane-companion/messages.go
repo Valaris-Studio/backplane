@@ -9,9 +9,11 @@ import (
 
 	"github.com/Valaris-Studio/backplane/companion/internal/agent"
 	"github.com/Valaris-Studio/backplane/companion/internal/beacon"
+	"github.com/Valaris-Studio/backplane/companion/internal/binding"
 	"github.com/Valaris-Studio/backplane/companion/internal/control"
 	"github.com/Valaris-Studio/backplane/companion/internal/credentials"
 	"github.com/Valaris-Studio/backplane/companion/internal/daemon"
+	"github.com/Valaris-Studio/backplane/companion/internal/hook"
 	"github.com/Valaris-Studio/backplane/companion/internal/service"
 	"github.com/Valaris-Studio/backplane/companion/internal/store"
 	"github.com/Valaris-Studio/backplane/companion/internal/uplink"
@@ -42,12 +44,51 @@ var (
 	errTooManyProjects  = errors.New("too_many_projects")
 )
 
+// Headless (operator-managed) refusals and the reasons a headless daemon
+// holds capture.
+var (
+	errCredentialSourceConflict  = errors.New("credential_source_conflict")
+	errHeadlessOperatorManaged   = errors.New("headless_operator_managed")
+	errHeadlessConfigInvalid     = errors.New("headless_config_invalid")
+	errCredentialRejected        = errors.New("credential_rejected")
+	errUpstreamUnauthorized      = errors.New("upstream_unauthorized")
+	errUpstreamForbidden         = errors.New("upstream_forbidden")
+	errCompanionUnavailable      = errors.New("companion_unavailable")
+	errEndpointRedirected        = errors.New("endpoint_redirected")
+	errIdentityMismatch          = errors.New("identity_mismatch")
+	errUnboundState              = errors.New("unbound_state")
+	errSwitchBlocked             = errors.New("switch_blocked")
+	errTokenNotReplacedForSwitch = errors.New("token_not_replaced_for_switch")
+	errTokenFileInDataRoot       = errors.New("token_file_in_data_root")
+)
+
 // errorCodes maps typed errors to stable codes. Order matters: the first
 // match wins, so specific errors come before general ones.
 var errorCodes = []struct {
 	err  error
 	code string
 }{
+	// Headless reasons wrap the uplink error they classify, so they come
+	// before it.
+	{errCredentialSourceConflict, "credential_source_conflict"},
+	{errHeadlessOperatorManaged, "headless_operator_managed"},
+	{errHeadlessConfigInvalid, "headless_config_invalid"},
+	{errCredentialRejected, "credential_rejected"},
+	{errUpstreamUnauthorized, "upstream_unauthorized"},
+	{errUpstreamForbidden, "upstream_forbidden"},
+	{errCompanionUnavailable, "companion_unavailable"},
+	{errEndpointRedirected, "endpoint_redirected"},
+	{errIdentityMismatch, "identity_mismatch"},
+	{errUnboundState, "unbound_state"},
+	{errSwitchBlocked, "switch_blocked"},
+	{errTokenNotReplacedForSwitch, "token_not_replaced_for_switch"},
+	{errTokenFileInDataRoot, "token_file_in_data_root"},
+	{binding.ErrSwitchInProgress, "switch_in_progress"},
+	{binding.ErrRecordInvalid, "binding_record_invalid"},
+	{credentials.ErrCredentialMissing, "credential_missing"},
+	{credentials.ErrCredentialUnsafe, "credential_unsafe"},
+	{credentials.ErrCredentialMalformed, "credential_malformed"},
+	{credentials.ErrCredentialUnreadable, "credential_unreadable"},
 	{errUsage, "usage"},
 	{errNotConnected, "not_connected"},
 	{errAlreadyConnected, "already_connected"},
@@ -55,6 +96,10 @@ var errorCodes = []struct {
 	{errSwitchInProgress, "pairing_persisting"},
 	{control.ErrUnsafeDirectory, "unsafe_control_directory"},
 	{control.ErrSocketInUse, "control_socket_in_use"},
+	{hook.ErrUnsafeDirectory, "unsafe_hook_directory"},
+	{hook.ErrSocketSubstituted, "hook_socket_substituted"},
+	{hook.ErrSocketInUse, "hook_socket_in_use"},
+	{hook.ErrSocketPathTooLong, "hook_socket_path_too_long"},
 	{errAPIKeyMissing, "api_key_missing"},
 	{errDaemonRunning, "daemon_running"},
 	{service.ErrDaemonStillRunning, "daemon_running"},
@@ -407,6 +452,26 @@ var messages = map[string][3]string{
 		"Los hooks del companion en el agente faltan o apuntan a otro lugar, así que sus sesiones no se capturan. Ejecuta agents install para este agente.",
 		"Os hooks do companion no agente estão ausentes ou apontam para outro lugar, então suas sessões não são capturadas. Execute agents install para este agente.",
 	},
+	"unsafe_hook_directory": {
+		"The hook socket's directory was refused. It must be an existing directory owned by this user, writable by no one else and not a symlink, holding nothing but the hook socket.",
+		"Se rechazó el directorio del socket de hooks. Debe ser un directorio existente cuyo dueño sea este usuario, que nadie más pueda modificar, que no sea un enlace simbólico y que solo contenga el socket de hooks.",
+		"O diretório do socket de hooks foi recusado. Ele deve ser um diretório existente cujo dono seja este usuário, que ninguém mais possa alterar, que não seja um link simbólico e que contenha apenas o socket de hooks.",
+	},
+	"hook_socket_substituted": {
+		"Something replaced the hook socket right after it was created. The daemon stopped serving it; check who can write its directory.",
+		"Algo reemplazó el socket de hooks justo después de crearlo. El daemon dejó de servirlo; revisa quién puede escribir en su directorio.",
+		"Algo substituiu o socket de hooks logo depois de ele ser criado. O daemon parou de servi-lo; verifique quem pode escrever no diretório dele.",
+	},
+	"hook_socket_in_use": {
+		"Another process is serving the hook socket path. Stop it, or point hook_socket elsewhere.",
+		"Otro proceso está sirviendo la ruta del socket de hooks. Deténlo o apunta hook_socket a otra ruta.",
+		"Outro processo está servindo o caminho do socket de hooks. Pare-o ou aponte hook_socket para outro caminho.",
+	},
+	"hook_socket_path_too_long": {
+		"The hook socket path is too long for a Unix socket. Choose a shorter hook_socket path.",
+		"La ruta del socket de hooks es demasiado larga para un socket Unix. Elige una ruta hook_socket más corta.",
+		"O caminho do socket de hooks é longo demais para um socket Unix. Escolha um caminho hook_socket mais curto.",
+	},
 	"unsafe_control_directory": {
 		"The local control socket was not started: the companion data directory is accessible to other users or holds something unexpected at control.sock. The companion keeps capturing.",
 		"No se inició el socket de control local: el directorio de datos del companion es accesible para otros usuarios o contiene algo inesperado en control.sock. El companion sigue capturando.",
@@ -416,6 +481,101 @@ var messages = map[string][3]string{
 		"Another process is serving the companion's local control socket; this daemon runs without it.",
 		"Otro proceso está sirviendo el socket de control local del companion; este daemon funciona sin él.",
 		"Outro processo está servindo o socket de controle local do companion; este daemon funciona sem ele.",
+	},
+	"credential_source_conflict": {
+		"Headless mode reads its device token only from the operator's token file. Unset BACKPLANE_COMPANION_KEYRING to run it.",
+		"El modo headless lee su token de dispositivo solo del archivo de token del operador. Quita BACKPLANE_COMPANION_KEYRING para ejecutarlo.",
+		"O modo headless lê o token do dispositivo somente do arquivo de token do operador. Remova BACKPLANE_COMPANION_KEYRING para executá-lo.",
+	},
+	"headless_operator_managed": {
+		"This data directory is operator-managed (headless): its connection comes from the operator's config file, so this is not available here.",
+		"Este directorio de datos lo gestiona el operador (headless): su conexión viene del archivo de configuración del operador, así que esto no está disponible aquí.",
+		"Este diretório de dados é gerenciado pelo operador (headless): a conexão vem do arquivo de configuração do operador, então isto não está disponível aqui.",
+	},
+	"headless_config_invalid": {
+		"The headless config was refused. It must be an absolute path to a regular file owned by root or this user, writable by no one else, in a directory under the same rules, with only known fields and valid values.",
+		"Se rechazó la configuración headless. Debe ser una ruta absoluta a un archivo normal cuyo dueño sea root o este usuario, que nadie más pueda modificar, en un directorio con las mismas reglas, solo con campos conocidos y valores válidos.",
+		"A configuração headless foi recusada. Ela deve ser um caminho absoluto para um arquivo comum cujo dono seja root ou este usuário, que ninguém mais possa alterar, em um diretório com as mesmas regras, apenas com campos conhecidos e valores válidos.",
+	},
+	"credential_missing": {
+		"The operator's device token file is missing. Capture and uploads wait until it is back; the queue is kept.",
+		"Falta el archivo de token de dispositivo del operador. La captura y los envíos esperan a que vuelva; la cola se conserva.",
+		"O arquivo de token do dispositivo do operador está ausente. A captura e os envios aguardam até que ele volte; a fila é mantida.",
+	},
+	"credential_unsafe": {
+		"The operator's device token file is not safe to use (its owner, mode, links or directories). Capture and uploads wait until it is fixed; the queue is kept.",
+		"El archivo de token de dispositivo del operador no es seguro (su dueño, permisos, enlaces o directorios). La captura y los envíos esperan a que se corrija; la cola se conserva.",
+		"O arquivo de token do dispositivo do operador não é seguro (dono, permissões, links ou diretórios). A captura e os envios aguardam até que seja corrigido; a fila é mantida.",
+	},
+	"credential_malformed": {
+		"The operator's device token file does not hold exactly one device token. Capture and uploads wait until it does; the queue is kept.",
+		"El archivo de token de dispositivo del operador no contiene exactamente un token de dispositivo. La captura y los envíos esperan a que lo contenga; la cola se conserva.",
+		"O arquivo de token do dispositivo do operador não contém exatamente um token de dispositivo. A captura e os envios aguardam até que contenha; a fila é mantida.",
+	},
+	"credential_unreadable": {
+		"The operator's device token file cannot be read. Capture and uploads wait until it can; the queue is kept.",
+		"No se puede leer el archivo de token de dispositivo del operador. La captura y los envíos esperan a que se pueda; la cola se conserva.",
+		"Não é possível ler o arquivo de token do dispositivo do operador. A captura e os envios aguardam até que seja possível; a fila é mantida.",
+	},
+	"credential_rejected": {
+		"Backplane rejected the device token (revoked or rotated). It is not sent again until the operator replaces the token file; the queue is kept.",
+		"Backplane rechazó el token de dispositivo (revocado o rotado). No se vuelve a enviar hasta que el operador reemplace el archivo de token; la cola se conserva.",
+		"O Backplane recusou o token do dispositivo (revogado ou rotacionado). Ele não é enviado de novo até que o operador substitua o arquivo de token; a fila é mantida.",
+	},
+	"upstream_unauthorized": {
+		"Something in front of Backplane, such as a proxy or a sign-in page, refused the request. Capture and uploads wait and try again.",
+		"Algo delante de Backplane, como un proxy o una página de inicio de sesión, rechazó la solicitud. La captura y los envíos esperan y lo vuelven a intentar.",
+		"Algo na frente do Backplane, como um proxy ou uma página de login, recusou a solicitação. A captura e os envios aguardam e tentam de novo.",
+	},
+	"upstream_forbidden": {
+		"Backplane refused this device's request. Capture and uploads wait and try again.",
+		"Backplane rechazó la solicitud de este dispositivo. La captura y los envíos esperan y lo vuelven a intentar.",
+		"O Backplane recusou a solicitação deste dispositivo. A captura e os envios aguardam e tentam de novo.",
+	},
+	"companion_unavailable": {
+		"The endpoint has no Companion API: it is turned off there, or the endpoint is not the Backplane API origin. Capture and uploads wait and try again.",
+		"El endpoint no tiene la API de Companion: está desactivada allí o el endpoint no es el origen de la API de Backplane. La captura y los envíos esperan y lo vuelven a intentar.",
+		"O endpoint não tem a API do Companion: ela está desativada lá ou o endpoint não é a origem da API do Backplane. A captura e os envios aguardam e tentam de novo.",
+	},
+	"endpoint_redirected": {
+		"The endpoint answered with a redirect, which is never followed. Configure the Backplane API origin itself.",
+		"El endpoint respondió con una redirección, que nunca se sigue. Configura directamente el origen de la API de Backplane.",
+		"O endpoint respondeu com um redirecionamento, que nunca é seguido. Configure diretamente a origem da API do Backplane.",
+	},
+	"identity_mismatch": {
+		"Backplane reports another installation or owner for this token than the config names. Nothing is captured or uploaded until they match, and nothing was moved.",
+		"Backplane indica otra instalación u otro dueño para este token que los de la configuración. No se captura ni se envía nada hasta que coincidan, y no se movió nada.",
+		"O Backplane informa outra instalação ou outro dono para este token do que os da configuração. Nada é capturado nem enviado até que coincidam, e nada foi movido.",
+	},
+	"unbound_state": {
+		"This data directory holds a desktop connection's state, which headless mode never adopts. Use an empty data directory or move that state aside.",
+		"Este directorio de datos contiene el estado de una conexión de escritorio, que el modo headless nunca adopta. Usa un directorio de datos vacío o aparta ese estado.",
+		"Este diretório de dados contém o estado de uma conexão de desktop, que o modo headless nunca adota. Use um diretório de dados vazio ou mova esse estado para outro lugar.",
+	},
+	"switch_in_progress": {
+		"A switch to the identity the config now names has not finished. Nothing is sent until it does.",
+		"No terminó el cambio a la identidad que ahora indica la configuración. No se envía nada hasta que termine.",
+		"A troca para a identidade que a configuração agora indica não terminou. Nada é enviado até que termine.",
+	},
+	"switch_blocked": {
+		"A switch cannot finish: the data directory entry named in blocked_by is in its way, and is never merged into or replaced. Nothing is sent. Move that entry out of the data directory and the switch finishes.",
+		"Un cambio no puede terminar: la entrada del directorio de datos indicada en blocked_by está en medio, y nunca se fusiona ni se reemplaza. No se envía nada. Saca esa entrada del directorio de datos y el cambio termina.",
+		"Uma troca não pode terminar: a entrada do diretório de dados indicada em blocked_by está no caminho, e nunca é mesclada nem substituída. Nada é enviado. Retire essa entrada do diretório de dados e a troca termina.",
+	},
+	"token_not_replaced_for_switch": {
+		"The config names another identity, but the token file is the one verified for the current binding, which is never presented to another server. Nothing is sent or moved until the operator replaces the token file.",
+		"La configuración indica otra identidad, pero el archivo de token es el verificado para el vínculo actual, que nunca se presenta a otro servidor. No se envía ni se mueve nada hasta que el operador reemplace el archivo de token.",
+		"A configuração indica outra identidade, mas o arquivo de token é o verificado para o vínculo atual, que nunca é apresentado a outro servidor. Nada é enviado nem movido até que o operador substitua o arquivo de token.",
+	},
+	"token_file_in_data_root": {
+		"The headless config's token_file is inside the data directory. Keep the token file outside it.",
+		"El token_file de la configuración headless está dentro del directorio de datos. Mantén el archivo de token fuera de él.",
+		"O token_file da configuração headless está dentro do diretório de dados. Mantenha o arquivo de token fora dele.",
+	},
+	"binding_record_invalid": {
+		"binding.json in the data directory is unreadable or damaged. Capture and uploads wait until it is repaired.",
+		"No se puede leer binding.json en el directorio de datos o está dañado. La captura y los envíos esperan a que se repare.",
+		"O binding.json no diretório de dados está ilegível ou danificado. A captura e os envios aguardam até que seja reparado.",
 	},
 	"internal_error": {
 		"Unexpected error.",

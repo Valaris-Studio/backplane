@@ -612,9 +612,8 @@ describe("explicit excerpt publication through the session reader", () => {
     expect(within(dialog).getByLabelText("Card (optional)")).toBeDisabled();
     expect(within(dialog).getByRole("region", { name: "Note content" }).querySelector('[contenteditable="true"]')).toBeNull();
     await user.keyboard("{Escape}");
-    const remainingDialog = screen.queryByRole("dialog", { name: "Share as note" });
-    const close = remainingDialog && within(remainingDialog).queryByRole("button", { name: /^(?:close|dismiss)$/i });
-    if (close) await user.click(close);
+    // The outgoing dialog retains its buttons during exit; recovery must use Resume.
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
     state.items = [unselected];
     if (sourceLoss === "404") server.use(http.get(`${CONTENTS_PATH}/window`, () => HttpResponse.json({ detail: "Source deleted", error_code: "content_not_found" }, { status: 404 })));
     await act(() => client.invalidateQueries({ queryKey: sessionKeys.all(SLUG) }));
@@ -622,13 +621,11 @@ describe("explicit excerpt publication through the session reader", () => {
       await screen.findByText("Linked record unavailable");
       expect(screen.getByRole("button", { name: "Resume note save" })).toBeVisible();
     }
-    // Dismissal is permitted, but it must preserve an accessible recovery action.
-    let retry = screen.queryByRole("button", { name: "Retry save" });
-    if (!retry) {
-      await user.click(screen.getByRole("button", { name: "Resume note save" }));
-      retry = screen.getByRole("button", { name: "Retry save" });
-    }
-    await user.click(retry);
+    await user.click(await screen.findByRole("button", { name: "Resume note save" }));
+    const resumedDialog = await screen.findByRole("dialog", { name: "Share as note" });
+    expect(resumedDialog).not.toBe(dialog);
+    expect(state.writes).toHaveLength(1);
+    await user.click(within(resumedDialog).getByRole("button", { name: "Retry save" }));
     await waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]).toEqual(sent);
     expect(state.bodies).toEqual([CONTENT_ID]);

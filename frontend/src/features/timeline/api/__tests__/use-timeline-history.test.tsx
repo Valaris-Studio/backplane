@@ -1,10 +1,12 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { webcrypto } from "node:crypto";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { BrowserRouter } from "react-router-dom";
 import { ApiError } from "@/lib/api-error";
 import type { WebSocketEvent } from "@/lib/websocket";
 import { useTimelineHistory } from "../use-timeline-history";
@@ -28,10 +30,22 @@ let client: QueryClient;
 let windowRequests: Array<Record<string, unknown>>;
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return <QueryClientProvider client={client}><BrowserRouter>{children}</BrowserRouter></QueryClientProvider>;
 }
 
+const originalSubtle = Object.getOwnPropertyDescriptor(globalThis.crypto, "subtle");
+beforeAll(() => {
+  // jsdom supplies randomUUID but no SubtleCrypto. Keep real browser-facing
+  // randomness and use Node's actual Web Crypto digest implementation.
+  if (!globalThis.crypto.subtle) Object.defineProperty(globalThis.crypto, "subtle", { configurable: true, value: webcrypto.subtle });
+});
+afterAll(() => {
+  if (originalSubtle) Object.defineProperty(globalThis.crypto, "subtle", originalSubtle);
+  else Reflect.deleteProperty(globalThis.crypto, "subtle");
+});
+
 beforeEach(() => {
+  window.history.replaceState({ idx: 0, key: "history-hook-origin", usr: null }, "", "/test-ws/boards/development/timeline");
   get.mockReset();
   post.mockReset();
   subscriptions.length = 0;
@@ -39,6 +53,7 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity }, mutations: { retry: false } } });
   post.mockResolvedValue({ data: generation() });
   get.mockImplementation(async (url: string, config?: { params?: Record<string, unknown> }) => {
+    if (url === "/me") return { data: { id: "user-me", name: "Timeline viewer", email: "timeline@example.test", avatar_url: null } };
     const id = url.split("/generations/")[1]?.split("/")[0] ?? GENERATION_ID;
     if (url.endsWith("/overview")) return { data: overview(id) };
     if (url.endsWith("/window")) {

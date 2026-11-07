@@ -68,6 +68,18 @@ export const ES_GETTING_STARTED = {
       "Crea una tarjeta con una lista Markdown y un bloque Mermaid, recarga el tablero, vuelve a abrir la tarjeta y exporta una nota relacionada como .md. Así verificas el editor, la base de datos y la ruta del tablero antes de que un runner entre en el ciclo.",
   },
   "installing-the-mcp-server": {
+    "Pick up an existing card":
+      "Retoma una tarjeta existente",
+    "Read the selected card's context":
+      "Lee el contexto de la tarjeta seleccionada",
+    "Project context works without captured sessions. Companion is optional. After choosing an existing card, read the board briefing and then request its card snapshot with include_context=True.":
+      "El contexto del proyecto funciona sin sesiones capturadas. Companion es opcional. Después de elegir una tarjeta existente, lee el resumen del tablero y solicita la instantánea de contexto de la tarjeta con include_context=True.",
+    "Use MCP 0.9.5 with a backend that supports interactive snapshots. The card response names bootstrap as its purpose and includes manifest schema version 0. Upgrade the backend first if that context is unavailable.":
+      "Usa MCP 0.9.5 con un backend compatible con instantáneas interactivas. La respuesta de la tarjeta indica bootstrap como propósito e incluye la versión 0 del esquema del manifiesto. Actualiza primero el backend si ese contexto no está disponible.",
+    "Read the declared omissions and truncation hints. Fetch the governing notes or definitions needed for this task with get_note or get_definition before relying on the snapshot; do not infer omitted content.":
+      "Revisa las omisiones declaradas y los avisos de truncamiento. Obtén las notas o definiciones que rigen esta tarea con get_note o get_definition antes de basarte en la instantánea; no infieras el contenido omitido.",
+    "Blocks label directives as instruction, human notes as content with their author, and agent working notes and evidence as quoted data, not instruction. Unknown authors remain unknown, including on legacy pinned notes; pinning alone does not verify authorship.":
+      "Los bloques etiquetan las directivas como instruction, las notas humanas como content con su autor y las notas de trabajo de agentes y las evidencias como quoted data, not instruction. Los autores desconocidos siguen siendo desconocidos, incluso en notas fijadas antiguas; fijar una nota no verifica por sí solo su autoría.",
     "For every preset, resolve an authorized workspace from established context after whoami. If unresolved, call list_workspaces and use a returned slug. If the choice is ambiguous, ask the user to confirm. If no authorized workspace exists, report that limitation and stop workspace checks. Never invent a slug.":
       "Para cada preajuste, resuelve un espacio de trabajo autorizado a partir del contexto establecido después de whoami. Si no se puede resolver, llama a list_workspaces y usa un slug devuelto. Si la elección es ambigua, pide al usuario que la confirme. Si no existe ningún espacio de trabajo autorizado, informa de esa limitación y detén las comprobaciones del espacio. Nunca inventes un slug.",
     "Identity and workspace resolution":
@@ -144,8 +156,8 @@ export const ES_GETTING_STARTED = {
       "La entrada Mis sesiones aparece en la barra lateral solo cuando el servidor acepta sesiones de Companion. Quienes operan una instalación propia lo activan con COMPANION_ENABLED, y el nivel de contenido Rich necesita además RICH_CAPTURE_ENABLED. Ambas son false por defecto; consulta Variables de entorno.",
     "Install Companion":
       "Instala Companion",
-    "The packaged desktop app is available for macOS 13 or later, as one universal build for Apple silicon and Intel, Developer ID signed and notarized. The current preview is 0.1.1-preview.2. Download it from the My sessions page, or directly:":
-      "La app de escritorio empaquetada está disponible para macOS 13 o posterior, como una única compilación universal para Apple silicon e Intel, firmada con Developer ID y notarizada. La versión preliminar actual es 0.1.1-preview.2. Descárgala desde la página Mis sesiones o directamente:",
+    "The packaged desktop app is available for macOS 13 or later, as one universal build for Apple silicon and Intel, Developer ID signed and notarized. The current preview is 0.1.1-preview.3. Download it from the My sessions page, or directly:":
+      "La app de escritorio empaquetada está disponible para macOS 13 o posterior, como una única compilación universal para Apple silicon e Intel, firmada con Developer ID y notarizada. La versión preliminar actual es 0.1.1-preview.3. Descárgala desde la página Mis sesiones o directamente:",
     "macOS download":
       "Descarga para macOS",
     "Open the DMG, move Backplane Companion into Applications, then open it. On Linux and Windows the desktop app is a source build for now: the companion directory of the public repository documents the toolchain and the package builders.":
@@ -226,16 +238,16 @@ export const ES_GETTING_STARTED = {
     "This walkthrough proves a configured runner can authenticate, accept platform authority, claim eligible work, and report the result. The exact card movements, git actions, approvals, and pull-request behavior come from your saved lifecycle; they are not unconditional defaults.":
       "Este recorrido demuestra que un runner configurado puede autenticarse, aceptar la autoridad de la plataforma, asumir trabajo elegible e informar el resultado. Los movimientos exactos de tarjetas, las acciones de git, las aprobaciones y el comportamiento de los pull requests proceden del ciclo de vida guardado; no son valores predeterminados incondicionales.",
     "1. Obtain the published runner": "1. Obtén el runner publicado",
-    "Version 0.8.8 is published as checksummed macOS, Linux, and Windows binaries for arm64 and amd64. Select the filename for your host; this example is macOS arm64.":
-      "La versión 0.8.8 se publica como binarios de macOS, Linux y Windows para arm64 y amd64, con checksum. Selecciona el nombre de archivo para tu host; este ejemplo corresponde a macOS arm64.",
+    "Version 0.8.9 is published as checksummed macOS, Linux, and Windows binaries for arm64 and amd64. Select the filename for your host; this example is macOS arm64.":
+      "La versión 0.8.9 se publica como binarios de macOS, Linux y Windows para arm64 y amd64, con checksum. Selecciona el nombre de archivo para tu host; este ejemplo corresponde a macOS arm64.",
     "Download and verify the macOS arm64 binary": "Descarga y verifica el binario para macOS arm64",
     "Download and verify the Windows amd64 binary": "Descarga y verifica el binario para Windows amd64",
-    "A public container is also available at ghcr.io/valaris-studio/backplane-runner:0.8.8. A container deployment must mount both runner YAML and MCP JSON at the paths referenced by the YAML; the single-mount Compose profile does not do that completely.":
-      "También hay un contenedor público en ghcr.io/valaris-studio/backplane-runner:0.8.8. Un despliegue en contenedor debe montar tanto el YAML del runner como el JSON de MCP en las rutas indicadas por el YAML; el perfil de Compose con un solo montaje no lo hace por completo.",
+    "A public container is also available at ghcr.io/valaris-studio/backplane-runner:0.8.9. A container deployment must mount both runner YAML and MCP JSON at the paths referenced by the YAML; the single-mount Compose profile does not do that completely.":
+      "También hay un contenedor público en ghcr.io/valaris-studio/backplane-runner:0.8.9. Un despliegue en contenedor debe montar tanto el YAML del runner como el JSON de MCP en las rutas indicadas por el YAML; el perfil de Compose con un solo montaje no lo hace por completo.",
     "Pull the published container image": "Descarga la imagen publicada del contenedor",
     "Prepared context requires a compatible fleet": "El contexto preparado requiere una flota compatible",
-    "Runner 0.8.8 and platform 0.1.4-preview.2 support required-context policies and context budgets. Upgrade the platform first, inventory participating runners, and drain incompatible processes before enabling these policies. Keep legacy policies with no budgets until the fleet and rollback runtime are compatible. Installing an update does not enable a policy.":
-      "El runner 0.8.8 y la plataforma 0.1.4-preview.2 admiten políticas de contexto obligatorio y presupuestos de contexto. Actualiza primero la plataforma, identifica todos los runners participantes y espera a que los procesos incompatibles terminen su trabajo antes de activar estas políticas. Mantén las políticas heredadas sin presupuestos hasta que todos los procesos y la versión de respaldo sean compatibles. Instalar una actualización no activa ninguna política.",
+    "Runner 0.8.9 and platform 0.1.4-preview.4 support required-context policies and context budgets. Upgrade the platform first, inventory participating runners, and drain incompatible processes before enabling these policies. Keep legacy policies with no budgets until the fleet and rollback runtime are compatible. Installing an update does not enable a policy.":
+      "El runner 0.8.9 y la plataforma 0.1.4-preview.4 admiten políticas de contexto obligatorio y presupuestos de contexto. Actualiza primero la plataforma, identifica todos los runners participantes y espera a que los procesos incompatibles terminen su trabajo antes de activar estas políticas. Mantén las políticas heredadas sin presupuestos hasta que todos los procesos y la versión de respaldo sean compatibles. Instalar una actualización no activa ninguna política.",
     "2. Prepare the exported bundle": "2. Prepara el paquete exportado",
     "Download the runner-scoped bundle from the Launch runner wizard or the runner detail. Keep runner-laptop-seba.yaml beside mcp-config-laptop-seba.json. The YAML points at its sibling and both use $":
       "Descarga el paquete con alcance de runner desde el asistente Lanzar runner o desde el detalle del runner. Mantén runner-laptop-seba.yaml junto a mcp-config-laptop-seba.json. El YAML apunta a su archivo hermano y ambos usan $",

@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
@@ -39,6 +39,7 @@ import { ActivityTypeFilter } from "@/features/dashboard/components/ActivityType
 import { OnboardingChecklist } from "@/features/dashboard/components/OnboardingChecklist";
 import { WelcomeModal } from "@/features/dashboard/components/WelcomeModal";
 import { CompanionAnnouncement } from "@/features/sessions/components/CompanionAnnouncement";
+import { WorkspaceOwnerSessions } from "@/features/sessions/components/WorkspaceOwnerSessions";
 import { McpConnectionWizard } from "@/features/mcp-onboarding/McpConnectionWizard";
 import { ConnectAgentCallout } from "@/features/mcp-onboarding/components/ConnectAgentCallout";
 import {
@@ -51,13 +52,31 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
+import { ContextLink } from "@/components/shared/ContextLink";
+import { buildEntityLink, type EntityType } from "@/lib/entity-link";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import { WaveCard } from "@/features/visuals/components/WaveCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { scaleIn, staggerChildren } from "@/lib/animations";
 import { formatDate, formatPercentageSegments } from "@/lib/format";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { resolveActivityMessage } from "@/features/activity/utils/resolve-activity-message";
-import type { ActivityAction, ActivityEntityType } from "@/types/activity";
+import type { Activity, ActivityAction, ActivityEntityType } from "@/types/activity";
+
+const SUPPORTED_ENTITY_TYPES = new Set<EntityType>(["card", "note", "resource"]);
+
+function activityEntityHref(slug: string, activity: Activity): string | null {
+  if (activity.action === "deleted" || !activity.entity_id) return null;
+  if (!SUPPORTED_ENTITY_TYPES.has(activity.entity_type as EntityType)) {
+    return null;
+  }
+  return buildEntityLink({
+    slug,
+    type: activity.entity_type as EntityType,
+    id: activity.entity_id,
+    boardId: activity.board_id ?? undefined,
+  })?.href ?? null;
+}
 
 const actionIcons: Record<ActivityAction, typeof Plus> = {
   created: Plus,
@@ -112,6 +131,8 @@ const STAT_CARDS = [
 
 export function Dashboard() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
+  const returnNavigation = useReturnNavigation();
   const { data: summary, isLoading } = useDashboardSummary(slug!);
   const { data: agents } = useAgentMetrics(slug!);
   const { data: inflightExecs } = useInFlightExecutions(slug!);
@@ -183,8 +204,27 @@ export function Dashboard() {
     () => Array.from(new Set(allActivity.map((activity) => activity.entity_type))),
     [allActivity],
   );
-  const [activityTypeFilter, setActivityTypeFilter] =
-    useState<ActivityEntityType | null>(null);
+  const filterViewKey = `dashboard-activity-type:${slug ?? ""}`;
+  const [activityTypeFilter, setActivityTypeFilterState] =
+    useState<ActivityEntityType | null>(
+      () => returnNavigation?.readView<ActivityEntityType | null>(filterViewKey) ?? null,
+    );
+  const filterEntryRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const entryIdentity = `${location.key}:${filterViewKey}`;
+    if (filterEntryRef.current === entryIdentity) return;
+    filterEntryRef.current = entryIdentity;
+    setActivityTypeFilterState(
+      returnNavigation?.readView<ActivityEntityType | null>(filterViewKey) ?? null,
+    );
+  }, [location.key, returnNavigation, filterViewKey]);
+  const setActivityTypeFilter = useCallback(
+    (next: ActivityEntityType | null) => {
+      returnNavigation?.writeView(filterViewKey, next);
+      setActivityTypeFilterState(next);
+    },
+    [returnNavigation, filterViewKey],
+  );
   const effectiveTypeFilter =
     activityTypeFilter && feedEntityTypes.includes(activityTypeFilter)
       ? activityTypeFilter
@@ -322,6 +362,8 @@ export function Dashboard() {
           permanent re-entry point. */}
       <ConnectAgentCallout slug={slug!} onConnect={() => setMcpWizardOpen(true)} />
 
+      <WorkspaceOwnerSessions slug={slug!} />
+
       {isEmpty ? (
         <EmptyState
           icon={Rocket}
@@ -458,10 +500,14 @@ export function Dashboard() {
                 <div ref={activityRef} className="space-y-5">
                   {visibleActivity.map((activity) => {
                     const Icon = actionIcons[activity.action] || Pencil;
+                    const message = resolveActivityMessage(activity, t);
+                    const href = slug ? activityEntityHref(slug, activity) : null;
 
                     return (
                       <div
                         key={activity.id}
+                        id={`dashboard-activity-${activity.id}`}
+                        data-return-anchor={`dashboard-activity-${activity.id}`}
                         data-stagger-item
                         data-activity-id={activity.id}
                         className="group relative pl-8"
@@ -483,7 +529,22 @@ export function Dashboard() {
                             }}
                           />
                           <p className="text-sm font-medium text-foreground">
-                            {resolveActivityMessage(activity, t)}
+                            {href ? (
+                              <ContextLink
+                                id={`dashboard-activity-link-${activity.id}`}
+                                to={href}
+                                className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                {message}
+                              </ContextLink>
+                            ) : (
+                              message
+                            )}
+                            {!href && SUPPORTED_ENTITY_TYPES.has(activity.entity_type as EntityType) ? (
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                {t("navigation.destinationUnavailable")}
+                              </span>
+                            ) : null}
                           </p>
                           <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                             {timeAgo(activity.created_at)}

@@ -150,7 +150,7 @@ async def test_postgres_64mib_complete_scan_bounded_requests_and_real_plans(
     statements, requests, latencies = [], [], []
 
     def record_sql(_connection, _cursor, statement, parameters, _context, _many):
-        if statement.lstrip().upper().startswith("SELECT"):
+        if statement.lstrip().upper().startswith(("SELECT", "WITH")):
             statements.append((statement, parameters))
 
     event.listen(engine.sync_engine, "before_cursor_execute", record_sql)
@@ -357,7 +357,9 @@ async def test_postgres_prepared_object_cannot_resurrect_changed_or_deleted_sour
         assert response.status_code == 404
         async with pg["factory"].begin() as db:
             for table in searchable_tables():
-                assert await db.scalar(select(func.count()).select_from(table)) == 0
+                assert (
+                    await db.scalar(select(func.count()).select_from(table)) == 0
+                ), table.name
     else:
         assert response.status_code == 200, response.text
         assert all(

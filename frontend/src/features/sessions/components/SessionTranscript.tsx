@@ -22,6 +22,8 @@ import { ContentBody, CoverageBadge, CoverageNote } from "./ContentBody";
 import { ExcerptCheckbox, SessionExcerpt } from "./SessionExcerpt";
 import { Segmented } from "./controls";
 import { CallContentText } from "./PromptText";
+import { useReaderValue, type FindDestination, type FindReturn, type ReaderCheckpoint } from "../hooks/use-find-navigation";
+import type { ContentMatch } from "./ContentBody";
 
 type View = "conversation" | "everything";
 
@@ -33,22 +35,34 @@ interface SessionTranscriptProps {
   session: AgentSession;
   active?: boolean;
   headingRef?: RefCallback<HTMLHeadingElement>;
+  destination?: FindDestination | null;
+  restoration?: FindReturn | null;
+  onRestored?: (checkpoint: ReaderCheckpoint) => void;
+  onReturnAnchor?: () => void;
 }
 
 /** What rich capture kept in one bounded, source-ordered window. */
-export function SessionTranscript({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
-  return <SessionReaderActive.Provider value={active}><SessionTranscriptReader key={`${slug}/${session.id}`} slug={slug} session={session} active={active} headingRef={headingRef} /></SessionReaderActive.Provider>;
+export function SessionTranscript(props: SessionTranscriptProps) {
+  return <SessionReaderActive.Provider value={props.active ?? true}><SessionTranscriptReader key={`${props.slug}/${props.session.id}`} {...props} /></SessionReaderActive.Provider>;
 }
 
 const MAX_SELECTED_RECORDS = 1024;
 
-function SessionTranscriptReader({ slug, session, active = true, headingRef }: SessionTranscriptProps) {
+function SessionTranscriptReader({ slug, session, active = true, headingRef, destination, restoration, onRestored, onReturnAnchor }: SessionTranscriptProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const location = useLocation();
   const navigationType = useNavigationType();
   const routerNavigate = useNavigate();
   const anchor = location.hash.startsWith(ANCHOR_PREFIX) ? location.hash.slice(ANCHOR_PREFIX.length) : undefined;
+  const consumedHash = useRef<string | null>(null);
+  const hashIdentity = `${location.key}:${location.hash}`;
+  const navigatingFind = !!destination || !!restoration;
+  const suppressHash = navigatingFind || consumedHash.current === hashIdentity;
+  const appliedFind = useRef(0);
+  const appliedReturn = useRef(0);
+  const returnWindowRequest = useRef(0);
+  const completedReturn = useRef(0);
   const returnNavigation = useReturnNavigation();
   const viewKey = `session-reader-view:${slug}/${session.id}`;
   const [view, setViewState] = useState<View>(() => returnNavigation?.readView<View>(viewKey) ?? "conversation");
@@ -61,10 +75,10 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
     if (navigationType === "REPLACE") returnNavigation?.writeView(viewKey, view);
     else setViewState(returnNavigation?.readView<View>(viewKey) ?? "conversation");
   }, [location.key, navigationType, returnNavigation, viewKey, view]);
-  const setView = (next: View) => {
+  const setView = useCallback((next: View) => {
     returnNavigation?.writeView(viewKey, next);
     setViewState(next);
-  };
+  }, [returnNavigation, viewKey]);
   const [actionsHeight, setActionsHeight] = useState(0);
   const handoff = useHandoffDraft(slug, session.id);
   const clearHandoff = handoff.clear;
@@ -73,7 +87,8 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
   const selectedItems = useMemo(() => [...snapshots.values()], [snapshots]);
   const draft = handoff.state.draft;
   const contents = useSessionWindow(slug, session.id, active, anchor);
-  const items = contents.data?.items ?? [];
+  const { navigate: navigateWindow, navigation: windowNavigation, isSuccess, isPlaceholderData, isFetching, data: windowData } = contents;
+  const items = useMemo(() => contents.data?.items ?? [], [contents.data]);
   const entries = useMemo(() => transcriptEntries(items, { includeRaw: view === "everything" }), [items, view]);
   const visibleItems = useMemo(() => items.filter((item) => view === "everything" || item.channel !== "native_record"), [items, view]);
   const nativeCount = items.length - visibleItems.length;
@@ -89,15 +104,68 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
   const refused = error?.status === 401 || error?.status === 403;
   const unavailable = error?.status === 404 && error.errorCode === "content_not_found";
   const hasMore = !!contents.data?.earlier_cursor || !!contents.data?.later_cursor;
-  const linkedItem = useLinkedItem(items, entries, contents.isSuccess && !contents.isPlaceholderData, active);
+  const linkedItem = useLinkedItem(items, entries, contents.isSuccess && !contents.isPlaceholderData, active && !suppressHash);
   const unlocated = contents.legacy && linkedItem === "beyond";
+
+  useEffect(() => {
+    if (destination?.hit.source_kind !== "content" || appliedFind.current === destination.request || restoration) return;
+    appliedFind.current = destination.request;
+    consumedHash.current = hashIdentity;
+    pageScroll.current = null;
+    focusedContent.current = null;
+    if (destination.hit.channel === "native_record") setView("everything");
+    if (destination.hit.content_id && destination.hit.source_state === "available") navigateWindow({ mode: "anchor", anchor_id: destination.hit.content_id });
+  }, [destination, restoration, hashIdentity, navigateWindow, setView]);
+
+  useEffect(() => {
+    if (!restoration || appliedReturn.current === restoration.request) return;
+    appliedReturn.current = restoration.request;
+    returnWindowRequest.current = windowNavigation.request + 1;
+    consumedHash.current = hashIdentity;
+    pageScroll.current = null;
+    focusedContent.current = null;
+    setView(restoration.checkpoint.view ?? "conversation");
+    const retained = restoration.checkpoint.window;
+    if (restoration.recoverAnchor && restoration.checkpoint.anchorId?.startsWith("content-")) {
+      navigateWindow({ mode: "anchor", anchor_id: restoration.checkpoint.anchorId.slice("content-".length) });
+    } else navigateWindow({ mode: retained?.legacy ? "beginning" : "refresh", cursor: retained?.cursor });
+  }, [restoration, hashIdentity, navigateWindow, windowNavigation.request, setView]);
+
+  useEffect(() => {
+    if (!active || isPlaceholderData || !isSuccess || isFetching) return;
+    if (restoration && appliedReturn.current === restoration.request) {
+      if (windowNavigation.request !== returnWindowRequest.current || completedReturn.current === restoration.request) return;
+      const anchorId = restoration.checkpoint.anchorId;
+      const target = anchorId ? document.getElementById(anchorId) : heading.current;
+      if (!target) { onRestored?.(restoration.checkpoint); return; }
+      const restore = () => {
+        if (target.querySelector('[data-body-pending="true"]')) return;
+        completedReturn.current = restoration.request;
+        // Return owns this window's focus; ordinary navigation resumes with the next request.
+        focusedNavigation.current = windowNavigation.request;
+        onRestored?.(restoration.checkpoint);
+      };
+      restore();
+      const observer = new MutationObserver(restore);
+      observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-body-pending"] });
+      return () => observer.disconnect();
+    }
+    if (!destination || destination.hit.source_kind !== "content" || !destination.hit.content_id) return;
+    const target = document.getElementById(`content-${destination.hit.content_id}`);
+    if (!target) return;
+    const scroll = () => (target.querySelector("mark") ?? target).scrollIntoView?.({ block: "nearest" });
+    scroll();
+    const observer = new MutationObserver(scroll);
+    observer.observe(target, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [active, isPlaceholderData, isSuccess, isFetching, windowData, windowNavigation.request, destination, restoration, onRestored]);
 
   useEffect(() => {
     const identity = `${location.key}:${anchor ?? ""}`;
     if (observedHash.current === identity) return;
     observedHash.current = identity;
-    if (anchor && (contents.isPlaceholderData || !items.some((item) => item.id === anchor))) contents.navigate({ mode: "anchor", anchor_id: anchor });
-  }, [anchor, location.key, items, contents.isPlaceholderData, contents.navigate]);
+    if (anchor && (isPlaceholderData || !items.some((item) => item.id === anchor))) navigateWindow({ mode: "anchor", anchor_id: anchor });
+  }, [anchor, location.key, items, isPlaceholderData, navigateWindow]);
 
   useEffect(() => {
     if (!refused) return;
@@ -105,7 +173,7 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
   }, [refused, clearHandoff]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || navigatingFind) return;
     const rememberFocus = () => {
       const target = document.activeElement?.closest<HTMLElement>('[id^="content-"]');
       focusedContent.current = target && items.some((item) => itemAnchor(item) === target.id) ? target.id : null;
@@ -125,10 +193,10 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
       document.removeEventListener("focusin", rememberFocus);
       document.removeEventListener("focusout", forgetDeliberateBlur);
     };
-  }, [active, items]);
+  }, [active, items, navigatingFind]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || navigatingFind) return;
     const remember = () => {
       const candidates = items.map((item) => document.getElementById(`content-${item.id}`)).filter((element): element is HTMLElement => !!element);
       const visible = candidates.find((element) => element.getBoundingClientRect().bottom > 80);
@@ -137,10 +205,10 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
     remember();
     window.addEventListener("scroll", remember, { passive: true });
     return () => window.removeEventListener("scroll", remember);
-  }, [active, items]);
+  }, [active, items, navigatingFind]);
 
   useLayoutEffect(() => {
-    if (!active || contents.isPlaceholderData) return;
+    if (!active || contents.isPlaceholderData || navigatingFind) return;
     if (unavailable || unlocated) {
       const identity = `${location.key}:${contents.navigation.request}`;
       if (failedAnchor.current !== identity) {
@@ -170,7 +238,7 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
         if (delta) window.scrollBy({ top: delta, behavior: "instant" });
       }
     }
-  }, [active, contents.dataUpdatedAt, contents.isSuccess, contents.isPlaceholderData, contents.navigation, unavailable, unlocated, location.key]);
+  }, [active, contents.dataUpdatedAt, contents.isSuccess, contents.isPlaceholderData, contents.navigation, unavailable, unlocated, location.key, navigatingFind]);
 
   function navigate(request: ContentWindowRequest) {
     pageScroll.current = null;
@@ -218,7 +286,11 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
         <p className="text-muted-foreground">{t("sessions.contents.source.reference", { source: t(`sessions.contents.source.${nativeTarget.source.kind}`), order: nativeTarget.source.order })}</p>
         <CoverageNote item={nativeTarget} />
       </div> : null}
-      {contents.changed ? <p role="status" className="border-b border-border px-[var(--card-padding)] py-3 text-sm">{t("sessions.contents.window.changed")}</p> : null}
+      {restoration && contents.changed ? <div className="grid justify-items-start gap-2 px-[var(--card-padding)] py-3">
+        <p role="status" className="text-sm">{t("sessions.find.returnChanged")}</p>
+        <Button variant="outline" className="min-h-[44px] min-w-[44px]" onClick={onReturnAnchor}>{t("sessions.find.returnAnchor")}</Button>
+      </div> : contents.changed ? <p role="status" className="border-b border-border px-[var(--card-padding)] py-3 text-sm">{t("sessions.contents.window.changed")}</p> : null}
+      {destination?.hit.source_state === "unavailable" ? <p role="status" className="px-[var(--card-padding)] py-3 text-sm">{t("sessions.find.sourceUnavailable")}</p> : null}
       {contents.unsupported && !contents.legacy ? <div className="grid justify-items-start gap-3 px-[var(--card-padding)] py-6 text-sm">
         <p>{t("sessions.contents.window.unsupported")}</p>
         <Button variant="outline" size="sm" onClick={contents.readBeginningFallback}>{t("sessions.contents.window.beginningFallback")}</Button>
@@ -232,8 +304,8 @@ function SessionTranscriptReader({ slug, session, active = true, headingRef }: S
         {visibleItems.length ? <LoadedContentNavigation session={session} items={visibleItems} hasMore={hasMore} /> : null}
         {entries.length ? <ol aria-labelledby={headingId} className="flex flex-col">
           {entries.map((entry) => entry.type === "call"
-            ? <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} active={active && !contents.isPlaceholderData} />
-            : <TranscriptMessage key={entry.item.id} slug={slug} session={session} item={entry.item} selected={selected} onSelect={onSelect} />)}
+            ? <TranscriptCall key={entry.callId} slug={slug} sessionId={session.id} callId={entry.callId} parts={entry.parts} selected={selected} onSelect={onSelect} active={active && !contents.isPlaceholderData} suppressHash={suppressHash} destination={restoration ? null : destination} />
+            : <TranscriptMessage key={entry.item.id} slug={slug} session={session} item={entry.item} selected={selected} onSelect={onSelect} match={restoration ? undefined : contentMatch(destination, entry.item.id)} />)}
         </ol> : contents.isSuccess ? <p className="px-[var(--card-padding)] py-8 text-center text-sm text-muted-foreground">{t(items.length ? "sessions.contents.onlyRaw" : "sessions.contents.emptyRich")}</p> : null}
       </div> : null}
     </TranscriptFrame>
@@ -376,7 +448,7 @@ interface ExcerptSelection {
   onSelect: (id: string, checked: boolean) => void;
 }
 
-const TranscriptMessage = memo(function TranscriptMessage({ slug, session, item, selected, onSelect }: { slug: string; session: AgentSession; item: SessionContent } & ExcerptSelection) {
+const TranscriptMessage = memo(function TranscriptMessage({ slug, session, item, selected, onSelect, match }: { slug: string; session: AgentSession; item: SessionContent; match?: ContentMatch } & ExcerptSelection) {
   const { t } = useTranslation();
   const labelId = useId();
   const copy = useCopyItemLink(slug, session.id);
@@ -391,7 +463,7 @@ const TranscriptMessage = memo(function TranscriptMessage({ slug, session, item,
         <ItemMeta item={item} onCopy={() => void copy(item)} />
       </div>
       <CoverageNote item={item} />
-      <ContentBody slug={slug} sessionId={session.id} content={item} prose={PROSE.has(item.channel)} emphasis={item.channel === "prompt"} />
+      <ContentBody slug={slug} sessionId={session.id} content={item} prose={PROSE.has(item.channel)} emphasis={item.channel === "prompt"} match={match} />
     </li>
   );
 });
@@ -407,17 +479,21 @@ interface TranscriptCallProps extends ExcerptSelection {
   callId: string;
   parts: SessionContent[];
   active: boolean;
+  suppressHash: boolean;
+  destination?: FindDestination | null;
 }
 
-const TranscriptCall = memo(function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, active }: TranscriptCallProps) {
+const TranscriptCall = memo(function TranscriptCall({ slug, sessionId, callId, parts, selected, onSelect, active, suppressHash, destination }: TranscriptCallProps) {
   const { t } = useTranslation();
   const { hash, key } = useLocation();
-  const linkedId = parts.find((part) => hash === `#${itemAnchor(part)}`)?.id;
+  const linkedId = !suppressHash ? parts.find((part) => hash === `#${itemAnchor(part)}`)?.id : undefined;
+  const matched = parts.some((part) => destination?.hit.content_id === part.id);
   const labelId = useId();
   const panelId = useId();
-  const [open, setOpen] = useState(!!linkedId);
+  const [open, setOpen] = useReaderValue(`group:${callId}`, !!linkedId);
+  useEffect(() => { if (matched) setOpen(true); }, [matched, destination?.request, setOpen]);
   const appliedNavigation = useRef<{ key: string; target: string } | null>(null);
-  useEffect(() => { if (linkedId) setOpen(true); }, [linkedId, key]);
+  useEffect(() => { if (linkedId) setOpen(true); }, [linkedId, key, setOpen]);
   useEffect(() => {
     if (!open || !linkedId) {
       appliedNavigation.current = null;
@@ -467,7 +543,7 @@ const TranscriptCall = memo(function TranscriptCall({ slug, sessionId, callId, p
                 <h3 className="text-[0.78rem] font-semibold text-muted-foreground">{partLabel(part, t)}</h3>
               </div>
               <CoverageNote item={part} />
-              <ContentBody slug={slug} sessionId={sessionId} content={part} prose={false} />
+              <ContentBody slug={slug} sessionId={sessionId} content={part} prose={false} match={contentMatch(destination, part.id)} />
             </div>
           ))}
         </div>
@@ -475,3 +551,9 @@ const TranscriptCall = memo(function TranscriptCall({ slug, sessionId, callId, p
     </li>
   );
 });
+
+function contentMatch(destination: FindDestination | null | undefined, id: string): ContentMatch | undefined {
+  const hit = destination?.hit;
+  return hit?.content_id === id ? { request: destination!.request, byteStart: hit.byte_start, byteEnd: hit.byte_end,
+    offset: hit.snippet_byte_start ?? hit.byte_start, available: hit.source_state === "available" } : undefined;
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/Valaris-Studio/backplane/companion/internal/agent"
 	"github.com/Valaris-Studio/backplane/companion/internal/agent/claudecode"
 	"github.com/Valaris-Studio/backplane/companion/internal/agent/codex"
+	"github.com/Valaris-Studio/backplane/companion/internal/agent/hermes"
 	"github.com/Valaris-Studio/backplane/companion/internal/agent/pi"
 	"github.com/Valaris-Studio/backplane/companion/internal/agentaccess"
 	"github.com/Valaris-Studio/backplane/companion/internal/credentials"
@@ -55,8 +56,14 @@ type app struct {
 	now        func() time.Time
 	tempDirs   []string
 	keyring    credentialStore
-	readSecret func(prompt string) (string, error)
-	registry   *agent.Registry
+	// headless is set by `run --headless-config`: the device token then comes
+	// only from the operator's token file and keyring is never used.
+	headless *headlessConfig
+	// hookPeerUID reads a hook socket peer's uid; nil means the kernel's
+	// peer credentials (tests replace it to play the coding uid).
+	hookPeerUID func(net.Conn) (int, error)
+	readSecret  func(prompt string) (string, error)
+	registry    *agent.Registry
 	// computerName is the computer's own name as a valid device name, or "".
 	computerName func() string
 	// uid selects the launchd domain; serviceRunner runs launchctl, systemctl
@@ -115,7 +122,7 @@ func newApp() *app {
 		tempDirs:      defaultTempDirs(),
 		keyring:       selectKeyring(home),
 		readSecret:    readSecretFromTerminal,
-		registry:      agent.NewRegistry(claudecode.New(), pi.New(), codex.New()),
+		registry:      agent.NewRegistry(claudecode.New(), pi.New(), codex.New(), hermes.New()),
 		computerName:  func() string { return systemComputerNameSources().read(runtime.GOOS) },
 		uid:           os.Getuid(),
 		serviceRunner: service.ExecRunner{},

@@ -424,6 +424,7 @@ async def test_inspection_preserves_shared_note_export_context_selection_and_lin
         "kind", "failure_class", "findings", "source_execution_id", "created_by",
         "created_at", "updated_at",
         "history_revision", "revision_digest", "applied_revision", "changed", "replayed",
+        "author_principal_kind", "author_agent_id", "pinned_by", "pinned_at",
     }
     assert saved["history_revision"] == 1
     assert isinstance(saved["revision_digest"], str)

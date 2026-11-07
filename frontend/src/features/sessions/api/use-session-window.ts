@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isApiError } from "@/lib/api-error";
@@ -12,7 +12,7 @@ import { useForgetSessionContent } from "./use-session-realtime";
 import { retryServerErrors } from "./use-sessions";
 
 export interface ContentWindowRequest {
-  mode: Exclude<SessionContentWindowMode, "refresh">;
+  mode: SessionContentWindowMode;
   cursor?: string;
   anchor_id?: string;
 }
@@ -60,9 +60,12 @@ export function useSessionWindow(slug: string, sessionId: string, active: boolea
       } catch (error) {
         if (!signal.aborted && isApiError(error)) {
           if ([401, 403].includes(error.status)) {
-            returnNavigation?.forget();
             queryClient.setQueryData(sessionKeys.detail(slug, sessionId), null);
             forgetContent(slug, sessionId);
+            returnNavigation?.forget(`/${slug}/sessions/${sessionId}`);
+          }
+          if (error.status === 404 && error.errorCode === "content_not_found") {
+            void queryClient.refetchQueries({ queryKey: sessionKeys.detail(slug, sessionId), exact: true });
           }
           if (error.status === 409 && error.errorCode === "content_window_changed") {
             parked.current = true;
@@ -100,11 +103,11 @@ export function useSessionWindow(slug: string, sessionId: string, active: boolea
     if (!active) void queryClient.cancelQueries({ queryKey: key, exact: true, predicate: (candidate) => !candidate.isActive() });
   }, [active, queryClient, key]);
 
-  function navigate(request: ContentWindowRequest) {
+  const navigate = useCallback((request: ContentWindowRequest) => {
     parked.current = false;
     setChanged(false);
     setNavigation((current) => ({ ...request, request: current.request + 1 }));
-  }
+  }, []);
 
   function readBeginningFallback() {
     setLegacy(true);

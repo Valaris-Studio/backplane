@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useReaderValue } from "../hooks/use-find-navigation";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -106,7 +107,7 @@ interface CallRowProps {
 export function CallRow({ slug, sessionId, item, evidenceProvenance }: CallRowProps) {
   const { t } = useTranslation();
   const failed = item.outcome === "failed";
-  const [expanded, setExpanded] = useState(failed && !evidenceProvenance);
+  const [expanded, setExpanded] = useReaderValue(`call:${item.key}`, failed && !evidenceProvenance);
   const panelId = useId();
   const { Icon, tone } = callVisual(item);
   const name = callDisplayName(item);
@@ -114,7 +115,7 @@ export function CallRow({ slug, sessionId, item, evidenceProvenance }: CallRowPr
   const outputWithheld = withheldBytes(item, "output");
 
   return (
-    <li data-call-row="">
+    <li data-call-row="" data-call-key={item.key} id={`session-call-${item.key}`} tabIndex={-1}>
       {evidenceProvenance ? <div className="mb-1.5 grid gap-0.5 text-[0.8rem] text-muted-foreground">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <time dateTime={item.started_at} className="tabular-nums">{formatClock(item.started_at)}</time>

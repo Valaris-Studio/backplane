@@ -5,9 +5,9 @@
 // against companion/README.md, so bumping one without the other fails.
 // Only macOS ships a packaged desktop app; Linux and Windows build from source.
 export const COMPANION_RELEASE = {
-  version: "0.1.1-preview.2",
+  version: "0.1.1-preview.3",
   macDownloadUrl:
-    "https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg",
+    "https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/Backplane-Companion-0.1.1-preview.3-universal.dmg",
   sourceUrl: "https://github.com/Valaris-Studio/backplane/tree/main/companion",
   docsSlug: "capturing-sessions-with-companion",
 } as const;

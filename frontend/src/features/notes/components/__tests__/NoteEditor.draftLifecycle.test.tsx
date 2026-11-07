@@ -14,7 +14,10 @@ vi.mock("../../api/use-notes", () => ({
 }));
 vi.mock("../NoteEditorMeta", () => ({ NoteEditorMeta: () => null }));
 vi.mock("@/features/kanban/components/CompletionContextWarning", () => ({ CompletionContextWarning: () => null }));
-vi.mock("@/features/sessions/components/LinkedSessionsSection", () => ({ NoteSessionsSection: () => null }));
+vi.mock("@/features/sessions/components/LinkedSessionsSection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/features/sessions/components/LinkedSessionsSection")>(),
+  NoteSessionsSection: () => null,
+}));
 vi.mock("@/components/shared/RichTextEditor", () => ({
   RichTextEditor: ({ content, onChange }: { content: string; onChange: (value: string) => void }) => (
     // Controlled: a stale textarea value must not hide a reset of editor state.

@@ -123,6 +123,170 @@ type Server struct {
 	Heartbeats    []map[string]any
 	Batches       [][]json.RawMessage
 	Revocations   int
+
+	// Headless (operator-managed file credential) additions.
+	//
+	// DeviceTokens maps further device tokens to the installation and owner
+	// each one authenticates as, the way the backend looks a token up by its
+	// hash; /me answers that identity for it.
+	DeviceTokens map[string]*DeviceIdentity
+	// PolicyInstallationID, when set, is the installation id every policy
+	// answer carries, as a server confused about the device would send.
+	PolicyInstallationID string
+	// Canned answers a path with a fixed response before any authentication:
+	// a redirect, a proxy's HTML 401, a companion-off 404.
+	Canned map[string]Canned
+	// Drop closes the connection of each request to a path without an
+	// answer, as a network failure would.
+	Drop map[string]bool
+	// OnRequest, when set, runs as each request arrives (before any stall),
+	// outside the server's lock.
+	OnRequest func(Request)
+	// requests are every request received, in arrival order.
+	requests []Request
+}
+
+// DeviceIdentity is what a device token authenticates as.
+type DeviceIdentity struct {
+	InstallationID string
+	OwnerEmail     string
+	// Name is the installation's name; "device" when empty.
+	Name string
+	// Revoked answers 401 invalid_device_token, as for a revoked or
+	// rotated-away token.
+	Revoked bool
+}
+
+// Canned is a fixed answer; Header may carry e.g. Location.
+type Canned struct {
+	Status int
+	Header map[string]string
+	Body   string
+}
+
+// Request is one request as it arrived. Host tells an alias listener from
+// the primary one.
+type Request struct {
+	Method string
+	Path   string
+	Host   string
+	Token  string
+	At     time.Time
+}
+
+// Requests returns every request received so far, in arrival order.
+func (s *Server) Requests() []Request {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Request(nil), s.requests...)
+}
+
+// Alias serves this same fake on a second loopback listener, as a second
+// origin (another host name or port) of one Backplane would, and returns
+// its URL.
+func (s *Server) Alias(t *testing.T) string {
+	t.Helper()
+	alias := httptest.NewServer(http.HandlerFunc(s.handle))
+	t.Cleanup(alias.Close)
+	return alias.URL
+}
+
+// IssueDeviceToken makes token authenticate as installationID of owner.
+func (s *Server) IssueDeviceToken(token, installationID, ownerEmail string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.DeviceTokens == nil {
+		s.DeviceTokens = map[string]*DeviceIdentity{}
+	}
+	s.DeviceTokens[token] = &DeviceIdentity{InstallationID: installationID, OwnerEmail: ownerEmail}
+	s.Installed[installationID] = true
+}
+
+// RevokeDeviceToken makes token answer 401 invalid_device_token from now on.
+func (s *Server) RevokeDeviceToken(token string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if identity := s.DeviceTokens[token]; identity != nil {
+		identity.Revoked = true
+	}
+}
+
+func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request, body []byte, identity *DeviceIdentity) {
+	switch {
+	case identity.Revoked:
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"detail": "Invalid or revoked device token", "error_code": "invalid_device_token"})
+	case r.Method == http.MethodGet && r.URL.Path == "/api/companion/me":
+		name := identity.Name
+		if name == "" {
+			name = "device"
+		}
+		var webOrigin any
+		if s.WebOrigin != "" {
+			webOrigin = s.WebOrigin
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"user": map[string]any{"email": identity.OwnerEmail, "display_name": nil}, "installation": map[string]any{"id": identity.InstallationID, "name": name}, "web_origin": webOrigin})
+	case r.Method == http.MethodGet && r.URL.Path == "/api/companion/policy":
+		s.Capabilities = append(s.Capabilities, r.Header.Get(policy.CapabilitiesHeader))
+		answer := s.policyFor(identity.InstallationID)
+		if s.PolicyInstallationID != "" {
+			answer.Installation.ID = s.PolicyInstallationID
+		}
+		writeJSON(w, http.StatusOK, answer)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/companion/status":
+		var report map[string]any
+		json.Unmarshal(body, &report)
+		s.Heartbeats = append(s.Heartbeats, report)
+		writeJSON(w, http.StatusOK, map[string]any{"recorded": true})
+	case r.Method == http.MethodPost && r.URL.Path == "/api/companion/ingest":
+		s.ingest(w, body)
+	case strings.HasPrefix(r.URL.Path, "/api/companion/contents/"):
+		s.handleContent(w, r, body)
+	case r.URL.Path == "/api/companion/agent-key":
+		s.agentKey(w, r.Method)
+	case r.Method == http.MethodDelete && r.URL.Path == "/api/companion/installation":
+		s.Revocations++
+		s.Revoked[identity.InstallationID] = true
+		identity.Revoked = true
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		// Mappings, settings, renames and session reads answer as a server
+		// that accepted them would, so a client that should never send them
+		// is caught by Requests rather than by an error it might swallow.
+		writeJSON(w, http.StatusOK, map[string]any{"id": "accepted"})
+	}
+}
+
+// arrive records a request and returns it with the hook to run outside
+// the lock.
+func (s *Server) arrive(r *http.Request) (Request, func(Request)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	request := Request{Method: r.Method, Path: r.URL.Path, Host: r.Host, Token: strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), At: time.Now()}
+	s.requests = append(s.requests, request)
+	return request, s.OnRequest
+}
+
+// answerFault answers a dropped or canned path; the caller holds the lock.
+func (s *Server) answerFault(w http.ResponseWriter, r *http.Request) bool {
+	if s.Drop[r.URL.Path] {
+		if hijacker, ok := w.(http.Hijacker); ok {
+			if connection, _, err := hijacker.Hijack(); err == nil {
+				connection.Close()
+				return true
+			}
+		}
+		panic(http.ErrAbortHandler)
+	}
+	canned, ok := s.Canned[r.URL.Path]
+	if !ok {
+		return false
+	}
+	for name, value := range canned.Header {
+		w.Header().Set(name, value)
+	}
+	w.WriteHeader(canned.Status)
+	io.WriteString(w, canned.Body)
+	return true
 }
 
 func New(t *testing.T) *Server {
@@ -181,6 +345,9 @@ func (s *Server) Records() []map[string]any {
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	if request, hook := s.arrive(r); hook != nil {
+		hook(request)
+	}
 	s.mu.Lock()
 	gate := s.Stall[r.URL.Path]
 	s.mu.Unlock()
@@ -193,6 +360,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.answerFault(w, r) {
+		return
+	}
 	if status := s.Status[r.URL.Path]; status != 0 {
 		w.WriteHeader(status)
 		return
@@ -257,6 +427,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		s.TokenRevoked = false
 		s.deviceInstallation = PairedInstallationID
 		writeJSON(w, http.StatusOK, map[string]any{"installation_id": PairedInstallationID, "device_token": DeviceToken})
+	case s.DeviceTokens[token] != nil:
+		s.handleDeviceToken(w, r, body, s.DeviceTokens[token])
 	case s.GrantTokens[token] != "":
 		s.handleGrant(w, r, token)
 	case token != DeviceToken || s.TokenRevoked:

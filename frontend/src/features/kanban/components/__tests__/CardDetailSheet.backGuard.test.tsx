@@ -23,7 +23,10 @@ vi.mock("@/features/agents/hooks/usePipelineConfig", () => ({ usePipelineConfig:
 vi.mock("@/features/notes/api/use-notes", () => ({ useNotes: () => ({ data: [] }), useUpdateNote: () => ({ mutate: vi.fn() }) }));
 vi.mock("../DependenciesSection", () => ({ DependenciesSection: () => null }));
 vi.mock("../CardCompletionSection", () => ({ CardCompletionSection: () => null }));
-vi.mock("@/features/sessions/components/LinkedSessionsSection", () => ({ CardSessionsSection: () => null }));
+vi.mock("@/features/sessions/components/LinkedSessionsSection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/features/sessions/components/LinkedSessionsSection")>(),
+  CardSessionsSection: () => null,
+}));
 vi.mock("@/components/shared/RichTextEditor", () => ({
   RichTextEditor: ({ content, onChange }: { content: string; onChange: (value: string) => void }) => (
     <textarea aria-label="Card description" value={content} onChange={(event) => onChange(event.target.value)} />

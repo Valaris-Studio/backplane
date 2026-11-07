@@ -16,6 +16,7 @@ identical retry neither duplicates chunks nor restarts anyone's search."""
 
 import hashlib
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -71,6 +72,7 @@ PrepareOutcome = Literal[
     "ineligible",
     "stale",
     "storage_unavailable",
+    "budget_deferred",
     "missing_object",
     "wrong_size",
     "digest_mismatch",
@@ -105,6 +107,22 @@ def event_anchor(native_tool_call_id: str | None, event_id: str) -> str:
     if native_tool_call_id:
         return CALL_PREFIX + native_tool_call_id
     return EVENT_PREFIX + event_id
+
+
+@dataclass
+class ObjectReadAccounting:
+    """What preparing bodies asked of the store, for a caller enforcing its own
+    bounds: each stat and read call, the bytes each read requested (counted
+    before the call, so failed requests are included) and returned, and the
+    bodies whose digest then matched. Counts and timings only."""
+
+    stat_calls: int = 0
+    read_calls: int = 0
+    requested_bytes: int = 0
+    returned_bytes: int = 0
+    verified_objects: int = 0
+    verified_bytes: int = 0
+    verify_seconds: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -187,7 +205,7 @@ class SessionSearchIndexWriter:
             return "absent"
         if prepared.outcome in ("stale", "ineligible"):
             return prepared.outcome
-        if prepared.outcome == "storage_unavailable":
+        if prepared.outcome in ("storage_unavailable", "budget_deferred"):
             return "pending"
         read = prepared.descriptor
         session = await self.repo.lock_session(read.session_id)
@@ -414,7 +432,10 @@ class SessionSearchObjectProcessor:
         content_id: uuid.UUID,
         expected_digest: str | None = None,
         expected_version: str | None = None,
+        max_requested_bytes: int | None = None,
+        io: ObjectReadAccounting | None = None,
     ) -> PreparedSource:
+        io = io if io is not None else ObjectReadAccounting()
         if expected_version is not None and expected_version != EXTRACTOR_VERSION:
             return PreparedSource(content_id, "stale")
         async with self.session_factory() as db:
@@ -431,12 +452,20 @@ class SessionSearchObjectProcessor:
         if read.inline_text is not None:
             body = read.inline_text.encode()
         else:
-            outcome, body = await self._read_object(read)
+            # Reservation metadata can change before this lookup. Include the
+            # integrity sentinel in the request budget before storage I/O.
+            if (
+                max_requested_bytes is not None
+                and read.byte_count is not None
+                and read.byte_count + 1 > max_requested_bytes
+            ):
+                return PreparedSource(content_id, "budget_deferred", read)
+            outcome, body = await self._read_object(read, io)
             if outcome is not None:
                 return PreparedSource(content_id, outcome, read)
         if len(body) != read.byte_count:
             return PreparedSource(content_id, "wrong_size", read)
-        if hashlib.sha256(body).hexdigest() != read.sha256:
+        if not _digest_matches(body, read.sha256, io):
             return PreparedSource(content_id, "digest_mismatch", read)
         try:
             text = body.decode("utf-8")
@@ -474,21 +503,36 @@ class SessionSearchObjectProcessor:
 
     @staticmethod
     async def _read_object(
-        read: ObjectDescriptor,
+        read: ObjectDescriptor, io: ObjectReadAccounting
     ) -> tuple[PrepareOutcome | None, bytes]:
         store = store_for(read.storage_backend) if read.storage_backend else None
         if store is None or read.storage_key is None:
             return "storage_unavailable", b""
         try:
+            io.stat_calls += 1
             found = await stored(store.stat, read.storage_key)
             if found is None:
                 return "missing_object", b""
             if found.size != read.byte_count:
                 return "wrong_size", b""
             # One byte past the declared size, so a longer object is caught.
-            body = await stored(store.read, read.storage_key, 0, read.byte_count + 1)
+            requested = read.byte_count + 1
+            io.read_calls += 1
+            io.requested_bytes += requested
+            body = await stored(store.read, read.storage_key, 0, requested)
+            io.returned_bytes += len(body)
         except (FileNotFoundError, ValueError):
             return "missing_object", b""
         except StorageBackendUnavailableError:
             return "storage_unavailable", b""
         return None, body
+
+
+def _digest_matches(body: bytes, sha256: str | None, io: ObjectReadAccounting) -> bool:
+    started = time.perf_counter()
+    matches = hashlib.sha256(body).hexdigest() == sha256
+    io.verify_seconds += time.perf_counter() - started
+    if matches:
+        io.verified_objects += 1
+        io.verified_bytes += len(body)
+    return matches

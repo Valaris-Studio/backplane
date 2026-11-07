@@ -82,6 +82,7 @@ async def search_cards(
 @router.get("/resolve", response_model=CardRead)
 async def resolve_card_by_prefix(
     prefix: str = Query(..., description="UUID prefix fragment (min 4 chars)."),
+    include_context: bool = Query(False, description="Include the read-only bootstrap context snapshot."),
     board_id: uuid.UUID = Depends(resolve_board_id),
     ctx: WorkspaceContext = Depends(get_workspace),
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -90,7 +91,8 @@ async def resolve_card_by_prefix(
     # shadowed by the UUID path param (FastAPI matches in declaration order).
     service = CardService(db)
     return await service.resolve_card_by_prefix(
-        board_id, prefix, workspace_id=ctx.workspace.id
+        board_id, prefix, workspace_id=ctx.workspace.id, reader_id=ctx.user.id,
+        include_context=include_context,
     )
 
 
@@ -122,6 +124,7 @@ async def bulk_create_cards(
 @router.get("/{card_id}", response_model=CardRead)
 async def get_card(
     card_id: uuid.UUID,
+    include_context: bool = Query(False, description="Include the read-only bootstrap context snapshot."),
     format: CardFormat = Query(
         default=CardFormat.prosemirror,
         description="`prosemirror` (default, stored value) or `markdown`.",
@@ -137,6 +140,7 @@ async def get_card(
         as_markdown=format == CardFormat.markdown,
         workspace_id=ctx.workspace.id,
         reader_id=ctx.user.id,
+        include_context=include_context,
     )
 
 

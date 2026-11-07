@@ -27,7 +27,7 @@ const (
 )
 
 // sessionEndEvents are the agents' own session-end hooks.
-var sessionEndEvents = map[string]bool{"SessionEnd": true, "session_shutdown": true}
+var sessionEndEvents = map[string]bool{"SessionEnd": true, "session_shutdown": true, "on_session_finalize": true}
 
 type SessionEvent struct {
 	Kind    string         `json:"kind"`

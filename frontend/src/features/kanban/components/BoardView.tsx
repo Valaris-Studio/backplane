@@ -10,7 +10,7 @@ import {
 } from "@dnd-kit/sortable";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Columns3, Plus, Snowflake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceAdmin } from "@/hooks/useWorkspaceAdmin";
@@ -167,6 +167,7 @@ function FrozenBanner({ slug, boardId }: { slug: string; boardId: string }) {
 export function BoardView() {
   const { t } = useTranslation();
   const { slug = "", boardId = "" } = useParams();
+  const location = useLocation();
   const { data: board, isLoading } = useBoard(slug, boardId);
   const boardAgentIds = useBoardAgentIds(slug, board?.id ?? boardId);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -174,35 +175,18 @@ export function BoardView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const cardParam = searchParams.get(CARD_SEARCH_PARAM);
 
-  // URL → sheet: ?card=<id> is the shareable source of truth. It opens the
-  // sheet on mount and on every param change (deep links, back/forward).
-  // selectedCardId is deliberately NOT cleared when the param disappears so
-  // the sheet keeps its content through the close animation. The sheet waits
-  // for the board data, and a STALE param (deleted card, mispasted agent
-  // reference) is stripped instead of stranding an empty sheet shell.
+  // Keep the requested identity even when the board's summary omits it. Only
+  // the exact detail endpoint can resolve it or explain current unavailability.
+  // Retain the selection during close animation, after explicit URL removal.
   useEffect(() => {
     if (!cardParam) {
       setSheetOpen(false);
       return;
     }
     if (!board) return;
-    const exists = board.columns.some((column) =>
-      column.cards.some((card) => card.id === cardParam),
-    );
-    if (exists) {
-      setSelectedCardId(cardParam);
-      setSheetOpen(true);
-    } else {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete(CARD_SEARCH_PARAM);
-          return next;
-        },
-        { replace: true },
-      );
-    }
-  }, [cardParam, board, setSearchParams]);
+    setSelectedCardId(cardParam);
+    setSheetOpen(true);
+  }, [cardParam, board]);
   const selectedCard = useMemo<Card | null>(() => {
     if (!selectedCardId || !board) return null;
     for (const column of board.columns) {
@@ -213,11 +197,14 @@ export function BoardView() {
   }, [selectedCardId, board]);
   // The board payload carries description EXCERPTS (summary mode), so the sheet
   // reads the one open card in full before handing it to the rich-text editor.
-  const { card: hydratedCard, isDetailLoaded } = useCardDetail(
+  const {
+    card: hydratedCard, isDetailLoaded, detailFailure, isDetailFetching, retryDetail,
+  } = useCardDetail(
     slug,
     boardId,
     selectedCard,
     sheetOpen,
+    cardParam ?? selectedCardId,
   );
   const [columnDialogOpen, setColumnDialogOpen] = useState(false);
   const [hotkeyCardDialogOpen, setHotkeyCardDialogOpen] = useState(false);
@@ -326,9 +313,9 @@ export function BoardView() {
         const next = new URLSearchParams(prev);
         next.set(CARD_SEARCH_PARAM, cardId);
         return next;
-      });
+      }, { state: location.state });
     },
-    [setSearchParams],
+    [setSearchParams, location.state],
   );
 
   const handleCardClick = useCallback(
@@ -347,11 +334,11 @@ export function BoardView() {
             next.delete(CARD_SEARCH_PARAM);
             return next;
           },
-          { replace: true },
+          { replace: true, state: location.state },
         );
       }
     },
-    [setSearchParams],
+    [setSearchParams, location.state],
   );
 
   const handleRenameColumn = useCallback(
@@ -537,6 +524,9 @@ export function BoardView() {
         onOpenCard={focusCardById}
         isFrozen={isFrozen}
         isDetailLoaded={isDetailLoaded}
+        detailFailure={detailFailure}
+        isDetailFetching={isDetailFetching}
+        onRetryDetail={retryDetail}
       />
       <CreateColumnDialog
         slug={slug}

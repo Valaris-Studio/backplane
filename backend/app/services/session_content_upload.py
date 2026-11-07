@@ -149,7 +149,9 @@ def expected_chunk_size(content: AgentSessionContent, index: int) -> int:
 
 
 def preview_of(body: bytes) -> str:
-    return body[:PREVIEW_BYTES].decode("utf-8", errors="ignore")
+    # PostgreSQL text rejects NUL, so keep only the original prefix before it.
+    preview_bytes = body[:PREVIEW_BYTES].split(b"\x00", 1)[0]
+    return preview_bytes.decode("utf-8", errors="ignore")
 
 
 def image_matches(media_type: str, body: bytes) -> bool:

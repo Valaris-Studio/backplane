@@ -58,21 +58,22 @@ interface RhythmStripProps {
 export function RhythmStrip({ slug, session }: RhythmStripProps) {
   const { t } = useTranslation();
   const compact = useMediaQuery(COMPACT_LIST_QUERY);
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const active = useSessionReaderActive();
   const rhythm = useSessionRhythm(slug, session.id, compact ? PHONE_BUCKETS : DESKTOP_BUCKETS, active);
 
   if (rhythm.isPending) return <Skeleton className="h-36 w-full" aria-hidden />;
   if (rhythm.isError) return <p className="text-sm text-muted-foreground">{t("sessions.rhythm.loadError")}</p>;
-  return <RhythmView slug={slug} session={session} rhythm={rhythm.data} onJump={jumpToTurnAt} />;
+  return <RhythmView slug={slug} session={session} rhythm={rhythm.data} onJump={(iso) => jumpToTurnAt(iso, reducedMotion)} />;
 }
 
 // Focus the turn that was under way at `iso`, if it is on a loaded page.
-function jumpToTurnAt(iso: string) {
+function jumpToTurnAt(iso: string, reducedMotion: boolean) {
   const target = Date.parse(iso);
   const turns = [...document.querySelectorAll<HTMLElement>("[data-turn][data-started]")];
   const turn = turns.filter((node) => Date.parse(node.dataset.started ?? "") <= target).at(-1) ?? turns[0];
-  turn?.focus();
-  turn?.scrollIntoView({ block: "start", behavior: "smooth" });
+  turn?.focus({ preventScroll: true });
+  turn?.scrollIntoView({ block: "start", behavior: reducedMotion ? "instant" : "smooth" });
 }
 
 interface RhythmViewProps {

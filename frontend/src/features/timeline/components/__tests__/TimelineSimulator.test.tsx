@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import "../../__tests__/history-identity-fixture";
 import { describe, expect, it } from "vitest";
 import {
   renderWithProviders,
@@ -412,7 +413,7 @@ describe("TimelineSimulator — historical inspection", () => {
     const board = await screen.findByTestId("replay-board");
     await user.click(within(board).getByText("Baseline card"));
     const detail = await screen.findByTestId("timeline-card-detail");
-    expect(within(detail).getByText(/Currently in Backlog/)).toBeInTheDocument();
+    expect(within(detail).getByText(/Column in this snapshot: Backlog/)).toBeInTheDocument();
   });
 });
 

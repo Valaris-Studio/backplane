@@ -10,7 +10,7 @@
 # script and ci.yml in lockstep — if you add a gate to one, add it to the other.
 #
 #   ./scripts/verify-all.sh            # everything
-#   ./scripts/verify-all.sh backend    # backend|mcp|frontend|companion|companion-rust|go|runner-artifact|secrets
+#   ./scripts/verify-all.sh backend    # one job: backend|mcp|hermes-worker|frontend|companion|companion-rust|go|runner-artifact|secrets
 #
 # Exit code is non-zero if ANY selected job fails; every job still runs, so one
 # failure does not hide the others.
@@ -77,6 +77,19 @@ job_mcp() {
   )
 }
 
+job_hermes_worker() {
+  # Withheld from the public export until an owner release decision, so a
+  # public tree has no package to verify.
+  [[ -d integrations/hermes-worker ]] || { echo "integrations/hermes-worker is not in this tree; nothing to verify."; return 0; }
+  (
+    cd integrations/hermes-worker || exit 1
+    command -v uv >/dev/null || { echo "Hermes worker verification requires uv." >&2; exit 1; }
+    # No bytecode or pytest cache: residue under the package makes its own
+    # clean-source check refuse the next build.
+    PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest==9.1.1 python -m pytest -q -p no:cacheprovider tests || exit 1
+  )
+}
+
 job_frontend() {
   # KNOWN: the vitest suite has a pre-existing intermittent failure, observed
   # roughly 1 run in 8 (2026-07-26: 1 failure in ~9 full runs, never the same
@@ -126,6 +139,7 @@ job_secrets() {
 
 run_job backend job_backend
 run_job mcp job_mcp
+run_job hermes-worker job_hermes_worker
 run_job frontend job_frontend
 run_job companion job_companion
 run_job companion-rust job_companion_rust

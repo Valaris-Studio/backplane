@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import "../../__tests__/history-identity-fixture";
 import { describe, expect, it } from "vitest";
 import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, waitFor, userEvent } from "@/test/test-utils";

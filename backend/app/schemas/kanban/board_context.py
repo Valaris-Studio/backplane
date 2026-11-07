@@ -3,6 +3,9 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
+
+from pydantic import Field
 
 from app.core.json_response import UTCModel
 
@@ -35,6 +38,14 @@ class DefinitionSummary(UTCModel):
 
 
 class NoteSummary(UTCModel):
+    content: str | None = None
+    material_class: str | None = Field(default=None, alias="class")
+    label: str | None = None
+    sha256: str | None = None
+    created_by: uuid.UUID | None = None
+    author_principal_kind: str | None = None
+    author_agent_id: uuid.UUID | None = None
+    pinned_by: uuid.UUID | None = None
     id: uuid.UUID
     title: str
     pinned: bool
@@ -69,3 +80,4 @@ class BoardContextRead(UTCModel):
     notes: list[NoteSummary] = []
     git_repos: list[GitRepoSummary] = []
     recent_activity: list[ActivitySummary] = []
+    omissions: list[dict[str, Any]] = []

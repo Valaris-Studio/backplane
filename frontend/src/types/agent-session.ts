@@ -473,3 +473,62 @@ export interface SessionContentWindow {
   window_cursor: string;
   anchor_id: string | null;
 }
+
+// Mirrors backend/app/schemas/session_search.py; ranges address original UTF-8 bytes.
+export type SearchType = ContentChannel | "tool" | "mcp" | "subagent";
+
+export interface SessionSearchRequest {
+  q: string;
+  types?: SearchType[] | null;
+  failures_only?: boolean;
+  work_only?: boolean;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface SessionSearchHit {
+  source_kind: "content" | "event";
+  source_id: string;
+  content_id: string | null;
+  event_id: string | null;
+  call_key: string | null;
+  channel: ContentChannel | null;
+  field: string;
+  occurred_at: string;
+  byte_start: number;
+  byte_end: number;
+  snippet: string | null;
+  snippet_byte_start: number | null;
+  source_state: "available" | "unavailable";
+}
+
+export interface SessionSearchCoverageCount {
+  count: number;
+  bytes: number | null;
+}
+
+export interface SessionSearchCoverage {
+  indexed: SessionSearchCoverageCount;
+  pending_index: SessionSearchCoverageCount;
+  pending_upload: SessionSearchCoverageCount;
+  withheld: SessionSearchCoverageCount;
+  uncaptured: SessionSearchCoverageCount;
+  unavailable: SessionSearchCoverageCount;
+  nontext: SessionSearchCoverageCount;
+  available: SessionSearchCoverageCount;
+  eligible: SessionSearchCoverageCount;
+  linked_child_metadata: { count: number; searchable: false };
+  index_ready: boolean;
+  extractor_version: string;
+  verified_at: string;
+}
+
+export interface SessionSearchPage {
+  items: SessionSearchHit[];
+  generation: number;
+  scanned_bytes: number;
+  eligible_bytes: number;
+  next_cursor: string | null;
+  complete: boolean;
+  coverage: SessionSearchCoverage;
+}

@@ -13,7 +13,7 @@ from pydantic import ValidationError as SchemaValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.call_correlation import captured_call_signature
-from app.core.harness import harness_enabled
+from app.core.harness import STRICT_METADATA_HARNESSES, harness_enabled
 from app.core.local_paths import local_path_of, place_event, place_text
 from app.core.time import as_utc
 from app.core.working_directory import (
@@ -32,9 +32,11 @@ from app.schemas.beacon import (
     promote,
     for_content_level,
     session_title,
+    strict_metadata_only,
 )
 from app.schemas.companion import (
     MAX_INGEST_EVENT_BYTES,
+    BeaconProvenance,
     HistoryDeleted,
     MAX_INGEST_RECORD_BYTES,
     MAX_INGEST_RECORDS,
@@ -64,6 +66,15 @@ from app.services.session_history_cutoff import (
 from app.services.session_work_link import SessionWorkLinkService
 
 _CAPTURE_ID = re.compile(r"^[0-9a-f]{32}$")
+# A strict harness's adapter names every event with a UUID; any other id would
+# be free text, and dropping it would make the ingest name the event by a hash.
+_STRICT_EVENT_ID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+_STRICT_HARNESS_VERSION = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,31}$")
+# The companion sends the pinned Beacon's full commit id (SHA-1 or SHA-256).
+_STRICT_BEACON_COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+_STRICT_BEACON_SCHEMA_VERSION = re.compile(r"^[0-9]+(\.[0-9]+)*$")
 _WINDOWS_ABSOLUTE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
 _PATH_SEPARATORS = re.compile(r"[\\/]")
 _DRIVE_NAME = re.compile(r"^[A-Za-z]:$")
@@ -123,10 +134,28 @@ def _validate_record(raw: dict, now: datetime) -> _ValidRecord:
     latest_allowed = now + MAX_CLOCK_SKEW
     if record.captured_at > latest_allowed:
         raise _Rejected(Reason.INVALID)
+    strict = record.harness in STRICT_METADATA_HARNESSES
+    # A strict harness sends metadata only: a declared content item would store
+    # a body, its digest or its length.
+    if strict and record.contents:
+        raise _Rejected(Reason.INVALID)
+    if strict:
+        record = _strict_record(record)
+    # Session facts (title, model, branch, tokens) are read from the parsed
+    # events, so a strict harness's events are cut to its allowlist first.
+    events = (
+        [strict_metadata_only(event) for event in record.events]
+        if strict
+        else record.events
+    )
     promoted = []
-    for event in record.events:
+    for event in events:
         if len(canonical_json(event).encode()) > MAX_INGEST_EVENT_BYTES:
             raise _Rejected(Reason.TOO_LARGE)
+        if strict and not _STRICT_EVENT_ID.fullmatch(
+            str((event.get("event") or {}).get("id", ""))
+        ):
+            raise _Rejected(Reason.INVALID)
         try:
             parsed = BeaconEvent.model_validate(event)
         except (SchemaValidationError, ValueError):
@@ -140,12 +169,68 @@ def _validate_record(raw: dict, now: datetime) -> _ValidRecord:
         if parsed.timestamp > latest_allowed:
             raise _Rejected(Reason.INVALID)
         promoted.append(promote(event, parsed, record.collection_method))
+    # A strict harness names each event once, so a repeated id has no copy
+    # to keep.
+    if strict and len({event.event_id for event in promoted}) < len(promoted):
+        raise _Rejected(Reason.CONFLICT)
+    if strict:
+        encoded = canonical_json(_strict_receipt_document(raw, record, events))
     return _ValidRecord(
         record=record,
-        raw_events=record.events,
+        raw_events=events,
         promoted=promoted,
         content_hash=hashlib.sha256(encoded.encode()).hexdigest(),
     )
+
+
+def _kept(value: str | None, pattern: re.Pattern) -> str | None:
+    # fullmatch: `$` alone would admit a trailing newline.
+    return value if value is not None and pattern.fullmatch(value) else None
+
+
+def _strict_record(record: RichCaptureRecord) -> RichCaptureRecord:
+    """A strict harness's record-level values, each kept only in its shape and
+    never stored as free text. Its adapter names no parent session, so a parent
+    link would be one nothing observed."""
+    return record.model_copy(
+        update={
+            "harness_version": _kept(record.harness_version, _STRICT_HARNESS_VERSION),
+            "parent_native_session_id": None,
+            "beacon": BeaconProvenance(
+                commit=_kept(record.beacon.commit, _STRICT_BEACON_COMMIT),
+                schema_version=_kept(
+                    record.beacon.schema_version, _STRICT_BEACON_SCHEMA_VERSION
+                ),
+            ),
+        }
+    )
+
+
+def _with_folder_name(event: dict) -> dict:
+    session = event.get("session")
+    working_directory = (
+        session.get("working_directory") if isinstance(session, dict) else None
+    )
+    if not isinstance(working_directory, str) or working_directory == ".":
+        return event
+    folder = _folder_name(working_directory, None)
+    return {**event, "session": {**session, "working_directory": folder}}
+
+
+def _strict_receipt_document(
+    raw: dict, record: RichCaptureRecord, events: list[dict]
+) -> dict:
+    """What a strict receipt hashes: the record as kept, each working directory
+    cut to the folder name a session stores at most, so no digest covers a
+    dropped value and an upload differing only in dropped values is a replay."""
+    document = {
+        **raw,
+        "harness_version": record.harness_version,
+        "beacon": record.beacon.model_dump(),
+        "events": [_with_folder_name(event) for event in events],
+    }
+    document.pop("parent_native_session_id", None)
+    return document
 
 
 def _after_cutoff(valid: _ValidRecord, cutoff: datetime) -> _ValidRecord:
@@ -632,10 +717,20 @@ class AgentSessionIngestService:
                     "mcp_tool": event.mcp_tool,
                     "outcome": event.outcome,
                     "tool_call_signature": signature,
-                    "event": for_content_level(raw_event, level),
+                    "event": (
+                        strict_metadata_only(raw_event)
+                        if record.harness in STRICT_METADATA_HARNESSES
+                        else for_content_level(raw_event, level)
+                    ),
                 }
             )
         new_ids = await self.sessions.insert_new_events(rows)
+        # This capture is new (its receipt was just inserted), so an event id
+        # already stored belongs to another capture. A strict harness names
+        # events by their capture, so the first copy stands and this record is
+        # refused whole, rolling back with its savepoint.
+        if record.harness in STRICT_METADATA_HARNESSES and len(new_ids) < len(rows):
+            raise _Rejected(Reason.CONFLICT)
         # Only rows this record stored, as stored: a replay never re-indexes
         # an older row from its incoming copy.
         await SessionSearchIndexWriter(self.db).index_new_events(

@@ -1,0 +1,18 @@
+{
+  "hook_event_name": "on_session_finalize",
+  "session_id": "20260924_115958_a1b2c3",
+  "cwd": "__CWD__",
+  "tool_name": null,
+  "tool_input": null,
+  "old_session_id": "20260924_110000_ffffff",
+  "new_session_id": "20260924_120000_eeeeee",
+  "extra": {
+    "reason": "shutdown",
+    "platform": "cli",
+    "observed_at": "2026-09-24T11:59:58.456789Z",
+    "plugin_schema": "backplane.hermes.v1",
+    "assistant_response": "HERMES_SENTINEL_ASSISTANT",
+    "access_token": "__API_KEY__",
+    "model": "anthropic/claude-sonnet-4.5"
+  }
+}

@@ -38,15 +38,17 @@ your team works, ready to reuse across projects.
 > APIs and workflows may evolve. **Runners are experimental**; review the
 > [known limitations](#known-limitations) before planning a deployment.
 
-The current platform preview includes private session readers, reviewed excerpt
-handoff and prepared runner context. Use [platform 0.1.4-preview.2](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.2),
-[runner 0.8.8](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.8)
-and [MCP server 0.9.4](https://pypi.org/project/backplane-mcp/0.9.4/).
+The current platform preview includes interactive project snapshots, private
+session readers, reviewed excerpt handoff and prepared runner context. Use
+[platform 0.1.4-preview.4](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4),
+[runner 0.8.9](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9)
+and [MCP server 0.9.5](https://pypi.org/project/backplane-mcp/0.9.5/).
 The signed [macOS Companion preview](companion/README.md#macos-desktop-preview)
 provides local capture and its desktop controls.
 
-Runner 0.8.8 setup still generates `uvx backplane-mcp==0.9.3`. To use MCP
-0.9.4, edit only that package argument to `backplane-mcp==0.9.4` in
+Runner 0.8.9 setup generates `uvx backplane-mcp==0.9.5`. Existing custom
+MCP configurations are preserved. To update an older generated configuration,
+change only its package argument to `backplane-mcp==0.9.5` in
 `mcpServers.valaris.args` in the MCP JSON selected by `llm.mcp_config_path`.
 Keep the existing command, environment, toolsets and allowlist settings.
 
@@ -448,15 +450,24 @@ client configuration, and protecting remote HTTP connections.
 
 **💡 Give your agent somewhere to start.** Once connected, try:
 
-> Read this project's definition and assigned skills, then summarize its goals
-> and working conventions.
+> Call `get_project_context` for this board, then read our selected card with
+> `get_card(include_context=True)`. Summarize its scope, decisions and next work.
+> Fetch any relevant governing notes or definitions listed as omitted before
+> proceeding, and read the assigned skills.
 
 > Show me the blocked cards and their dependencies.
 
 > Record our decision in a project note so the next session can find it.
 
-Use your own prompts and conventions. **The shared context stays in Backplane**
-when you switch sessions or tools.
+The card snapshot names its purpose, `bootstrap`, and includes a version 0
+manifest of included and omitted records. Blocks distinguish instructions,
+human-authored content and quoted agent work or evidence. Unknown authorship
+remains unknown, including on legacy pinned notes. Read relevant omissions; the
+snapshot is bounded and does not replace those follow-up reads.
+
+Boards, definitions and notes provide useful context even when no session has
+ever been captured. Use your own prompts and conventions. **The shared context
+stays in Backplane** when you switch sessions or tools.
 
 ### Optional runners
 
@@ -604,7 +615,7 @@ than the rest of the platform. Verify your first deployment carefully.
   Docker Compose builds them locally. Client artifacts are released separately:
   the runner as a multi-arch image (`ghcr.io/valaris-studio/backplane-runner`)
   and standalone binaries with checksums
-  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.8/SHA256SUMS)),
+  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.9/SHA256SUMS)),
   and the MCP server through `uvx backplane-mcp`.
 - **GitLab PAT connections are supported** for repository credentials and backend
   merge-queue plumbing. The runner forge driver for GitLab does not yet open,

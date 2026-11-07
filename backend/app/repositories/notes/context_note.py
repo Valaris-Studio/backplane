@@ -64,6 +64,11 @@ class ContextNoteHeader:
     pinned: bool
     created_at: datetime
     raw_bytes: int
+    created_by: uuid.UUID | None = None
+    author_principal_kind: str | None = None
+    author_agent_id: uuid.UUID | None = None
+    pinned_by: uuid.UUID | None = None
+    card_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +84,10 @@ class ContextNoteBody:
     card_id: uuid.UUID | None
     raw_bytes: int
     content: str
+    created_by: uuid.UUID | None = None
+    author_principal_kind: str | None = None
+    author_agent_id: uuid.UUID | None = None
+    pinned_by: uuid.UUID | None = None
 
 
 _HEADER_COLUMNS = (Note.id, Note.title, Note.kind, Note.pinned, Note.created_at)
@@ -118,7 +127,11 @@ class ContextNoteRepository:
         """At most `limit` eligible headers plus whether a further eligible
         row exists; that sentinel row is read as metadata and discarded."""
         result = await self.db.execute(
-            select(*_HEADER_COLUMNS, utf8_octet_length(Note.content).label("raw_bytes"))
+            select(
+                *_HEADER_COLUMNS, utf8_octet_length(Note.content).label("raw_bytes"),
+                Note.created_by, Note.author_principal_kind, Note.author_agent_id,
+                Note.pinned_by, Note.card_id,
+            )
             .where(*_scope_predicates(scope))
             .order_by(*_window_order(scope))
             .limit(limit + 1)
@@ -142,6 +155,10 @@ class ContextNoteRepository:
                 Note.card_id,
                 raw_bytes.label("raw_bytes"),
                 Note.content,
+                Note.created_by,
+                Note.author_principal_kind,
+                Note.author_agent_id,
+                Note.pinned_by,
             ).where(
                 Note.id == note_id, *_scope_predicates(scope), raw_bytes <= max_bytes
             )

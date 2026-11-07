@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "2026-09-24T11:59:58.456789Z",
+  "event": {"id": "__EVENT_ID__", "action": "session.ended", "category": "session", "kind": "agent_runtime", "fidelity": "observed"},
+  "harness": {"name": "hermes", "collection_method": "plugin"},
+  "session": {"id": "20260924_115958_a1b2c3", "working_directory": "__CWD__"}
+}

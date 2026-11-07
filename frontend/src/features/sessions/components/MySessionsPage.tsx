@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ListFilter, Lock } from "lucide-react";
@@ -35,10 +35,12 @@ import { FirstRunState, LoadErrorState, SessionListSkeleton } from "./SessionSta
 
 export function MySessionsPage() {
   const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
   return (
     <div className="flex flex-col gap-[var(--page-section-gap)]">
       <PageHeader
         title={t("sessions.title")}
+        titleRef={heading}
         description={
           <span className="inline-flex items-center gap-1.5">
             <Lock aria-hidden className="size-3.5 shrink-0" />
@@ -49,7 +51,7 @@ export function MySessionsPage() {
       />
       <CompanionGate>
         <SessionsTabs />
-        <SessionsList />
+        <SessionsList heading={heading} />
       </CompanionGate>
     </div>
   );
@@ -90,7 +92,7 @@ function hasFirstItem(probe: { pages: AgentSessionPage[] } | undefined): boolean
   return !!probe?.pages[0]?.items.length;
 }
 
-function SessionsList() {
+function SessionsList({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
   const { t } = useTranslation();
   const { slug = "" } = useParams();
   const enabled = useCompanionEnabled() === true;
@@ -150,22 +152,53 @@ function SessionsList() {
     : !filters.subagents && anyRootSession.isError ? anyRootSession : null;
   const failedQuery = list.isError ? list : emptyUnfiltered ? failedHistoryQuery : null;
 
+  // Retrying a failure that never had data puts its query back to pending and
+  // drops the error, which would swap the focused Retry for the skeleton. While
+  // that retry runs or waits for connectivity in this same view, keep the failure.
+  // A two-host agent family narrows loaded rows here without changing the
+  // server query, and history checks only count while the view still needs them.
+  const failureScope = JSON.stringify([slug, listQuery, filters.agent]);
+  const [retriedFailure, setRetriedFailure] = useState<{ scope: string; error: unknown } | null>(null);
+  const retryHeld = retriedFailure?.scope === failureScope
+    && (list.fetchStatus !== "idle" || (emptyUnfiltered && (anySession.fetchStatus !== "idle" || (!filters.subagents && anyRootSession.fetchStatus !== "idle"))));
+  useEffect(() => {
+    if (retriedFailure && !retryHeld) setRetriedFailure(null);
+  }, [retriedFailure, retryHeld]);
+  const shownFailure = retryHeld ? retriedFailure : failedQuery;
+  // A focused Retry that leaves this same view would drop focus on the body;
+  // the page heading takes it. A changed view or a moved focus is left alone.
+  const retryButton = useRef<HTMLButtonElement | null>(null);
+  const restoreRetryFocus = useRef<string | null>(null);
+  const setRetryButton = useCallback((node: HTMLButtonElement | null) => {
+    if (!node && retryButton.current === document.activeElement) restoreRetryFocus.current = failureScope;
+    retryButton.current = node;
+  }, [failureScope]);
+  useLayoutEffect(() => {
+    if (restoreRetryFocus.current === failureScope && !shownFailure) heading.current?.focus({ preventScroll: true });
+    restoreRetryFocus.current = null;
+  });
+
   // Whoever has no paired computer left is told how to capture again, even
   // with older sessions in the list; the first run already teaches it.
   const devices = useCompanionDevices(enabled);
   const noActiveComputer = devices.isSuccess && !devices.data.some((device) => !device.revoked_at);
 
   let body: React.ReactNode;
-  if (list.isPending || probing) {
+  if ((list.isPending || probing) && !retryHeld) {
     body = <SessionListSkeleton />;
-  } else if (failedQuery) {
+  } else if (shownFailure) {
     body = (
       <LoadErrorState
-        error={failedQuery.error}
+        error={shownFailure.error}
         title={t("sessions.loadError.title")}
         description={t("sessions.loadError.description")}
-        onRetry={() => void failedQuery.refetch()}
-        retrying={failedQuery.isFetching}
+        onRetry={() => {
+          if (!failedQuery) return;
+          setRetriedFailure({ scope: failureScope, error: failedQuery.error });
+          void failedQuery.refetch();
+        }}
+        retrying={retryHeld || !!failedQuery?.isFetching}
+        retryRef={setRetryButton}
       />
     );
   } else if (firstRun) {

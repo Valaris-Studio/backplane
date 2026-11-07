@@ -51,6 +51,10 @@ var ErrAlreadyRunning = errors.New("daemon_already_running")
 // nothing can be uploaded until the device connects again. The queue is kept.
 var ErrRevoked = errors.New("device_revoked")
 
+// ErrPolicyInstallationMismatch is a refreshed policy of another
+// installation; its mappings and API base never become this one's scope.
+var ErrPolicyInstallationMismatch = errors.New("policy_installation_mismatch")
+
 type API interface {
 	Policy(context.Context) (policy.Policy, error)
 	ResolveMapping(ctx context.Context, repoURL string) (policy.Mapping, error)
@@ -81,6 +85,10 @@ type Config struct {
 	Sessions func(SessionEvent)
 	// Flush, when set, lets the control API skip the upload backoff once.
 	Flush *FlushSignal
+	// VerifyPolicyInstallation refuses to cache a refreshed policy of any
+	// installation but InstallationID. Headless sessions set it; the desktop
+	// checks the installation where it caches a policy itself.
+	VerifyPolicyInstallation bool
 }
 
 type Daemon struct {
@@ -237,6 +245,11 @@ func (d *Daemon) refreshPolicy(ctx context.Context) {
 			d.markRevoked(ctx)
 		}
 		d.recordPolicyError(err)
+		return
+	}
+	if d.config.VerifyPolicyInstallation && fresh.Installation.ID != d.config.InstallationID {
+		d.nextPolicyRefresh = now.Add(policyRetryInterval)
+		d.recordPolicyError(ErrPolicyInstallationMismatch)
 		return
 	}
 	d.nextPolicyRefresh = now.Add(PolicyInterval)
@@ -429,8 +442,14 @@ func (d *Daemon) drainItem(ctx context.Context, name string) error {
 		d.countDropped()
 		return inbox.Remove(dir, name)
 	}
+	sourceKey := name
+	if source, ok := adapter.(agent.CaptureKeySource); ok {
+		if key, named := source.CaptureKey(item.Observation, item.Payload); named {
+			sourceKey = key
+		}
+	}
 	err = d.process(ctx, observed{
-		captureID:   captureID(adapter.ID(), name),
+		captureID:   captureID(adapter.ID(), sourceKey),
 		adapter:     adapter,
 		observation: item.Observation,
 		payload:     item.Payload,
@@ -493,6 +512,12 @@ func (d *Daemon) process(ctx context.Context, item observed) error {
 				d.countDropped()
 				return nil
 			}
+		}
+	}
+	if projector, ok := item.adapter.(agent.EventProjector); ok {
+		if events.Events, err = projector.ProjectEvents(item.observation, item.payload, events.Events); err != nil {
+			d.countDropped()
+			return nil
 		}
 	}
 	return d.enqueue(item, decision.MappingID, decision.Place, decision.ContentLevel, events)
@@ -821,7 +846,7 @@ func (d *Daemon) countNormalizeFailure() {
 var knownErrors = []error{
 	uplink.ErrDeviceRevoked, uplink.ErrUnauthorized, uplink.ErrForbidden, uplink.ErrNotFound, uplink.ErrConflict,
 	uplink.ErrTooLarge, uplink.ErrUnprocessable, uplink.ErrUnavailable, uplink.ErrUnexpectedStatus,
-	uplink.ErrInvalidResponse, queue.ErrMalformedAck, queue.ErrNoProgress, policy.ErrInvalid, store.ErrUnsafePath,
+	uplink.ErrInvalidResponse, ErrPolicyInstallationMismatch, queue.ErrMalformedAck, queue.ErrNoProgress, policy.ErrInvalid, store.ErrUnsafePath,
 	agent.ErrConfigInvalid, agent.ErrConfigSymlink, agent.ErrConfigForeign,
 	context.Canceled, context.DeadlineExceeded,
 }

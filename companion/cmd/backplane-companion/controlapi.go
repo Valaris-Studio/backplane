@@ -51,7 +51,7 @@ const envAllowInsecureLoopback = "BACKPLANE_COMPANION_ALLOW_INSECURE_LOOPBACK"
 
 func (a *app) controlConfig(layout store.Layout, pairer control.Pairer) control.Config {
 	backend := &controlBackend{app: a, layout: layout, probes: &statusProbes{}}
-	return control.Config{
+	config := control.Config{
 		DataDir:     layout.Root,
 		Backend:     backend,
 		Pairer:      pairer,
@@ -70,7 +70,17 @@ func (a *app) controlConfig(layout store.Layout, pairer control.Pairer) control.
 		PolicyPath:   layout.Policy(),
 		Now:          a.now,
 		Logf:         func(format string, args ...any) { a.logLine(fmt.Sprintf(format, args...)) },
+		RefuseChanges: func() error {
+			if a.operatorManaged(layout) {
+				return errHeadlessOperatorManaged
+			}
+			return nil
+		},
 	}
+	if a.headless != nil {
+		config.WatchPaths = append(config.WatchPaths, layout.HeadlessState())
+	}
+	return config
 }
 
 // startControlAPI serves the control API for the daemon's lifetime, ctx;
@@ -331,6 +341,7 @@ var controlStatuses = map[string]int{
 	"agent_config_changed":                http.StatusConflict,
 	"agent_config_not_owned":              http.StatusConflict,
 	"secure_credential_store_unavailable": http.StatusServiceUnavailable,
+	"headless_operator_managed":           http.StatusForbidden,
 }
 
 func (b *controlBackend) DescribeError(err error, language string) *control.Error {

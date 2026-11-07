@@ -6,7 +6,7 @@ sessions linked to Backplane work. Claude Code, Pi and Codex (CLI and
 Desktop) are supported; the agent interface (`internal/agent`) is where
 further adapters plug in.
 
-**macOS desktop preview 0.1.1-preview.2 is available below.** Linux and Windows
+**macOS desktop preview 0.1.1-preview.3 is available below.** Linux and Windows
 desktop packages remain source builds. The backend's `COMPANION_ENABLED` and
 `RICH_CAPTURE_ENABLED` flags default to `false`. Enable the services deliberately
 and choose the device scope, capture level and retention before collecting data.
@@ -27,10 +27,10 @@ decides, before retaining anything, whether it is in scope.
 
 ## macOS desktop preview
 
-[Download Backplane Companion 0.1.1-preview.2](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/Backplane-Companion-0.1.1-preview.2-universal.dmg)
+[Download Backplane Companion 0.1.1-preview.3](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/Backplane-Companion-0.1.1-preview.3-universal.dmg)
 for macOS 13 or later, on Apple silicon or Intel. The universal app and DMG are
-Developer ID signed and notarized. This preview adds richer session capture,
-transcript recovery and the current updater verification key.
+Developer ID signed and notarized. This preview includes the latest capture
+compatibility fixes and retains the existing updater verification key.
 
 For a new installation, open the DMG, move **Backplane Companion** into
 **Applications**, then open it and follow the connection and capture setup.
@@ -89,10 +89,11 @@ For an existing installation:
 Keep the existing connection, mappings and capture settings. Disconnecting or
 removing the companion is a different operation and can delete captured data.
 
-Install this first signed preview manually to establish the current updater
-key. It is published on the **beta** channel; installation does not change your
-chosen channel. Select beta in update settings if you want future beta updates.
-The stable channel is separate. The [versioned update manifest](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.2/latest.json)
+When upgrading from an older ad hoc or source-built app, install the signed
+preview manually to establish the current updater key. It is published on the
+**beta** channel; installation does not change your chosen channel. Select beta
+in update settings if you want future beta updates.
+The stable channel is separate. The [versioned update manifest](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/latest.json)
 identifies the signed universal update archive for both Mac architectures.
 
 ## How it works
@@ -286,6 +287,116 @@ inbox, queue and Beacon work files, discovered projects, threads, suppressed
 sessions, health, the `otel/` runtime files, ignored paths and the logs (a
 running daemon's open logs are emptied by `disconnect` and removed by
 `service uninstall`). Delete the directory itself to remove those too.
+
+### Headless (operator-managed)
+
+On a Unix host without a keyring, run `backplane-companion run
+--headless-config /abs/config.json`. The config names the one identity the
+data directory captures for, and only the operator may change it. It must be
+a regular file owned by root or the companion's user, writable by no one
+else, in a directory under the same rules. Unknown fields are refused:
+
+```json
+{"endpoint": "https://backplane.example.com",
+ "token_file": "/run/backplane-companion/token/device-token",
+ "installation_id": "<installation uuid>", "owner_email": "owner@example.com"}
+```
+
+`endpoint` is the API origin, with no path. Optional fields are
+`token_uid`/`token_gid` (default: the companion's user and group) and
+`allow_loopback_http` (loopback test servers only). The token file must lie
+outside the data directory (`token_file_in_data_root` otherwise). It holds
+exactly one device token with at most one trailing newline. It has mode 0400
+or 0600 and a single link, and no symlink appears on its path. Every
+directory above it is owned by root or `token_uid` and writable by no one
+else unless sticky. Replace it by renaming a new file over the path; in a
+container, mount its directory, not the file. The token is never written,
+logged or reported.
+
+Before any capture, each session checks the token with `GET
+/api/companion/me`. Until that matches the config, capture holds and keeps
+the queue; `status` shows why under `headless`. A changed token file ends the
+session within about 2 s. A token file the server rejected is not sent again,
+across restarts too, until the file changes. Editing the config to another
+identity moves the old state to `quarantine/<binding_id>/`, and switching
+back restores it. A switch also needs the new identity's token file: until it
+replaces the one verified for the current binding, the switch holds as
+`token_not_replaced_for_switch` and nothing is sent. The Companion tells files
+apart by their metadata (device, inode, size, times, mode, owner), not their
+bytes, so touching or re-provisioning the old token counts as a replacement:
+install the new identity's token before restarting. Anything but an empty
+directory in a switch's way holds it as `switch_blocked`, named in
+`blocked_by`; it is never merged or removed, and the switch finishes once the
+operator moves it out of the data directory. On SIGTERM the daemon uploads
+what is queued for at most 8 s.
+
+A coding agent that runs as another user cannot run `hook` against a 0700
+data directory. For that topology the config names a hook socket and the
+one uid it serves:
+
+```json
+{"hook_socket": "/run/backplane-companion/hook/hook.sock", "hook_peer_uid": 10000}
+```
+
+Both fields or neither. `hook_socket` is an absolute path in a directory
+owned by the companion's user, mode 0711, writable by no one else and not a
+symlink (`unsafe_hook_directory` otherwise, refused at start); the socket
+itself is 0666 so the peer can connect, and the peer check is the boundary.
+`hook_peer_uid` is never 0 and never the companion's own uid. The daemon
+serves the socket only while a verified binding captures: it is absent
+before verification, during a hold, a switch or a rejection, and during the
+stop drain, so no record is retained for another binding. Each connection
+carries one record, `<agent-id>\n<payload>`, half-closed by the client, at
+most 64 KiB of payload, within 5 s; the daemon answers `{}` once the record
+went through the same shim as `hook <agent>`, and closes without an answer
+when it refuses the frame (counted in `health.json` as
+`hook_payload_too_large`, `hook_agent_not_served`, `hook_invalid_framing` or
+`hook_read_timeout`). A connection from any other uid, or one that cannot be
+identified, is closed without a reply or a count, as is any connection past
+64 held open at once. A connection that sends nothing is a liveness probe;
+it proves a listener answers at the path, not which Companion or for which
+uid, which the worker's runtime qualification establishes. Only agents
+whose records arrive through an in-agent plugin (Hermes, Pi) are served;
+the others run the shim themselves. The shim writes what `hook <agent>`
+writes: the inbox, the health counters and, for an out-of-scope repository,
+its root and remote in `discovered.json`; never the payload.
+The Hermes plugin dials the socket when `BACKPLANE_COMPANION_HOOK_SOCKET`
+names it in the gateway's environment. Because the shim canonicalizes each
+record's working directory on this filesystem, the companion container must
+mount the worker's repository read-only at the same path the worker sees it.
+Windows has no headless mode, so there the field is refused with
+`unsupported_platform` like the rest of the config.
+
+In a bound data directory, `connect`, `disconnect`, `mcp`, `uninstall`,
+`rename`, `pause`, `resume`, `projects map|ignore|unignore`, `agents
+install|uninstall` and every control API request other than `GET` answer
+`headless_operator_managed`, as session reads do. The device token can act
+for its owner beyond capture, so protect it like an owner API key. The
+companion ignores HTTP proxies, so restricting its egress is the operator's
+network responsibility.
+
+`headless/` packages this mode as a container. Build it with `companion/` as
+the context; both base images are pinned by digest, and the build fetches Go
+modules and the pinned Beacon archive:
+
+```sh
+docker build --platform linux/amd64 -f headless/Dockerfile \
+  --build-arg COMPANION_VERSION=0.1.0 --build-arg COMPANION_COMMIT="$(git rev-parse HEAD)" \
+  -t backplane-companion-headless:0.1.0 .
+```
+
+The image has no shell. It runs `run --headless-config
+/etc/backplane-companion/config.json` as UID and GID 10001. Its executables
+are root-owned and read-only, and its data root is `/var/lib/backplane-companion`.
+It ships `beacon-hooks` but not the OTLP collector, so it captures no Codex
+telemetry.
+
+`headless/compose.example.yaml` is the hardened service: a read-only root,
+every capability dropped, `no-new-privileges`, a named volume for the data
+root, the token's directory and the config mounted read-only, no ports, and a
+20 s stop grace period for the 8 s drain. It does not restrict egress.
+`headless/qualification/qualify.py` re-runs the container qualification
+against fake servers, with no network.
 
 ## Bundles
 
@@ -489,6 +600,35 @@ tests that run the real `beacon-hooks` are skipped.
   hook arrives within one minute of creation is eligible. The directory,
   mapping, capture windows, content level and redaction still apply; this
   fallback does not import other messages or old session history.
+
+- **Hermes Agent**: an observer plugin that forwards `on_session_start`,
+  `post_tool_call`, denied `post_approval_response` and `on_session_finalize`
+  to `backplane-companion hook hermes`, at most once, from one background
+  thread, with only `PATH`, `HOME` and `BACKPLANE_COMPANION_HOME` in its
+  environment. It registers no hook that can block or rewrite what Hermes
+  does. Only metadata is uploaded, at every content level: ids, tool and MCP
+  names, status, the approval decision, the working folder and when Hermes
+  observed the event. Duration, model and surface stay on the device;
+  arguments, results, messages and approval commands are dropped, never
+  digested.
+  Sessions on messaging platforms are not captured. Set the plugin up by hand:
+  copy `internal/agent/hermes/plugin/` to
+  `$HERMES_HOME/plugins/backplane-companion/` (default `~/.hermes`), rename
+  `__init__.py.tmpl` to `__init__.py`, replace `__COMPANION_ARGV__` with
+  `["<absolute companion path>", "hook", "hermes"]`, then run
+  `hermes plugins enable backplane-companion`. Capture also needs
+  `hermes_agent` in the installation's `enabled_agents`, the owner's
+  capture-policy setting (`PATCH /api/me/companion/installations/{id}/policy`);
+  it is not on by default. The desktop app does not list or toggle Hermes, and
+  saving its agent settings can drop `hermes_agent` (a known limitation).
+  Turn outcomes and token usage are unknown, and MCP calls are not linked to
+  cards or notes: Hermes sends MCP servers no tool-call id. Beacon records
+  blocked or failed Hermes tool calls as ordinary tool events, and Backplane
+  shows no outcome for them; in one-shot runs Hermes blocks a flagged command
+  without asking, so no denied approval is recorded. A gateway session is
+  recorded as ended when its last viewer detaches: Hermes finalizes it outside
+  the session, so the plugin reports the surface and folder the session last
+  showed, and drops the end of a session it never saw.
 
 ### Using Pi with the Backplane MCP server
 

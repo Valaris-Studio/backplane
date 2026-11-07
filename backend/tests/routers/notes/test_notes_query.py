@@ -98,6 +98,7 @@ async def test_paramless_workspace_list_shape_unchanged(
         "pinned", "kind", "failure_class", "findings", "source_execution_id",
         "created_by", "created_at", "updated_at",
         "history_revision", "revision_digest", "applied_revision", "changed", "replayed",
+        "author_principal_kind", "author_agent_id", "pinned_by", "pinned_at",
     }
     for note in body:
         # Legacy rows have no recorded history; list reads do not hash their bodies.

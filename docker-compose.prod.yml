@@ -35,6 +35,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-backplane}@postgres:5432/${POSTGRES_DB:-backplane}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # Unset keeps PostgreSQL's server default; an explicit empty value is invalid.
+      DATABASE_WORK_MEM_MB:
       ENV: production
       EVENT_BUS_BACKEND: postgres
       # Left at the default: the postgres bus already makes Tier-1 cache

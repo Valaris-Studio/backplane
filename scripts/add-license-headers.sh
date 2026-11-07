@@ -38,7 +38,7 @@ has_header() {
 }
 
 list_source_files() {
-  find backend frontend mcp-server runner companion scripts infra -type f \
+  find backend frontend mcp-server runner companion scripts infra integrations -type f \
     \( -name '*.py' -o -name '*.go' -o -name '*.rs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.sh' \) \
     -not -path '*/node_modules/*' \
     -not -path '*/.venv/*' \

@@ -43,7 +43,7 @@ describe("SessionTranscript local hash navigation preserves its upstream return"
       await user.click(screen.getByRole("link", { name: "Read note evidence" }));
       await screen.findByText("Captured evidence 2");
       const returnState = router.state.location.state;
-      expect(returnState).toEqual({ bpReturn: { v: 1, originKey, originIdx: 0 } });
+      expect(returnState).toEqual({ bpReturn: { v: 1, originKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i), originIdx: 0 } });
       expect(screen.getByRole("link", { name: "Return to selected note" })).toHaveAttribute("href", origin);
       if (action === "jump to a loaded record") {
         await user.selectOptions(screen.getByRole("combobox", { name: "Jump to loaded content" }), "record-2");

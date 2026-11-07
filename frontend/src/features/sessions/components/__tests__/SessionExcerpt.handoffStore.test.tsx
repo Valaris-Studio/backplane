@@ -107,7 +107,13 @@ describe("Session handoff across real route unmounts", () => {
     await act(async () => { await router.navigate(-1); });
     await user.click(await screen.findByRole("button", { name: "Resume note save" }));
     const resumed = screen.getByRole("dialog", { name: "Share as note" });
-    expect(within(resumed).getByRole("button", { name: "Save note" })).toBeDisabled();
+    const busySave = within(resumed).getByRole("button", { name: "Save note" });
+    expect(busySave).toHaveAttribute("aria-disabled", "true");
+    expect(busySave).not.toBeDisabled();
+    await user.click(busySave);
+    expect(busySave).toHaveFocus();
+    expect(state.writes).toHaveLength(1);
+    expect(state.writes[0]).toEqual(original);
 
     await act(async () => { response.resolve(HttpResponse.error()); });
     expect(await within(resumed).findByRole("alert")).toHaveTextContent(/may have been saved/i);

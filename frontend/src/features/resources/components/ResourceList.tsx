@@ -3,8 +3,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { resolveApiErrorMessage } from "@/lib/localized-errors";
+import { isApiError } from "@/lib/api-error";
 import {
   DndContext,
   DragOverlay,
@@ -40,11 +42,18 @@ import {
   useDeleteResource,
   useDownloadUrl,
   usePreviewDownloadUrl,
+  useResourceDetail,
   useResources,
   useTags,
   useUpdateResource,
 } from "../api/use-resources";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import {
+  resourceItemDomId,
+  useResourceDestination,
+  useResourceView,
+} from "../hooks/use-resource-destination";
+import { ContextLink } from "@/components/shared/ContextLink";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import { FrozenActionTooltip } from "@/features/kanban/components/FrozenActionTooltip";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -141,7 +150,11 @@ function InlineEditName({
           }
         }}
         className="h-7 text-sm"
-        onClick={(e) => e.stopPropagation()}
+        // The field sits inside the row link; a click in it must not follow it.
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       />
     );
   }
@@ -241,46 +254,101 @@ function RootDropZone() {
 
 export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListProps) {
   const { t, i18n } = useTranslation();
-  const [breadcrumbs, setBreadcrumbs] = useState<Breadcrumb[]>([
-    { id: null, name: "home" },
-  ]);
+  const location = useLocation();
+  const returnNavigation = useReturnNavigation();
+  const { view, linkSearch, replaceSearch, openFolder, openFile, setFilter } = useResourceView();
+  const scopeKey = `${slug}:${boardId ?? ""}`;
+  const [selected, setSelected] = useState<{ scopeKey: string; resource: Resource } | null>(null);
+  const selectedFile = selected?.scopeKey === scopeKey ? selected.resource : null;
+  const { destination, close: closeDestination, retry: retryDestination } = useResourceDestination({
+    slug, boardId, view, selectedFile, replaceSearch,
+  });
+  const [provisionalTrail, setProvisionalTrail] = useState<{ key: string; trail: Breadcrumb[] } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [previewResource, setPreviewResource] = useState<Resource | null>(null);
   const [moveResource, setMoveResource] = useState<Resource | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Resource | null>(null);
   const [draggingResource, setDraggingResource] = useState<Resource | null>(null);
   const reducedMotion = useReducedMotion();
   const listRef = useRef<HTMLDivElement>(null);
-
-  // Search & filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<string | undefined>(undefined);
-  const [filterTag, setFilterTag] = useState<string | undefined>(undefined);
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     (localStorage.getItem("resource-view-mode") as ViewMode) ?? "list",
   );
 
-  const debouncedQuery = useDebouncedValue(searchQuery, 300);
-
+  const currentParentId = view.folderId;
+  // A text search spans the whole scope; type and tag filters stay in the folder.
+  const isSearching = Boolean(view.query);
   const searchParams: ResourceSearchParams | undefined =
-    debouncedQuery || filterType || filterTag
+    view.query || view.resourceType || view.tag
       ? {
-          q: debouncedQuery || undefined,
-          resource_type: filterType,
-          tag: filterTag,
+          q: view.query || undefined,
+          resource_type: view.resourceType,
+          tag: view.tag,
         }
       : undefined;
 
-  const currentParentId = breadcrumbs[breadcrumbs.length - 1]!.id;
-  const { data: resources, isLoading } = useResources(
-    slug,
-    boardId,
-    searchParams ? undefined : currentParentId,
-    searchParams,
+  const listQuery = useResources(slug, boardId, currentParentId, searchParams);
+  const { data: resources, isLoading } = listQuery;
+  const folderQuery = useResourceDetail(slug, boardId, isSearching ? null : currentParentId);
+  const currentFolder = folderQuery.data?.id === currentParentId ? folderQuery.data : undefined;
+  const folderUnavailable = currentParentId !== null && !isSearching && (
+    folderQuery.isUnavailable ||
+    (currentFolder !== undefined && currentFolder.resource_type !== "folder")
   );
+  const folderTrail: Breadcrumb[] = !currentParentId || folderUnavailable
+    ? []
+    : currentFolder
+      ? [...(currentFolder.ancestors ?? []), currentFolder].map(({ id, name }) => ({ id, name }))
+      : provisionalTrail?.key === `${scopeKey}:${currentParentId}` ? provisionalTrail.trail : [];
+  const breadcrumbs: Breadcrumb[] = [{ id: null, name: "home" }, ...folderTrail];
+  const pathTruncated = currentFolder?.ancestors_complete === false;
+  const listDenied = listQuery.isUnavailable;
+  const listProblem =
+    folderUnavailable || (listDenied && currentParentId !== null && !isSearching)
+      ? "resources.folderUnavailable"
+      : listDenied
+        ? "resources.listUnavailable"
+        : listQuery.error && !resources
+          ? "resources.listLoadFailed"
+          : null;
+  const scopeDenied = isApiError(listQuery.error) &&
+    (listQuery.error.status === 401 || listQuery.error.status === 403);
+
+  useEffect(() => {
+    if (selected && (destination.kind === "unavailable" || listDenied || folderUnavailable)) {
+      setSelected(null);
+    }
+  }, [destination.kind, listDenied, folderUnavailable, selected]);
+
+  useEffect(() => {
+    // Selection can commit before the router transition. Clear on a committed
+    // destination change, never against the old URL immediately after a click.
+    setSelected((current) => current?.scopeKey === scopeKey && current.resource.id === view.resourceId
+      ? current
+      : null);
+  }, [scopeKey, view.resourceId]);
+
+  useEffect(() => {
+    if (folderUnavailable || listDenied) setProvisionalTrail(null);
+  }, [folderUnavailable, listDenied]);
+
+  // The search box keeps its own typing draft. Back, or opening a matched
+  // folder, changes q underneath it, so restart that draft from the URL.
+  const typedQuery = useRef(view.query);
+  const [toolbarGeneration, setToolbarGeneration] = useState(0);
+  useEffect(() => {
+    if (view.query === typedQuery.current) return;
+    typedQuery.current = view.query;
+    setToolbarGeneration((generation) => generation + 1);
+  }, [view.query]);
+
+  useEffect(() => {
+    // Lost access drops this page's private return views along with the rows.
+    if (scopeDenied) returnNavigation?.forget(location.pathname);
+  }, [scopeDenied, returnNavigation, location.pathname]);
+
   const { data: availableTags } = useTags(slug, boardId);
   const deleteResource = useDeleteResource(slug, boardId);
   const downloadUrl = useDownloadUrl(slug, boardId);
@@ -323,18 +391,43 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
     }
   }
 
-  function handlePreview(resource: Resource) {
-    if (resource.resource_type === "file") {
-      setPreviewResource(resource);
+  function handleSearchChange(query: string) {
+    typedQuery.current = query;
+    setFilter("q", query || undefined);
+  }
+
+  function handleItemActivation(resource: Resource, event: React.MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (resource.resource_type === "folder") {
+      // Rows of the previous folder or filter stay painted while the next list
+      // loads; a folder followed from them would open a location the operator
+      // is no longer looking at. A file is safe: it resolves by exact identity.
+      if (listQuery.isPlaceholderData) {
+        event.preventDefault();
+        return;
+      }
+      const isChildOfCurrent = !isSearching && (resource.parent_id ?? null) === currentParentId;
+      setProvisionalTrail({
+        key: `${scopeKey}:${resource.id}`,
+        trail: isChildOfCurrent ? [...folderTrail, { id: resource.id, name: resource.name }] : [],
+      });
+    } else {
+      // The href is identity-only for new tabs and copying; selecting in
+      // place keeps this view's folder and filters beneath the preview.
+      event.preventDefault();
+      setSelected({ scopeKey, resource });
+      openFile(resource.id, event.currentTarget);
     }
   }
 
-  function navigateToFolder(folder: Resource) {
-    setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
+  function handlePreview(resource: Resource) {
+    if (resource.resource_type !== "file") return;
+    setSelected({ scopeKey, resource });
+    openFile(resource.id, document.getElementById(resourceItemDomId(resource.id)));
   }
 
-  function navigateToBreadcrumb(index: number) {
-    setBreadcrumbs((prev) => prev.slice(0, index + 1));
+  function navigateToBreadcrumb(crumb: Breadcrumb) {
+    if (crumb.id !== currentParentId) openFolder(crumb.id);
   }
 
   function handleDelete(resource: Resource) {
@@ -383,8 +476,6 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
       })
     : [];
 
-  const isSearching = Boolean(searchParams);
-
   if (isLoading) {
     return (
       <div className="space-y-[var(--page-section-gap)]">
@@ -426,22 +517,29 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
           {/* Toolbar */}
           <div className="border-b border-border/70 px-[var(--card-padding)] py-3">
             <ResourceToolbar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              resourceType={filterType}
-              onResourceTypeChange={setFilterType}
-              selectedTag={filterTag}
-              onTagChange={setFilterTag}
+              key={toolbarGeneration}
+              searchQuery={view.query}
+              onSearchChange={handleSearchChange}
+              resourceType={view.resourceType}
+              onResourceTypeChange={(type) => setFilter("resource_type", type)}
+              selectedTag={view.tag}
+              onTagChange={(tag) => setFilter("tag", tag)}
               availableTags={availableTags ?? []}
               viewMode={viewMode}
               onViewModeChange={handleViewModeChange}
             />
           </div>
 
-          {/* Breadcrumbs (hidden when searching) */}
+          {destination.kind === "loading" && (
+            <p role="status" className="border-b border-border/70 px-[var(--card-padding)] py-2 text-xs text-muted-foreground">
+              {t("common.loading")}
+            </p>
+          )}
+
+          {/* Breadcrumbs (hidden while a text search spans the scope) */}
           {!isSearching && (
             <div className="border-b border-border/70 px-[var(--card-padding)] py-3">
-              <nav className="flex flex-wrap items-center gap-1.5 text-sm">
+              <nav aria-label={t("resources.folderPath")} className="flex flex-wrap items-center gap-1.5 text-sm">
                 {breadcrumbs.map((crumb, index) => (
                   <DroppableBreadcrumb
                     key={crumb.id ?? "root"}
@@ -452,9 +550,21 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
                         {index > 0 && (
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
+                        {index === 1 && pathTruncated && (
+                          <>
+                            <span
+                              title={t("resources.pathTruncated")}
+                              className="flex items-center px-1 text-muted-foreground"
+                            >
+                              <MoreHorizontal aria-hidden className="h-4 w-4" />
+                              <span className="sr-only">{t("resources.pathTruncated")}</span>
+                            </span>
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </>
+                        )}
                         <button
                           type="button"
-                          onClick={() => navigateToBreadcrumb(index)}
+                          onClick={() => navigateToBreadcrumb(crumb)}
                           className={cn(
                             "rounded-full px-2 py-1 transition-colors",
                             index === breadcrumbs.length - 1
@@ -479,7 +589,16 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
           )}
 
           {/* Content */}
-          {!sorted.length ? (
+          {listProblem ? (
+            <div role="status" className="space-y-3 p-[var(--card-padding)] text-sm text-muted-foreground">
+              <p>{t(listProblem)}</p>
+              {listProblem === "resources.listLoadFailed" && (
+                <Button variant="outline" size="sm" disabled={listQuery.isFetching} onClick={() => void listQuery.refetch()}>
+                  {t("resources.retry")}
+                </Button>
+              )}
+            </div>
+          ) : !sorted.length ? (
             <div className="p-[var(--card-padding)]">
               <EmptyState
                 icon={FolderOpen}
@@ -494,7 +613,8 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
           ) : viewMode === "grid" ? (
             <ResourceGrid
               resources={sorted}
-              onNavigateFolder={navigateToFolder}
+              linkSearch={linkSearch}
+              onActivate={handleItemActivation}
               onPreview={handlePreview}
               onDownload={handleDownload}
               onRename={(r) => {
@@ -520,13 +640,14 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
                         isOverDrop && isFolder && "bg-primary/8 ring-1 ring-inset ring-primary/30",
                       )}
                     >
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
-                        onClick={() => {
-                          if (isFolder) navigateToFolder(resource);
-                          else handlePreview(resource);
-                        }}
+                      <ContextLink
+                        to={{ search: linkSearch(resource) }}
+                        id={resourceItemDomId(resource.id)}
+                        data-return-anchor
+                        // Native link dragging would pre-empt the row's move drag.
+                        draggable={false}
+                        className="flex min-w-0 flex-1 items-center gap-4 rounded-[var(--radius-cap)] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={(event) => handleItemActivation(resource, event)}
                       >
                         <div
                           className={cn(
@@ -583,7 +704,7 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
                             </p>
                           )}
                         </div>
-                      </button>
+                      </ContextLink>
 
                       <span className="hidden text-sm text-muted-foreground md:block">
                         {resource.resource_type === "file" && resource.size_bytes != null
@@ -719,23 +840,35 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
           onConfirm={confirmDelete}
         />
 
-        {/* Preview sheet */}
+        {/* Preview sheet: the URL's exact target, never a copied row */}
         <Sheet
-          open={previewResource !== null}
+          open={destination.kind === "file" || destination.kind === "unavailable" || destination.kind === "failed"}
           onOpenChange={(open) => {
-            if (!open) setPreviewResource(null);
+            if (!open) {
+              setSelected(null);
+              closeDestination();
+            }
           }}
         >
           <SheetContent className="flex flex-col gap-4 overflow-y-auto">
-            {previewResource && (
+            {destination.kind === "file" ? (
               <PreviewContent
-                key={`${slug}:${boardId ?? "workspace"}:${previewResource.id}`}
-                resource={previewResource}
+                // Identity-only key: refreshed metadata must not remount the
+                // preview, re-sign its URL or refetch its body.
+                key={`${slug}:${boardId ?? "workspace"}:${destination.resource.id}`}
+                resource={destination.resource}
+                locationUnavailable={!destination.locationVerified}
                 slug={slug}
                 boardId={boardId}
                 onDownload={handleDownload}
               />
-            )}
+            ) : destination.kind === "unavailable" || destination.kind === "failed" ? (
+              <DestinationProblem
+                unavailable={destination.kind === "unavailable"}
+                retrying={destination.retrying}
+                onRetry={retryDestination}
+              />
+            ) : null}
           </SheetContent>
         </Sheet>
       </div>
@@ -743,20 +876,54 @@ export function ResourceList({ slug, boardId, isFrozen = false }: ResourceListPr
   );
 }
 
+// --- Exact target that cannot be shown: no body, no download ---
+function DestinationProblem({
+  unavailable,
+  retrying,
+  onRetry,
+}: {
+  unavailable: boolean;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="text-lg">{t("resources.unavailableTitle")}</SheetTitle>
+      </SheetHeader>
+      <div role="alert" className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4 text-sm">
+        <p>{t(unavailable ? "resources.resourceUnavailable" : "resources.resourceLoadFailed")}</p>
+        <Button variant="outline" size="sm" disabled={retrying} onClick={onRetry}>
+          {t("resources.retry")}
+        </Button>
+      </div>
+    </>
+  );
+}
+
 // --- Preview content inside sheet ---
 function PreviewContent({
   resource,
+  locationUnavailable,
   slug,
   boardId,
   onDownload,
 }: {
   resource: Resource;
+  locationUnavailable: boolean;
   slug: string;
   boardId?: string;
   onDownload: (r: Resource) => void;
 }) {
   const { t } = useTranslation();
   const { data: signedUrl, isError, isFetching, refetch } = usePreviewDownloadUrl(slug, boardId, resource);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   return (
     <>
@@ -764,6 +931,9 @@ function PreviewContent({
         <SheetTitle className="text-lg">{resource.name}</SheetTitle>
         {resource.description && (
           <SheetDescription>{resource.description}</SheetDescription>
+        )}
+        {locationUnavailable && (
+          <p className="text-xs text-muted-foreground">{t("resources.locationUnavailable")}</p>
         )}
       </SheetHeader>
 
@@ -784,8 +954,11 @@ function PreviewContent({
             resource={resource}
             downloadUrl={signedUrl}
             onRefreshUrl={async () => {
+              if (!mounted.current) return undefined;
               const result = await refetch();
-              return result.isError ? undefined : result.data;
+              // Cancelling an unmounted signing query can resolve with its old
+              // URL. Do not let that continuation recreate the removed body query.
+              return mounted.current && !result.isError ? result.data : undefined;
             }}
           />
         ) : (

@@ -7,16 +7,22 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
+    String,
     and_,
+    any_,
+    bindparam,
     case,
     delete,
     false,
     func,
     insert,
+    literal,
     or_,
     select,
     tuple_,
 )
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent_session import (
@@ -47,6 +53,21 @@ Source = SessionSearchSource
 Content = AgentSessionContent
 Event = AgentSessionEvent
 
+CONTENT_FACTS_POINT_LOOKUP_LIMIT = 32
+CONTENT_FACT_GROUP_KEYS = ("state", "coverage", "is_text", "index_status")
+CONTENT_COVERAGE_COUNTERS = (
+    "count",
+    "stored_bytes",
+    "stored_known",
+    "original_bytes",
+    "original_known",
+)
+CONTENT_FACT_COUNTERS = (
+    *CONTENT_COVERAGE_COUNTERS,
+    "eligible_sources",
+    "eligible_bytes",
+)
+
 # (sort_us, sort_order, source_id, ordinal): where a chronological scan stands.
 ScanPosition = tuple[int, int, uuid.UUID, int]
 
@@ -63,6 +84,19 @@ class SearchScope:
     mcp_anchors: frozenset[str] | None = None
     failed_anchors: frozenset[str] | None = None
     work_anchors: frozenset[str] | None = None
+
+
+def _known_empty_scope(scope: SearchScope) -> bool:
+    if scope.channels is not None and not (
+        scope.channels or scope.tool_alias or scope.tool_anchors or scope.mcp_anchors
+    ):
+        return True
+    anchors = scope.failed_anchors
+    if scope.work_anchors is not None:
+        anchors = (
+            scope.work_anchors if anchors is None else anchors & scope.work_anchors
+        )
+    return anchors is not None and not anchors
 
 
 @dataclass(frozen=True)
@@ -117,6 +151,80 @@ class ContentCoverageRow:
     stored_known: int
     original_bytes: int
     original_known: int
+
+
+@dataclass(frozen=True)
+class ContentFacts:
+    coverage_rows: list[ContentCoverageRow]
+    eligible_totals: tuple[int, int]
+    snapshot: str | None
+    xid: str | None
+
+
+@dataclass(frozen=True)
+class _CoverageReuse:
+    session_id: uuid.UUID
+    extractor_version: str
+    facts: ContentFacts
+    transaction: object
+    nested_transaction: object
+    connection: object
+
+
+def _decode_coverage_row(row) -> ContentCoverageRow:
+    return ContentCoverageRow(
+        state=row[0],
+        coverage=row[1],
+        is_text=bool(row[2]),
+        index_status=row[3],
+        unverified=bool(row[4]),
+        count=int(row[5]),
+        stored_bytes=int(row[6]),
+        stored_known=int(row[7]),
+        original_bytes=int(row[8]),
+        original_known=int(row[9]),
+    )
+
+
+def _decode_content_facts(payload) -> ContentFacts:
+    return ContentFacts(
+        coverage_rows=[_decode_coverage_row(row) for row in payload["rows"]],
+        eligible_totals=(int(payload["totals"][0]), int(payload["totals"][1])),
+        snapshot=payload["snapshot"],
+        xid=payload["xid"],
+    )
+
+
+def _reclassify_unverified(
+    rows: list[ContentCoverageRow], unverified: list[list]
+) -> list[ContentCoverageRow]:
+    groups = {
+        (row.state, row.coverage, row.is_text, row.index_status, row.unverified): [
+            row.count,
+            row.stored_bytes,
+            row.stored_known,
+            row.original_bytes,
+            row.original_known,
+        ]
+        for row in rows
+    }
+    for _content_id, *values in unverified:
+        key = (*values[:4], False)
+        counts = values[5:]
+        previous = groups[key]
+        groups[key] = [
+            total - count for total, count in zip(previous, counts, strict=True)
+        ]
+        key = (*values[:4], True)
+        previous = groups.get(key, [0] * 5)
+        groups[key] = [
+            total + count for total, count in zip(previous, counts, strict=True)
+        ]
+    return [
+        _decode_coverage_row((*key, *values))
+        for key, values in groups.items()
+        if values[0]
+    ]
 
 
 @dataclass(frozen=True)
@@ -196,6 +304,7 @@ def _chunk_rows(source_id: uuid.UUID, record: SourceRecord) -> list[dict]:
 class SessionSearchRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._coverage_reuse: _CoverageReuse | None = None
 
     def _dialect(self) -> str:
         return self.db.get_bind().dialect.name
@@ -399,10 +508,13 @@ class SessionSearchRepository:
             if scope.mcp_anchors is not None:
                 choices.append(Source.call_anchor.in_(scope.mcp_anchors))
             conditions.append(or_(*choices) if choices else false())
-        if scope.failed_anchors is not None:
-            conditions.append(Source.call_anchor.in_(scope.failed_anchors))
+        anchors = scope.failed_anchors
         if scope.work_anchors is not None:
-            conditions.append(Source.call_anchor.in_(scope.work_anchors))
+            anchors = (
+                scope.work_anchors if anchors is None else anchors & scope.work_anchors
+            )
+        if anchors is not None:
+            conditions.append(Source.call_anchor.in_(anchors))
         return conditions
 
     def _scanned(self, columns, session_id, scope):
@@ -414,23 +526,459 @@ class SessionSearchRepository:
             .where(*self._scope(session_id, scope))
         )
 
+    def _content_metadata(self, session_id, extractor_version: str):
+        # The composite foreign keys make a session's Contents authoritative.
+        # Pending rows have the same coverage as an absent current Source.
+        return (
+            select(
+                Content.state.label("state"),
+                Content.coverage.label("coverage"),
+                case((Content.media_type.in_(TEXT_MEDIA_TYPES), 1), else_=0).label(
+                    "is_text"
+                ),
+                func.coalesce(Source.status, "pending").label("index_status"),
+                Content.byte_count.label("stored_bytes"),
+                func.coalesce(Content.original_byte_count, Content.byte_count).label(
+                    "original_bytes"
+                ),
+            )
+            .select_from(Content)
+            .outerjoin(
+                Source,
+                and_(
+                    Source.content_id == Content.id,
+                    Source.content_id.is_not(None),
+                    Source.session_id == session_id,
+                    Source.extractor_version == extractor_version,
+                    Source.source_digest == Content.sha256,
+                    # Keep the partial-index predicate visible in generic plans.
+                    Source.status != literal("pending", literal_execute=True),
+                ),
+            )
+            .where(Content.session_id == session_id)
+        )
+
+    def _content_row_eligibility(self, scope: SearchScope, contents, sources):
+        conditions = [sources.c.chunk_count > 0]
+        if scope.channels is not None:
+            choices = [contents.c.channel.in_(scope.channels)] if scope.channels else []
+            if scope.tool_alias:
+                choices.append(contents.c.channel.in_(("tool_input", "tool_output")))
+            if scope.tool_anchors is not None:
+                choices.append(sources.c.call_anchor.in_(scope.tool_anchors))
+            if scope.mcp_anchors is not None:
+                choices.append(sources.c.call_anchor.in_(scope.mcp_anchors))
+            conditions.append(or_(*choices) if choices else false())
+        anchors = scope.failed_anchors
+        if scope.work_anchors is not None:
+            anchors = (
+                scope.work_anchors if anchors is None else anchors & scope.work_anchors
+            )
+        if anchors is not None:
+            conditions.append(sources.c.call_anchor.in_(anchors))
+        return and_(*conditions)
+
+    def _content_fact_rows(
+        self,
+        scope: SearchScope,
+        contents,
+        *,
+        runtime_session,
+        last_prefix_id,
+        point_lookup=False,
+    ):
+        if point_lookup:
+            # The composite FK supplies the session for this unique content key.
+            # UNIQUE(content_id) permits one current row without dropping facts.
+            sources = (
+                select(
+                    Source.content_id,
+                    Source.status,
+                    Source.source_digest,
+                    Source.folded_bytes,
+                    Source.chunk_count,
+                    Source.call_anchor,
+                )
+                .where(
+                    Source.content_id.is_not(None),
+                    Source.extractor_version == scope.extractor_version,
+                    Source.status != literal("pending", literal_execute=True),
+                    Source.content_id == contents.c.id,
+                    Source.source_digest == contents.c.sha256,
+                )
+                .correlate(contents)
+                .limit(literal(1, literal_execute=True))
+                .lateral("current_source")
+            )
+            current_source = and_(
+                sources.c.content_id == contents.c.id,
+                sources.c.source_digest == contents.c.sha256,
+            )
+        else:
+            sources = Source.__table__
+            # Match only same-session Sources beyond the materialized prefix.
+            current_source = and_(
+                sources.c.content_id == contents.c.id,
+                sources.c.source_digest == contents.c.sha256,
+                sources.c.session_id == runtime_session,
+                sources.c.content_id > last_prefix_id,
+                sources.c.content_id.is_not(None),
+                sources.c.extractor_version == scope.extractor_version,
+                sources.c.status != literal("pending", literal_execute=True),
+            )
+        return (
+            select(
+                contents.c.state.label("state"),
+                contents.c.coverage.label("coverage"),
+                case((contents.c.media_type.in_(TEXT_MEDIA_TYPES), 1), else_=0).label(
+                    "is_text"
+                ),
+                func.coalesce(sources.c.status, "pending").label("index_status"),
+                contents.c.byte_count.label("stored_bytes"),
+                func.coalesce(
+                    contents.c.original_byte_count, contents.c.byte_count
+                ).label("original_bytes"),
+                self._content_row_eligibility(scope, contents, sources).label(
+                    "eligible"
+                ),
+                sources.c.folded_bytes.label("folded_bytes"),
+            )
+            .select_from(contents)
+            .outerjoin(sources, current_source)
+        )
+
+    def _content_facts_query(self, session_id, scope: SearchScope, *, events=False):
+        # Keep the session value an InitPlan parameter for both Content accesses,
+        # independent of a prepared plan's previous hot-session cardinality.
+        parameters = (
+            select(session_id.label("session_id"))
+            .cte("content_session_parameter")
+            .prefix_with("MATERIALIZED")
+        )
+        runtime_session = select(parameters.c.session_id).scalar_subquery()
+        content_rows = select(
+            Content.id,
+            Content.state,
+            Content.coverage,
+            Content.media_type,
+            Content.sha256,
+            Content.byte_count,
+            Content.original_byte_count,
+            Content.channel,
+        )
+        # Singleton ANY preserves both sort keys instead of making session_id
+        # a redundant equality-constrained key in the prefix ordering.
+        prefix = (
+            content_rows.where(
+                Content.session_id
+                == any_(array([runtime_session], type_=Content.session_id.type))
+            )
+            .order_by(Content.session_id, Content.id)
+            .limit(literal(CONTENT_FACTS_POINT_LOOKUP_LIMIT + 1, literal_execute=True))
+            .cte("content_prefix")
+            .prefix_with("MATERIALIZED")
+        )
+        prefix_count = select(func.count()).select_from(prefix).scalar_subquery()
+        last_prefix_id = (
+            select(prefix.c.id)
+            .order_by(prefix.c.id.desc())
+            .limit(literal(1, literal_execute=True))
+            .scalar_subquery()
+        )
+        prefix_groups = self._group_content_facts(
+            self._content_fact_rows(
+                scope,
+                prefix,
+                runtime_session=runtime_session,
+                last_prefix_id=last_prefix_id,
+                point_lookup=True,
+            ),
+            "prefix_groups",
+        )
+        remainder = content_rows.where(
+            Content.session_id == runtime_session,
+            tuple_(Content.session_id, Content.id)
+            > tuple_(runtime_session, last_prefix_id),
+        ).subquery("remainder_contents")
+        remainder_groups = self._group_content_facts(
+            self._content_fact_rows(
+                scope,
+                remainder,
+                runtime_session=runtime_session,
+                last_prefix_id=last_prefix_id,
+            ),
+            "remainder_groups",
+        )
+        merged = self._merge_content_fact_groups(prefix_groups, remainder_groups)
+        body = case(
+            (
+                prefix_count
+                <= literal(CONTENT_FACTS_POINT_LOOKUP_LIMIT, literal_execute=True),
+                self._encode_content_facts(
+                    prefix_groups, session_id, scope, events=events
+                ).scalar_subquery(),
+            ),
+            else_=self._encode_content_facts(
+                merged, session_id, scope, events=events
+            ).scalar_subquery(),
+        )
+        certificate = func.jsonb_build_object(
+            "snapshot",
+            func.pg_current_snapshot().cast(String),
+            "xid",
+            func.public.session_search_leader_xid_if_assigned().cast(String),
+        )
+        # Keep both CTEs inside the facts arm, after the SERIALIZABLE baseline.
+        return select(body.cast(JSONB).op("||")(certificate).cast(JSON)).add_cte(
+            parameters, prefix, nest_here=True
+        )
+
+    def _group_content_facts(self, rows, name):
+        classified = rows.subquery()
+        keys = [classified.c[key] for key in CONTENT_FACT_GROUP_KEYS]
+        return (
+            select(
+                *keys,
+                func.count().label("count"),
+                func.coalesce(func.sum(classified.c.stored_bytes), 0).label(
+                    "stored_bytes"
+                ),
+                func.count(classified.c.stored_bytes).label("stored_known"),
+                func.coalesce(func.sum(classified.c.original_bytes), 0).label(
+                    "original_bytes"
+                ),
+                func.count(classified.c.original_bytes).label("original_known"),
+                func.count().filter(classified.c.eligible).label("eligible_sources"),
+                func.coalesce(
+                    func.sum(classified.c.folded_bytes).filter(classified.c.eligible), 0
+                ).label("eligible_bytes"),
+            )
+            .group_by(*keys)
+            .subquery(name)
+        )
+
+    def _merge_content_fact_groups(self, prefix_groups, remainder_groups):
+        partitions = (
+            select(*prefix_groups.c)
+            .union_all(select(*remainder_groups.c))
+            .subquery("partition_groups")
+        )
+        keys = [partitions.c[key] for key in CONTENT_FACT_GROUP_KEYS]
+        return (
+            select(
+                *keys,
+                *(
+                    func.sum(partitions.c[name]).label(name)
+                    for name in CONTENT_FACT_COUNTERS
+                ),
+            )
+            .group_by(*keys)
+            .subquery("merged_groups")
+        )
+
+    def _encode_content_facts(
+        self, groups, session_id, scope: SearchScope, *, events=False
+    ):
+        eligible_group = and_(
+            groups.c.index_status == "indexed",
+            groups.c.state == "available",
+            groups.c.coverage.in_(WITH_BODY),
+            groups.c.is_text == 1,
+        )
+        values = [groups.c[name] for name in CONTENT_FACT_GROUP_KEYS]
+        values += [literal(False)]
+        values += [groups.c[name] for name in CONTENT_COVERAGE_COUNTERS]
+        fields = [
+            "rows",
+            func.coalesce(
+                func.json_agg(func.json_build_array(*values)), literal([], type_=JSON)
+            ),
+            "totals",
+            func.json_build_array(
+                func.coalesce(
+                    func.sum(groups.c.eligible_sources).filter(eligible_group), 0
+                ),
+                func.coalesce(
+                    func.sum(groups.c.eligible_bytes).filter(eligible_group), 0
+                ),
+            ),
+        ]
+        if events:
+            # Event chunks retain their channel/field semantics. Explicitly
+            # guard the branch: a natural join can otherwise scan content chunks
+            # before discovering there are no event Sources in the session.
+            event_totals = self._scanned(
+                (
+                    func.count(func.distinct(Chunk.source_id)),
+                    func.coalesce(func.sum(Chunk.owned_bytes), 0),
+                ),
+                session_id,
+                scope,
+            ).where(Source.session_id == session_id, Source.event_id.is_not(None))
+            fields += [
+                "events",
+                case(
+                    (
+                        select(Source.id)
+                        .where(
+                            Source.session_id == session_id,
+                            Source.event_id.is_not(None),
+                            Source.status == "indexed",
+                            Source.extractor_version == scope.extractor_version,
+                        )
+                        .exists(),
+                        event_totals.with_only_columns(
+                            func.json_build_array(*event_totals.selected_columns)
+                        ).scalar_subquery(),
+                    ),
+                    else_=literal([0, 0], type_=JSON),
+                ),
+            ]
+        return select(func.json_build_object(*fields)).select_from(groups)
+
+    async def content_facts(
+        self, session_id: uuid.UUID, scope: SearchScope
+    ) -> ContentFacts:
+        """Content-only facts, classified and certified by one PostgreSQL statement."""
+        query = self._content_facts_query(
+            literal(session_id, type_=UUID(as_uuid=True)), scope
+        )
+        # Preserve the mapped SELECT's autoflush boundary for metadata reads.
+        payload = await self.db.scalar(
+            select(Content.id).with_only_columns(query.scalar_subquery())
+        )
+        return _decode_content_facts(payload)
+
+    def _scoped_session(self, session_id: uuid.UUID):
+        # Late coverage retains its original join without a Source session
+        # restriction, so a hot session's plan must not control a tiny one.
+        return (
+            literal(session_id, type_=UUID(as_uuid=True), literal_execute=True)
+            if self._dialect() == "postgresql"
+            else session_id
+        )
+
     async def eligible_totals(
         self, session_id: uuid.UUID, scope: SearchScope
     ) -> tuple[int, int]:
         """(sources, folded bytes) a complete scan of this scope reads."""
-        row = (
-            await self.db.execute(
-                self._scanned(
-                    (
-                        func.count(func.distinct(Chunk.source_id)),
-                        func.coalesce(func.sum(Chunk.owned_bytes), 0),
-                    ),
-                    session_id,
-                    scope,
-                )
+        self._coverage_reuse = None
+        query = self._scanned(
+            (
+                func.count(func.distinct(Chunk.source_id)),
+                func.coalesce(func.sum(Chunk.owned_bytes), 0),
+            ),
+            session_id,
+            scope,
+        )
+        # Known-empty eligibility retains its no-population-read contract.
+        # Coverage, if requested later, uses the original late statement.
+        if self._dialect() != "postgresql" or _known_empty_scope(scope):
+            row = (await self.db.execute(query)).one()
+            return int(row[0]), int(row[1])
+        baseline = query.with_only_columns(
+            func.json_build_object(
+                "totals", func.json_build_array(*query.selected_columns)
             )
-        ).one()
-        return int(row[0]), int(row[1])
+        ).scalar_subquery()
+        facts = self._content_facts_query(
+            literal(session_id, type_=UUID(as_uuid=True)), scope, events=True
+        )
+        # Choose the baseline before either branch reads at SERIALIZABLE.
+        # Its first position also preserves relation-lock acquisition order.
+        statement = select(Chunk.id).with_only_columns(
+            case(
+                (
+                    func.current_setting("transaction_isolation") == "serializable",
+                    baseline,
+                ),
+                else_=facts.scalar_subquery(),
+            )
+        )
+        payload = (await self.db.execute(statement)).scalar_one()
+        content_totals = tuple(map(int, payload["totals"]))
+        if "snapshot" not in payload:
+            return content_totals
+        content_facts = _decode_content_facts(payload)
+        self._coverage_reuse = _CoverageReuse(
+            session_id,
+            scope.extractor_version,
+            content_facts,
+            self.db.sync_session.get_transaction(),
+            self.db.sync_session.get_nested_transaction(),
+            await self.db.connection(),
+        )
+        event_totals = payload["events"]
+        return content_totals[0] + int(event_totals[0]), content_totals[1] + int(
+            event_totals[1]
+        )
+
+    async def _certified_coverage(
+        self, session_id: uuid.UUID, extractor_version: str, unverified: set[uuid.UUID]
+    ) -> list[ContentCoverageRow] | None:
+        reuse, self._coverage_reuse = self._coverage_reuse, None
+        if reuse is None or (
+            reuse.session_id != session_id
+            or reuse.extractor_version != extractor_version
+            or reuse.transaction is not self.db.sync_session.get_transaction()
+            or reuse.nested_transaction
+            is not self.db.sync_session.get_nested_transaction()
+            or reuse.connection is not await self.db.connection()
+        ):
+            return None
+        fields = [
+            "snapshot",
+            func.pg_current_snapshot().cast(String),
+            "xid",
+            func.pg_current_xact_id_if_assigned().cast(String),
+        ]
+        if unverified:
+            current = (
+                self._content_metadata(
+                    self._scoped_session(session_id), extractor_version
+                )
+                .add_columns(Content.id.label("id"))
+                .where(Content.id.in_(unverified))
+                .subquery()
+            )
+            values = [
+                current.c[name]
+                for name in ("state", "coverage", "is_text", "index_status")
+            ]
+            values += [
+                literal(False),
+                literal(1),
+                func.coalesce(current.c.stored_bytes, 0),
+                case((current.c.stored_bytes.is_not(None), 1), else_=0),
+                func.coalesce(current.c.original_bytes, 0),
+                case((current.c.original_bytes.is_not(None), 1), else_=0),
+            ]
+            fields += [
+                "rows",
+                select(
+                    func.coalesce(
+                        func.json_agg(func.json_build_array(current.c.id, *values)),
+                        literal([], type_=JSON),
+                    )
+                )
+                .select_from(current)
+                .scalar_subquery(),
+            ]
+        statement = select(Content.id).with_only_columns(
+            func.json_build_object(*fields)
+        )
+        certificate = (await self.db.execute(statement)).scalar_one()
+        # Even an unchanged assigned xid can hide this transaction's own writes
+        # or a rolled-back savepoint. Only two unassigned xids permit reuse.
+        if (
+            reuse.facts.xid is not None
+            or certificate["xid"] is not None
+            or certificate["snapshot"] != reuse.facts.snapshot
+        ):
+            return None
+        return _reclassify_unverified(
+            reuse.facts.coverage_rows, certificate.get("rows", [])
+        )
 
     async def scan_window(
         self,
@@ -480,10 +1028,9 @@ class SessionSearchRepository:
         return row.folded_text[: row.owned_chars] if row is not None else None
 
     async def matching_chunks(
-        self, chunk_ids: list[uuid.UUID], folded_query: str
+        self, chunk_ids: list[uuid.UUID], folded_query: str, limit: int
     ) -> dict[uuid.UUID, MatchingChunk]:
-        """The chunks among `chunk_ids` whose text contains the folded query
-        anywhere, overlap included; only those carry their text back."""
+        """The first chunks owning a match, in the captured scan order."""
         if not chunk_ids:
             return {}
         # Plain substring position: no pattern characters, so `%`, `_` and
@@ -493,6 +1040,18 @@ class SessionSearchRepository:
             if self._dialect() == "postgresql"
             else func.instr(Chunk.folded_text, folded_query)
         )
+        if self._dialect() == "postgresql":
+            selected_ids = bindparam(
+                "matching_chunk_ids", chunk_ids, type_=ARRAY(UUID(as_uuid=True))
+            )
+            selected = Chunk.id == any_(selected_ids)
+            scan_order = func.array_position(selected_ids, Chunk.id)
+        else:
+            selected = Chunk.id.in_(chunk_ids)
+            scan_order = case(
+                {chunk_id: position for position, chunk_id in enumerate(chunk_ids)},
+                value=Chunk.id,
+            )
         rows = await self.db.execute(
             select(
                 Chunk.id,
@@ -512,7 +1071,9 @@ class SessionSearchRepository:
                 Chunk.case_map,
             )
             .join(Source, Source.id == Chunk.source_id)
-            .where(Chunk.id.in_(chunk_ids), contains > 0)
+            .where(selected, contains > 0, contains <= Chunk.owned_chars)
+            .order_by(scan_order)
+            .limit(limit)
         )
         return {
             row.id: MatchingChunk(
@@ -640,12 +1201,12 @@ class SessionSearchRepository:
 
     # --- coverage ---
 
-    async def content_coverage(
+    def _content_coverage_query(
         self,
         session_id: uuid.UUID,
         extractor_version: str,
         unverified: set[uuid.UUID],
-    ) -> list[ContentCoverageRow]:
+    ):
         current = and_(
             Source.content_id == Content.id,
             Source.extractor_version == extractor_version,
@@ -671,41 +1232,42 @@ class SessionSearchRepository:
             .where(Content.session_id == session_id)
             .subquery()
         )
-        rows = await self.db.execute(
-            select(
-                classified.c.state,
-                classified.c.coverage,
-                classified.c.is_text,
-                classified.c.index_status,
-                classified.c.unverified,
-                func.count(),
-                func.coalesce(func.sum(classified.c.stored_bytes), 0),
-                func.count(classified.c.stored_bytes),
-                func.coalesce(func.sum(classified.c.original_bytes), 0),
-                func.count(classified.c.original_bytes),
-            ).group_by(
-                classified.c.state,
-                classified.c.coverage,
-                classified.c.is_text,
-                classified.c.index_status,
-                classified.c.unverified,
-            )
+        return select(
+            classified.c.state,
+            classified.c.coverage,
+            classified.c.is_text,
+            classified.c.index_status,
+            classified.c.unverified,
+            func.count(),
+            func.coalesce(func.sum(classified.c.stored_bytes), 0),
+            func.count(classified.c.stored_bytes),
+            func.coalesce(func.sum(classified.c.original_bytes), 0),
+            func.count(classified.c.original_bytes),
+        ).group_by(
+            classified.c.state,
+            classified.c.coverage,
+            classified.c.is_text,
+            classified.c.index_status,
+            classified.c.unverified,
         )
-        return [
-            ContentCoverageRow(
-                state=row[0],
-                coverage=row[1],
-                is_text=bool(row[2]),
-                index_status=row[3],
-                unverified=bool(row[4]),
-                count=int(row[5]),
-                stored_bytes=int(row[6]),
-                stored_known=int(row[7]),
-                original_bytes=int(row[8]),
-                original_known=int(row[9]),
-            )
-            for row in rows
-        ]
+
+    async def content_coverage(
+        self,
+        session_id: uuid.UUID,
+        extractor_version: str,
+        unverified: set[uuid.UUID],
+    ) -> list[ContentCoverageRow]:
+        certified = await self._certified_coverage(
+            session_id, extractor_version, unverified
+        )
+        if certified is not None:
+            return certified
+        scoped_session = self._scoped_session(session_id)
+        query = self._content_coverage_query(
+            scoped_session, extractor_version, unverified
+        )
+        rows = await self.db.execute(query)
+        return [_decode_coverage_row(row) for row in rows]
 
     async def event_coverage(
         self,

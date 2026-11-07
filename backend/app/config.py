@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     # `make dev-backend` runs.
     DATABASE_URL: str = "postgresql+asyncpg://valaris:valaris@localhost:5433/valaris"
     DATABASE_PASSWORD: SecretStr | None = None
+    DATABASE_WORK_MEM_MB: int | None = Field(default=None, gt=0)
     CORS_ORIGINS: str = "http://localhost:5173"
     ENV: str = "development"
     GCS_BUCKET: str = ""
@@ -225,7 +226,9 @@ class Settings(BaseSettings):
             try:
                 value = json.loads(value)
             except ValueError:
-                raise ValueError("CONTEXT_BUDGET_CEILINGS must be a JSON object") from None
+                raise ValueError(
+                    "CONTEXT_BUDGET_CEILINGS must be a JSON object"
+                ) from None
         if value is None:
             raise ValueError("CONTEXT_BUDGET_CEILINGS must be a JSON object")
         return value
@@ -255,6 +258,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+
+    def database_connect_args(self, url: str) -> dict[str, dict[str, str]]:
+        """Use the same admitted work memory for requests and startup migrations."""
+        if url.startswith("postgresql") and self.DATABASE_WORK_MEM_MB is not None:
+            return {"server_settings": {"work_mem": f"{self.DATABASE_WORK_MEM_MB}MB"}}
+        return {}
 
     @property
     def is_development(self) -> bool:

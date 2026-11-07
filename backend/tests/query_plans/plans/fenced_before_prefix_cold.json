@@ -1,0 +1,73 @@
+{
+  "plan": {
+    "Node Type": "Fixture Root",
+    "Plans": [
+      {
+        "Node Type": "Index Scan",
+        "Parent Relationship": "Outer",
+        "Index Name": "uq_agent_session_contents_id_session",
+        "Relation Name": "agent_session_contents",
+        "Actual Rows": 33,
+        "Actual Loops": 1,
+        "Index Cond": "(agent_session_contents_1.session_id = $5)",
+        "Rows Removed by Index Recheck": 0
+      },
+      {
+        "Node Type": "Index Only Scan",
+        "Parent Relationship": "InitPlan",
+        "Index Name": "ix_session_search_sources_event_metadata",
+        "Relation Name": "session_search_sources",
+        "Actual Rows": 0,
+        "Actual Loops": 1,
+        "Index Cond": "(session_search_sources_4.session_id = '729055b6-af03-487e-9540-e7f68dca2f9b'::uuid)",
+        "Rows Removed by Index Recheck": 0,
+        "Filter": "(((session_search_sources_4.status)::text = 'indexed'::text) AND ((session_search_sources_4.extractor_version)::text = 'session-search-2/unicode-15.0.0'::text))",
+        "Rows Removed by Filter": 0
+      },
+      {
+        "Node Type": "Index Scan",
+        "Parent Relationship": "Outer",
+        "Index Name": "uq_session_search_source_content",
+        "Relation Name": "session_search_sources",
+        "Actual Rows": 1,
+        "Actual Loops": 33,
+        "Index Cond": "((session_search_sources_6.content_id IS NOT NULL) AND (session_search_sources_6.content_id = content_prefix_3.id))",
+        "Rows Removed by Index Recheck": 0,
+        "Filter": "(((session_search_sources_6.status)::text <> 'pending'::text) AND ((session_search_sources_6.extractor_version)::text = 'session-search-2/unicode-15.0.0'::text) AND (session_search_sources_6.source_digest = content_prefix_3.sha256))",
+        "Rows Removed by Filter": 0
+      },
+      {
+        "Node Type": "Bitmap Heap Scan",
+        "Parent Relationship": "Outer",
+        "Relation Name": "agent_session_contents",
+        "Actual Rows": 3039,
+        "Actual Loops": 1,
+        "Recheck Cond": "((agent_session_contents_4.session_id = $23) AND (agent_session_contents_4.id > $24))",
+        "Rows Removed by Index Recheck": 0,
+        "Lossy Heap Blocks": 0,
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "ix_agent_session_contents_search_session",
+            "Actual Rows": 3039,
+            "Actual Loops": 1,
+            "Index Cond": "((agent_session_contents_4.session_id = $23) AND (agent_session_contents_4.id > $24))"
+          }
+        ]
+      },
+      {
+        "Node Type": "Index Scan",
+        "Parent Relationship": "Inner",
+        "Index Name": "uq_session_search_source_content",
+        "Relation Name": "session_search_sources",
+        "Actual Rows": 1,
+        "Actual Loops": 3039,
+        "Index Cond": "((session_search_sources_7.content_id = ANY (ARRAY[agent_session_contents_4.id])) AND (session_search_sources_7.content_id IS NOT NULL))",
+        "Rows Removed by Index Recheck": 0,
+        "Filter": "((session_search_sources_7.source_digest = ANY (ARRAY[agent_session_contents_4.sha256])) AND ((session_search_sources_7.status)::text <> 'pending'::text) AND ((session_search_sources_7.extractor_version)::text = 'session-search-2/unicode-15.0.0'::text))",
+        "Rows Removed by Filter": 0
+      }
+    ]
+  }
+}

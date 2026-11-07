@@ -151,7 +151,7 @@ EXPECTED_CONTENT_HASHES = {
     "pr-description-conventions": "fc6095b011dd02a92a97301eb97df6cfe3471225656a22dd3e70bd85fbda3ca6",
     "board-hygiene-for-agents": "aaeb15aa6b148e4722d0eab24b47acd7c034fa4358b3bf0b6e812b06372e8673",
     "release-checklist": "0552bb5bac89141e25b59290099e4a9bf32b9cbc274fddfeef8625d0d8aebf86",
-    "mcp-coordination-rulebook": "52ba5c7c7722ebd6fb44fe17b38a1a9cf8dbaa8ab20e49fdaec32203429e15f5",
+    "mcp-coordination-rulebook": "3baf14099cd20158e1f6a9ecd935f6240ad8a8c6caac49f66275d0652d9dd07e",
     "project-bootstrap": "41aadb0ff386cb9e66e3c4515b562c679475d27e92aa950e970a8bbd23f55ece",
     "agentic-board-setup": "c26d3d93e410e6d633f40dd07d392ea53c2e252c10f0752f6731b08dcfd528ec",
     "autonomous-run-monitoring": "e7260b082dcb39e03217452b1fbfa9e59260ae5c03752e55b0afa66fe885e7c3",
