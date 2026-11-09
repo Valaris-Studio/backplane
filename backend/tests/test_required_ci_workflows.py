@@ -118,7 +118,11 @@ def _frontend_copy_baseline_preflight() -> list[tuple[str, str]]:
     # Run only the workflow's preflight, never pnpm or the frontend test suite.
     # An absent preflight remains a no-op so the regression reaches real Git.
     test_lines = test_step["run"].splitlines()
-    suite_lines = [index for index, line in enumerate(test_lines) if line.strip() == "pnpm vitest run"]
+    suite_lines = [
+        index
+        for index, line in enumerate(test_lines)
+        if line.strip() == "pnpm vitest run --maxWorkers=2"
+    ]
     assert len(suite_lines) == 1
     scripts.append((test_step.get("working-directory", "."), "\n".join(test_lines[:suite_lines[0]])))
     return scripts
