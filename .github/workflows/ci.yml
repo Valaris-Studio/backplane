@@ -168,7 +168,9 @@ jobs:
         env:
           I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'HEAD^' }}
         # Keep CPU headroom for jsdom; match the local verification worker budget.
-        run: pnpm vitest run --maxWorkers=2
+        run: |
+          test -z "${VITEST_MAX_WORKERS+x}"
+          pnpm vitest run --maxWorkers=2
       - name: Asset retention tests
         run: python3 -m unittest discover -s frontend/tests
       - name: Nginx asset and HTML contract
