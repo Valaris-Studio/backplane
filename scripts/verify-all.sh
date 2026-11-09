@@ -99,7 +99,8 @@ job_frontend() {
     cd frontend || exit 1
     pnpm audit || exit 1
     pnpm lint || exit 1
-    pnpm vitest run || exit 1
+    # Keep CPU headroom for jsdom; match the CI worker budget.
+    pnpm vitest run --maxWorkers=2 || exit 1
     python3 -m unittest discover -s tests || exit 1
     node --test scripts/check-mermaid-chunk.test.mjs || exit 1
     python3 tests/nginx-integration.py || exit 1
