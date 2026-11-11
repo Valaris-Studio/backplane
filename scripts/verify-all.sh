@@ -10,7 +10,7 @@
 # script and ci.yml in lockstep — if you add a gate to one, add it to the other.
 #
 #   ./scripts/verify-all.sh            # everything
-#   ./scripts/verify-all.sh backend    # one job: backend|mcp|hermes-worker|frontend|companion|companion-rust|go|runner-artifact|secrets
+#   ./scripts/verify-all.sh backend    # one job: backend|mcp|hermes-worker|frontend|companion|companion-rust|go|runner-artifact|runner-container|secrets
 #
 # Exit code is non-zero if ANY selected job fails; every job still runs, so one
 # failure does not hide the others.
@@ -134,6 +134,10 @@ job_runner_artifact() {
   "$REPO_ROOT/scripts/runner-artifact-gate.sh"
 }
 
+job_runner_container() {
+  "$REPO_ROOT/scripts/runner-container-gate.sh"
+}
+
 job_secrets() {
   ./scripts/scan-secrets.sh
 }
@@ -146,6 +150,7 @@ run_job companion job_companion
 run_job companion-rust job_companion_rust
 run_job go job_go
 run_job runner-artifact job_runner_artifact
+run_job runner-container job_runner_container
 run_job secrets job_secrets
 
 bold "── summary ──"

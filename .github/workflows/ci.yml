@@ -319,6 +319,23 @@ jobs:
       - name: Qualify binary, real API, recovery and generated MCP through the TUI
         run: ./scripts/runner-artifact-gate.sh
 
+  runner-container:
+    if: github.repository == 'Valaris-Studio/backplane'
+    name: Runner — container runtime (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build and exercise both coding-agent runtimes without credentials
+        run: ./scripts/runner-container-gate.sh '${{ matrix.platform }}'
+
   secrets:
     if: github.repository == 'Valaris-Studio/backplane'
     name: Secrets scan

@@ -40,13 +40,13 @@ your team works, ready to reuse across projects.
 
 The current platform preview includes interactive project snapshots, private
 session readers, reviewed excerpt handoff and prepared runner context. Use
-[platform 0.1.4-preview.4](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4),
-[runner 0.8.9](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9)
+[platform 0.1.4-preview.5](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.5),
+[runner 0.8.10](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.10)
 and [MCP server 0.9.5](https://pypi.org/project/backplane-mcp/0.9.5/).
 The signed [macOS Companion preview](companion/README.md#macos-desktop-preview)
 provides local capture and its desktop controls.
 
-Runner 0.8.9 setup generates `uvx backplane-mcp==0.9.5`. Existing custom
+Runner 0.8.10 setup generates `uvx backplane-mcp==0.9.5`. Existing custom
 MCP configurations are preserved. To update an older generated configuration,
 change only its package argument to `backplane-mcp==0.9.5` in
 `mcpServers.valaris.args` in the MCP JSON selected by `llm.mcp_config_path`.
@@ -615,7 +615,7 @@ than the rest of the platform. Verify your first deployment carefully.
   Docker Compose builds them locally. Client artifacts are released separately:
   the runner as a multi-arch image (`ghcr.io/valaris-studio/backplane-runner`)
   and standalone binaries with checksums
-  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.9/SHA256SUMS)),
+  ([darwin/linux/windows × arm64/amd64](https://storage.googleapis.com/backplane-artifacts/runner/v0.8.10/SHA256SUMS)),
   and the MCP server through `uvx backplane-mcp`.
 - **GitLab PAT connections are supported** for repository credentials and backend
   merge-queue plumbing. The runner forge driver for GitLab does not yet open,
