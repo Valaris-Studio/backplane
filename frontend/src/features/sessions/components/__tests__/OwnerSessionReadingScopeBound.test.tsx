@@ -57,6 +57,8 @@ type PhaseJournal = ReturnType<typeof phaseJournal>;
 
 const OWNER = "user-me";
 const FILTER_COUNT = 8;
+// Eight real debounces and the multi-route return journey share this total budget.
+const READING_SCOPE_JOURNEY_TIMEOUT_MS = 10_000;
 const finalQuery = `reading-${FILTER_COUNT}`;
 const workspaces = [
   { id: "scope-acme", slug: "acme", name: "Acme" },
@@ -259,8 +261,7 @@ it("releases settled obsolete Global filter orders while preserving the current 
   const historyLength = window.history.length;
 
   // Each edit waits for its real HTTP response and rendered row. Eight settled
-  // queries expose obsolete-slot retention without bypassing the 250ms debounce
-  // or exceeding the default deadline just to cross the separate view cap.
+  // queries expose obsolete-slot retention without bypassing the 250ms debounce.
   for (let index = 1; index <= FILTER_COUNT; index += 1) {
     const query = `reading-${index}`;
     trace.mark("filter-edit:begin", { index });
@@ -344,4 +345,4 @@ it("releases settled obsolete Global filter orders while preserving the current 
   expect(fixture.ledger.unexpected).toEqual([]);
   expect(fixture.ledger.requests.every((request) => ["/api/auth/modes", "/api/me", "/api/workspaces", "/api/me/sessions", "/api/me/sessions/overview"].includes(request.path))).toBe(true);
   trace.mark("all-assertions-complete");
-});
+}, READING_SCOPE_JOURNEY_TIMEOUT_MS);

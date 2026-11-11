@@ -22,7 +22,7 @@ RUN GIT_COMMIT=${GIT_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo un
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git openssh-client ca-certificates curl python3 python3-venv \
+    git openssh-client ca-certificates curl python3 python3-venv libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # uv for MCP server — system-wide, so the non-root runner user can exec it

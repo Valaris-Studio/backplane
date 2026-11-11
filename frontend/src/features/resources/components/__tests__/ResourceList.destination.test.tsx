@@ -177,6 +177,9 @@ it("keeps ordinary list labels metadata-only and preserves deliberate preview/do
   await waitFor(() => expect(fixture.client.isFetching()).toBe(0));
   expect(fixture.receipts.filter((request) => ["body", "sign"].includes(request.kind))).toEqual([]);
   await userEvent.click(resourceAction("visible.txt"));
+  await waitFor(() => expect(fixture.client.isFetching()).toBe(0));
+  // The first preview loads its real module graph before it can request the body.
+  await act(async () => { await vi.dynamicImportSettled(); });
   expect(await screen.findByText("Exact authorized body root-file")).toBeVisible();
   const opened = vi.spyOn(window, "open").mockImplementation(() => null);
   await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Download" }));

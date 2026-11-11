@@ -5,8 +5,8 @@ version lines:
 
 | Component | What it is | Current release | Get it |
 | --- | --- | --- | --- |
-| **Platform** | The web app, API and database you self-host | [0.1.4-preview.4](#platform-v0.1.4-preview.4) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4) |
-| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.9](#v0.8.9) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9) · `ghcr.io/valaris-studio/backplane-runner:0.8.9` |
+| **Platform** | The web app, API and database you self-host | [0.1.4-preview.5](#platform-v0.1.4-preview.5) | [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.5) |
+| **Runner** | Optional CLI that drives your own coding agent through board work | [0.8.10](#v0.8.10) | [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.10) · `ghcr.io/valaris-studio/backplane-runner:0.8.10` |
 | **MCP server** | Connects any MCP client to your boards | [0.9.5](#mcp-server-v0.9.5) | [`backplane-mcp` on PyPI](https://pypi.org/project/backplane-mcp/) |
 | **Companion desktop** | Local session capture and desktop controls | [0.1.1-preview.3](companion/README.md#macos-desktop-preview) | [Signed macOS installer](https://storage.googleapis.com/backplane-artifacts/companion-desktop/v0.1.1-preview.3/Backplane-Companion-0.1.1-preview.3-universal.dmg) |
 
@@ -33,11 +33,77 @@ keeps its own detailed per-tool history in
 
 ---
 
+<a id="v0.8.10"></a>
+
+## Runner 0.8.10 — 2026-11-11
+
+`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.10)
+
+#### Fixed
+
+- Include the atomic runtime library required by Node.js in the Debian runner
+  container. This fixes the missing `libatomic.so.1` error during coding-agent
+  CLI installation.
+
+#### Upgrade notes
+
+- Supersede the incomplete 0.8.9 distribution with coordinated native binaries
+  and a container image. The 0.8.9 source tag remains unchanged.
+- Pair with platform 0.1.4-preview.5. Newly generated MCP configurations still
+  use `backplane-mcp==0.9.5`; existing custom launch settings are preserved.
+  Upgrade the platform first and keep required-context policies and budgets
+  inactive until the participating fleet and rollback runtime are compatible.
+  Installing an update does not enable a policy.
+
+---
+
+<a id="platform-v0.1.4-preview.5"></a>
+
+## Platform 0.1.4-preview.5 — 2026-11-11
+
+`platform` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.5)
+
+#### Fixed
+
+- Include the runner container's Node.js runtime dependency in the source
+  archive, so building the optional runner image does not fail with a missing
+  `libatomic.so.1` library.
+
+#### Changed
+
+- Supersede preview.4 before artifact publication. This preview includes the
+  interactive context, session-reading and project-navigation changes described
+  in the [preview.4 entry](#platform-v0.1.4-preview.4).
+
+#### Upgrade notes
+
+- Use runner 0.8.10, MCP 0.9.5 and Companion desktop beta 0.1.1-preview.3.
+  Upgrade the platform before clients. Companion is optional, capture stays
+  disabled by default, and its beta channel and updater key are unchanged.
+- Interactive board and card context works without captured sessions. Fetch
+  relevant governing notes or definitions identified by the snapshot's
+  omissions before acting; unknown authorship remains labelled as unknown.
+
+#### Known limitations
+
+- Context snapshots are bounded and do not establish session-index coverage
+  or prove that an agent followed up on omissions.
+- The optional Compose runner profile still requires operator configuration,
+  including mounts for both runner YAML and the referenced MCP JSON.
+- Runners remain experimental. Keep required-context policies and budgets in
+  legacy mode until the participating fleet and rollback runtime are compatible.
+
+---
+
 <a id="v0.8.9"></a>
 
 ## Runner 0.8.9 — 2026-11-06
 
-`runner` · [Binaries](https://github.com/Valaris-Studio/backplane/releases/tag/v0.8.9)
+`runner` · [Source tag](https://github.com/Valaris-Studio/backplane/tree/v0.8.9)
+
+> **Distribution status:** Container publication failed because the Node.js
+> runtime could not load `libatomic.so.1`. The immutable source tag is preserved;
+> use [runner 0.8.10](#v0.8.10) for the coordinated distribution.
 
 #### Changed
 
@@ -58,7 +124,11 @@ keeps its own detailed per-tool history in
 
 ## Platform 0.1.4-preview.4 — 2026-11-06
 
-`platform` · [Source archive](https://github.com/Valaris-Studio/backplane/releases/tag/platform-v0.1.4-preview.4)
+`platform` · [Source tag](https://github.com/Valaris-Studio/backplane/tree/platform-v0.1.4-preview.4)
+
+> **Distribution status:** Superseded before artifact publication. The immutable
+> source tag is preserved; [preview.5](#platform-v0.1.4-preview.5) includes the
+> corrected dependency for the optional runner image build.
 
 #### Upgrade notes
 

@@ -118,15 +118,15 @@ describe("installing and getting-started documentation against main", () => {
     expect(source).not.toContain("it embeds the API key");
   });
 
-  it("documents the published v0.8.9 runner distribution and explicit config launch", () => {
+  it("documents the published v0.8.10 runner distribution and explicit config launch", () => {
     const source = section("getting-started-your-first-pipeline-run");
 
-    expect(source).toContain("storage.googleapis.com/backplane-artifacts/runner/v0.8.9");
+    expect(source).toContain("storage.googleapis.com/backplane-artifacts/runner/v0.8.10");
     expect(source).toContain("SHA256SUMS");
     expect(source).toMatch(/macOS, Linux, and Windows binaries/);
     expect(source).toContain("backplane-runner-windows-amd64.exe");
-    expect(source).toContain("ghcr.io/valaris-studio/backplane-runner:0.8.9");
-    expect(source).toContain("Runner 0.8.9 and platform 0.1.4-preview.4 support required-context");
+    expect(source).toContain("ghcr.io/valaris-studio/backplane-runner:0.8.10");
+    expect(source).toContain("Runner 0.8.10 and platform 0.1.4-preview.5 support required-context");
     expect(source).toContain("drain incompatible processes before");
     expect(source).not.toContain("unreleased source");
     expect(source).not.toContain("downloads above do not implement");
