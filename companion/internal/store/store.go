@@ -136,6 +136,17 @@ func (l Layout) DaemonPID() string { return filepath.Join(l.Root, "daemon.pid") 
 // DisconnectRequest asks a running daemon to end its session.
 func (l Layout) DisconnectRequest() string { return filepath.Join(l.Root, "disconnect.request") }
 
+// Binding names the identity an operator-managed (headless) root's
+// connection state belongs to; its presence marks the root as headless.
+func (l Layout) Binding() string { return filepath.Join(l.Root, "binding.json") }
+
+// QuarantineDir holds, per binding, the state an operator's switch set aside.
+func (l Layout) QuarantineDir() string { return filepath.Join(l.Root, "quarantine") }
+
+// HeadlessState is what the headless daemon last decided (capturing, or
+// held and why), for status in other processes.
+func (l Layout) HeadlessState() string { return filepath.Join(l.Root, "headless.json") }
+
 // EnsurePrivateDir creates dir as owner-only: mode 0700, or on Windows an
 // access list that grants no other user.
 func EnsurePrivateDir(dir string) error {

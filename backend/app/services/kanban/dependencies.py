@@ -178,6 +178,14 @@ class DependencyService:
         await self._attach_satisfied(view.depends_on + view.blocks, workspace_id)
         return view
 
+    async def list_for_context(self, *, workspace_id: uuid.UUID, card_id: uuid.UUID, limit: int):
+        await self._assert_card_scope(workspace_id, card_id)
+        depends_on = await self.repo.list_depends_on(card_id, workspace_id=workspace_id, limit=limit + 1)
+        blocks = await self.repo.list_blocks(card_id, workspace_id=workspace_id, limit=limit + 1)
+        view = CardDependenciesView(depends_on=depends_on[:limit], blocks=blocks[:limit])
+        unauthorized_count = await self.repo.count_unauthorized_context_links(card_id, workspace_id)
+        return view, unauthorized_count, len(depends_on) > limit or len(blocks) > limit
+
     async def _attach_satisfied(self, edges, workspace_id):
         satisfied = await CompletionDependencyService(self.db).satisfied_ids(
             {edge.depends_on_card_id for edge in edges}, workspace_id=workspace_id,

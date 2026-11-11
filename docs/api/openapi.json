@@ -2168,6 +2168,51 @@
         "x-surface": "internal"
       }
     },
+    "/api/me/companion/installations/{installation_id}/capture-only": {
+      "post": {
+        "tags": [
+          "companion"
+        ],
+        "summary": "Restrict To Capture",
+        "description": "Limit the device's token to capture, permanently: it keeps working on\n`/me`, `/policy`, `/status`, `/ingest` and content uploads only, and its\nagent key is deleted. For full authority again, enroll a new installation.\nRepeating it returns 200; 409 for a revoked device.",
+        "operationId": "restrict_to_capture_api_me_companion_installations__installation_id__capture_only_post",
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Installation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-surface": "internal"
+      }
+    },
     "/api/me/companion/installations/{installation_id}/sessions": {
       "delete": {
         "tags": [
@@ -11576,6 +11621,18 @@
               "title": "Prefix"
             },
             "description": "UUID prefix fragment (min 4 chars)."
+          },
+          {
+            "name": "include_context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include the read-only bootstrap context snapshot.",
+              "default": false,
+              "title": "Include Context"
+            },
+            "description": "Include the read-only bootstrap context snapshot."
           }
         ],
         "responses": {
@@ -11762,6 +11819,18 @@
               "type": "string",
               "title": "Slug"
             }
+          },
+          {
+            "name": "include_context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include the read-only bootstrap context snapshot.",
+              "default": false,
+              "title": "Include Context"
+            },
+            "description": "Include the read-only bootstrap context snapshot."
           },
           {
             "name": "format",
@@ -13499,6 +13568,16 @@
             }
           },
           {
+            "name": "exact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Exact"
+            }
+          },
+          {
             "name": "at_time",
             "in": "query",
             "required": false,
@@ -14149,7 +14228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResourceRead"
+                  "$ref": "#/components/schemas/ResourceDetailRead"
                 }
               }
             }
@@ -14655,7 +14734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResourceRead"
+                  "$ref": "#/components/schemas/ResourceDetailRead"
                 }
               }
             }
@@ -26208,6 +26287,15 @@
             "type": "array",
             "title": "Recent Activity",
             "default": []
+          },
+          "omissions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Omissions",
+            "default": []
           }
         },
         "type": "object",
@@ -27696,6 +27784,16 @@
       },
       "CardRead": {
         "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContextSnapshotRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -31700,6 +31798,91 @@
         "title": "ContextRecord",
         "description": "One selected note occurrence, hashed over the exact bytes it rendered."
       },
+      "ContextSnapshotManifest": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 0,
+            "title": "Schema Version",
+            "default": 0
+          },
+          "digest_basis": {
+            "type": "string",
+            "const": "sha256_utf8_rendered_text",
+            "title": "Digest Basis",
+            "default": "sha256_utf8_rendered_text"
+          },
+          "inclusions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Inclusions"
+          },
+          "omissions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Omissions"
+          },
+          "omissions_summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Omissions Summary"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limits"
+        ],
+        "title": "ContextSnapshotManifest"
+      },
+      "ContextSnapshotRead": {
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "const": "bootstrap",
+            "title": "Purpose",
+            "default": "bootstrap"
+          },
+          "principal_kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "installation",
+              "agent"
+            ],
+            "title": "Principal Kind"
+          },
+          "blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Blocks"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/ContextSnapshotManifest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "principal_kind",
+          "manifest"
+        ],
+        "title": "ContextSnapshotRead"
+      },
       "ContextSource": {
         "properties": {
           "source_index": {
@@ -32319,12 +32502,21 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "token_scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "capture_only"
+            ],
+            "title": "Token Scope"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "token_scope"
         ],
         "title": "DeviceSelf"
       },
@@ -35805,6 +35997,16 @@
             "maxLength": 64,
             "minLength": 1,
             "title": "Platform"
+          },
+          "token_scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "capture_only"
+            ],
+            "title": "Token Scope",
+            "description": "`full` acts for the owner on every device route. `capture_only` reaches only `GET /me`, `GET /policy`, `POST /status`, `POST /ingest` and the content uploads; it never mints an agent key, writes mappings or settings, or reads boards and sessions. It belongs to the installation, so rotating the token keeps it, and there is no way back to `full`.",
+            "default": "full"
           }
         },
         "additionalProperties": false,
@@ -35837,13 +36039,22 @@
           "token_prefix": {
             "type": "string",
             "title": "Token Prefix"
+          },
+          "token_scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "capture_only"
+            ],
+            "title": "Token Scope"
           }
         },
         "type": "object",
         "required": [
           "installation_id",
           "device_token",
-          "token_prefix"
+          "token_prefix",
+          "token_scope"
         ],
         "title": "InstallationEnrollment",
         "description": "`device_token` is present only on the response that minted it."
@@ -35866,6 +36077,14 @@
           "token_prefix": {
             "type": "string",
             "title": "Token Prefix"
+          },
+          "token_scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "capture_only"
+            ],
+            "title": "Token Scope"
           },
           "created_at": {
             "type": "string",
@@ -35932,6 +36151,7 @@
           "name",
           "platform",
           "token_prefix",
+          "token_scope",
           "created_at",
           "last_seen_at",
           "revoked_at",
@@ -39549,6 +39769,58 @@
             ],
             "title": "Source Execution Id"
           },
+          "author_principal_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "installation",
+                  "agent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Principal Kind"
+          },
+          "author_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Agent Id"
+          },
+          "pinned_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned By"
+          },
+          "pinned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned At"
+          },
           "created_by": {
             "type": "string",
             "format": "uuid",
@@ -42173,6 +42445,48 @@
         ],
         "title": "ReservationInfo"
       },
+      "ResourceAncestorRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "resource_type": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "resource_type",
+          "workspace_id",
+          "board_id"
+        ],
+        "title": "ResourceAncestorRead"
+      },
       "ResourceCreate": {
         "properties": {
           "name": {
@@ -42260,6 +42574,144 @@
           "name"
         ],
         "title": "ResourceCreate"
+      },
+      "ResourceDetailRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "resource_type": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "gcs_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcs Path"
+          },
+          "mime_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime Type"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Uploaded By"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "ancestors": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceAncestorRead"
+            },
+            "type": "array",
+            "title": "Ancestors"
+          },
+          "ancestors_complete": {
+            "type": "boolean",
+            "title": "Ancestors Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "board_id",
+          "parent_id",
+          "resource_type",
+          "name",
+          "gcs_path",
+          "mime_type",
+          "size_bytes",
+          "uploaded_by",
+          "created_at",
+          "updated_at",
+          "ancestors",
+          "ancestors_complete"
+        ],
+        "title": "ResourceDetailRead"
       },
       "ResourceRead": {
         "properties": {
@@ -47089,6 +47541,97 @@
       },
       "app__schemas__kanban__board_context__NoteSummary": {
         "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "author_principal_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Principal Kind"
+          },
+          "author_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Agent Id"
+          },
+          "pinned_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned By"
+          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -47192,6 +47735,58 @@
               }
             ],
             "title": "Source Execution Id"
+          },
+          "author_principal_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "installation",
+                  "agent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Principal Kind"
+          },
+          "author_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Agent Id"
+          },
+          "pinned_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned By"
+          },
+          "pinned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned At"
           },
           "created_by": {
             "type": "string",

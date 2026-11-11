@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { Ref } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, AudioWaveform, Laptop, PlugZap, RotateCw } from "lucide-react";
@@ -130,23 +131,26 @@ interface LoadErrorStateProps {
   description: string;
   onRetry: () => void;
   retrying?: boolean;
+  retryRef?: Ref<HTMLButtonElement>;
 }
 
-export function LoadErrorState({ error, title, description, onRetry, retrying }: LoadErrorStateProps) {
+export function LoadErrorState({ error, title, description, onRetry, retrying, retryRef }: LoadErrorStateProps) {
   const { t } = useTranslation();
-  const agentKeyRefused = isApiError(error) && error.status === 403;
+  // A forbidden response also covers revoked membership; it does not identify the credential used.
+  const accessDenied = isApiError(error) && error.status === 403;
   return (
     <EmptyState
       icon={AlertCircle}
       title={title}
-      description={agentKeyRefused ? t("sessions.loadError.agentKey") : description}
+      description={accessDenied ? t("sessions.loadError.accessDenied") : description}
       action={
-        agentKeyRefused ? undefined : (
-          <Button variant="outline" onClick={onRetry} disabled={retrying}>
-            <RotateCw aria-hidden className={retrying ? "motion-safe:animate-spin" : undefined} />
-            {t("sessions.loadError.retry")}
-          </Button>
-        )
+        // Keep the busy action focusable; native disabling strands keyboard focus on the page body.
+        <Button ref={retryRef} variant="outline" className="aria-disabled:opacity-45"
+          aria-disabled={retrying || undefined} aria-busy={retrying || undefined}
+          onClick={() => { if (!retrying) onRetry(); }}>
+          <RotateCw aria-hidden className={retrying ? "motion-safe:animate-spin" : undefined} />
+          {t("sessions.loadError.retry")}
+        </Button>
       }
     />
   );

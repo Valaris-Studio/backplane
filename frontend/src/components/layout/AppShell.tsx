@@ -23,20 +23,19 @@ export function AppShell({ children }: { children?: ReactNode }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isTablet = useMediaQuery("(max-width: 1023px)");
   const reducedMotion = useReducedMotion();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const [tabletSidebarCollapsed, setTabletSidebarCollapsed] = useState(true);
+  const sidebarCollapsed = isTablet ? tabletSidebarCollapsed : desktopSidebarCollapsed;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   useCostAlerts();
 
   useEffect(() => {
-    if (isTablet && !isMobile) {
-      setSidebarCollapsed(true);
-    }
     if (isMobile) {
       setMobileSidebarOpen(false);
     }
-  }, [isMobile, isTablet]);
+  }, [isMobile]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -54,7 +53,8 @@ export function AppShell({ children }: { children?: ReactNode }) {
       return;
     }
 
-    setSidebarCollapsed((collapsed) => !collapsed);
+    if (isTablet) setTabletSidebarCollapsed((collapsed) => !collapsed);
+    else setDesktopSidebarCollapsed((collapsed) => !collapsed);
   }
 
   // Gutter starts at md (768px) — the same breakpoint where the sidebar

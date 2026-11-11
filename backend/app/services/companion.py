@@ -26,6 +26,8 @@ from app.exceptions import (
 from app.models.activity import ActivityAction, ActivityEntityType
 from app.models.companion import (
     CONTENT_LEVELS,
+    TOKEN_SCOPE_CAPTURE_ONLY,
+    TOKEN_SCOPE_FULL,
     CompanionInstallation,
     CompanionProjectMapping,
 )
@@ -117,6 +119,7 @@ def installation_read(
         name=installation.name,
         platform=installation.platform,
         token_prefix=installation.token_prefix,
+        token_scope=installation.token_scope,
         created_at=installation.created_at,
         last_seen_at=installation.last_seen_at,
         revoked_at=installation.revoked_at,
@@ -246,16 +249,30 @@ class CompanionService:
         self, owner_id: uuid.UUID, data: InstallationCreate
     ) -> tuple[InstallationEnrollment, bool]:
         """Create the installation and mint its token, or return the existing
-        one without a token. Returns (enrollment, created)."""
+        one without a token. Returns (enrollment, created).
+
+        A retry asking for another token scope than the installation has is a
+        conflict: answering 200 would let the caller believe the token it
+        holds is narrower, or wider, than it is."""
         self._require_human()
         installation, token = await self.create_installation(
-            owner_id, data.installation_id, data.name, data.platform
+            owner_id,
+            data.installation_id,
+            data.name,
+            data.platform,
+            token_scope=data.token_scope,
         )
+        if installation.token_scope != data.token_scope:
+            raise ConflictError(
+                "This installation was enrolled with another token scope",
+                error_code="token_scope_mismatch",
+            )
         return (
             InstallationEnrollment(
                 installation_id=installation.id,
                 device_token=token,
                 token_prefix=installation.token_prefix,
+                token_scope=installation.token_scope,
             ),
             token is not None,
         )
@@ -266,6 +283,8 @@ class CompanionService:
         installation_id: uuid.UUID,
         name: str,
         platform: str,
+        *,
+        token_scope: str = TOKEN_SCOPE_FULL,
     ) -> tuple[CompanionInstallation, str | None]:
         """Insert the installation with a fresh device token, or find the
         existing one. The token is returned only when this call created it."""
@@ -277,6 +296,7 @@ class CompanionService:
             platform=platform,
             token_hash=token_hash,
             token_prefix=token[:8],
+            token_scope=token_scope,
             enabled_agents=list(KNOWN_HARNESSES),
             exclude_globs=[],
         )
@@ -311,6 +331,30 @@ class CompanionService:
             installation_id=installation.id,
             device_token=token,
             token_prefix=installation.token_prefix,
+            token_scope=installation.token_scope,
+        )
+
+    async def restrict_to_capture(
+        self, owner_id: uuid.UUID, installation_id: uuid.UUID
+    ) -> tuple[InstallationRead, list[Invalidation]]:
+        """Narrow the device's token to the headless uplink, for good; the
+        token itself keeps working. Its agent key goes in the same
+        transaction: it was minted under the wider scope and would outlive
+        it. Repeating it changes nothing and announces nothing."""
+        installation = await self._owned(owner_id, installation_id)
+        # Same row lock as the mint: whichever commits first, the other sees it.
+        await self.db.refresh(
+            installation, ["revoked_at", "token_scope"], with_for_update=True
+        )
+        if installation.revoked_at is not None:
+            raise ConflictError("Installation is revoked")
+        if installation.token_scope == TOKEN_SCOPE_CAPTURE_ONLY:
+            return await self._read(installation), []
+        installation.token_scope = TOKEN_SCOPE_CAPTURE_ONLY
+        await ApiKeyService(self.db).delete_installation_keys(installation.id)
+        await self.db.flush()
+        return await self._read(installation), await self._updated(
+            installation, "token_scope"
         )
 
     async def issue_device_token(self, installation: CompanionInstallation) -> str:
@@ -518,6 +562,14 @@ class CompanionService:
         # heartbeat or an ingest that stored something.
         return installation
 
+    @staticmethod
+    def require_full_token(installation: CompanionInstallation) -> None:
+        if installation.token_scope != TOKEN_SCOPE_FULL:
+            raise ForbiddenError(
+                "This device token is limited to capture",
+                error_code="capture_only_token",
+            )
+
     async def revoke_device(
         self, installation: CompanionInstallation
     ) -> InstallationRead:
@@ -532,6 +584,15 @@ class CompanionService:
     ) -> AgentKeyCreated:
         """Rotation, not an idempotent create: the raw key is never stored, so
         a device that lost it can only get a new one, replacing the old."""
+        # Re-read under the row lock: a restriction or revocation that
+        # committed after this request authenticated would otherwise get a
+        # key minted behind its back.
+        await self.db.refresh(
+            installation, ["revoked_at", "token_scope"], with_for_update=True
+        )
+        if installation.revoked_at is not None:
+            raise DeviceAuthenticationError()
+        self.require_full_token(installation)
         name = f"Companion · {installation.name} · agents"[:API_KEY_NAME_MAX]
         api_key, raw_key = await ApiKeyService(self.db).rotate_installation_key(
             installation.owner_id, installation.id, name
@@ -612,7 +673,11 @@ class CompanionService:
     ) -> DevicePolicy:
         """Also records what the device announced: each policy read replaces
         the capabilities its rich capture is judged by, and `_at` says since
-        when it has announced them. An unchanged announcement writes nothing."""
+        when it has announced them. An unchanged announcement writes nothing.
+
+        A capture-only token cannot auto-match or hand agents a key, so its
+        policy says auto-match is off and carries no repository catalog and no
+        agent API base; the owner's stored choice is kept."""
         announced = announced_capabilities(capabilities_header)
         if announced != installation.capture_capabilities:
             installation.capture_capabilities = announced
@@ -620,6 +685,29 @@ class CompanionService:
                 datetime.now(timezone.utc) if announced is not None else None
             )
             await self.db.flush()
+        policy = policy_of(installation)
+        api_base_url = advertised_api_base(settings.API_URL)
+        if installation.token_scope != TOKEN_SCOPE_FULL:
+            policy.auto_match_repos = False
+            catalog = []
+            api_base_url = None
+        else:
+            catalog = await self._repo_catalog(installation.owner_id)
+        mappings = await self._device_mapping_rows(installation)
+        return DevicePolicy(
+            installation=DevicePolicyInstallation(
+                id=installation.id, **policy.model_dump()
+            ),
+            mappings=[
+                mapping_read(mapping, installation, to_device=True)
+                for mapping in mappings
+            ],
+            repo_catalog=catalog,
+            api_base_url=api_base_url,
+            rich_capture=rich_capture_offer(installation, mappings),
+        )
+
+    async def _repo_catalog(self, owner_id: uuid.UUID) -> list[RepoCatalogEntry]:
         catalog = []
         for (
             slug,
@@ -628,7 +716,7 @@ class CompanionService:
             board_id,
             board_name,
             url,
-        ) in await self.repo.repo_catalog(installation.owner_id):
+        ) in await self.repo.repo_catalog(owner_id):
             normalized = normalize_repo_url(url)
             if normalized:
                 catalog.append(
@@ -641,19 +729,7 @@ class CompanionService:
                         repo_url_normalized=normalized,
                     )
                 )
-        mappings = await self._device_mapping_rows(installation)
-        return DevicePolicy(
-            installation=DevicePolicyInstallation(
-                id=installation.id, **policy_of(installation).model_dump()
-            ),
-            mappings=[
-                mapping_read(mapping, installation, to_device=True)
-                for mapping in mappings
-            ],
-            repo_catalog=catalog,
-            api_base_url=advertised_api_base(settings.API_URL),
-            rich_capture=rich_capture_offer(installation, mappings),
-        )
+        return catalog
 
     async def device_mappings(
         self, installation: CompanionInstallation
@@ -816,7 +892,11 @@ class CompanionService:
         owner = await self.repo.get_user(installation.owner_id)
         return DeviceIdentity(
             user=DeviceOwner(email=owner.email, display_name=owner.name or None),
-            installation=DeviceSelf(id=installation.id, name=installation.name),
+            installation=DeviceSelf(
+                id=installation.id,
+                name=installation.name,
+                token_scope=installation.token_scope,
+            ),
             web_origin=configured_origin(settings.FRONTEND_URL),
         )
 

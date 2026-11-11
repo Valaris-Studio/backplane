@@ -40,6 +40,9 @@ var (
 	// code: the device token is revoked or unknown. A bare 401, e.g. from a
 	// proxy in front of the backend, stays ErrUnauthorized.
 	ErrDeviceRevoked = errors.New("device_revoked")
+	// ErrHeadlessPathRefused is a request outside the capture routes, which a
+	// headless client fails before sending.
+	ErrHeadlessPathRefused = errors.New("headless_path_refused")
 )
 
 const revokedDeviceCode = "invalid_device_token"
@@ -64,6 +67,8 @@ type Client struct {
 	allowLoopbackHTTP bool
 	token             string
 	http              *http.Client
+	// headless restricts the client to the capture routes.
+	headless bool
 }
 
 func New(options Options) (*Client, error) {
@@ -108,6 +113,42 @@ func (c *Client) WithDeviceToken(token string) (*Client, error) {
 	return &copied, nil
 }
 
+// Headless returns a copy that sends only what capture needs: GET /me, GET
+// /policy, POST /status, POST /ingest and the content uploader's three
+// calls. An operator-managed token is owner-equivalent, so the client never
+// enrolls, pairs, maps, changes settings, renames, reads sessions or mints
+// agent keys with it.
+func (c *Client) Headless() *Client {
+	copied := *c
+	copied.headless = true
+	return &copied
+}
+
+// contentSegment is one escaped content id; it cannot start with a dot, so
+// "." and ".." never lead a request out of the contents API.
+const contentSegment = `/api/companion/contents/[A-Za-z0-9_~-][A-Za-z0-9._~-]*`
+
+// headlessContentRoutes are the content uploader's calls, by method.
+var headlessContentRoutes = map[string]*regexp.Regexp{
+	http.MethodGet:  regexp.MustCompile(`^` + contentSegment + `$`),
+	http.MethodPut:  regexp.MustCompile(`^` + contentSegment + `/chunks/[0-9]+$`),
+	http.MethodPost: regexp.MustCompile(`^` + contentSegment + `/finalize$`),
+}
+
+func (c *Client) refuseOutsideCapture(method, path string) error {
+	if !c.headless {
+		return nil
+	}
+	content, known := headlessContentRoutes[method]
+	switch {
+	case method == http.MethodGet && (path == "/api/companion/me" || path == "/api/companion/policy"),
+		method == http.MethodPost && (path == "/api/companion/status" || path == "/api/companion/ingest"),
+		known && content.MatchString(path):
+		return nil
+	}
+	return fmt.Errorf("%w: %s %s", ErrHeadlessPathRefused, method, path)
+}
+
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 
 func (c *Client) do(ctx context.Context, method, path, token string, body any) ([]byte, error) {
@@ -132,6 +173,9 @@ type exchange struct {
 }
 
 func (c *Client) send(ctx context.Context, exchange exchange) ([]byte, error) {
+	if err := c.refuseOutsideCapture(exchange.method, exchange.path); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, exchange.deadline)
 	defer cancel()
 	var reader io.Reader

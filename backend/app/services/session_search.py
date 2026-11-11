@@ -440,13 +440,24 @@ class SessionSearchService(AgentSessionContentService):
                 break
             selected.append(chunk)
             budget += size
-        matching = await self.index.matching_chunks(
-            [chunk.id for chunk in selected], query
-        )
+        selected_ids = [chunk.id for chunk in selected]
+        positions = {chunk.id: index for index, chunk in enumerate(selected)}
+        matching_through = -1
         hits: list[_Hit] = []
         scanned = 0
         last = cursor.last_hit if cursor is not None else None
-        for chunk in selected:
+        for index, chunk in enumerate(selected):
+            if index > matching_through:
+                matching = await self.index.matching_chunks(
+                    selected_ids[index:], query, limit + 1
+                )
+                # Matches before the resume position may yield no new hit;
+                # refill after a full batch rather than truncating the scan.
+                matching_through = (
+                    max(positions[chunk_id] for chunk_id in matching)
+                    if len(matching) == limit + 1
+                    else len(selected) - 1
+                )
             from_char, from_byte = _resumed(chunk, cursor)
             found = matching.get(chunk.id)
             if found is not None:

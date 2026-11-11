@@ -64,6 +64,14 @@ export function ReferenceEnvironmentVariables() {
               </td>
             </tr>
             <tr className="border-b border-border align-top">
+              <td className="py-3 pr-4"><code>DATABASE_WORK_MEM_MB</code></td>
+              <td className="py-3 pr-4">—</td>
+              <td className="py-3 pr-4">
+                Optional positive integer in MB for PostgreSQL work_mem per sort or hash operation.
+                Unset preserves the server default. Applies to application and Alembic connections.
+              </td>
+            </tr>
+            <tr className="border-b border-border align-top">
               <td className="py-3 pr-4">
                 <code>ENV</code>
               </td>

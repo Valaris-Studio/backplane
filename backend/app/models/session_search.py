@@ -18,12 +18,14 @@ from sqlalchemy import (
     CHAR,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -60,6 +62,13 @@ class SessionSearchSource(Base, UUIDMixin):
     __table_args__ = (
         UniqueConstraint("content_id", name="uq_session_search_source_content"),
         UniqueConstraint("event_id", name="uq_session_search_source_event"),
+        Index("uq_session_search_sources_id_session", "id", "session_id", unique=True),
+        ForeignKeyConstraint(
+            ["content_id", "session_id"],
+            ["agent_session_contents.id", "agent_session_contents.session_id"],
+            name="fk_session_search_sources_content_session",
+            ondelete="CASCADE",
+        ),
         CheckConstraint(
             "(content_id IS NULL) <> (event_id IS NULL)",
             name="ck_session_search_source_kind",
@@ -69,6 +78,31 @@ class SessionSearchSource(Base, UUIDMixin):
             name="ck_session_search_source_status",
         ),
         Index("ix_session_search_sources_session", "session_id", "status"),
+        Index(
+            "ix_session_search_sources_content_metadata",
+            "session_id",
+            "content_id",
+            postgresql_where=text("content_id IS NOT NULL AND status <> 'pending'"),
+        ).ddl_if(dialect="postgresql"),
+        Index(
+            "ix_session_search_sources_event_metadata",
+            "session_id",
+            "id",
+            postgresql_include=[
+                "status",
+                "extractor_version",
+                "event_id",
+                "call_anchor",
+            ],
+            postgresql_where=text("event_id IS NOT NULL"),
+        ).ddl_if(dialect="postgresql"),
+        Index(
+            "ix_session_search_sources_indexed_metadata",
+            "status",
+            "extractor_version",
+            "content_id",
+            postgresql_include=["source_digest", "id"],
+        ).ddl_if(dialect="postgresql"),
     )
 
     session_id: Mapped[uuid.UUID] = mapped_column(
@@ -112,6 +146,12 @@ class SessionSearchChunk(Base, UUIDMixin):
 
     __tablename__ = "session_search_chunks"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["source_id", "session_id"],
+            ["session_search_sources.id", "session_search_sources.session_id"],
+            name="fk_session_search_chunks_source_session",
+            ondelete="CASCADE",
+        ),
         Index(
             "ix_session_search_chunks_scan",
             "session_id",
@@ -120,6 +160,12 @@ class SessionSearchChunk(Base, UUIDMixin):
             "source_id",
             "ordinal",
         ),
+        Index(
+            "ix_session_search_chunks_metadata",
+            "session_id",
+            "source_id",
+            postgresql_include=["owned_bytes", "channel"],
+        ).ddl_if(dialect="postgresql"),
     )
 
     session_id: Mapped[uuid.UUID] = mapped_column(

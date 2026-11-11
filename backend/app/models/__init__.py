@@ -45,6 +45,7 @@ from app.models.session_search import (
     SessionSearchSource,
     SessionSearchState,
 )
+from app.models.session_search_backfill import SessionSearchBackfillClaim, SessionSearchBackfillRun
 from app.models.skills.skill import BoardSkill, Skill, SkillAuditEvent, SkillVersion, SkillVersionStatus
 from app.models.user import User
 from app.models.webhooks.webhook import Webhook, WebhookEvent
@@ -67,6 +68,7 @@ __all__ = [
     "SessionSearchChunk",
     "SessionSearchSource",
     "SessionSearchState",
+    "SessionSearchBackfillClaim", "SessionSearchBackfillRun",
     "CompanionInstallation",
     "CompanionPairing",
     "CompanionPairingLookupFailure",

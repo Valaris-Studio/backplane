@@ -111,6 +111,8 @@ type statusReport struct {
 	Queue           queueReport               `json:"queue"`
 	PendingProjects []state.DiscoveredProject `json:"pending_projects"`
 	Health          state.Health              `json:"health"`
+	// Headless is set only for an operator-managed data root.
+	Headless *headlessReport `json:"headless,omitempty"`
 }
 
 type connectionReport struct {
@@ -224,7 +226,7 @@ func (a *app) probe(ctx context.Context, layout store.Layout, probes *statusProb
 func (a *app) buildStatus(ctx context.Context, layout store.Layout, probes *statusProbes) (statusReport, error) {
 	probe := a.probe(ctx, layout, probes)
 	installation, connectErr := probe.installation, probe.connectErr
-	report := statusReport{Companion: buildinfo.Current(a.goos, a.goarch), InstallationID: installation.ID, Endpoint: installation.Endpoint, DataDir: layout.Root, DaemonRunning: daemonRunning(layout), Service: probe.service}
+	report := statusReport{Companion: buildinfo.Current(a.goos, a.goarch), InstallationID: installation.ID, Endpoint: installation.Endpoint, DataDir: layout.Root, DaemonRunning: daemonRunning(layout), Service: probe.service, Headless: a.headlessStatus(layout)}
 	if installation.ID != "" && installation.Endpoint != "" {
 		url, source := agentAPI(layout, installation)
 		report.AgentAPI = &agentAPIReport{URL: url, Source: source}
@@ -242,6 +244,11 @@ func (a *app) buildStatus(ctx context.Context, layout store.Layout, probes *stat
 	// policy refresh; it is not this installation's revocation.
 	admission.Unauthorized = report.Revoked
 	report.Connected = connectErr == nil && !report.Revoked
+	if report.Headless != nil {
+		// Only the daemon reads the token file; its verified session is the
+		// connection, read fresh so no cached probe outlives a token change.
+		report.Connected = report.DaemonRunning && report.Headless.State == headlessCapturing && !report.Revoked
+	}
 	cached, policyErr := policy.Load(layout.Policy())
 	var cachedPolicy *policy.Cached
 	if policyErr == nil {

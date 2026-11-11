@@ -21,7 +21,7 @@ import { UnsavedChangesPrompt } from "@/components/ui/unsaved-changes-prompt";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { Note } from "@/types/note";
-import { NoteSessionsSection } from "@/features/sessions/components/LinkedSessionsSection";
+import { NoteSessionsSection, useLinkedSessionsJump } from "@/features/sessions/components/LinkedSessionsSection";
 
 interface NoteEditorProps {
   /** Must carry the note's FULL body — see `isBodyAuthoritative`. */
@@ -71,6 +71,7 @@ export function NoteEditor({
   }>({ note: source, slug, open, isBodyAuthoritative });
   const updateNote = useUpdateNote(slug, boardId);
   const deleteNote = useDeleteNote(slug, boardId);
+  const sessionsJump = useLinkedSessionsJump();
 
   const resetDraft = useCallback(() => {
     setTitle(source.title);
@@ -286,7 +287,7 @@ export function NoteEditor({
           placeholder={t("notes.titlePlaceholder")}
           aria-label={t("cards.titleLabel")}
         />
-        <NoteEditorMeta note={note} slug={slug} />
+        <NoteEditorMeta note={note} slug={slug} onJumpToSessions={sessionsJump.jump} />
       </div>
       {/* Mounts on the provisional body and re-seeds when the fetched one
           lands — RichTextEditor syncs external `content` changes. Save stays
@@ -299,7 +300,7 @@ export function NoteEditor({
         workspaceSlug={slug}
         className="min-h-[240px]"
       />
-      <NoteSessionsSection slug={slug} noteId={note.id} boardId={note.board_id} />
+      <NoteSessionsSection slug={slug} noteId={note.id} boardId={note.board_id} jumpRequest={sessionsJump.request} />
     </EditorSheet>
     <UnsavedChangesPrompt
       open={guard.guardOpen}

@@ -67,6 +67,19 @@ class ResourceRead(UTCModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class ResourceAncestorRead(UTCModel):
+    id: uuid.UUID
+    name: str
+    resource_type: ResourceType
+    workspace_id: uuid.UUID
+    board_id: uuid.UUID | None
+
+
+class ResourceDetailRead(ResourceRead):
+    ancestors: list[ResourceAncestorRead]
+    ancestors_complete: bool
+
+
 def validate_storage_filename(v: str) -> str:
     """One definition shared with the local-storage serving routes — a second
     copy of a security predicate drifts invisibly."""

@@ -32,6 +32,14 @@ if TYPE_CHECKING:
 # From most to least private. `rich` is full plus content bodies beside the
 # events (app/schemas/session_content.py).
 ContentLevel = Literal["metadata", "standard", "full", "rich"]
+TokenScope = Literal["full", "capture_only"]
+TOKEN_SCOPE_DESCRIPTION = (
+    "`full` acts for the owner on every device route. `capture_only` reaches "
+    "only `GET /me`, `GET /policy`, `POST /status`, `POST /ingest` and the "
+    "content uploads; it never mints an agent key, writes mappings or settings, "
+    "or reads boards and sessions. It belongs to the installation, so rotating "
+    "the token keeps it, and there is no way back to `full`."
+)
 MAX_INGEST_RECORDS = 32
 MAX_INGEST_BATCH_BYTES = 8 << 20
 MAX_INGEST_RECORD_BYTES = 4 << 20
@@ -81,6 +89,7 @@ class InstallationCreate(BaseModel):
     installation_id: uuid.UUID
     name: DeviceName
     platform: str = Field(min_length=1, max_length=64)
+    token_scope: TokenScope = Field("full", description=TOKEN_SCOPE_DESCRIPTION)
 
 
 class InstallationRename(BaseModel):
@@ -95,6 +104,7 @@ class InstallationEnrollment(BaseModel):
     installation_id: uuid.UUID
     device_token: str | None
     token_prefix: str
+    token_scope: TokenScope
 
 
 class AgentKeyRead(UTCModel):
@@ -149,6 +159,7 @@ class InstallationRead(UTCModel):
     name: str
     platform: str
     token_prefix: str
+    token_scope: TokenScope
     created_at: datetime
     last_seen_at: datetime | None
     revoked_at: datetime | None
@@ -362,6 +373,8 @@ class DeviceOwner(BaseModel):
 class DeviceSelf(BaseModel):
     id: uuid.UUID
     name: str
+    # Lets a headless device confirm at start that its token is capture-only.
+    token_scope: TokenScope
 
 
 class DeviceIdentity(BaseModel):

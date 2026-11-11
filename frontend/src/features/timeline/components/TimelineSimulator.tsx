@@ -12,11 +12,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api-error";
 import { timelineKeys } from "@/lib/query-keys";
+import { useReturnNavigation } from "@/providers/ReturnNavigationProvider";
 import { useTimelineHistory } from "../api/use-timeline-history";
 import { TimelineHistoryOverview } from "./TimelineHistoryOverview";
 import { usePlayback } from "../hooks/use-playback";
 import { useSpotlight } from "../hooks/use-spotlight";
-import { useViewMode } from "../hooks/use-view-mode";
+import { useViewMode, type ViewMode } from "../hooks/use-view-mode";
 import { buildActorAccents, eventActorKey } from "../utils/actor-colors";
 import { reconstructWindowState } from "../utils/window-replay";
 import { computeCardAnalytics } from "../utils/analytics";
@@ -61,24 +62,51 @@ function buildColumnNames(events: TimelineEvent[], anchorColumns: ColumnSnapshot
   return names;
 }
 
+const HOLD_EVENTS = ["pointerdown", "keydown"] as const;
+const RELEASE_EVENTS = ["pointerup", "pointercancel", "keyup"] as const;
+// Release settles a held scrub or step; this only covers a release the page
+// never receives. It outlasts default OS key-repeat delays (Windows 500 ms,
+// X11 660 ms) so a held key settles once instead of before its repeats begin.
+const HELD_INPUT_IDLE_COMMIT_MS = 800;
+
 const EMPTY_EVENTS: HistoryWindow["events"] = [];
 const UNKNOWN_ANCHOR: HistoryAnchor = { through_seq: null, state: { columns: [], cards: [] }, coverage: { quality: "partial", unknown_origin: true, missing_structural_snapshots: "0", reasons: ["unknown_origin"] } };
 
 export function TimelineSimulator({ slug, boardId }: Props) {
+  const history = useTimelineHistory(slug, boardId);
+  return <TimelineReplay key={`${history.viewIdentity}:${history.status === "denied"}`} slug={slug} boardId={boardId} history={history} />;
+}
+
+interface RetainedReplay {
+  identity: string;
+  moment: string | null;
+  selectedSeq: string | null;
+  selectedCardId: string | null;
+  flagQuery: FlagQuery;
+  viewMode: ViewMode;
+  detailsOpen: boolean;
+  observing: boolean;
+}
+
+function TimelineReplay({ slug, boardId, history }: Props & { history: ReturnType<typeof useTimelineHistory> }) {
   const { t } = useTranslation();
   const reducedMotion = useReducedMotion();
-  const history = useTimelineHistory(slug, boardId);
+  const returnNavigation = useReturnNavigation();
+  const memoryKey = `timeline-replay:${slug}/${boardId}`;
+  const [retained] = useState(() => {
+    const saved = returnNavigation?.readView<RetainedReplay>(memoryKey);
+    return history.status !== "denied" && saved?.identity === history.viewIdentity && saved.moment === history.moment ? saved : undefined;
+  });
   const readyWindow = history.status === "ready" && history.window?.status === "ready" ? history.window : undefined;
   const events = readyWindow?.events ?? EMPTY_EVENTS;
   const anchor = readyWindow?.anchor ?? UNKNOWN_ANCHOR;
   const anchorState = anchor.state;
-  const [observing, setObserving] = useState(false);
+  const [observing, setObserving] = useState(retained?.observing ?? false);
   const observedQuery = useQuery({
     queryKey: [...timelineKeys.history(slug, boardId), history.generation?.id, "live-head"],
     queryFn: async ({ signal }) => (await api.get<HistoryLiveHead>(`/workspaces/${slug}/boards/${boardId}/timeline/generations/${history.generation?.id}/live-head`, { signal })).data,
     enabled: observing && Boolean(history.generation), retry: false, staleTime: Infinity,
   });
-  const isLoading = history.status === "loading" || observing && observedQuery.isPending;
   const [continuePlayback, setContinuePlayback] = useState(false);
   const playback = usePlayback(events.length, () => {
     if (readyWindow?.window.next_cursor) {
@@ -87,10 +115,12 @@ export function TimelineSimulator({ slug, boardId }: Props) {
     }
   });
   const { viewMode, setViewMode } = useViewMode();
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(retained?.selectedCardId ?? null);
+  const [detailsOpen, setDetailsOpen] = useState(retained?.detailsOpen ?? false);
+  useEffect(() => { if (retained) setViewMode(retained.viewMode); }, [retained, setViewMode]);
   // Flags MARK matching events on the scrubber (search text + actor chips);
   // the replay fold and the board are never filtered by them.
-  const [flagQuery, setFlagQuery] = useState<FlagQuery>(EMPTY_FLAG_QUERY);
+  const [flagQuery, setFlagQuery] = useState<FlagQuery>(retained?.flagQuery ?? EMPTY_FLAG_QUERY);
 
   const selectedPrefix = useMemo(() => events.slice(0, playback.frameIndex + 1), [events, playback.frameIndex]);
   const presentationState = observing && observedQuery.data ? observedQuery.data.state : anchorState;
@@ -118,32 +148,44 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   );
   const displayColumns = frame.columns;
   const [selectionRevision, setSelectionRevision] = useState(0);
-  const pendingSelection = useRef<HistorySelector | null>(null);
+  const pendingSelection = useRef<HistorySelector | null>(retained?.selectedSeq ? { at_seq: retained.selectedSeq } : null);
   const pendingEnd = useRef(false);
   const previousWindow = useRef<string | undefined>(undefined);
+  const windowIdentity = readyWindow ? `${readyWindow.generation_id}:${readyWindow.window.first_seq}:${selectionRevision}` : null;
+  const [positionedWindow, setPositionedWindow] = useState<string | null>(null);
+  const [missingSelection, setMissingSelection] = useState(false);
+  const positioned = windowIdentity !== null && positionedWindow === windowIdentity;
+  const replayUnavailable = ["denied", "expired", "error", "invalid", "missing"].includes(history.status);
+  // An explicitly requested observation has its own authorized response; a
+  // pending replay window must neither hide it nor resume playback behind it.
+  const observationReady = observing && Boolean(history.generation) && observedQuery.isSuccess && !replayUnavailable;
+  const isLoading = observing
+    ? !replayUnavailable && observedQuery.isPending
+    : history.status === "loading" || Boolean(readyWindow && !positioned && !missingSelection);
   const { seek, play, pause } = playback;
   useEffect(() => {
-    if (!readyWindow) return;
-    const identity = `${readyWindow.generation_id}:${readyWindow.window.first_seq}`;
-    if (previousWindow.current === identity) return;
-    previousWindow.current = identity;
-    const target = pendingSelection.current;
+    if (!readyWindow || !windowIdentity) return;
+    if (previousWindow.current === windowIdentity) return;
+    previousWindow.current = windowIdentity;
+    const target = pendingSelection.current ?? history.selector;
     let index = pendingEnd.current ? events.length - 1 : 0;
     pendingEnd.current = false;
     if (target && "at_seq" in target) {
-      index = events.findIndex((event) => BigInt(event.seq) >= BigInt(target.at_seq!));
-      if (index < 0) index = events.length - 1;
+      index = events.findIndex((event) => event.seq === target.at_seq);
+      if (index < 0) { pause(); setContinuePlayback(false); setMissingSelection(true); return; }
     } else if (target && "at_time" in target && events.length) {
       const time = Date.parse(target.at_time!);
       index = events.reduce((closest, event, candidate) => Math.abs(Date.parse(event.created_at) - time) < Math.abs(Date.parse(events[closest]!.created_at) - time) ? candidate : closest, 0);
     }
     seek(index);
+    setPositionedWindow(windowIdentity);
+    setMissingSelection(false);
     pendingSelection.current = null;
     if (continuePlayback) { play(); setContinuePlayback(false); }
-  }, [readyWindow, events, seek, play, selectionRevision, continuePlayback]);
+  }, [readyWindow, windowIdentity, history.selector, events, seek, play, pause, continuePlayback]);
   useEffect(() => {
-    if (["preparing", "failed", "expired", "error"].includes(history.status)) setContinuePlayback(false);
-  }, [history.status]);
+    if (["preparing", "failed", "expired", "error", "denied", "invalid", "missing"].includes(history.status)) { pause(); setContinuePlayback(false); }
+  }, [history.status, pause]);
   const { playing, toggle, atStart, atEnd, stepBack: stepBackWithin, stepForward: stepForwardWithin } = playback;
   const selectHistoryWindow = history.selectWindow;
   const selectWindow = useCallback((selector: HistorySelector) => {
@@ -151,6 +193,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
     setContinuePlayback(false);
     setObserving(false);
     setSelectedCardId(null);
+    setMissingSelection(false);
     pendingEnd.current = "cursor" in selector && selector.cursor === readyWindow?.window.previous_cursor;
     previousWindow.current = undefined;
     pendingSelection.current = selector;
@@ -177,11 +220,49 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   }, [playing, atEnd, readyWindow?.window.next_cursor, readyWindow?.window.first_seq, firstHistorySeq, selectWindow, toggle]);
   const refresh = () => {
     const selected = events[playback.frameIndex];
-    selectWindow(selected ? { at_seq: selected.seq } : {});
-    history.refresh();
+    history.refresh(selected?.seq);
   };
 
-  const currentEvent = observing ? null : events[playback.frameIndex] ?? null;
+  const currentEvent = observing || !positioned || missingSelection ? null : events[playback.frameIndex] ?? null;
+  const selectedSeq = positioned ? events[playback.frameIndex]?.seq ?? null : null;
+  useEffect(() => {
+    if (!positioned || missingSelection || history.status !== "ready") return;
+    returnNavigation?.writeView(memoryKey, { identity: history.viewIdentity, moment: history.moment, selectedSeq, selectedCardId, flagQuery, viewMode, detailsOpen, observing } satisfies RetainedReplay);
+  }, [positioned, missingSelection, history, selectedSeq, selectedCardId, flagQuery, viewMode, detailsOpen, observing, returnNavigation, memoryKey]);
+  // A held pointer or key previews every frame in memory; only the settled
+  // moment reaches the address bar. Each replace mints a router entry key, so
+  // per-frame commits would evict the bounded return views, origin included.
+  const inputHeld = useRef(false);
+  const pendingMoment = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const hold = () => { inputHeld.current = true; };
+    const release = () => {
+      inputHeld.current = false;
+      const settle = pendingMoment.current;
+      pendingMoment.current = null;
+      settle?.();
+    };
+    // Window capture records the press before any control seeks in response.
+    for (const type of HOLD_EVENTS) window.addEventListener(type, hold, true);
+    for (const type of RELEASE_EVENTS) window.addEventListener(type, release, true);
+    return () => {
+      for (const type of HOLD_EVENTS) window.removeEventListener(type, hold, true);
+      for (const type of RELEASE_EVENTS) window.removeEventListener(type, release, true);
+    };
+  }, []);
+  const { commitMoment } = history;
+  const momentCommittable = positioned && !missingSelection && history.status === "ready" && !playing && !observing;
+  useEffect(() => {
+    if (!momentCommittable || !selectedSeq) return;
+    const settle = () => commitMoment(selectedSeq);
+    if (!inputHeld.current) { settle(); return; }
+    pendingMoment.current = settle;
+    const idleSettle = window.setTimeout(settle, HELD_INPUT_IDLE_COMMIT_MS);
+    return () => {
+      window.clearTimeout(idleSettle);
+      if (pendingMoment.current === settle) pendingMoment.current = null;
+    };
+  }, [momentCommittable, selectedSeq, commitMoment]);
   // Board-time anchors for the StepPanel chips: the log's first event dates
   // "Day N"; the previous event exposes the real gap the uniform playback
   // cadence hides. Derived here so StepPanel stays pure.
@@ -250,13 +331,13 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   // Resolve the selected card's snapshot AT the current frame; if it's not in
   // the frame (created later / deleted earlier) keep the panel closed.
   const selectedCard = useMemo(() => {
-    if (!selectedCardId) return null;
+    if (!selectedCardId || history.status !== "ready" || !positioned || missingSelection) return null;
     for (const column of frame.columns) {
       const found = column.cards.find((c) => c.snapshot.id === selectedCardId);
       if (found) return found.snapshot;
     }
     return null;
-  }, [frame, selectedCardId]);
+  }, [frame, selectedCardId, history.status, positioned, missingSelection]);
 
   const analytics = useMemo(
     () =>
@@ -272,6 +353,9 @@ export function TimelineSimulator({ slug, boardId }: Props) {
   };
 
   const expired = history.status === "expired" || observing && observedQuery.error instanceof ApiError && observedQuery.error.status === 410;
+  const missing = history.status === "missing" || missingSelection;
+  const invalid = history.status === "invalid";
+  const denied = history.status === "denied";
   const transportControls = (
     <TransportControls
       playing={playback.playing}
@@ -296,10 +380,11 @@ export function TimelineSimulator({ slug, boardId }: Props) {
           window={readyWindow} hasNewActivity={history.hasNewActivity} busy={history.busy} observing={observing}
           onSelect={selectWindow} onRefresh={refresh} onObserve={() => { pause(); setContinuePlayback(false); setSelectedCardId(null); setObserving((value) => !value); }}
         />}
-        {observing && observedQuery.data && <p role="status" className="text-xs text-muted-foreground">{t("timeline.history.observation", { time: formatDateTime(observedQuery.data.observed_at) })}</p>}
+        {history.status === "ready" && <p className="text-xs text-muted-foreground">{t("timeline.history.reloadState")}</p>}
+        {observationReady && observedQuery.data && <p role="status" className="text-xs text-muted-foreground">{t("timeline.history.observation", { time: formatDateTime(observedQuery.data.observed_at) })}</p>}
         {!observing && readyWindow && (frame.partial || readyWindow.coverage.quality === "partial") && <p data-testid="timeline-partial-note" className="rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-foreground">{t("timeline.history.partial")}</p>}
         {continuePlayback && !readyWindow && <Button variant="outline" onClick={() => setContinuePlayback(false)}>{t("timeline.transport.pause")}</Button>}
-        <div hidden={observing || !readyWindow} className="space-y-2">
+        <div hidden={observing || !readyWindow || !positioned || missingSelection} className="space-y-2">
         {events.length > 0 ? (
           <TimelineFlagBar
             query={flagQuery}
@@ -323,6 +408,7 @@ export function TimelineSimulator({ slug, boardId }: Props) {
 
         {currentEvent && descriptor ? (
           <StepPanel
+            slug={slug}
             event={currentEvent}
             descriptor={descriptor}
             columnNames={columnNames}
@@ -331,8 +417,14 @@ export function TimelineSimulator({ slug, boardId }: Props) {
             firstEventAt={firstEventAt}
             prevEventAt={prevEventAt}
             reducedMotion={reducedMotion}
+            detailsOpen={detailsOpen}
+            onDetailsOpenChange={setDetailsOpen}
             onInspect={() => {
               if (playback.playing) playback.toggle();
+            }}
+            onOpenCurrent={() => {
+              pause();
+              setContinuePlayback(false);
             }}
           />
         ) : null}
@@ -354,8 +446,17 @@ export function TimelineSimulator({ slug, boardId }: Props) {
           <div data-testid="timeline-loading" className="space-y-4">
             <Skeleton className="h-[28rem] rounded-[calc(var(--radius-xl))]" />
           </div>
-        ) : history.status === "error" || history.status === "expired" || observedQuery.isError && observing ? (
-          <div data-testid="timeline-error"><EmptyState icon={AlertTriangle} title={t(expired ? "timeline.history.expiredTitle" : "timeline.error.title")} description={t(expired ? "timeline.history.expired" : "timeline.error.body")} action={<Button variant="outline" onClick={() => { if (expired) refresh(); else if (observing) void observedQuery.refetch(); else history.retry(); }}>{t(expired ? "timeline.history.refresh" : "timeline.error.retry")}</Button>} /></div>
+        ) : history.status === "error" || expired || missing || invalid || denied || observedQuery.isError && observing ? (
+          <div data-testid="timeline-error" role="alert"><EmptyState icon={AlertTriangle}
+            title={t(expired ? "timeline.history.expiredTitle" : invalid ? "timeline.history.invalidMomentTitle" : missing ? "timeline.history.missingMomentTitle" : denied ? "timeline.history.accessLostTitle" : "timeline.error.title")}
+            description={t(expired ? "timeline.history.expired" : invalid ? "timeline.history.invalidMoment" : missing ? "timeline.history.missingMoment" : denied ? "timeline.history.accessLost" : "timeline.error.body")}
+            action={<Button variant="outline" onClick={() => {
+              if (expired) refresh();
+              else if (missing || invalid) { setMissingSelection(false); previousWindow.current = undefined; pendingSelection.current = null; history.chooseMoment(); }
+              else if (observing && !denied) void observedQuery.refetch();
+              else history.retry();
+            }}>{t(expired ? "timeline.history.rebuildMoment" : missing || invalid ? "timeline.history.chooseMoment" : "timeline.error.retry")}</Button>}
+          /></div>
         ) : !observing && history.window && history.window.status !== "ready" ? (
           <div role="status" className="space-y-3 py-8 text-center">
             <p className="text-sm font-medium">{t(history.window.status === "failed" ? "timeline.history.preparationFailed" : "timeline.history.preparing")}</p>
@@ -390,6 +491,8 @@ export function TimelineSimulator({ slug, boardId }: Props) {
       </div>
 
       <TimelineCardDetail
+        slug={slug}
+        boardId={boardId}
         open={selectedCard !== null}
         onOpenChange={(open) => {
           if (!open) setSelectedCardId(null);
@@ -398,6 +501,10 @@ export function TimelineSimulator({ slug, boardId }: Props) {
         analytics={analytics}
         analyticsScope={observing ? undefined : t("timeline.history.analyticsScope")}
         columnNames={columnNames}
+        onOpenCurrent={() => {
+          pause();
+          setContinuePlayback(false);
+        }}
       />
     </div>
   );

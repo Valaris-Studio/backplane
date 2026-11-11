@@ -1,10 +1,11 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, waitFor } from "@/test/test-utils";
 import type { BoardDetail, Card, Column } from "@/types/kanban";
+import { http, HttpResponse, server } from "@/test/msw-server";
 
 // BoardView's deep-link contract is what's under test; the board chrome and
 // network hooks around it are stubbed to keep the test on the URL <-> sheet
@@ -143,6 +144,19 @@ function renderBoard(initialEntry: string) {
   );
 }
 
+const exactReads: string[] = [];
+beforeEach(() => {
+  exactReads.length = 0;
+  server.use(http.get("/api/workspaces/acme/boards/board-1/cards/:cardId", ({ params }) => {
+    const id = String(params.cardId);
+    exactReads.push(id);
+    const card = board.columns.flatMap((column) => column.cards).find((item) => item.id === id);
+    return card
+      ? HttpResponse.json(card)
+      : HttpResponse.json({ detail: "Card not found" }, { status: 404 });
+  }));
+});
+
 describe("BoardView card deep-linking", () => {
   it("opens the referenced card's detail sheet from a ?card= param", async () => {
     renderBoard("/acme/boards/board-1/kanban?card=card-2");
@@ -173,10 +187,18 @@ describe("BoardView card deep-linking", () => {
 });
 
 describe("BoardView stale card deep-links", () => {
-  it("strips a ?card= that resolves to no card on the board and keeps the sheet closed", async () => {
-    // Agents paste references to cards that may since be deleted — a stale
-    // param must not strand an empty editable sheet shell.
+  it("retains an unavailable exact identity until deliberate close without inventing a card", async () => {
+    // List absence is not authorization. This URL/sheet harness keeps its
+    // lightweight sheet; the real error panel and write controls are covered
+    // independently by BoardView.destinationAccess.test.tsx.
     renderBoard("/acme/boards/board-1/kanban?card=ghost-card");
+    await waitFor(() => expect(exactReads).toContain("ghost-card"));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/acme/boards/board-1/kanban?card=ghost-card",
+    );
+    expect(screen.queryByText("sheet:Card One")).not.toBeInTheDocument();
+    expect(screen.queryByText("sheet:Card Two")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByText("close-sheet"));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(
         /\/acme\/boards\/board-1\/kanban$/,

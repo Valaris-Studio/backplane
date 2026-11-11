@@ -26,6 +26,9 @@ from app.models.base import Base, UUIDMixin
 # Most to least private; `rich` last, so the most private choice still wins.
 CONTENT_LEVELS = ("metadata", "standard", "full", "rich")
 MAPPING_ORIGINS = ("explicit", "auto_repo")
+TOKEN_SCOPE_FULL = "full"
+TOKEN_SCOPE_CAPTURE_ONLY = "capture_only"
+TOKEN_SCOPES = (TOKEN_SCOPE_FULL, TOKEN_SCOPE_CAPTURE_ONLY)
 
 
 class CompanionInstallation(Base, UUIDMixin):
@@ -36,6 +39,12 @@ class CompanionInstallation(Base, UUIDMixin):
     """
 
     __tablename__ = "companion_installations"
+    __table_args__ = (
+        CheckConstraint(
+            "token_scope IN ('full', 'capture_only')",
+            name="ck_companion_installation_token_scope",
+        ),
+    )
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
@@ -44,6 +53,11 @@ class CompanionInstallation(Base, UUIDMixin):
     platform: Mapped[str] = mapped_column(String(64))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     token_prefix: Mapped[str] = mapped_column(String(12))
+    # Belongs to the installation, not the token, so a rotation keeps it.
+    # `capture_only` reaches the headless uplink alone and never goes back.
+    token_scope: Mapped[str] = mapped_column(
+        String(16), default=TOKEN_SCOPE_FULL, server_default=TOKEN_SCOPE_FULL
+    )
     paused: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )

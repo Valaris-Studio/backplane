@@ -21,6 +21,10 @@ beforeEach(() => {
   stubReducedMotion(true);
   missingStorage = false;
   vi.mocked(toast.error).mockClear();
+  server.use(http.get("/api/workspaces/acme/boards/board-1/resources/res-1", () => HttpResponse.json({
+    ...resource, gcs_path: missingStorage ? null : resource.gcs_path,
+    parent_id: null, board_id: "board-1", ancestors: [], ancestors_complete: true,
+  })));
 });
 
 async function openPreview() {

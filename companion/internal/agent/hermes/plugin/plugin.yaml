@@ -1,0 +1,8 @@
+name: backplane-companion
+version: "1.0.0"
+description: "Observer only: sends session, tool-call and approval-denial metadata (never arguments, results or messages) to the local Backplane Companion."
+provides_hooks:
+  - on_session_start
+  - post_tool_call
+  - post_approval_response
+  - on_session_finalize

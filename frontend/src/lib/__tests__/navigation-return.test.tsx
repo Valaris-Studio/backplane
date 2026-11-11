@@ -35,7 +35,7 @@ describe("shared entity navigation", () => {
     await act(async () => { await router.navigate(-1); });
 
     await waitFor(() => expect(router.state.location).toMatchObject({ key: original.key, pathname: original.pathname, search: original.search, hash: original.hash }));
-    const link = screen.getByRole("link", { name: "Read handoff" });
+    const link = await screen.findByRole("link", { name: "Read handoff" });
     expect(link.closest("article")).toHaveAttribute("id", "content-selected-item");
     expect(link).toBeVisible();
     expect(link).toHaveFocus();
@@ -76,7 +76,7 @@ describe("continuous return capture and safe fallback", () => {
     await userEvent.click(screen.getByRole("link", { name: "Ordinary source link" }));
     await act(async () => { await router.navigate(-1); });
     await waitFor(() => expect(router.state.location.pathname).toBe("/ordinary-origin"));
-    expect(screen.getByRole("link", { name: "Ordinary source link" })).toHaveFocus();
+    expect(await screen.findByRole("link", { name: "Ordinary source link" })).toHaveFocus();
   });
 
   it("uses the canonical parent when the origin is no longer the immediately previous entry", async () => {

@@ -1,6 +1,8 @@
 packages:
   - "frontend"
 allowBuilds:
+  esbuild: false
+  msw: false
   sharp: true
 # Keep in sync with frontend/pnpm-workspace.yaml (standalone Docker/CI installs).
 overrides:

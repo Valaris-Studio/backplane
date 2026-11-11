@@ -176,7 +176,11 @@ async def source_index_state(factory, source):
         chunks = await db.scalar(
             select(func.count())
             .select_from(SessionSearchChunk)
-            .join(SessionSearchSource)
+            .join(
+                SessionSearchSource,
+                (SessionSearchChunk.source_id == SessionSearchSource.id)
+                & (SessionSearchChunk.session_id == SessionSearchSource.session_id),
+            )
             .where(SessionSearchSource.content_id == source["content_id"])
         )
         pid = await db.scalar(text("SELECT pg_backend_pid()"))

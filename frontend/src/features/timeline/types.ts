@@ -162,7 +162,7 @@ export interface HistoryPreparation {
   retryable: boolean;
   error: { code: string; message: string } | null;
 }
-export type HistorySelector = { at_seq: string } | { at_time: string } | { cursor: string } | Record<string, never>;
+export type HistorySelector = { at_seq: string; exact?: boolean } | { at_time: string } | { cursor: string } | Record<string, never>;
 export interface HistorySearchPage {
   generation_id: string;
   scope: "generation";

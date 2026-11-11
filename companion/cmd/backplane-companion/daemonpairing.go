@@ -48,6 +48,9 @@ func (a *app) newDaemonPairer(root context.Context, layout store.Layout) *daemon
 }
 
 func (p *daemonPairer) Start(ctx context.Context, endpoint, name string, replace bool) (control.Pairing, error) {
+	if p.app.operatorManaged(p.layout) {
+		return control.Pairing{}, errHeadlessOperatorManaged
+	}
 	if p.persisting() {
 		// The approved pairing is becoming this device's connection; a new
 		// one would only race it.

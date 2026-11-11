@@ -76,6 +76,7 @@ async def read_window(
     response: Response,
     limit: int = Query(default=200, ge=1, le=500),
     at_seq: str | None = Query(default=None, max_length=19),
+    exact: bool = False,
     at_time: datetime | None = None,
     cursor: str | None = Query(default=None, max_length=2048),
     user: User = Depends(get_current_user),
@@ -88,6 +89,7 @@ async def read_window(
         user.id,
         limit=limit,
         at_seq=at_seq,
+        exact=exact,
         at_time=utc(at_time) if at_time else None,
         cursor=cursor,
     )

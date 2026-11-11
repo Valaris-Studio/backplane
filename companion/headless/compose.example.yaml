@@ -1,0 +1,95 @@
+# Copyright (c) 2026 Valaris Studio
+# SPDX-License-Identifier: MIT
+#
+# Operator-managed headless Companion (companion/README.md, "Headless"): the
+# Companion service only. Copy this file and replace every <...>.
+#
+# Host layout, created by root before the first start (10001 is the image's
+# Companion UID and GID):
+#
+#   install -d -o root -g root  -m 0755 /etc/backplane-companion/config
+#   install -o root -g root -m 0644 config.json /etc/backplane-companion/config/config.json
+#   install -d -o root -g 10001 -m 0750 /etc/backplane-companion/token
+#
+# config.json names "token_file": "/run/backplane-companion/token/device-token".
+# The config is read at start: restart the service after editing it.
+#
+# To observe an operator-managed coding agent running as another UID (10000
+# in this example), the same host directory holds the hook socket for both containers
+# and config.json adds "hook_socket": "/run/backplane-companion/hook/hook.sock",
+# "hook_peer_uid": 10000:
+#
+#   install -d -o 10001 -g 10001 -m 0711 /var/lib/backplane-companion-hook
+#
+# The Companion then also needs the peer's repository, read-only, at the very
+# path the peer sees it (/workspace/repo), because records are scoped by
+# their working directory on this container's filesystem. Both mounts are
+# commented below. Supply the peer container's configuration separately,
+# sharing this hook directory and using the same repository path.
+# Install or replace the token by writing a new file in the token directory
+# and renaming it over the path, never by editing it in place:
+#
+#   cd /etc/backplane-companion/token
+#   (umask 077; cat > .incoming) && chown 10001:10001 .incoming \
+#     && chmod 0400 .incoming && mv -f .incoming device-token
+#
+# Egress: the Companion ignores HTTP(S)_PROXY and connects to the configured
+# endpoint directly. Nothing in this file restricts where it can connect;
+# restrict its egress at the network layer (host firewall or an
+# egress-controlled network allowing only the API host on 443 and DNS).
+
+services:
+  companion:
+    image: backplane-companion-headless:<version>
+    build:
+      context: ..
+      dockerfile: headless/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:size=16m,uid=10001,gid=10001,mode=0700
+    volumes:
+      # Queue, inbox and binding state; a new named volume takes the image's
+      # 0700 directory owned by 10001. Never a tmpfs: the queue must survive
+      # restarts.
+      - companion-data:/var/lib/backplane-companion
+      # The token's directory, not the file: a file mount keeps the old
+      # inode, so a replacement renamed in on the host would never be seen.
+      - type: bind
+        source: /etc/backplane-companion/token
+        target: /run/backplane-companion/token
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /etc/backplane-companion/config
+        target: /etc/backplane-companion
+        read_only: true
+        bind: {create_host_path: false}
+      # Peer observation (see the header): the hook socket's directory,
+      # writable so the Companion can bind the socket, and the peer's
+      # repository read-only at the peer's own path.
+      # - type: bind
+      #   source: /var/lib/backplane-companion-hook
+      #   target: /run/backplane-companion/hook
+      #   bind: {create_host_path: false}
+      # - type: bind
+      #   source: /srv/worker/repo
+      #   target: /workspace/repo
+      #   read_only: true
+      #   bind: {create_host_path: false}
+    # On SIGTERM the Companion uploads what is queued for at most 8 s.
+    stop_grace_period: 20s
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+    # Deliberately absent: ports, privileged, pid: host, the Docker socket
+    # and any device or secret mount besides the two above.
+
+volumes:
+  companion-data: {}

@@ -3,10 +3,12 @@
 
 import { cn } from "@/lib/utils";
 import { Marquee } from "@/components/ui/marquee";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 interface PageHeaderProps {
   title: ReactNode;
+  /** Makes the title a programmatic focus target, e.g. when the focused control it replaced is gone. */
+  titleRef?: Ref<HTMLHeadingElement>;
   description?: ReactNode;
   eyebrow?: ReactNode;
   actions?: ReactNode;
@@ -23,6 +25,7 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  titleRef,
   description,
   eyebrow,
   actions,
@@ -38,7 +41,7 @@ export function PageHeader({
           className,
         )}
       >
-        <h1 className="min-w-0 truncate text-sm font-semibold text-foreground sm:text-base">
+        <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="min-w-0 truncate text-sm font-semibold text-foreground sm:text-base">
           {title}
         </h1>
         {actions ? (
@@ -67,6 +70,8 @@ export function PageHeader({
           </p>
         ) : null}
         <h1
+          ref={titleRef}
+          tabIndex={titleRef ? -1 : undefined}
           className={cn(
             "font-bold text-balance text-foreground",
             compact ? "text-lg sm:text-xl" : "text-xl sm:text-2xl",

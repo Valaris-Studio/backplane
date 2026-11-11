@@ -57,6 +57,10 @@ type Config struct {
 	IdleTimeout           time.Duration
 	// Locale localizes messages when a request names no language.
 	Locale string
+	// RefuseChanges, when it returns an error, answers every request that is
+	// not a GET or HEAD with it before any handler runs, so a route added
+	// later is refused too.
+	RefuseChanges func() error
 	// WatchPaths are state files whose change republishes status;
 	// ProbePaths among them also invalidate the cached probes, ProjectPaths
 	// republish projects, and PolicyPath emits policy.changed.
@@ -124,8 +128,23 @@ func New(config Config) *Server {
 	server := &Server{config: config}
 	server.hub = newHub(server, config.QueueSize, config.StatusDebounce)
 	server.watcher = newWatcher(server, config)
-	server.handler = server.recovering(server.routes())
+	server.handler = server.recovering(server.refusingChanges(server.routes()))
 	return server
+}
+
+func (s *Server) refusingChanges(next http.Handler) http.Handler {
+	if s.config.RefuseChanges == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if err := s.config.RefuseChanges(); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Handler serves the API without a listener, e.g. for tests.

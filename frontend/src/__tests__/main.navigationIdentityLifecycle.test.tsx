@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, screen, stubReducedMotion, userEvent, waitFor } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";
 import { ApiError } from "@/lib/api-error";
-import { meKeys } from "@/lib/query-keys";
+import { meKeys, noteKeys } from "@/lib/query-keys";
 import { makeContent, makeSession } from "@/features/sessions/__tests__/fixtures";
 import type { HandoffDraftController, HandoffForm } from "@/features/sessions/hooks/use-handoff-drafts";
 import type { ExcerptNoteDraft } from "@/features/sessions/utils/excerpt-note";
@@ -110,6 +110,13 @@ const form: HandoffForm = {
 };
 const releases: (() => void)[] = [];
 
+function holdResponse() {
+  let release = () => {};
+  const ready = new Promise<void>((resolve) => { release = resolve; });
+  releases.push(release);
+  return { ready, release };
+}
+
 function serve(holdIdentity = false) {
   let releaseIdentity!: () => void;
   const identity = new Promise<void>((resolve) => { releaseIdentity = resolve; });
@@ -120,6 +127,9 @@ function serve(holdIdentity = false) {
   releases.push(() => releasePublication(HttpResponse.error()));
   const traffic = {
     status: 200, owner: ownerA, identityReturned: 0, reads: [] as string[],
+    workspaceStatus: 200, workspaceGate: null as ReturnType<typeof holdResponse> | null,
+    workspaceRequests: [] as { owner: string; status: number }[],
+    noteGate: null as ReturnType<typeof holdResponse> | null, noteRequests: 0, noteResponses: 0,
     writes: [] as { route: string; body: unknown }[], unexpected: [] as string[],
     releaseIdentity, releasePublication,
   };
@@ -137,15 +147,32 @@ function serve(holdIdentity = false) {
         return traffic.status === 200 ? HttpResponse.json(traffic.owner)
           : HttpResponse.json({ detail: "Identity unavailable" }, { status: traffic.status });
       }
+      if (path === "/api/workspaces/lifecycle") {
+        const status = traffic.workspaceStatus;
+        traffic.workspaceRequests.push({ owner: traffic.owner.id, status });
+        await traffic.workspaceGate?.ready;
+        return HttpResponse.json(status === 200 ? workspace : { detail: "Workspace unavailable" }, { status });
+      }
+      if (path === "/api/workspaces/lifecycle/notes/lifecycle-note") {
+        const status = traffic.workspaceStatus;
+        const gate = traffic.noteGate;
+        traffic.noteGate = null;
+        traffic.noteRequests += 1;
+        await gate?.ready;
+        traffic.noteResponses += 1;
+        return HttpResponse.json(status === 200 ? note : { detail: "Note unavailable" }, { status });
+      }
+      if (path.startsWith("/api/workspaces/lifecycle/") && traffic.workspaceStatus !== 200) {
+        return HttpResponse.json({ detail: "Workspace unavailable" }, { status: traffic.workspaceStatus });
+      }
       const responses: Record<string, unknown> = {
         "/api/auth/modes": { oidc_enabled: false, password_enabled: false, dev_mode: true, companion_enabled: false, rich_capture_enabled: false },
         "/api/auth/setup-status": { needs_setup: false },
-        "/api/workspaces": [workspace], "/api/workspaces/lifecycle": workspace,
+        "/api/workspaces": traffic.workspaceStatus === 200 ? [workspace] : [],
         "/api/workspaces/lifecycle/members": [{ user_id: ownerA.id, role: "owner", name: ownerA.name, email: ownerA.email }],
         "/api/workspaces/lifecycle/boards": [board], "/api/workspaces/lifecycle/boards/lifecycle-board": board,
         "/api/workspaces/lifecycle/agents": [],
         "/api/workspaces/lifecycle/notes": [{ ...Object.fromEntries(Object.entries(note).filter(([key]) => key !== "content")), preview: "Authorized note body." }],
-        "/api/workspaces/lifecycle/notes/lifecycle-note": note,
         "/api/workspaces/lifecycle/config/completion-context-impact": { attempts: [] },
         "/api/notifications/unread-count": { count: 0 }, "/api/notifications": [],
         "/api/workspaces/lifecycle/approvals": [],
@@ -177,6 +204,15 @@ function expectEmptyHandoff() {
   expect(owned.handoff!.state.selected.size).toBe(0);
 }
 
+async function expectPreviousNoteHidden() {
+  await waitFor(() => expect(document.querySelector('[contenteditable="true"]')).not.toBeInTheDocument());
+  expect(screen.queryByDisplayValue(note.title)).not.toBeInTheDocument();
+  expect(screen.queryByText(note.title)).not.toBeInTheDocument();
+  expect(screen.queryAllByText("Authorized note body.")).toHaveLength(0);
+  expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("unsaved-changes-prompt")).not.toBeInTheDocument();
+}
+
 beforeEach(() => {
   vi.resetModules(); localStorage.clear(); sessionStorage.clear(); stubReducedMotion(true);
   // Fresh main modules must share context instances with this factory's hooks.
@@ -192,6 +228,86 @@ afterEach(async () => {
 });
 
 describe("main-owned identity lifecycle", () => {
+  it("hides A's fetched note before B's held workspace authorization and rejects a late A response", async () => {
+    const traffic = serve();
+    const client = await mount(true);
+    await screen.findByDisplayValue(note.title);
+    await waitFor(() => expect(document.querySelector('[contenteditable="true"]')).toHaveTextContent("Authorized note body."));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(client.getQueryData(meKeys.me())).toEqual(ownerA);
+    expect(traffic.workspaceRequests).toEqual([{ owner: ownerA.id, status: 200 }]);
+
+    const lateNote = holdResponse();
+    traffic.noteGate = lateNote;
+    const noteRequests = traffic.noteRequests;
+    const noteResponses = traffic.noteResponses;
+    act(() => { void client.refetchQueries({ queryKey: noteKeys.detail(workspace.slug, note.id), exact: true }); });
+    await waitFor(() => expect(traffic.noteRequests).toBe(noteRequests + 1));
+    expect(traffic.noteResponses).toBe(noteResponses);
+
+    const nextAuthority = holdResponse();
+    traffic.workspaceGate = nextAuthority;
+    traffic.workspaceStatus = 403;
+    traffic.owner = ownerB;
+    await refreshIdentity(client);
+    expect(client.getQueryData(meKeys.me())).toEqual(ownerB);
+    await expectPreviousNoteHidden();
+    await waitFor(() => expect(traffic.workspaceRequests).toContainEqual({ owner: ownerB.id, status: 403 }));
+
+    await act(async () => { lateNote.release(); });
+    await waitFor(() => expect(traffic.noteResponses).toBe(noteResponses + 1));
+    await expectPreviousNoteHidden();
+    await act(async () => { nextAuthority.release(); });
+    await screen.findByTestId("workspace-not-found");
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    await expectPreviousNoteHidden();
+    expect(traffic.writes).toEqual([]);
+    expect(traffic.unexpected).toEqual([]);
+  });
+
+  it.each([401, 403])("hides the previously authenticated note after /me returns %s before workspace reauthorization", async (status) => {
+    const traffic = serve();
+    const client = await mount(true);
+    await screen.findByDisplayValue(note.title);
+    await waitFor(() => expect(document.querySelector('[contenteditable="true"]')).toHaveTextContent("Authorized note body."));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(client.getQueryData(meKeys.me())).toEqual(ownerA);
+    const authority = holdResponse();
+    traffic.workspaceGate = authority;
+    traffic.workspaceStatus = 403;
+    traffic.status = status;
+    await refreshIdentity(client);
+    expect(client.getQueryState(meKeys.me())?.status).toBe("error");
+    await expectPreviousNoteHidden();
+    await act(async () => { authority.release(); });
+    await screen.findByTestId("workspace-not-found");
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    await expectPreviousNoteHidden();
+    expect(traffic.writes).toEqual([]);
+    expect(traffic.unexpected).toEqual([]);
+  });
+
+  it.each([200, 503])("preserves the authorized dirty note and focus after same-principal /me status %s", async (status) => {
+    const traffic = serve();
+    const client = await mount(true);
+    const title = await screen.findByDisplayValue(note.title);
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    fireEvent.change(title, { target: { value: "Owner A unsaved title" } });
+    title.focus();
+    expect(title).toHaveFocus();
+    traffic.status = status;
+    await refreshIdentity(client);
+    expect(client.getQueryState(meKeys.me())?.status).toBe(status === 200 ? "success" : "error");
+    expect(client.getQueryData(meKeys.me())).toEqual(ownerA);
+    expect(screen.getByDisplayValue("Owner A unsaved title")).toBe(title);
+    expect(title).toHaveFocus();
+    expect(document.querySelector('[contenteditable="true"]')).toHaveTextContent("Authorized note body.");
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.queryByTestId("workspace-not-found")).not.toBeInTheDocument();
+    expect(traffic.writes).toEqual([]);
+    expect(traffic.unexpected).toEqual([]);
+  });
+
   it.each(["success", "unknown"] as const)("isolates owner B after A → denial → B when A's pending publication settles with %s", async (outcome) => {
     const traffic = serve();
     const client = await mount();

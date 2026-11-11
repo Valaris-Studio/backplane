@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import "../../__tests__/history-identity-fixture";
 import { expect, it } from "vitest";
 import { renderWithProviders, screen, within } from "@/test/test-utils";
 import { http, HttpResponse, server } from "@/test/msw-server";

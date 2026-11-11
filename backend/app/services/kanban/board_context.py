@@ -22,6 +22,9 @@ from app.schemas.kanban.board_context import (
     NoteSummary,
 )
 from app.services.activity import ActivityService
+from app.services.agents.context_snapshot import note_class
+from app.services.agents.context_manifest import sha256_text
+from app.services.notes.content_serializer import prosemirror_to_markdown
 
 # card.status is free text and agents sometimes write progress prose into it, so a
 # busy column can carry one distinct ~255-char status per card (a real board had
@@ -133,8 +136,25 @@ class BoardContextService:
             DefinitionSummary.model_validate(definition) if definition else None
         )
 
-        notes = await self.note_repo.list_by_board(board_id)
-        note_summaries = [NoteSummary.model_validate(n) for n in notes]
+        notes, has_more_notes, unauthorized_count = await self.note_repo.list_board_briefing(
+            board_id, workspace_id, limit=25,
+        )
+        note_summaries = []
+        omissions = []
+        if unauthorized_count:
+            omissions.append({"reason": "unauthorized", "count": unauthorized_count})
+        if has_more_notes:
+            omissions.append({"reason": "over_budget", "detail": "selection_window", "count_at_least": 1})
+        for note in notes:
+            summary = NoteSummary.model_validate(note)
+            if note.pinned:
+                material_class, label = note_class(note)
+                body = prosemirror_to_markdown(note.content)
+                summary.content = body
+                summary.material_class = material_class
+                summary.label = label
+                summary.sha256 = sha256_text(body)
+            note_summaries.append(summary)
 
         git_repos = await self.git_repo_repo.list_by_board(board_id)
         git_repo_summaries = [GitRepoSummary.model_validate(r) for r in git_repos]
@@ -150,4 +170,5 @@ class BoardContextService:
             notes=note_summaries,
             git_repos=git_repo_summaries,
             recent_activity=activity_summaries,
+            omissions=omissions,
         )

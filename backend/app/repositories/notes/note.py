@@ -4,7 +4,7 @@
 import uuid
 from typing import Literal
 
-from sqlalchemy import LargeBinary, Row, String, case, cast, func, or_, select
+from sqlalchemy import LargeBinary, Row, String, and_, case, cast, func, or_, select
 
 from app.models.notes.note import Note
 from app.models.user import User
@@ -107,6 +107,31 @@ class NoteRepository(BaseRepository[Note]):
             .order_by(Note.pinned.desc(), Note.created_at.desc(), Note.id.asc())
         )
         return list(result.scalars().all())
+
+    async def list_board_briefing(self, board_id: uuid.UUID, workspace_id: uuid.UUID, *, limit: int):
+        # Shared context excludes agent working records before selecting the
+        # finite window. Human promotion and unstamped legacy records survive.
+        shared_record = or_(
+            Note.author_principal_kind.is_(None),
+            Note.author_principal_kind != "agent",
+            and_(Note.pinned.is_(True), Note.pinned_by.is_not(None)),
+        )
+        authorized = and_(Note.workspace_id == workspace_id, shared_record)
+        rows = list((await self.db.execute(
+            select(
+                Note.id, Note.title, Note.pinned, Note.created_at, Note.created_by,
+                Note.author_principal_kind, Note.author_agent_id, Note.pinned_by,
+                case((Note.pinned.is_(True), Note.content)).label("content"),
+            )
+            .where(Note.board_id == board_id, authorized)
+            .order_by(Note.pinned.desc(), Note.created_at.desc(), Note.id.asc())
+            .limit(limit + 1)
+        )).all())
+        unauthorized_count = await self.db.scalar(
+            select(func.count()).select_from(Note)
+            .where(Note.board_id == board_id, ~authorized)
+        ) or 0
+        return rows[:limit], len(rows) > limit, unauthorized_count
 
     async def list_by_card(
         self, card_id: uuid.UUID, workspace_id: uuid.UUID, *, limit: int | None = None

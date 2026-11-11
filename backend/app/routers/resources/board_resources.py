@@ -18,6 +18,7 @@ from app.exceptions import StorageUnavailableError
 from app.schemas.resources.resource import (
     DownloadUrlResponse,
     ResourceCreate,
+    ResourceDetailRead,
     ResourceRead,
     ResourceUpdate,
     UploadUrlRequest,
@@ -95,7 +96,7 @@ async def get_upload_url(
     return UploadUrlResponse(upload_url=upload_url, gcs_path=gcs_path)
 
 
-@router.get("/{resource_id}", response_model=ResourceRead)
+@router.get("/{resource_id}", response_model=ResourceDetailRead)
 async def get_board_resource(
     resource_id: uuid.UUID,
     board_id: uuid.UUID = Depends(resolve_board_id),
@@ -103,7 +104,7 @@ async def get_board_resource(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     service = ResourceService(db)
-    return await service.get_board_resource(resource_id, ctx.workspace.id, board_id)
+    return await service.get_resource_detail(resource_id, ctx.workspace.id, board_id)
 
 
 @router.get("/{resource_id}/download-url", response_model=DownloadUrlResponse)

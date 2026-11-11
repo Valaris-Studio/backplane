@@ -1,15 +1,15 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { ApiError, isApiError } from "@/lib/api-error";
 import { sessionKeys } from "@/lib/query-keys";
 import type { ContentBodyPage, SessionContent, SessionContentPage } from "@/types/agent-session";
 import { downloadName } from "../utils/contents";
 import { retryServerErrors } from "./use-sessions";
-import { useForgetSessionContent } from "./use-session-realtime";
+import { usePrivateContentRead } from "./use-private-session-read";
+export { usePrivateContentRead } from "./use-private-session-read";
 
 export const CONTENT_PAGE_SIZE = 100;
 export const SessionReaderActive = createContext(true);
@@ -24,28 +24,6 @@ function useCancelInactiveReads(queryKey: QueryKey, active: boolean) {
 
 function contentsPath(slug: string, sessionId: string) {
   return `/workspaces/${slug}/sessions/${sessionId}/contents`;
-}
-
-export function usePrivateContentRead(slug: string, sessionId: string) {
-  const queryClient = useQueryClient();
-  const forgetContent = useForgetSessionContent();
-  return useCallback(async <T,>(signal: AbortSignal, read: () => Promise<T>): Promise<T> => {
-    signal.throwIfAborted();
-    // Mounted observers can briefly recreate a removed query before the denied
-    // parent commits. A known authority loss must not start another private read.
-    if (queryClient.getQueryData(sessionKeys.detail(slug, sessionId)) === null) {
-      throw new ApiError("Session unavailable", 403);
-    }
-    try {
-      return await read();
-    } catch (error) {
-      if (!signal.aborted && isApiError(error) && [401, 403].includes(error.status)) {
-        queryClient.setQueryData(sessionKeys.detail(slug, sessionId), null);
-        forgetContent(slug, sessionId);
-      }
-      throw error;
-    }
-  }, [forgetContent, queryClient, sessionId, slug]);
 }
 
 export function useSessionContents(slug: string, sessionId: string, callId?: string, enabled = true) {
@@ -72,7 +50,20 @@ export function useSessionContents(slug: string, sessionId: string, callId?: str
 }
 
 /** The body pages asked for so far, in order; each offset is the previous page's end. */
-export function useContentBodyPages(slug: string, sessionId: string, content: SessionContent, offsets: readonly number[]) {
+export function useContentBodyPages(slug: string, sessionId: string, content: SessionContent, offsets: readonly number[], retainForReturn = false) {
+  const queryClient = useQueryClient();
+  const wasRetained = useRef(retainForReturn);
+  if (retainForReturn) wasRetained.current = true;
+  const pageKeys = useMemo(() => offsets.map((offset) => sessionKeys.contentBody(slug, sessionId, content.id, content.sha256 ?? "", offset)), [slug, sessionId, content.id, content.sha256, offsets]);
+  useEffect(() => () => {
+    if (retainForReturn || !wasRetained.current) return;
+    queueMicrotask(() => {
+      for (const key of pageKeys) {
+        const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+        if (query && query.getObserversCount() === 0) queryClient.removeQueries({ queryKey: key, exact: true });
+      }
+    });
+  }, [queryClient, pageKeys, retainForReturn]);
   const active = useSessionReaderActive();
   const read = usePrivateContentRead(slug, sessionId);
   const pages = useQueries({
@@ -86,7 +77,7 @@ export function useContentBodyPages(slug: string, sessionId: string, content: Se
         return data;
       }),
       enabled: active,
-      gcTime: 0,
+      gcTime: retainForReturn ? 5 * 60_000 : 0,
       staleTime: Infinity,
       retry: retryServerErrors,
     })),

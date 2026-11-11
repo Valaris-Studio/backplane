@@ -3,18 +3,46 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { workspaceKeys } from "@/lib/query-keys";
+import { isApiError } from "@/lib/api-error";
+import { ownerSessionKeys, workspaceKeys } from "@/lib/query-keys";
 import { useDomainSync } from "@/hooks/useDomainSync";
 import type { Workspace, WorkspaceCreate } from "@/types/workspace";
 
-export function useWorkspaces() {
+// Pages without a workspace socket still need current membership; they poll
+// this one shared inventory alongside their own visible refresh.
+export interface WorkspaceInventoryFreshness {
+  refetchInterval: number;
+  staleTime: number;
+}
+
+export function useWorkspaces(freshness?: WorkspaceInventoryFreshness) {
+  const queryClient = useQueryClient();
   useDomainSync("activity.workspace", workspaceKeys.all);
 
   return useQuery({
+    // An explicit undefined would override the client defaults for this
+    // observer, so freshness options exist only when a page asks for them.
+    ...(freshness ? {
+      staleTime: freshness.staleTime,
+      refetchInterval: freshness.refetchInterval,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
+    } : {}),
     queryKey: workspaceKeys.all,
     queryFn: async ({ signal }) => {
-      const { data } = await api.get<Workspace[]>("/workspaces", { signal });
-      return data;
+      try {
+        const { data } = await api.get<Workspace[]>("/workspaces", { signal });
+        return data;
+      } catch (error) {
+        if (!signal.aborted && isApiError(error) && [401, 403, 404].includes(error.status)) {
+          // A later outage cannot restore metadata whose authorization was
+          // explicitly withdrawn. Recovery fetches discovery afresh.
+          await queryClient.cancelQueries({ queryKey: ownerSessionKeys.all });
+          queryClient.removeQueries({ queryKey: ownerSessionKeys.all });
+          queryClient.setQueryData<Workspace[]>(workspaceKeys.all, []);
+        }
+        throw error;
+      }
     },
   });
 }

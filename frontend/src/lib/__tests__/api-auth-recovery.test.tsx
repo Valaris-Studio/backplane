@@ -25,6 +25,11 @@ describe("API auth/authorization recovery", () => {
   it("keeps resource permission failures in context and allows retry with local login enabled", async () => {
     let forbidden = true;
     server.use(
+      http.get("/api/workspaces/acme/resources/r1", () => HttpResponse.json({
+        id: "r1", name: "notes.txt", resource_type: "file", gcs_path: "test/notes.txt",
+        metadata: { tags: [] }, updated_at: "2026-09-10T00:00:00Z",
+        parent_id: null, board_id: null, ancestors: [], ancestors_complete: true,
+      })),
       http.get("/api/workspaces/acme/resources/r1/download-url", () => forbidden
         ? HttpResponse.json({ detail: "Permission denied", error_code: "forbidden" }, { status: 403 })
         : HttpResponse.json({ download_url: "/recovered-resource" })),

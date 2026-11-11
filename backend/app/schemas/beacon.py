@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.codex_tool_result import CodexToolResult, codex_tool_result
 from app.core.command_content import without_command_content
-from app.core.harness import COLLECTION_METHODS, native_call_key
+from app.core.harness import COLLECTION_METHODS, NATIVE_ID_PATTERN, native_call_key
 
 TITLE_MAX_CHARS = 200
 
@@ -546,6 +546,77 @@ def for_content_level(event: dict, content_level: str) -> dict:
     if content_level == "standard":
         return _without_tool_output(event)
     return event
+
+
+_LIFECYCLE_TOKEN = re.compile(r"^[a-z][a-z0-9_./-]{0,63}$")
+_TOOL_NAME = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+_NATIVE_ID = re.compile(NATIVE_ID_PATTERN)
+# Hermes mints `call_<12 hex>` from the tool name and arguments for a call that
+# came without an id (agent/message_sanitization.py deterministic_call_id),
+# renames a repeat `<id>_d<n>`, and Responses bridges spell a call
+# `<call id>|<item id>`. Hashing a guessed command confirms such an id, so the
+# server drops it whether or not the companion replaced it.
+_HERMES_MINTED_CALL_ID = r"call_[0-9a-f]{12}(?:_d[0-9]+)*(?:\||$)"
+_STRICT_TOOL_CALL_ID = re.compile(
+    f"^(?!{_HERMES_MINTED_CALL_ID}){NATIVE_ID_PATTERN.removeprefix('^')}"
+)
+
+# What the Hermes Agent adapter uploads
+# (companion/internal/agent/hermes/projection.go eventAllowlist, plus status),
+# each leaf with the pattern its value must fit to be kept. None marks a leaf
+# bounded elsewhere: the timestamp and event id by BeaconEvent, the working
+# directory by the ingest's placement.
+_STRICT_METADATA_LEAVES = {
+    "schema_version": re.compile(r"^[0-9]+(\.[0-9]+)*$"),
+    "timestamp": None,
+    "status": re.compile(r"^(ok|error|blocked|cancelled)$"),
+    "event.id": None,
+    "event.action": _LIFECYCLE_TOKEN,
+    "event.category": _LIFECYCLE_TOKEN,
+    "event.kind": _LIFECYCLE_TOKEN,
+    "event.fidelity": _LIFECYCLE_TOKEN,
+    "harness.name": _LIFECYCLE_TOKEN,
+    "harness.collection_method": _LIFECYCLE_TOKEN,
+    "session.id": _NATIVE_ID,
+    "session.working_directory": None,
+    "tool.name": _TOOL_NAME,
+    "mcp.server": _TOOL_NAME,
+    "mcp.tool": _TOOL_NAME,
+    "mcp.method.name": _LIFECYCLE_TOKEN,
+    "gen_ai.operation.name": _LIFECYCLE_TOKEN,
+    "gen_ai.tool.name": _TOOL_NAME,
+    "gen_ai.tool.call.id": _STRICT_TOOL_CALL_ID,
+    "approval.decision": _LIFECYCLE_TOKEN,
+}
+
+_STRICT_METADATA_TREE = _leaf_tree(_STRICT_METADATA_LEAVES)
+
+
+def _keep_only_allowlisted(value: dict, allowed: dict, path: tuple = ()) -> dict:
+    kept = {}
+    for key, child in value.items():
+        rule = allowed.get(key)
+        if rule is True and not isinstance(child, (dict, list)):
+            pattern = _STRICT_METADATA_LEAVES[".".join((*path, key))]
+            if pattern is None:
+                kept[key] = _capped(child) if isinstance(child, str) else child
+            # fullmatch: `$` alone would admit a trailing newline.
+            elif isinstance(child, str) and pattern.fullmatch(child):
+                kept[key] = child
+        elif isinstance(rule, dict) and isinstance(child, dict):
+            nested = _keep_only_allowlisted(child, rule, (*path, key))
+            if nested:
+                kept[key] = nested
+    return kept
+
+
+def strict_metadata_only(event: dict) -> dict:
+    """The copy of an uploaded event of a strict-metadata harness, at every
+    content level: each allowlisted leaf whose value fits the leaf's pattern,
+    and the leaves bounded elsewhere capped as the metadata tree caps them.
+    Everything else is dropped with no `backplane_redactions` entry, so no hash
+    or size of it is stored either."""
+    return _keep_only_allowlisted(event, _STRICT_METADATA_TREE)
 
 
 def strip_identity(event: dict) -> dict:

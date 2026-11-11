@@ -703,25 +703,36 @@ class CardService:
         as_markdown: bool = False,
         workspace_id: uuid.UUID | None = None,
         reader_id: uuid.UUID | None = None,
+        include_context: bool = False,
     ):
         card = await self.card_repo.get_by_id(card_id)
         if not card or card.board_id != board_id:
             raise ResourceNotFoundError("Card not found", error_code="card_not_found")
-        if workspace_id is not None and reader_id is not None:
+        snapshot = None
+        if include_context:
+            from app.services.kanban.card_context import CardContextService
+
+            snapshot = await CardContextService(self.db).snapshot(
+                card=card, board_id=board_id, workspace_id=workspace_id, reader_id=reader_id,
+            )
+        if not include_context and workspace_id is not None and reader_id is not None:
             await WorkConsultationService(self.db).record(
                 workspace_id, reader_id, "card", card.id
             )
         await attach_pending_approvals(self.db, [card])
         await attach_agent_presence(self.db, [card])
         await attach_dependency_counts(self.db, [card])
-        if as_markdown:
+        if as_markdown or include_context:
             # Project on a schema copy, never on the ORM instance — the
             # session auto-commits and would persist the markdown back.
             from app.schemas.kanban.card import CardRead
 
             read = CardRead.model_validate(card)
             return read.model_copy(
-                update={"description": prosemirror_to_markdown(card.description)}
+                update={
+                    "description": prosemirror_to_markdown(card.description) if as_markdown else card.description,
+                    "context": snapshot,
+                }
             )
         return card
 
@@ -737,6 +748,8 @@ class CardService:
         prefix: str,
         *,
         workspace_id: uuid.UUID | None = None,
+        reader_id: uuid.UUID | None = None,
+        include_context: bool = False,
     ):
         """Resolve a card on `board_id` from a UUID prefix fragment.
 
@@ -769,6 +782,11 @@ class CardService:
             )
 
         card = matches[0]
+        if include_context:
+            return await self.get_card(
+                card.id, board_id, workspace_id=workspace_id, reader_id=reader_id,
+                include_context=True, as_markdown=True,
+            )
         await attach_pending_approvals(self.db, [card], workspace_id=workspace_id)
         await attach_agent_presence(self.db, [card])
         await attach_dependency_counts(self.db, [card])

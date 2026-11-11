@@ -8,6 +8,7 @@ import { act, renderWithProviders, screen, userEvent, waitFor } from "@/test/tes
 import { http, HttpResponse, server } from "@/test/msw-server";
 import { api } from "@/lib/api";
 import { sessionKeys } from "@/lib/query-keys";
+import i18n from "@/i18n/config";
 import { SLUG, callPage, contentPage, makeCall, makeSession, stubAuthModes } from "../../__tests__/fixtures";
 import { SessionDetailPage } from "../SessionDetailPage";
 
@@ -17,6 +18,7 @@ const PATH = `/api/workspaces/${SLUG}/sessions/${SESSION}`;
 const PRIVATE_TITLE = "Private investigation title";
 const PRIVATE_ARGS = "unpublished deployment credential investigation";
 const PRIVATE_CHILD = "Private subagent investigation";
+const PRIVATE_SEARCH = "Private retained search snippet";
 const privateCall = makeCall({ key: "call:private", name: "Inspect evidence", args_preview: PRIVATE_ARGS });
 const session = makeSession({ id: SESSION, title: PRIVATE_TITLE, capture_levels: ["rich"] });
 const clients: QueryClient[] = [];
@@ -40,6 +42,19 @@ function serveSession() {
   stubAuthModes(true);
   server.use(
     http.get(PATH, () => response.status === 200 ? HttpResponse.json(session) : HttpResponse.json({ detail: "Unavailable" }, { status: response.status })),
+    http.post(`${PATH}/search`, () => HttpResponse.json({
+      items: [{ source_kind: "event", source_id: "event-private", content_id: null, event_id: "event-private",
+        call_key: privateCall.key, channel: null, field: "tool.arguments", occurred_at: session.started_at,
+        byte_start: 8, byte_end: 16, snippet: PRIVATE_SEARCH, snippet_byte_start: 0, source_state: "available" }],
+      generation: 1, scanned_bytes: PRIVATE_SEARCH.length, eligible_bytes: PRIVATE_SEARCH.length, next_cursor: null, complete: true,
+      coverage: {
+        indexed: { count: 1, bytes: PRIVATE_SEARCH.length }, available: { count: 1, bytes: PRIVATE_SEARCH.length },
+        eligible: { count: 1, bytes: PRIVATE_SEARCH.length }, pending_index: { count: 0, bytes: 0 },
+        pending_upload: { count: 0, bytes: 0 }, withheld: { count: 0, bytes: 0 }, uncaptured: { count: 0, bytes: 0 },
+        unavailable: { count: 0, bytes: 0 }, nontext: { count: 0, bytes: 0 }, linked_child_metadata: { count: 0, searchable: false },
+        index_ready: true, extractor_version: "session-search/1", verified_at: session.started_at,
+      },
+    })),
     http.get(`${PATH}/calls`, () => HttpResponse.json(callPage([privateCall]))),
     http.get(`${PATH}/calls/:key`, () => HttpResponse.json({ key: privateCall.key, events: [] })),
     http.get(`${PATH}/usage`, () => HttpResponse.json({ price_table_version: "test", items: [] })),
@@ -115,7 +130,11 @@ describe("Session authority loss clears the private observation surface", () => 
     await screen.findByRole("heading", { name: PRIVATE_TITLE });
     await screen.findByText(PRIVATE_ARGS);
     await screen.findByText(PRIVATE_CHILD);
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("sessions.find.title") }));
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("sessions.find.title") }), "retained");
+    await screen.findByRole("button", { name: PRIVATE_SEARCH });
     await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(JSON.stringify(client.getQueriesData({ queryKey: sessionKeys.searchRoot(SLUG, SESSION) }))).toContain(PRIVATE_SEARCH);
 
     // These inactive pages must leave with the visible surface; default gcTime=0 would hide the regression.
     client.setQueryData(sessionKeys.calls(SLUG, SESSION, "work"), { pages: [callPage([privateCall])], pageParams: [null] });
@@ -123,7 +142,7 @@ describe("Session authority loss clears the private observation surface", () => 
     client.setQueryData(sessionKeys.contents(SLUG, SESSION, { kind: "tool" }), { pages: [contentPage([])], pageParams: [null] });
     client.setQueryData(sessionKeys.contentBody(SLUG, SESSION, "body-private", "sha-private", 0), { text: "private captured body" });
     client.setQueryData(sessionKeys.contentFile(SLUG, SESSION, "file-private", "sha-file"), "private captured file");
-    expect(new Set(descendants(client).map((query) => query.queryKey[4]))).toEqual(new Set(["calls", "call", "usage", "links", "children", "rhythm", "contents", "content-body", "content-file"]));
+    expect(new Set(descendants(client).map((query) => query.queryKey[4]))).toEqual(new Set(["calls", "call", "usage", "links", "children", "rhythm", "contents", "content-body", "content-file", "search"]));
 
     await deny(client, response, status);
 
@@ -133,6 +152,8 @@ describe("Session authority loss clears the private observation surface", () => 
     expect(client.getQueryData(sessionKeys.calls(SLUG, SIBLING, "all"))).toBeDefined();
     expect(screen.queryByText(PRIVATE_ARGS)).not.toBeInTheDocument();
     expect(screen.queryByText(PRIVATE_CHILD)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: PRIVATE_SEARCH })).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
   it("does not revive denied previews after a later outage or remount, then accepts a fresh authorized read", async () => {

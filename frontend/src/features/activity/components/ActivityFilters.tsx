@@ -32,18 +32,22 @@ const ACTIONS = [
 interface ActivityFiltersProps {
   filters: Filters;
   onChange: (filters: Filters) => void;
+  searchInput?: string;
+  onSearchInputChange?: (value: string) => void;
 }
 
-export function ActivityFiltersBar({ filters, onChange }: ActivityFiltersProps) {
+export function ActivityFiltersBar({ filters, onChange, searchInput: retainedSearchInput, onSearchInputChange }: ActivityFiltersProps) {
   const { t } = useTranslation();
-  const [searchInput, setSearchInput] = useState(filters.search ?? "");
+  const [localSearchInput, setLocalSearchInput] = useState(filters.search ?? "");
+  const searchInput = retainedSearchInput ?? localSearchInput;
 
   useEffect(() => {
+    if (searchInput === (filters.search ?? "")) return;
     const timer = setTimeout(() => {
       onChange({ ...filters, search: searchInput || undefined });
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchInput]);
+  }, [filters, onChange, searchInput]);
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -54,7 +58,9 @@ export function ActivityFiltersBar({ filters, onChange }: ActivityFiltersProps) 
         }
       >
         <SelectTrigger className="w-40">
-          <SelectValue placeholder={t("activity.filterByType")} />
+          <SelectValue placeholder={t("activity.filterByType")}>
+            {filters.entity_type ? t(`activity.entityTypes.${filters.entity_type}`) : t("activity.allTypes")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">{t("activity.allTypes")}</SelectItem>
@@ -73,7 +79,9 @@ export function ActivityFiltersBar({ filters, onChange }: ActivityFiltersProps) 
         }
       >
         <SelectTrigger className="w-44">
-          <SelectValue placeholder={t("activity.filterByAction")} />
+          <SelectValue placeholder={t("activity.filterByAction")}>
+            {filters.action ? t(`activity.actions.${filters.action}`) : t("activity.allActions")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">{t("activity.allActions")}</SelectItem>
@@ -90,7 +98,10 @@ export function ActivityFiltersBar({ filters, onChange }: ActivityFiltersProps) 
         <Input
           placeholder={t("activity.searchPlaceholder")}
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          onChange={(e) => {
+            setLocalSearchInput(e.target.value);
+            onSearchInputChange?.(e.target.value);
+          }}
           className="pl-9"
         />
       </div>

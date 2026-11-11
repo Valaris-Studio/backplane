@@ -46,6 +46,29 @@ class ModuleIdentityTest(unittest.TestCase):
         # ignored, so a stale path ships a Companion without its version.
         self.assertEqual(build_bundle.BUILDINFO, declared_module(COMPANION / "go.mod") + "/internal/buildinfo")
 
+    def test_headless_ldflags_stamp_the_declared_buildinfo_package(self):
+        dockerfile = (COMPANION / "headless" / "Dockerfile").read_text(encoding="utf-8")
+        assignments = re.findall(r'-X\s+([^=\s]+)=([^\s"]+)', dockerfile)
+        buildinfo = declared_module(COMPANION / "go.mod") + "/internal/buildinfo"
+        self.assertCountEqual(assignments, [
+            (buildinfo + ".Version", "${COMPANION_VERSION}"),
+            (buildinfo + ".Commit", "${COMPANION_COMMIT}"),
+        ])
+
+    def test_first_party_go_imports_use_the_declared_companion_module(self):
+        module = declared_module(COMPANION / "go.mod")
+        import_declaration = re.compile(r"^\s*import\s+(\(.*?^\s*\)|[^\n]+)", re.MULTILINE | re.DOTALL)
+        companion_import = re.compile(r'["`](github\.com/[^/"`]+/backplane/companion(?:/[^"`]*)?)["`]')
+        imported_paths = 0
+        for source in sorted(COMPANION.rglob("*.go")):
+            for declaration in import_declaration.findall(source.read_text(encoding="utf-8")):
+                for imported in companion_import.findall(declaration):
+                    imported_paths += 1
+                    with self.subTest(source=source.relative_to(COMPANION).as_posix(), imported=imported):
+                        self.assertTrue(imported == module or imported.startswith(module + "/"),
+                                        f"{imported} must use declared module {module}")
+        self.assertGreater(imported_paths, 0, "no first-party Companion imports were checked")
+
 
 if __name__ == "__main__":
     unittest.main()

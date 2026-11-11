@@ -172,6 +172,10 @@ func (l *peerCheckedListener) Accept() (net.Conn, error) {
 	}
 }
 
+// PeerUID reads the connecting process's uid from the kernel's peer
+// credentials; the hook socket shares it.
+func PeerUID(conn net.Conn) (int, error) { return peerUID(conn) }
+
 func peerUID(conn net.Conn) (int, error) {
 	unixConn, ok := conn.(*net.UnixConn)
 	if !ok {

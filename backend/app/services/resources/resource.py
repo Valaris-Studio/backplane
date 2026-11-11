@@ -16,12 +16,21 @@ from app.exceptions import (
 from app.models.activity import ActivityAction, ActivityEntityType
 from app.models.resources.resource import ResourceType
 from app.repositories.resources.resource import ResourceRepository
-from app.schemas.resources.resource import ResourceCreate, ResourceMetadata, ResourceUpdate
+from app.schemas.resources.resource import (
+    ResourceAncestorRead,
+    ResourceCreate,
+    ResourceDetailRead,
+    ResourceMetadata,
+    ResourceRead,
+    ResourceUpdate,
+)
 from app.services.activity import ActivityService
 from app.services.gcs import ObjectStoreUnavailableError
 from app.services.kanban.freeze_guard import assert_board_not_frozen
 from app.services.storage.objects import stat_stored_object
 from app.utils import shallow_merge_dicts
+
+MAX_RESOURCE_ANCESTORS = 32
 
 
 class ResourceService:
@@ -160,6 +169,13 @@ class ResourceService:
         resource_type: str | None = None,
         tag: str | None = None,
     ):
+        if parent_id and not q and workspace_id is not None:
+            parent = await self._get_scoped(parent_id, workspace_id, board_id)
+            # A workspace route can name an authorized board folder. Filter
+            # its children in that folder's actual scope, just like listing
+            # them without filters; explicit board routes were checked above.
+            board_id = parent.board_id
+
         has_filters = q or resource_type or tag
 
         if has_filters:
@@ -170,6 +186,7 @@ class ResourceService:
                     q=q,
                     resource_type=resource_type,
                     tag=tag,
+                    parent_id=parent_id,
                 )
             if workspace_id:
                 return await self.repo.search(
@@ -177,14 +194,11 @@ class ResourceService:
                     q=q,
                     resource_type=resource_type,
                     tag=tag,
+                    parent_id=parent_id,
                 )
             return []
 
         if parent_id:
-            if workspace_id is not None:
-                # The folder must sit inside this route's scope, or a known
-                # folder id lists another board's or workspace's children.
-                await self._get_scoped(parent_id, workspace_id, board_id)
             return await self.repo.list_by_parent(parent_id)
         if board_id:
             return await self.repo.list_root_by_board(board_id)
@@ -214,6 +228,38 @@ class ResourceService:
         if resource.board_id != board_id:
             raise ResourceNotFoundError("Resource not found")
         return resource
+
+    async def get_resource_detail(
+        self,
+        resource_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
+    ) -> ResourceDetailRead:
+        resource = await self._get_scoped(resource_id, workspace_id, board_id)
+        ancestors: list[ResourceAncestorRead] = []
+        parent_id = resource.parent_id
+        visited = {resource.id}
+
+        # Legacy links can cross scopes or cycle. Keep only the nearest
+        # verified chain, never skip an invalid parent to invent a path.
+        while parent_id is not None and len(ancestors) < MAX_RESOURCE_ANCESTORS:
+            if parent_id in visited:
+                break
+            visited.add(parent_id)
+            parent = await self.repo.get_folder_location(
+                parent_id, resource.workspace_id, resource.board_id
+            )
+            if parent is None:
+                break
+            ancestors.append(ResourceAncestorRead.model_validate(parent))
+            parent_id = parent["parent_id"]
+
+        ancestors.reverse()
+        return ResourceDetailRead(
+            **ResourceRead.model_validate(resource).model_dump(),
+            ancestors=ancestors,
+            ancestors_complete=parent_id is None,
+        )
 
     async def _get_scoped(
         self, resource_id: uuid.UUID, workspace_id: uuid.UUID, board_id: uuid.UUID | None

@@ -40,8 +40,8 @@ thing that runs on your machines without the platform's copyleft following it.
 
 ## Release compatibility
 
-The current release pair is **runner 0.8.8** with **platform 0.1.4-preview.2**.
-Runner 0.8.8 generates MCP configs pinned to `backplane-mcp==0.9.3`, the
+The current release pair is **runner 0.8.9** with **platform 0.1.4-preview.4**.
+Runner 0.8.9 generates MCP configs pinned to `backplane-mcp==0.9.5`, the
 corresponding published MCP package. Existing custom MCP launch settings are
 preserved; regenerate or update a generated configuration deliberately.
 
@@ -50,7 +50,7 @@ and runner versions; this release pair supports them. Keep policies in legacy
 mode with no budgets until all workers
 and runners, including the rollback runtime, support the enabled policies.
 Drain incompatible processes before opting in. Upgrade the backend before
-upgrading the runner. See the [upgrade notes](../CHANGELOG.md#platform-v0.1.4-preview.2).
+upgrading the runner. See the [upgrade notes](../CHANGELOG.md#platform-v0.1.4-preview.4).
 
 ## Prerequisites
 
@@ -194,7 +194,7 @@ switch to another project's configuration. Creating a config at an occupied
 path requires a different destination or explicitly selecting the existing
 file. The shipped example and an explicit Skip cannot launch a loop.
 
-Generated `uvx` configs pin `backplane-mcp==0.9.3`. For a board with an explicit
+Generated `uvx` configs pin `backplane-mcp==0.9.5`. For a board with an explicit
 completion policy, the loop checks the actual MCP launch environment, all five
 completion tools, and `get_board_loop` before dispatching work. Missing packages,
 tools, or incompatible policy responses stop setup before the next model call.

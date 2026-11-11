@@ -29,9 +29,18 @@ export interface Note {
   // Lets the UI link a note straight to its source execution (house "link the
   // element" rule). See backend app/models/notes/note.py.
   source_execution_id: string | null;
+  // Server-stamped attribution (see backend app/models/notes/note.py): the
+  // kind of principal that wrote the note and, for agents, which one; the
+  // human who pinned it and when (cleared on unpin). Null on pre-131 rows.
+  author_principal_kind?: "user" | "installation" | "agent" | null;
+  author_agent_id?: string | null;
+  pinned_by?: string | null;
+  pinned_at?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+  history_revision?: number;
+  revision_digest?: string | null;
 }
 
 /**

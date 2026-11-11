@@ -583,6 +583,10 @@ html { font-size: 87.5%; }
    alone here — GSAP presets already branch on prefersReducedMotion()
    (src/lib/animations.ts) and motion@12 respects the query natively. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .animate-pulse,
   .animate-ping,
   .animate-loop-turn,

@@ -14,6 +14,17 @@ export function sameWorkRelationship(left: SessionWorkIdentity, right: SessionWo
     left.entity_id === right.entity_id && left.relation === right.relation;
 }
 
+// A navigation handoff arrives untyped from per-tab memory. Only a complete
+// relationship may select evidence; anything else opens the ordinary timeline.
+export function parseSessionWorkIdentity(value: unknown): SessionWorkIdentity | null {
+  if (!value || typeof value !== "object") return null;
+  const { workspace_id, entity_type, entity_id, relation } = value as Record<string, unknown>;
+  if (typeof workspace_id !== "string" || typeof entity_id !== "string") return null;
+  if (entity_type !== "card" && entity_type !== "note") return null;
+  if (relation !== "changed" && relation !== "consulted") return null;
+  return { workspace_id, entity_type, entity_id, relation };
+}
+
 export function useRefreshSessionEvidence(slug: string, sessionId: string) {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);

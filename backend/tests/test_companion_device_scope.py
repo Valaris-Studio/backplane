@@ -898,7 +898,11 @@ async def test_me_returns_the_owner_and_this_installation(
     assert response.headers["cache-control"] == "no-store"
     assert response.json() == {
         "user": {"email": test_user.email, "display_name": "Dev User"},
-        "installation": {"id": laptop["installation_id"], "name": "Laptop"},
+        "installation": {
+            "id": laptop["installation_id"],
+            "name": "Laptop",
+            "token_scope": "full",
+        },
         "web_origin": "https://bp.example.test",
     }
 
@@ -950,6 +954,7 @@ async def test_me_never_returns_another_users_data(
     assert theirs.json()["installation"] == {
         "id": other["installation_id"],
         "name": "Theirs",
+        "token_scope": "full",
     }
     assert test_user.email not in theirs.text
     assert laptop["installation_id"] not in theirs.text

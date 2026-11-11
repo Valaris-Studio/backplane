@@ -52,6 +52,9 @@ func (a *app) connect(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if a.operatorManaged(layout) {
+		return errHeadlessOperatorManaged
+	}
 	if *browser {
 		return a.connectByBrowser(ctx, layout, *endpoint, *name, *loopback, *replace)
 	}
@@ -486,6 +489,11 @@ func (a *app) connectedClient(layout store.Layout) (state.Installation, *uplink.
 	if installation.ID == "" {
 		return installation, nil, errNotConnected
 	}
+	// An operator-managed root has no keyring entry: its token is a file only
+	// the headless daemon reads, and nothing else may act with it.
+	if a.operatorManaged(layout) {
+		return installation, nil, errHeadlessOperatorManaged
+	}
 	token, err := a.keyring.Load(installation.ID)
 	if errors.Is(err, credentials.ErrNotFound) {
 		return installation, nil, errNotConnected
@@ -541,6 +549,9 @@ func (a *app) disconnectDevice(ctx context.Context, expectedServer string) (disc
 	layout, err := a.layout()
 	if err != nil {
 		return disconnectResult{}, err
+	}
+	if a.operatorManaged(layout) {
+		return disconnectResult{}, errHeadlessOperatorManaged
 	}
 	session, err := a.endDaemonSession(ctx, layout)
 	if err != nil {
@@ -730,8 +741,9 @@ func (a *app) runDaemon(ctx context.Context, args []string) error {
 	otelcolManifest := flags.String("otelcol-artifact", a.defaultOtelcolManifest(), "pinned beacon-otelcol otelcol.json")
 	dataDir := flags.String("data-dir", "", "data directory (instead of BACKPLANE_COMPANION_HOME)")
 	logPath := flags.String("log", "", "append diagnostics to this file")
+	headlessConfig := flags.String("headless-config", "", "operator-managed headless mode: the absolute path of its config file")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		return fmt.Errorf("%w: run [--beacon-artifact PATH] [--data-dir DIR] [--log FILE]", errUsage)
+		return fmt.Errorf("%w: run [--beacon-artifact PATH] [--data-dir DIR] [--log FILE] [--headless-config FILE]", errUsage)
 	}
 	if *dataDir != "" {
 		if !filepath.IsAbs(*dataDir) {
@@ -746,6 +758,9 @@ func (a *app) runDaemon(ctx context.Context, args []string) error {
 		}
 		defer log.Close()
 		a.stderr = log
+	}
+	if *headlessConfig != "" {
+		return a.runHeadless(ctx, *headlessConfig, *manifest, *otelcolManifest)
 	}
 	return a.superviseDaemon(ctx, *manifest, *otelcolManifest)
 }
@@ -1078,6 +1093,11 @@ func (a *app) agents(_ context.Context, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("%w: agents list|install|uninstall|status [agent...]", errUsage)
 	}
+	if args[0] == "install" || args[0] == "uninstall" {
+		if err := a.refuseOperatorManaged(); err != nil {
+			return err
+		}
+	}
 	reports, err := a.agentReports(args[0], args[1:], false)
 	if err != nil {
 		return err
@@ -1265,6 +1285,9 @@ func (a *app) projects(ctx context.Context, args []string) error {
 	layout, err := a.layout()
 	if err != nil {
 		return err
+	}
+	if args[0] != "list" && a.operatorManaged(layout) {
+		return errHeadlessOperatorManaged
 	}
 	switch {
 	case args[0] == "list" && len(args) == 1:
@@ -1566,6 +1589,9 @@ func canonicalPath(path string) (string, error) {
 }
 
 func (a *app) setPaused(ctx context.Context, paused bool) error {
+	if err := a.refuseOperatorManaged(); err != nil {
+		return err
+	}
 	if err := a.writePaused(ctx, paused); err != nil {
 		return err
 	}

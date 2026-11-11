@@ -15,7 +15,7 @@ import { isApiError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 import type { AgentSession } from "@/types/agent-session";
 import { useCompanionEnabled, useSession } from "../api/use-sessions";
-import { useRefreshSessionEvidence, type SessionWorkIdentity } from "../api/use-session-evidence";
+import { parseSessionWorkIdentity, useRefreshSessionEvidence, type SessionWorkIdentity } from "../api/use-session-evidence";
 import { useNow } from "../hooks/use-now";
 import { formatTokens, formatUsd, formatWallTime, sessionTotalTokens, sessionWallSeconds } from "../utils/format";
 import { isUsageOnly } from "../utils/group-sessions";
@@ -28,6 +28,9 @@ import { SessionTimeline } from "./SessionTimeline";
 import { SessionTranscript } from "./SessionTranscript";
 import { RhythmStrip } from "./RhythmStrip";
 import { SessionReaderActive } from "../api/use-session-contents";
+import { SessionFind } from "./SessionFind";
+import { SessionEventMatch } from "./SessionEventMatch";
+import { ReaderInvestigation, useFindNavigation } from "../hooks/use-find-navigation";
 
 export function SessionDetailPage() {
   const { t } = useTranslation();
@@ -133,6 +136,7 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
   const navigationType = useNavigationType();
   const returnNavigation = useReturnNavigation();
   const tabKey = `session-reader-tab:${slug}/${session.id}`;
+  const workKey = `session-reader-work:${slug}/${session.id}`;
   const [tab, setTabState] = useState<ReaderTab>(() => returnNavigation?.readView<ReaderTab>(tabKey) ?? (location.hash.startsWith("#content-") ? "transcript" : "timeline"));
   const setTab = useCallback((next: ReaderTab) => {
     returnNavigation?.writeView(tabKey, next);
@@ -152,44 +156,81 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
     setTab(retainedTab ?? (location.hash.startsWith("#content-") ? "transcript" : "timeline"));
   }, [location.hash, location.key, navigationType, returnNavigation, tabKey, tab, setTab]);
   useEffect(() => { if (!compact && tab === "details") setTab("timeline"); }, [compact, tab, setTab]);
-  const [selectedWork, setSelectedWork] = useState<SessionWorkIdentity | null>(null);
+  // This entry's own selection, including an explicit clear, outranks the
+  // private handoff from the link that opened it. Usage-only sessions have no
+  // timeline evidence to select.
+  const [arrival] = useState(() => {
+    const retained = returnNavigation?.readView<SessionWorkIdentity | null>(workKey);
+    if (retained !== undefined) return { work: retained, handedOff: false };
+    const handedOff = isUsageOnly(session) ? null : parseSessionWorkIdentity(returnNavigation?.readHandoff());
+    return { work: handedOff, handedOff: handedOff !== null };
+  });
+  const [selectedWork, setSelectedWorkState] = useState<SessionWorkIdentity | null>(arrival.work);
+  const selectWork = useCallback((identity: SessionWorkIdentity | null) => {
+    returnNavigation?.writeView(workKey, identity);
+    setSelectedWorkState(identity);
+  }, [returnNavigation, workKey]);
   const [timelineTarget, setTimelineTarget] = useState<HTMLElement | null>(null);
   const [readerTarget, setReaderTarget] = useState<HTMLHeadingElement | null>(null);
   const [navigation, setNavigation] = useState<{ destination: "timeline" | "reader"; request: number } | null>(null);
   const appliedNavigation = useRef<number | null>(null);
+  const focusedTarget = useRef<HTMLElement | null>(null);
   const { refresh, refreshing } = useRefreshSessionEvidence(slug, session.id);
   const usageOnly = isUsageOnly(session);
+  const findNavigation = useFindNavigation(slug, session.id, tab, selectedWork, setTab, selectWork);
 
-  function navigateTo(destination: "timeline" | "reader") {
+  const navigateTo = useCallback((destination: "timeline" | "reader") => {
     setTab(destination === "reader" ? "transcript" : "timeline");
     setNavigation((previous) => ({ destination, request: (previous?.request ?? 0) + 1 }));
-  }
+  }, [setTab]);
+
+  const arrivalApplied = useRef(false);
+  useEffect(() => {
+    if (!arrival.handedOff || arrivalApplied.current) return;
+    arrivalApplied.current = true;
+    selectWork(arrival.work);
+    navigateTo("timeline");
+  }, [arrival, selectWork, navigateTo]);
 
   useEffect(() => {
-    if (!navigation || appliedNavigation.current === navigation.request) return;
+    if (!navigation) return;
     const target = navigation.destination === "timeline" ? timelineTarget : readerTarget;
     if (!target?.isConnected || target.closest("[hidden]")) return;
-    target.scrollIntoView?.({ block: "start" });
+    if (appliedNavigation.current === navigation.request) {
+      // Evidence replaces its heading once the session's links load. Follow
+      // it only while focus fell back to the document with the old element.
+      const active = document.activeElement;
+      const dropped = !active || active === document.body || !active.isConnected;
+      if (target === focusedTarget.current || focusedTarget.current?.isConnected || !dropped) return;
+    } else target.scrollIntoView?.({ block: "start" });
     target.focus({ preventScroll: true });
     appliedNavigation.current = navigation.request;
+    focusedTarget.current = target;
   }, [navigation, timelineTarget, readerTarget, compact, tab]);
 
+  const eventMatch = findNavigation.destination?.hit.source_kind === "event" && !findNavigation.restoration;
   const timeline = (
     <SessionReaderActive.Provider value={tab === "timeline"}>
     <div className="flex min-w-0 flex-col gap-3">
       <SessionBanners session={session} />
       {usageOnly ? null : <RhythmStrip slug={slug} session={session} />}
+      {eventMatch ? <SessionEventMatch slug={slug} sessionId={session.id} destination={findNavigation.destination!} /> : null}
+      <SessionReaderActive.Provider value={tab === "timeline" && !eventMatch}>
+      <div hidden={eventMatch}>
       {usageOnly ? null : <SessionTimeline
         slug={slug} session={session} headingHidden={false} selectedWork={selectedWork}
         headingRef={setTimelineTarget}
-        onReturn={() => { setSelectedWork(null); navigateTo("timeline"); }}
+        onReturn={() => { selectWork(null); navigateTo("timeline"); }}
         onReadContent={() => navigateTo("reader")}
       />}
+      </div>
+      </SessionReaderActive.Provider>
     </div>
     </SessionReaderActive.Provider>
   );
 
   return (
+    <ReaderInvestigation.Provider value={findNavigation.memory}>
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4")}>
       <SessionHeader slug={slug} session={session} />
       {compact ? <SessionStatStrip session={session} /> : null}
@@ -200,9 +241,14 @@ function SessionDetailBody({ slug, session }: { slug: string; session: AgentSess
           {t("sessions.evidence.refresh")}
         </Button>
       </div>
-      <SessionPanels slug={slug} session={session} timeline={timeline} transcript={<SessionTranscript slug={slug} session={session} active={tab === "transcript"} headingRef={setReaderTarget} />} compact={compact} tab={tab} onTabChange={setTab}
-        onInspect={usageOnly ? undefined : (identity) => { setSelectedWork(identity); navigateTo("timeline"); }} />
+      <SessionFind slug={slug} sessionId={session.id} onNavigate={findNavigation.navigate} onOpen={findNavigation.prepare} />
+      {findNavigation.originalMissing ? <p role="status" className="text-sm text-muted-foreground">{t("sessions.find.originalUnavailable")}</p> : null}
+      {findNavigation.checkpoint ? <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] self-start" onClick={() => findNavigation.restore()}>{t("sessions.find.back")}</Button> : null}
+      <SessionPanels slug={slug} session={session} timeline={timeline} transcript={<SessionTranscript slug={slug} session={session} active={tab === "transcript"} headingRef={setReaderTarget}
+        destination={findNavigation.destination} restoration={findNavigation.restoration?.checkpoint.tab === "transcript" ? findNavigation.restoration : null} onRestored={findNavigation.finishRestore} onReturnAnchor={() => findNavigation.restore(true)} />} compact={compact} tab={tab} onTabChange={setTab}
+        onInspect={usageOnly ? undefined : (identity) => { selectWork(identity); navigateTo("timeline"); }} />
     </div>
+    </ReaderInvestigation.Provider>
   );
 }
 

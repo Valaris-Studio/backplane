@@ -101,12 +101,13 @@ class ApiKeyService:
     async def verify_key(self, raw_key: str) -> ApiKey | None:
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         api_key = await self.repo.get_by_key_hash(key_hash)
-        # Revoking an installation deletes its keys; this refuses one that
-        # survived anyway (defence in depth), on HTTP and WebSocket alike.
+        # Revoking an installation, or limiting it to capture, deletes its
+        # keys; this refuses one that survived anyway (a mint racing the
+        # change, or defence in depth), on HTTP and WebSocket alike.
         if (
             api_key is not None
             and api_key.installation_id is not None
-            and await self.repo.installation_revoked(api_key.installation_id)
+            and await self.repo.installation_refuses_keys(api_key.installation_id)
         ):
             return None
         return api_key

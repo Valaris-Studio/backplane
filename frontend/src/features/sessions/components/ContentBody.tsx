@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Valaris Studio
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,11 @@ import { usePromptsHidden } from "../hooks/use-hide-prompts";
 import { formatBytes } from "../utils/format";
 import { ContentMarkdown } from "./ContentMarkdown";
 import { CallContentText } from "./PromptText";
+import { ReaderInvestigation, useReaderValue } from "../hooks/use-find-navigation";
+import { SessionMatchText, type MatchRange } from "./SessionMatchText";
+import { utf8Range } from "../utils/find-ranges";
+
+export interface ContentMatch extends MatchRange { request: number; available: boolean }
 
 type ContentFailure = "refused" | "gone" | "storage" | "failed";
 
@@ -76,21 +81,34 @@ interface ContentBodyProps {
   // Prose (prompts, replies, instructions) reads as text; tool parts as code.
   prose: boolean;
   emphasis?: boolean;
+  match?: ContentMatch;
 }
 
-export function ContentBody({ slug, sessionId, content, prose, emphasis }: ContentBodyProps) {
+export function ContentBody({ slug, sessionId, content, prose, emphasis, match }: ContentBodyProps) {
   const identity = JSON.stringify([content.id, content.sha256, content.render]);
-  if (content.render === "text") return <TextContent key={identity} slug={slug} sessionId={sessionId} content={content} prose={prose} emphasis={emphasis} />;
+  if (content.render === "text") return <TextContent key={identity} slug={slug} sessionId={sessionId} content={content} prose={prose} emphasis={emphasis} match={match} />;
   if (content.render === "image") return <ImageContent key={identity} slug={slug} sessionId={sessionId} content={content} />;
   if (content.render === "download") return <FileContent key={identity} slug={slug} sessionId={sessionId} content={content} />;
   return content.channel === "attachment" ? <MediaFacts content={content} /> : null;
 }
 
-function TextContent({ slug, sessionId, content, prose, emphasis }: ContentBodyProps) {
+function TextContent({ slug, sessionId, content, prose, emphasis, match }: ContentBodyProps) {
   const { t } = useTranslation();
   // Offsets of the body pages asked for; empty while only the preview shows.
-  const [offsets, setOffsets] = useState<number[]>([]);
-  const pages = useContentBodyPages(slug, sessionId, content, offsets);
+  const memory = useContext(ReaderInvestigation);
+  const bodyKey = `body:${content.id}:${content.sha256 ?? ""}`;
+  const [offsets, setOffsets] = useReaderValue<number[]>(bodyKey, []);
+  const [sourceMode, setSourceMode] = useReaderValue<boolean>(`source:${content.id}:${content.sha256 ?? ""}`, false, true);
+  const [highlight, setHighlight] = useState(true);
+  const lastMatch = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!match || lastMatch.current === match.request) return;
+    lastMatch.current = match.request;
+    setHighlight(true);
+    if (match.available) setSourceMode(true);
+    setOffsets(match.available && !utf8Range(content.preview?.text ?? "", match.byteStart, match.byteEnd) ? [match.offset] : []);
+  }, [match, content.preview, setOffsets, setSourceMode]);
+  const pages = useContentBodyPages(slug, sessionId, content, offsets, memory?.retainedBodies.has(bodyKey) ?? false);
   const loaded = pages.filter((page) => page.data).map((page) => page.data!);
   const failed = pages.find((page) => page.isError);
   const fetching = pages.some((page) => page.isFetching);
@@ -102,11 +120,15 @@ function TextContent({ slug, sessionId, content, prose, emphasis }: ContentBodyP
   const size = content.byte_count ?? 0;
 
   const text = loaded.length ? loaded.map((page) => page.text).join("") : (content.preview?.text ?? "");
-  const block = text ? markdown || prose ? <TextBlock text={text} markdown={markdown} emphasis={emphasis} /> : <MonoBlock text={text} /> : null;
+  const range = match && highlight && match.available ? { ...match, offset: loaded[0]?.offset ?? 0 } : undefined;
+  // A retained body stays source text when Find moves to another tab or match.
+  const block = sourceMode || match?.available ? <pre className={cn(TEXT_CLASSES, "max-h-[32rem] overflow-auto rounded-[var(--radius-cap)] p-2", !prose && "bg-card font-mono text-[0.8rem]")}><SessionMatchText text={text} range={range} /></pre>
+    : text ? markdown || prose ? <TextBlock text={text} markdown={markdown} emphasis={emphasis} /> : <MonoBlock text={text} /> : null;
 
   return (
-    <div className="grid gap-1.5">
-      {block}
+    <div className="grid gap-1.5" data-body-pending={fetching || waiting ? "true" : undefined}>
+      {match && !match.available ? <p role="status" className="text-sm text-muted-foreground">{t("sessions.find.sourceUnavailable")}</p> : block}
+      {match?.available && offsets.length > 0 && highlight ? <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] justify-self-start" onClick={() => { setHighlight(false); setOffsets([0]); }}>{t("sessions.find.beginning")}</Button> : null}
       {failed ? <FailureNote error={failed.error} onRetry={() => void failed.refetch()} /> : null}
       {expandable ? (
         <div className="flex flex-wrap items-center gap-2">

@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Iterable
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ from app.models.notes.finding import FindingSeverity
 from app.models.notes.kinds import IMMUTABLE_KINDS, REVIEW_VERDICT
 from app.models.notes.note import Note
 from app.models.workspace import WorkspaceRole
+from app.repositories.agents.execution import ExecutionRepository
 from app.repositories.kanban.card import CardRepository
 from app.repositories.notes.note import NoteOrderBy, NoteRepository, SortDirection
 from app.repositories.notes.save_receipt import NoteSaveReceiptRepository
@@ -92,6 +94,21 @@ PUBLISHED_NOTE_REVISION_VERSION = 1
 # A lowercase hex sha256, as note_revision writes it. CHAR(64) space-pads
 # anything shorter, which then fails this too.
 _SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+# A pinned note is a human-promoted directive (SEC, card 6f33e60a): Agent
+# principals can neither pin nor touch one, whoever authored it.
+AGENT_PIN_REFUSED = (
+    "Agent keys cannot pin notes; pinning is a human promotion act. "
+    "Create the note unpinned and ask a person to pin it."
+)
+AGENT_PINNED_NOTE_REFUSED = (
+    "Agent keys cannot modify a pinned note; it is a human-promoted directive. "
+    "Write a separate note or ask a person to unpin it."
+)
+FOREIGN_EXECUTION_CITATION_REFUSED = (
+    "source_execution_id must name one of the calling agent's own executions "
+    "in this workspace"
+)
 
 
 def derive_approved(
@@ -244,12 +261,19 @@ class NoteService:
         board_id: uuid.UUID | None = None,
     ) -> tuple[Note, bool]:
         """(note, created): False when an excerpt save replays its receipt."""
+        calling_agent_id = current_agent_id.get()
+        if data.pinned and calling_agent_id is not None:
+            raise ForbiddenError(AGENT_PIN_REFUSED, error_code="pin_requires_human")
         if data.excerpt_source is not None or data.client_request_id is not None:
             await self._authorize_excerpt_publisher(workspace_id, user_id)
-        await NoteHistoryAccess(self.db).authorize(workspace_id, user_id, write=True)
+        actor = await NoteHistoryAccess(self.db).authorize(workspace_id, user_id, write=True)
+        if calling_agent_id is not None and data.source_execution_id is not None:
+            await self._assert_own_execution(
+                workspace_id, calling_agent_id, data.source_execution_id
+            )
         await self._check_destination(workspace_id, board_id, data.card_id)
         if data.excerpt_source is None or data.client_request_id is None:
-            return await self._insert_note(workspace_id, data, user_id, board_id), True
+            return await self._insert_note(workspace_id, data, user_id, board_id, actor), True
         return await self._save_excerpt(
             workspace_id,
             data,
@@ -257,6 +281,7 @@ class NoteService:
             board_id,
             data.excerpt_source,
             data.client_request_id,
+            actor,
         )
 
     async def _authorize_excerpt_publisher(
@@ -278,6 +303,22 @@ class NoteService:
             raise ForbiddenError("Not a member of this workspace")
         if membership.role == WorkspaceRole.viewer:
             raise ForbiddenError("Insufficient permissions")
+
+    async def _assert_own_execution(
+        self, workspace_id: uuid.UUID, agent_id: uuid.UUID, execution_id: uuid.UUID
+    ) -> None:
+        """An Agent may only cite its own execution as provenance. Missing,
+        foreign and other-workspace ids share one refusal so the check never
+        reveals whether a foreign execution exists."""
+        execution = await ExecutionRepository(self.db).get_by_id(execution_id)
+        if (
+            execution is None
+            or execution.agent_id != agent_id
+            or execution.workspace_id != workspace_id
+        ):
+            raise ForbiddenError(
+                FOREIGN_EXECUTION_CITATION_REFUSED, error_code="foreign_execution_citation"
+            )
 
     async def _check_destination(
         self,
@@ -303,6 +344,7 @@ class NoteService:
         board_id: uuid.UUID | None,
         source: ExcerptSource,
         client_request_id: uuid.UUID,
+        actor: dict | None,
     ) -> tuple[Note, bool]:
         """Publish an owner-reviewed excerpt of their captured session once
         per client_request_id. The publisher and destination are already
@@ -338,7 +380,7 @@ class NoteService:
             {item.content_id: item.sha256 for item in source.items},
             max_total_bytes=EXCERPT_SOURCE_BYTES_LIMIT,
         )
-        note = await self._insert_note(workspace_id, data, user_id, board_id)
+        note = await self._insert_note(workspace_id, data, user_id, board_id, actor)
         await receipts.complete(
             receipt_id,
             note.id,
@@ -376,6 +418,7 @@ class NoteService:
         data: NoteCreate,
         user_id: uuid.UUID,
         board_id: uuid.UUID | None,
+        actor: dict | None,
     ) -> Note:
         content = await MediaLinkCanonicalizer(self.db).rich_text(workspace_id, data.content)
         create_kwargs = dict(
@@ -386,6 +429,10 @@ class NoteService:
             content=content,
             content_text=extract_plain_text(content),
             pinned=data.pinned,
+            # Attribution comes from the authorized principal, never the body;
+            # the actor's agent_id is this same context value, stringified.
+            author_principal_kind=actor["principal_kind"] if actor else None,
+            author_agent_id=current_agent_id.get() if actor else None,
             kind=data.kind,
             failure_class=data.failure_class,
             findings=(
@@ -397,11 +444,10 @@ class NoteService:
         )
         if data.card_id:
             create_kwargs["card_id"] = data.card_id
-        # Plumbing for the "link a note to its source execution" rule: we accept
-        # and persist it whenever a caller sends it. No backend path sets it yet;
-        # the Go runner stamping its EXECUTION_ID on verdict/system note creation
-        # is a follow-up. Until then this stays NULL for real notes and the UI
-        # link falls back to the notes page.
+        if data.pinned:
+            create_kwargs.update(pinned_by=user_id, pinned_at=datetime.now(timezone.utc))
+        # Provenance link; Agent callers may only cite their own execution
+        # (see _assert_own_execution).
         if data.source_execution_id:
             create_kwargs["source_execution_id"] = data.source_execution_id
         note = await self.note_repo.create(**create_kwargs)
@@ -410,7 +456,6 @@ class NoteService:
             await self._stamp_ui_validation_routing(
                 workspace_id, data.card_id, data.title, user_id
             )
-        actor = await NoteHistoryAccess(self.db).authorize(workspace_id, user_id, write=True)
         note.history_revision = 1
         await NoteHistoryContent(self.db).record(
             note_id=note.id, revision=1, snapshot=snapshot(note),
@@ -774,6 +819,14 @@ class NoteService:
         if note is None or note.workspace_id != workspace_id or (board_id is not None and note.board_id != board_id):
             raise ResourceNotFoundError("Note not found")
         actor = await access.authorize(workspace_id, actor_id, write=True)
+        if current_agent_id.get() is not None:
+            # Before replay and change detection: no agent write reaches a pinned note.
+            if note.pinned:
+                raise ForbiddenError(
+                    AGENT_PINNED_NOTE_REFUSED, error_code="pinned_note_human_controlled"
+                )
+            if data.pinned is True:
+                raise ForbiddenError(AGENT_PIN_REFUSED, error_code="pin_requires_human")
         if note.kind in IMMUTABLE_KINDS:
             raise ForbiddenError(f"Cannot modify a {note.kind} note")
         await assert_board_not_frozen(self.db, note.board_id)
@@ -828,6 +881,10 @@ class NoteService:
                 setattr(note, key, update_fields[key])
             if "content" in changed_fields:
                 note.content_text = extract_plain_text(note.content)
+            if "pinned" in changed_fields:
+                # Only a pin transition re-stamps; a human unpin clears the act.
+                note.pinned_by = actor_id if note.pinned else None
+                note.pinned_at = datetime.now(timezone.utc) if note.pinned else None
             note.history_revision += 1
             applied_revision = note.history_revision
             await history.record(note_id=note_id, revision=applied_revision,
@@ -974,6 +1031,10 @@ class NoteService:
             raise ResourceNotFoundError("Note not found")
         if note.kind in IMMUTABLE_KINDS:
             raise ForbiddenError(f"Cannot modify a {note.kind} note")
+        if note.pinned and current_agent_id.get() is not None:
+            raise ForbiddenError(
+                AGENT_PINNED_NOTE_REFUSED, error_code="pinned_note_human_controlled"
+            )
         await assert_board_not_frozen(self.db, note.board_id)
         if actor_id and workspace_id:
             activity = ActivityService(self.db)

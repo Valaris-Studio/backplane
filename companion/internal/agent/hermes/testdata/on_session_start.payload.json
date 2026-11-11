@@ -1,0 +1,11 @@
+{
+  "hook_event_name": "on_session_start",
+  "session_id": "20260924_115958_a1b2c3",
+  "cwd": "__CWD__",
+  "extra": {
+    "model": "anthropic/claude-sonnet-4.5",
+    "platform": "cli",
+    "observed_at": "2026-09-24T11:59:50.123456Z",
+    "plugin_schema": "backplane.hermes.v1"
+  }
+}

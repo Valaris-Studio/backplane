@@ -47,9 +47,15 @@ type Shim struct {
 // decision.
 func (s Shim) HandleAndRecord(agentName string, input io.Reader) {
 	if err := s.Handle(agentName, input); err != nil {
-		if _, statErr := os.Stat(s.Layout.Root); statErr == nil {
-			state.RecordHookError(s.Layout, errorCode(err), s.Now())
-		}
+		s.RecordFailure(errorCode(err))
+	}
+}
+
+// RecordFailure counts a content-free failure code in the health file of a
+// root that exists; the hook socket counts its own refusals through it.
+func (s Shim) RecordFailure(code string) {
+	if _, err := os.Stat(s.Layout.Root); err == nil {
+		state.RecordHookError(s.Layout, code, s.Now())
 	}
 }
 

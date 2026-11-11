@@ -210,9 +210,11 @@ class TimelineRepository:
             )
         )
 
-    async def seek(self, generation, *, seq=None, at_time=None):
+    async def seek(self, generation, *, seq=None, exact=False, at_time=None):
         stmt = select(Activity.seq).where(self.visible(generation))
         if seq is not None:
+            if exact:
+                return await self.db.scalar(stmt.where(Activity.seq == seq).limit(1))
             found = await self.db.scalar(
                 stmt.where(Activity.seq >= seq).order_by(Activity.seq).limit(1)
             )

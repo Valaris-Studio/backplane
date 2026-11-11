@@ -1,0 +1,33 @@
+# Copyright (c) 2026 Valaris Studio
+# SPDX-License-Identifier: MIT
+#
+# The qualification topology, layered over ../compose.example.yaml by
+# qualify.py: the same Companion service and hardening, but with no egress
+# at all (it joins the fake server's network-none namespace and reaches it
+# on loopback), named volumes standing in for the host's token and config
+# directories, and a synthetic mapped project root.
+
+services:
+  companion:
+    image: ${HW02_IMAGE:?}
+    platform: ${HW02_PLATFORM:?}
+    pull_policy: never
+    container_name: ${HW02_PREFIX:?}-companion
+    network_mode: container:${HW02_PREFIX:?}-fake-a
+    restart: "no"
+    tmpfs:
+      - /srv/hw-project:size=1m,uid=10001,gid=10001,mode=0700
+    volumes:
+      - type: volume
+        source: token
+        target: /run/backplane-companion/token
+        read_only: true
+      - type: volume
+        source: config
+        target: /etc/backplane-companion
+        read_only: true
+
+volumes:
+  companion-data: {name: "${HW02_PREFIX:?}-data"}
+  token: {name: "${HW02_PREFIX:?}-token", external: true}
+  config: {name: "${HW02_PREFIX:?}-config", external: true}

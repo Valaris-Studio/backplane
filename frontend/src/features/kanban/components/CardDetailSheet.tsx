@@ -12,13 +12,14 @@ import {
   useRemoveParticipant,
 } from "../api/use-cards";
 import { useOptimisticCardMove } from "../hooks/use-optimistic-card-move";
+import type { CardDetailFailure } from "../api/use-card-detail";
 import { useMembers } from "@/features/members/api/use-members";
 import { useCardExecutions } from "@/features/agents/hooks/useAgentMetrics";
 import { usePipelineConfig } from "@/features/agents/hooks/usePipelineConfig";
 import { useNotes, useUpdateNote } from "@/features/notes/api/use-notes";
 import { AgentInfoSubtab } from "@/components/agentic/agent-info-section";
 import { EntityLink } from "@/components/shared/EntityLink";
-import { CardSessionsSection } from "@/features/sessions/components/LinkedSessionsSection";
+import { CardSessionsSection, LinkedSessionsJump, useLinkedSessionsJump } from "@/features/sessions/components/LinkedSessionsSection";
 import {
   Sheet,
   SheetContent,
@@ -89,6 +90,9 @@ interface Props {
    * card they already hold in full.
    */
   isDetailLoaded?: boolean;
+  detailFailure?: CardDetailFailure;
+  isDetailFetching?: boolean;
+  onRetryDetail?: () => void;
 }
 
 function descriptionsMatch(draft: string, saved: string): boolean {
@@ -117,11 +121,15 @@ export function CardDetailSheet({
   onOpenCard,
   isFrozen = false,
   isDetailLoaded = true,
+  detailFailure = null,
+  isDetailFetching = false,
+  onRetryDetail,
 }: Props) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const rootId = useId();
   const fieldId = (name: string) => `${rootId}-${name}`;
+  const sessionsJump = useLinkedSessionsJump();
   const [title, setTitle] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
@@ -131,7 +139,7 @@ export function CardDetailSheet({
   const acknowledgedFields = useRef<Partial<Pick<Card, DraftField>>>({});
   const sourceBeforeAcknowledgment = useRef<Card | null>(null);
   const approvedClose = useRef(false);
-  const previousSource = useRef<{ card: Card | null; open: boolean; slug: string; boardId: string; isDetailLoaded: boolean; savingDraft: boolean } | null>(null);
+  const previousSource = useRef<{ card: Card | null; open: boolean; slug: string; boardId: string; isDetailLoaded: boolean; hasLoadedDetail: boolean; savingDraft: boolean } | null>(null);
   const [description, setDescription] = useState("");
   const [cardType, setCardType] = useState<CardType>("task");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -159,15 +167,20 @@ export function CardDetailSheet({
   // Card-scoped: the backend filters by this card, so a done card's full
   // pipeline history is returned regardless of how old it is (was empty before —
   // the workspace-wide newest-50 fetch never contained an old card's rows).
-  const { data: executions } = useCardExecutions(slug, card?.id);
-  const { data: cardNotes } = useNotes(slug, boardId, { cardId: card?.id });
+  const canReadCardRelations = open && card !== null && detailFailure === null;
+  const { data: executions } = useCardExecutions(slug, canReadCardRelations ? card.id : undefined);
+  const { data: cardNotes } = useNotes(slug, boardId, {
+    cardId: card?.id,
+    // An absent cardId selects the unfiltered full-body list, not an empty list.
+    enabled: canReadCardRelations,
+  });
   const [linkNoteOpen, setLinkNoteOpen] = useState(false);
   // The board-wide list feeds the link-note picker only, and it is the
   // UNPAGINATED endpoint — full ProseMirror bodies for every note on the
   // board — so it stays disabled until the picker opens. Its cache entry
   // (noteKeys.byBoard) is NOT shared with the notes page, whose browse list
   // lives under noteKeys.list.
-  const { data: boardNotes } = useNotes(slug, boardId, { enabled: linkNoteOpen });
+  const { data: boardNotes } = useNotes(slug, boardId, { enabled: canReadCardRelations && linkNoteOpen });
   const updateNote = useUpdateNote(slug, boardId);
   const [noteLinkError, setNoteLinkError] = useState<unknown>(null);
   // preferDetail: the backend writes the user-actionable copy into `detail`
@@ -290,15 +303,22 @@ export function CardDetailSheet({
     sourceBeforeAcknowledgment.current = null;
     setSavingDraft(false);
     setSaveError(null);
-    if (!card) return;
-    setTitle(card.title);
-    setDescription(card.description);
-    setCardType(card.card_type);
-    setPriority(card.priority);
-    setColumnId(card.column_id);
-    setDueDate(card.due_date ?? "");
-    setStatus(card.status ?? "");
-    setLabelsText(card.labels?.join(", ") ?? "");
+    setTitle(card?.title ?? "");
+    setDescription(card?.description ?? "");
+    setCardType(card?.card_type ?? "task");
+    setPriority(card?.priority ?? "medium");
+    setColumnId(card?.column_id ?? "");
+    setDueDate(card?.due_date ?? "");
+    setStatus(card?.status ?? "");
+    setLabelsText(card?.labels?.join(", ") ?? "");
+    if (!card) {
+      setConfirmDelete(false);
+      setLinkNoteOpen(false);
+      setDeleteError(null);
+      setNoteLinkError(null);
+      setNewUserId("");
+      setNewRole("");
+    }
   }, [card]);
 
   const draftMatches = useCallback((saved: Card) => {
@@ -323,14 +343,20 @@ export function CardDetailSheet({
 
   useEffect(() => {
     const previous = previousSource.current;
-    previousSource.current = { card, open, slug, boardId, isDetailLoaded, savingDraft };
-    if (!open || !card || (previous?.card === card && previous.open === open &&
+    const sameEditor = previous?.open && open && previous.card?.id === card?.id &&
+      previous.slug === slug && previous.boardId === boardId;
+    const hadLoadedDetail = !!sameEditor && previous?.hasLoadedDetail === true;
+    previousSource.current = { card, open, slug, boardId, isDetailLoaded, hasLoadedDetail: isDetailLoaded || hadLoadedDetail, savingDraft };
+    if (!card) {
+      if (previous?.card) resetDraft();
+      return;
+    }
+    if (!open || (previous?.card === card && previous.open === open &&
         previous.slug === slug && previous.boardId === boardId && previous.isDetailLoaded === isDetailLoaded &&
         previous.savingDraft === savingDraft)) return;
-    // Reopening and initial detail hydration start from the saved card.
-    if (!previous?.open || !previous.card || previous.card.id !== card.id ||
-        previous.slug !== slug || previous.boardId !== boardId ||
-        (!previous.isDetailLoaded && isDetailLoaded)) {
+    // Only first hydration initializes the draft. A successful retry after an
+    // outage must reconcile an already-loaded editor, preserving local edits.
+    if (!sameEditor || !previous?.card || (!hadLoadedDetail && isDetailLoaded)) {
       resetDraft();
       return;
     }
@@ -430,7 +456,7 @@ export function CardDetailSheet({
   }
 
   async function saveDraft(closeAfterSave: boolean): Promise<boolean> {
-    if (!card || !title.trim() || savingDraft || acknowledgmentPending(card)) return false;
+    if (!card || !isDetailLoaded || detailFailure || isFrozen || !title.trim() || savingDraft || acknowledgmentPending(card)) return false;
     const currentAttempt = ++saveAttempt.current;
     const submittedEditVersion = draftEditVersion.current;
     fieldsEditedDuringSave.current.clear();
@@ -608,6 +634,23 @@ export function CardDetailSheet({
             a header copy would be pure duplication. */}
         <SheetTitle className="sr-only">{t("cards.editTitle")}</SheetTitle>
 
+        {!card || detailFailure ? (
+          <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-6 pt-14">
+            <p role={detailFailure ? "alert" : "status"} className="text-sm text-muted-foreground">
+              {detailFailure === "unavailable" ? t("cards.deepLink.unavailable")
+                : detailFailure === "transient" ? t("cards.deepLink.loadError")
+                  : t("common.loading")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {detailFailure && onRetryDetail ? (
+                <Button variant="outline" onClick={onRetryDetail} disabled={isDetailFetching} aria-busy={isDetailFetching}>
+                  {t("cards.deepLink.retry")}
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={guard.requestClose}>{t("common.close")}</Button>
+            </div>
+          </div>
+        ) : <>
         {/* Kebab menu — left of the built-in close (X) so the two never
             overlap. Absolute like the close button; the title row's pr-16
             (below) reserves room for both. */}
@@ -678,7 +721,7 @@ export function CardDetailSheet({
               pr-16 keeps the title row clear of BOTH the kebab and the close
               (X) when it's the topmost element (no approval alert above
               pushing it down). */}
-          <div className={cn(!card?.has_pending_approval && "pr-16")}>
+          <div className={cn("space-y-2", !card?.has_pending_approval && "pr-16")}>
             <Input
               id={fieldId("title")}
               value={title}
@@ -686,6 +729,7 @@ export function CardDetailSheet({
               placeholder={t("cards.titleLabel")}
               aria-label={t("cards.titleLabel")}
             />
+            <LinkedSessionsJump kind="card" onJump={sessionsJump.jump} />
           </div>
           <RichTextEditor
             content={description}
@@ -1169,10 +1213,10 @@ export function CardDetailSheet({
             </Select>
           </div>
 
-          {/* Last in the sheet, so its lazy reveal never shifts a field being
-              edited. Owner-only; renders nothing with capture off or for
-              viewers without Companion devices or linked sessions. */}
-          {card ? <CardSessionsSection slug={slug} boardId={boardId} cardId={card.id} /> : null}
+          {/* Keep the one related-session section after the fields. It stays
+              lazy until visible or requested; a requested section explains
+              loading, empty, unavailable and retryable-error states. */}
+          {card ? <CardSessionsSection slug={slug} boardId={boardId} cardId={card.id} jumpRequest={sessionsJump.request} /> : null}
         </div>
 
         {saveError !== null ? <p role="alert" className="px-6 py-2 text-sm text-destructive">{resolveApiErrorMessage(saveError, t, i18n)}</p> : null}
@@ -1200,9 +1244,10 @@ export function CardDetailSheet({
             </Button>
           </FrozenActionTooltip>
         </SheetFooter>
+        </>}
       </SheetContent>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <Dialog open={confirmDelete && card !== null && detailFailure === null} onOpenChange={setConfirmDelete}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("cards.delete.confirmTitle")}</DialogTitle>
@@ -1234,7 +1279,7 @@ export function CardDetailSheet({
         </DialogContent>
       </Dialog>
 
-      {card ? (
+      {card && !detailFailure ? (
         <CardNoteLinkPicker
           open={linkNoteOpen}
           onOpenChange={setLinkNoteOpen}

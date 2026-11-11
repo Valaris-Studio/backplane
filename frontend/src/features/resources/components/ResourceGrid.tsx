@@ -19,8 +19,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { resourceItemDomId } from "../hooks/use-resource-destination";
 import type { Resource } from "@/types/resource";
 
 function DraggableGridCard({
@@ -64,7 +66,8 @@ function DroppableGridFolder({
 
 interface ResourceGridProps {
   resources: Resource[];
-  onNavigateFolder: (folder: Resource) => void;
+  linkSearch: (resource: Resource) => string;
+  onActivate: (resource: Resource, event: React.MouseEvent<HTMLAnchorElement>) => void;
   onPreview: (resource: Resource) => void;
   onDownload: (resource: Resource) => void;
   onRename: (resource: Resource) => void;
@@ -74,7 +77,8 @@ interface ResourceGridProps {
 
 export function ResourceGrid({
   resources,
-  onNavigateFolder,
+  linkSearch,
+  onActivate,
   onPreview,
   onDownload,
   onRename,
@@ -96,16 +100,14 @@ export function ResourceGrid({
                 isOverDrop && isFolder && "ring-2 ring-primary/40 bg-primary/8",
               )}
             >
-              <button
-                type="button"
-                className="flex w-full flex-col items-center p-4 text-center"
-                onClick={() => {
-                  if (isFolder) {
-                    onNavigateFolder(resource);
-                  } else {
-                    onPreview(resource);
-                  }
-                }}
+              <ContextLink
+                to={{ search: linkSearch(resource) }}
+                id={resourceItemDomId(resource.id)}
+                data-return-anchor
+                // Native link dragging would pre-empt the card's move drag.
+                draggable={false}
+                className="flex w-full flex-col items-center rounded-xl p-4 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={(event) => onActivate(resource, event)}
               >
                 <div
                   className={cn(
@@ -129,7 +131,7 @@ export function ResourceGrid({
                     {formatBytes(resource.size_bytes)}
                   </p>
                 )}
-              </button>
+              </ContextLink>
 
               {resource.metadata?.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1 px-3 pb-3">

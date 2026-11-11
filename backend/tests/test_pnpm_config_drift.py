@@ -235,3 +235,15 @@ def test_doctor_target_exists():
     import os
 
     assert os.access(doctor_script, os.X_OK), f"{doctor_script} is not executable"
+
+
+def test_workspace_build_script_decisions_agree_for_frontend_dependencies():
+    frontend_decisions = _load_yaml(FRONTEND_WORKSPACE_YAML)["allowBuilds"]
+    root_decisions = _load_yaml(ROOT_WORKSPACE_YAML)["allowBuilds"]
+    for package in ("esbuild", "msw"):
+        assert frontend_decisions[package] is False
+        assert root_decisions.get(package) is False, (
+            f"root workspace must explicitly skip {package}'s build script, "
+            "matching the standalone frontend install"
+        )
+    assert root_decisions["sharp"] is True

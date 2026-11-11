@@ -32,10 +32,11 @@ import {
 import { resolveActivityMessage } from "../utils/resolve-activity-message";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { EntityLink } from "@/components/shared/EntityLink";
+import { ContextLink } from "@/components/shared/ContextLink";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { buildEntityLink } from "@/lib/entity-link";
 import { formatAbsolute, formatRelative } from "@/lib/date-format";
 import { formatDate, formatTime } from "@/lib/format";
 import { scaleIn, staggerChildren } from "@/lib/animations";
@@ -239,10 +240,6 @@ function StaleDivider({ boundary, t }: { boundary: Activity; t: TFunction }) {
   );
 }
 
-// Entity types that resolve to a real in-app route (via EntityLink). Only these
-// get a clickable title chip; everything else stays plain text.
-const LINKABLE_ENTITY_TYPES = new Set(["card", "note"]);
-
 function EventRow({
   item,
   t,
@@ -256,10 +253,12 @@ function EventRow({
   const isAgent = !!activity.agent_id;
   const Icon = isAgent ? Bot : actionIcons[activity.action] || Pencil;
   const actorLabel = activity.actor_name || activity.actor_email;
-  const linkedEntity =
-    activity.entity_title && LINKABLE_ENTITY_TYPES.has(activity.entity_type)
-      ? activity.entity_title
-      : null;
+  const entityType = activity.entity_type;
+  const supported = entityType === "card" || entityType === "note" || entityType === "resource";
+  const destination = supported && activity.action !== "deleted"
+    ? buildEntityLink({ type: entityType, id: activity.entity_id, slug, boardId: activity.board_id ?? undefined })
+    : null;
+  const message = resolveActivityMessage(activity, t);
 
   return (
     <Card
@@ -314,20 +313,19 @@ function EventRow({
                 {t("activity.viaApiKey", { apiKey: activity.via_api_key })}{" "}
               </span>
             ) : null}
-            {linkedEntity ? (
-              <>
-                <EntityLink
-                  type={activity.entity_type as "card" | "note"}
-                  id={activity.entity_id}
-                  slug={slug}
-                  boardId={activity.board_id ?? undefined}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {linkedEntity}
-                </EntityLink>{" "}
-              </>
+            {destination ? (
+              <ContextLink
+                to={destination.href}
+                className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {message}
+              </ContextLink>
+            ) : message}
+            {supported && !destination ? (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {t("navigation.destinationUnavailable")}
+              </span>
             ) : null}
-            {resolveActivityMessage(activity, t)}
           </p>
         </div>
       </CardContent>

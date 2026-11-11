@@ -42,6 +42,10 @@ KNOWN_HARNESSES: dict[str, str] = {
     "pi_cli": "Pi",
 }
 
+# Harnesses whose stored events keep only their allowlisted leaves at every
+# content level (beacon.strict_metadata_only).
+STRICT_METADATA_HARNESSES = frozenset({"hermes_agent"})
+
 
 # Harnesses that are one agent to the outside world. Every Codex host
 # introduces itself to MCP servers as `codex-mcp-client`, so an MCP invocation

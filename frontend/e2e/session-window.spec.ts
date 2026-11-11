@@ -303,3 +303,30 @@ test("a finite live burst refreshes only the visible window; authority loss canc
   await expect.poll(() => state.failures.some((failure) => failure.includes("/body net::ERR_ABORTED"))).toBe(true);
   await page.screenshot({ path: test.info().outputPath("authority-loss.png") });
 });
+
+
+test("A08 reduced-motion rhythm jump focuses the loaded turn without smooth scrolling", async ({ page }) => {
+  const state = await setup(page);
+  const turn = page.locator("[data-turn][data-started]").first();
+  await expect(turn).toBeVisible();
+  const tick = page.getByRole("group", { name: s.rhythm.stripLabel, exact: true }).getByRole("button").first();
+  await tick.focus();
+  await page.evaluate(() => {
+    const original = Element.prototype.scrollIntoView;
+    const observations: (boolean | ScrollIntoViewOptions | undefined)[] = [];
+    Object.assign(window, { rhythmScrollObservations: observations });
+    Element.prototype.scrollIntoView = function (options) {
+      if (this.matches("[data-turn]")) observations.push(options);
+      original.call(this, options);
+    };
+  });
+  await page.keyboard.press("Enter");
+  await expect(turn).toBeFocused();
+  const scrolls = await page.evaluate(() => (window as unknown as {
+    rhythmScrollObservations: ScrollIntoViewOptions[];
+  }).rhythmScrollObservations);
+  expect(scrolls).toEqual([{ block: "start", behavior: "instant" }]);
+  await settle(state);
+  expect(byteRequests(state)).toEqual([]);
+  expect(state.requests.filter(({ method }) => method !== "GET")).toEqual([]);
+});

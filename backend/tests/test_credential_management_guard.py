@@ -69,6 +69,7 @@ CREDENTIAL_MANAGEMENT_ROUTES = {
     ("GET", "/api/me/companion/installations/{installation_id}"),
     ("PATCH", "/api/me/companion/installations/{installation_id}"),
     ("POST", "/api/me/companion/installations/{installation_id}/rotate"),
+    ("POST", "/api/me/companion/installations/{installation_id}/capture-only"),
     ("DELETE", "/api/me/companion/installations/{installation_id}"),
     ("DELETE", "/api/me/companion/installations/{installation_id}/sessions"),
     ("GET", "/api/me/companion/installations/{installation_id}/policy"),

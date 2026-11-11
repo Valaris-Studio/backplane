@@ -65,6 +65,7 @@ const DocumentationSection = lazyPage(() => import("@/pages/documentation"), "Do
 const DocumentationStandalone = lazyPage(() => import("@/pages/documentation"), "DocumentationStandalone");
 const CompanionPairPage = lazyPage(() => import("@/features/companion-pairing/components/CompanionPairPage"), "CompanionPairPage");
 const MySessionsPage = lazyPage(() => import("@/features/sessions/components/MySessionsPage"), "MySessionsPage");
+const GlobalSessionsPage = lazyPage(() => import("@/features/sessions/components/GlobalSessionsPage"), "GlobalSessionsPage");
 const DevicesPage = lazyPage(() => import("@/features/sessions/components/DevicesPage"), "DevicesPage");
 const SessionDetailPage = lazyPage(() => import("@/features/sessions/components/SessionDetailPage"), "SessionDetailPage");
 
@@ -94,6 +95,7 @@ export function App() {
         <SetupGate>
           <Routes>
             <Route path="/" element={<WorkspacesPage />} />
+            <Route path="/-/sessions" element={<GlobalSessionsPage />} />
             {/* Sign-in surface for the OIDC session tier. Static, so it outranks
                 /:slug — and reachable while signed out, unlike everything else. */}
             <Route path="/login" element={<LoginPage />} />

@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "2026-09-24T11:59:52.234567Z",
+  "event": {"id": "__EVENT_ID__", "action": "mcp.tool_invoked", "category": "mcp", "kind": "agent_runtime", "fidelity": "observed"},
+  "harness": {"name": "hermes", "collection_method": "plugin"},
+  "session": {"id": "20260924_115958_a1b2c3", "working_directory": "__CWD__"},
+  "tool": {"name": "mcp__backplane__get_card"},
+  "mcp": {"server": "backplane", "tool": "get_card", "method": {"name": "tools/call"}},
+  "gen_ai": {"operation": {"name": "execute_tool"}, "tool": {"name": "get_card", "call": {"id": "toolu_01AbCdEf"}}},
+  "status": "ok"
+}

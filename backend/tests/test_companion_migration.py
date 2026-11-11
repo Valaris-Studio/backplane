@@ -23,6 +23,7 @@ LATER_MIGRATIONS = [
     VERSIONS / "115_session_activity_count.py",
     VERSIONS / "117_session_tombstone_history_cutoff.py",
     VERSIONS / "119_session_contents.py",
+    VERSIONS / "127_companion_token_scope.py",
 ]
 NEW_TABLES = {
     "companion_installations",

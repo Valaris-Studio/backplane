@@ -99,6 +99,31 @@ jobs:
         working-directory: mcp-server
         run: uv build --wheel --out-dir /tmp/wheel
 
+  hermes-worker:
+    if: github.repository == 'Valaris-Studio/backplane'
+    name: Hermes worker — pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Tests
+        # No bytecode or pytest cache: residue under the package makes its own
+        # clean-source check refuse the next build.
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          # Withheld from the public export until an owner release decision.
+          if [ ! -d integrations/hermes-worker ]; then
+            echo "integrations/hermes-worker is not in this tree; nothing to verify."
+            exit 0
+          fi
+          cd integrations/hermes-worker
+          uv run --no-project --with pytest==9.1.1 python -m pytest -q -p no:cacheprovider tests
+
   frontend:
     if: github.repository == 'Valaris-Studio/backplane'
     name: Frontend — lint + test + build
@@ -142,7 +167,10 @@ jobs:
         working-directory: frontend
         env:
           I18N_COPY_BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'HEAD^' }}
-        run: pnpm vitest run
+        # Keep CPU headroom for jsdom; match the local verification worker budget.
+        run: |
+          test -z "${VITEST_MAX_WORKERS+x}"
+          pnpm vitest run --maxWorkers=2
       - name: Asset retention tests
         run: python3 -m unittest discover -s frontend/tests
       - name: Nginx asset and HTML contract
@@ -211,7 +239,7 @@ jobs:
   companion-rust:
     if: github.repository == 'Valaris-Studio/backplane'
     name: Companion desktop — Rust source contracts (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
